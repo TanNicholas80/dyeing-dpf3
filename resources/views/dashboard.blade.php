@@ -9,7 +9,7 @@
         }
 
         .card-date span,
-        ..card-time span {
+        .card-time span {
             white-space: nowrap;
         }
 
@@ -425,8 +425,20 @@
                                 <!-- Cycle Time -->
                                 <div class="col-md-6">
                                     <div class="form-group">
-                                        <label class="form-label fw-semibold">Cycle Time (jam:menit:detik)</label>
-                                        <input type="time" name="cycle_time" step="1" class="form-control"
+                                        <label class="form-label fw-semibold">
+                                            Cycle Time (jam:menit:detik)
+                                            <i class="fas fa-info-circle text-info ml-1"
+                                                data-toggle="tooltip"
+                                                data-placement="top"
+                                                title="Isi dengan durasi proses, bukan jam selesai mesin.">
+                                            </i>
+                                        </label>
+                                        <input type="text"
+                                            name="cycle_time"
+                                            class="form-control"
+                                            placeholder="Jam:Menit:Detik"
+                                            pattern="^[0-9]{2}:[0-9]{2}:[0-9]{2}$"
+                                            title="Format durasi Jam:Menit:Detik"
                                             required>
                                     </div>
                                 </div>
@@ -791,6 +803,60 @@
                 }
             });
         });
+
+        // Inisialisasi tooltip Bootstrap (termasuk tooltip pada label Cycle Time)
+        $(document).ready(function() {
+            if (typeof $.fn.tooltip === 'function') {
+                $('[data-toggle="tooltip"]').tooltip();
+            }
+        });
+
+        // Auto-format input Cycle Time menjadi HH:MM:SS (hanya dari sisi JavaScript)
+        $(document).ready(function() {
+            var $cycleInput = $('[name="cycle_time"]');
+
+            // Saat user mengetik: hanya izinkan angka dan otomatis sisipkan ":"
+            $cycleInput.on('input', function() {
+                var val = this.value.replace(/\D/g, ''); // hanya digit
+
+                // Batasi maksimal 6 digit (HHMMSS)
+                if (val.length > 6) {
+                    val = val.slice(0, 6);
+                }
+
+                var formatted = '';
+                if (val.length <= 2) {
+                    // H atau HH
+                    formatted = val;
+                } else if (val.length <= 4) {
+                    // HHMM
+                    formatted = val.slice(0, 2) + ':' + val.slice(2);
+                } else {
+                    // HHMMSS
+                    formatted = val.slice(0, 2) + ':' + val.slice(2, 4) + ':' + val.slice(4);
+                }
+
+                this.value = formatted;
+            });
+
+            // Saat blur: paksa selalu jadi 6 digit -> HH:MM:SS (padding 0 di belakang jika kurang)
+            $cycleInput.on('blur', function() {
+                var val = this.value.replace(/\D/g, ''); // ambil digit saja
+                if (!val) return;
+
+                // Jika kurang dari 6 digit, tambahkan 0 di belakang (contoh: 12 -> 120000 -> 12:00:00)
+                while (val.length < 6) {
+                    val += '0';
+                }
+                val = val.slice(0, 6);
+
+                var hh = val.slice(0, 2);
+                var mm = val.slice(2, 4);
+                var ss = val.slice(4, 6);
+
+                this.value = hh + ':' + mm + ':' + ss;
+            });
+        });
     </script>
     {{-- Script tambahan --}}
     <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
@@ -858,7 +924,7 @@
                         barcodes.forEach(function(bk, idx) {
                             if (bk.cancel) return; // Jangan tampilkan barcode yang sudah cancel
                             html += `<div style="position:relative;flex:1 0 30%;max-width:32%;background:#f3f3f3;border-radius:6px;padding:6px 4px;margin-bottom:6px;text-align:center;font-weight:bold;font-size:13px;color:#222;box-shadow:0 1px 2px #0001;">
-                                <span style='position:absolute;top:2px;right:6px;cursor:pointer;font-weight:bold;color:#b00;font-size:16px;z-index:2;' class='cancel-barcode-btn' data-type='${barcodeType}' data-proses='${prosesId}' data-id='${bk.id}' data-matdok='${bk.matdok}' title='Cancel barcode'>&times;</span>
+                                <span style='position:absolute;top:2px;right:6px;cursor:pointer;font-weight:bold;color:#b00;font-size:16px;z-index:2;' class='cancel-barcode-btn' data-type='${barcodeType}' data-proses='${prosesId}' data-id='${bk.id}' data-matdok='${bk.matdok}' data-barcode='${bk.barcode}' title='Cancel barcode'>&times;</span>
                                 ${bk.barcode} ${(bk.matdok ? '<br><span style=\'font-size:11px;color:#888;\'>' + bk.matdok + '</span>' : '')}
                             </div>`;
                         });
@@ -1050,8 +1116,23 @@
         $(document).ready(function() {
             $('[name="jenis"]').on('change', function() {
                 var isMaintenance = $(this).val() === 'Maintenance';
+                
+                // Modifikasi: Handle No OP dan No Partai (Disable jika Maintenance)
+                var $noOp = $('#no_op');
+                var $noPartai = $('#no_partai');
+
+                if (isMaintenance) {
+                    $noOp.val(null).trigger('change').prop('disabled', true).removeAttr('required');
+                    $noPartai.val(null).trigger('change').prop('disabled', true).removeAttr('required');
+                } else {
+                    $noOp.prop('disabled', false).attr('required', 'required');
+                    // No Partai di-enable logika-nya ada di event listener no_op select, tapi kita pastikan required-nya kembali
+                    $noPartai.attr('required', 'required');
+                }
+
+                // Sisa field auto-fill
                 var fields = [
-                    'no_op', 'no_partai', 'item_op', 'kode_material', 'konstruksi', 'gramasi',
+                    'item_op', 'kode_material', 'konstruksi', 'gramasi',
                     'lebar', 'hfeel', 'warna', 'kode_warna', 'kategori_warna', 'qty'
                 ];
                 fields.forEach(function(name) {
@@ -1070,66 +1151,199 @@
             $('[name="jenis"]').trigger('change');
         });
 
-        $(document).on('click', '.cancel-barcode-btn', function() {
+        // Helper function untuk notifikasi Swal Toast
+        function showToastNotification(type, message) {
+            const Toast = Swal.mixin({
+                toast: true,
+                position: 'top-end',
+                icon: type,
+                showConfirmButton: false,
+                timer: 3000,
+                timerProgressBar: true,
+            });
+            Toast.fire({
+                title: message
+            });
+        }
+
+        $(document).on('click', '.cancel-barcode-btn', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
             const barcodeType = $(this).data('type');
             const prosesId = $(this).data('proses');
             const barcodeId = $(this).data('id');
             const matdok = $(this).data('matdok');
+            const barcode = $(this).data('barcode') || '';
+            
             if (!matdok) {
-                alert('Material document tidak tersedia!');
+                showToastNotification('error', 'Material document tidak tersedia!');
                 return;
             }
-            cancelBarcodeData = { barcodeType, prosesId, barcodeId, matdok };
+            
+            // Simpan data untuk konfirmasi
+            cancelBarcodeData = { barcodeType, prosesId, barcodeId, matdok, barcode };
+            
+            // Update informasi di modal
+            const typeLabel = barcodeType === 'kain' ? 'Barcode Kain' : 
+                            barcodeType === 'la' ? 'Barcode LA' : 'Barcode AUX';
+            const barcodeText = barcode ? `<strong>${barcode}</strong>` : 'barcode ini';
+            const matdokText = matdok ? `<br><small class="text-muted">Material Document: ${matdok}</small>` : '';
+            
+            $('#confirmCancelBarcodeText').html(
+                `Apakah Anda yakin ingin membatalkan ${typeLabel}?<br><br>` +
+                `${barcodeText}${matdokText}<br><br>` +
+                `<span class="text-danger"><i class="fas fa-exclamation-triangle"></i> Tindakan ini tidak dapat dibatalkan!</span>`
+            );
+            
+            // Reset loading state
+            $('#btnConfirmCancelBarcode').prop('disabled', false).html('<i class="fas fa-times mr-1"></i>Ya, Cancel');
+            
+            // Tampilkan modal
             $('#modalConfirmCancelBarcode').modal('show');
         });
+        
         // Modal konfirmasi cancel barcode
         if (!document.getElementById('modalConfirmCancelBarcode')) {
             $(document.body).append(`
             <div class="modal fade" id="modalConfirmCancelBarcode" tabindex="-1" aria-labelledby="modalConfirmCancelBarcodeLabel" aria-hidden="true">
-                <div class="modal-dialog modal-dialog-centered" style="max-width:400px;">
+                <div class="modal-dialog modal-dialog-centered" style="max-width:500px;">
                     <div class="modal-content shadow-lg border-0 rounded-3">
                         <div class="modal-header bg-danger text-white">
-                            <h5 class="modal-title fw-bold" id="modalConfirmCancelBarcodeLabel">Konfirmasi Cancel Barcode</h5>
+                            <h5 class="modal-title fw-bold" id="modalConfirmCancelBarcodeLabel">
+                                <i class="fas fa-exclamation-triangle mr-2"></i>Konfirmasi Cancel Barcode
+                            </h5>
                             <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
                                 <span aria-hidden="true">&times;</span>
                             </button>
                         </div>
-                        <div class="modal-body py-3 px-4 text-center">
-                            <div id="confirmCancelBarcodeText" style="font-size:16px;">Apakah Anda yakin ingin mengcancel barcode ini?</div>
+                        <div class="modal-body py-4 px-4 text-center">
+                            <div id="confirmCancelBarcodeText" style="font-size:15px;line-height:1.6;">
+                                Apakah Anda yakin ingin mengcancel barcode ini?
+                            </div>
+                            <div id="cancelBarcodeLoading" style="display:none;margin-top:15px;">
+                                <div class="spinner-border text-danger" role="status">
+                                    <span class="sr-only">Loading...</span>
+                                </div>
+                                <p class="mt-2 text-muted">Memproses cancel barcode...</p>
+                            </div>
                         </div>
                         <div class="modal-footer d-flex justify-content-end px-4">
-                            <button type="button" class="btn btn-secondary" data-dismiss="modal">Batal</button>
-                            <button type="button" class="btn btn-danger" id="btnConfirmCancelBarcode">Ya, Cancel</button>
+                            <button type="button" class="btn btn-secondary" data-dismiss="modal" id="btnCancelCancelBarcode">
+                                <i class="fas fa-times mr-1"></i>Batal
+                            </button>
+                            <button type="button" class="btn btn-danger" id="btnConfirmCancelBarcode">
+                                <i class="fas fa-check mr-1"></i>Ya, Cancel
+                            </button>
                         </div>
                     </div>
                 </div>
             </div>
             `);
         }
+        
         let cancelBarcodeData = null;
+        let currentProsesForRefresh = null;
+        
         $(document).on('click', '#btnConfirmCancelBarcode', function() {
             if (!cancelBarcodeData) return;
-            const { barcodeType, prosesId, barcodeId, matdok } = cancelBarcodeData;
-            $('#modalConfirmCancelBarcode').modal('hide');
-            // Request ke backend Laravel, backend yang relay ke SAP API
+            
+            const { barcodeType, prosesId, barcodeId, matdok, barcode } = cancelBarcodeData;
+            
+            // Simpan proses ID untuk refresh
+            currentProsesForRefresh = prosesId;
+            
+            // Tampilkan loading dan disable button
+            $('#btnConfirmCancelBarcode').prop('disabled', true).html('<span class="spinner-border spinner-border-sm mr-1"></span>Memproses...');
+            $('#btnCancelCancelBarcode').prop('disabled', true);
+            $('#cancelBarcodeLoading').show();
+            
+            // Request ke backend Laravel
             $.ajax({
                 url: `/proses/${prosesId}/barcode/${barcodeType}/${barcodeId}/cancel`,
                 method: 'POST',
                 headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
                 data: { matdok: matdok },
                 success: function(r) {
+                    $('#modalConfirmCancelBarcode').modal('hide');
+                    
                     if (r && r.status === 'success') {
-                        // Refresh barcode list
-                        $(document).find('.status-card[data-proses="'+prosesId+'"], .status-card').dblclick();
+                        // Show success message
+                        showToastNotification('success', 'Barcode berhasil di-cancel!');
+                        
+                        // Refresh barcode list di modal detail proses jika masih terbuka
+                        if ($('#modalDetailProses').hasClass('show') || $('#modalDetailProses').is(':visible')) {
+                            // Simulasi double click pada card proses yang aktif untuk refresh
+                            const activeProses = $('.status-card').filter(function() {
+                                const proses = $(this).data('proses');
+                                return proses && proses.id == currentProsesForRefresh;
+                            }).first();
+                            
+                            if (activeProses.length) {
+                                // Reload barcode data via AJAX
+                                $.ajax({
+                                    url: '/proses/' + currentProsesForRefresh + '/barcodes',
+                                    method: 'GET',
+                                    success: function(data) {
+                                        function renderBarcodeGrid(barcodes, barcodeType, prosesId) {
+                                            if (!barcodes || !barcodes.length) {
+                                                return '<span style="color:#888;">Belum ada barcode.</span>';
+                                            }
+                                            let html = '<div style="display:flex;flex-wrap:wrap;gap:6px;">';
+                                            barcodes.forEach(function(bk, idx) {
+                                                if (bk.cancel) return;
+                                                html += `<div style="position:relative;flex:1 0 30%;max-width:32%;background:#f3f3f3;border-radius:6px;padding:6px 4px;margin-bottom:6px;text-align:center;font-weight:bold;font-size:13px;color:#222;box-shadow:0 1px 2px #0001;">
+                                                    <span style='position:absolute;top:2px;right:6px;cursor:pointer;font-weight:bold;color:#b00;font-size:16px;z-index:2;' class='cancel-barcode-btn' data-type='${barcodeType}' data-proses='${prosesId}' data-id='${bk.id}' data-matdok='${bk.matdok}' data-barcode='${bk.barcode}' title='Cancel barcode'>&times;</span>
+                                                    ${bk.barcode} ${(bk.matdok ? '<br><span style=\'font-size:11px;color:#888;\'>' + bk.matdok + '</span>' : '')}
+                                                </div>`;
+                                            });
+                                            html += '</div>';
+                                            return html;
+                                        }
+                                        $('#barcode-kain-list').html(renderBarcodeGrid(data.barcode_kain, 'kain', currentProsesForRefresh));
+                                        $('#barcode-la-list').html(renderBarcodeGrid(data.barcode_la, 'la', currentProsesForRefresh));
+                                        $('#barcode-aux-list').html(renderBarcodeGrid(data.barcode_aux, 'aux', currentProsesForRefresh));
+                                    },
+                                    error: function() {
+                                        showToastNotification('error', 'Gagal me-refresh data barcode. Silakan tutup dan buka kembali modal detail.');
+                                    }
+                                });
+                            }
+                        }
                     } else {
-                        alert('Cancel barcode gagal: ' + (r && r.message ? r.message : 'Unknown error'));
+                        const errorMsg = 'Cancel barcode gagal: ' + (r && r.message ? r.message : 'Unknown error');
+                        showToastNotification('error', errorMsg);
                     }
                 },
                 error: function(xhr) {
-                    alert('Gagal request ke server.');
+                    $('#modalConfirmCancelBarcode').modal('hide');
+                    let errorMsg = 'Gagal request ke server.';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        errorMsg = xhr.responseJSON.message;
+                    } else if (xhr.status === 0) {
+                        errorMsg = 'Tidak dapat terhubung ke server. Periksa koneksi internet Anda.';
+                    } else if (xhr.status === 500) {
+                        errorMsg = 'Terjadi kesalahan pada server. Silakan coba lagi.';
+                    } else if (xhr.status === 404) {
+                        errorMsg = 'Endpoint tidak ditemukan.';
+                    }
+                    showToastNotification('error', errorMsg);
+                },
+                complete: function() {
+                    // Reset loading state
+                    $('#btnConfirmCancelBarcode').prop('disabled', false).html('<i class="fas fa-check mr-1"></i>Ya, Cancel');
+                    $('#btnCancelCancelBarcode').prop('disabled', false);
+                    $('#cancelBarcodeLoading').hide();
+                    cancelBarcodeData = null;
                 }
             });
+        });
+        
+        // Reset data saat modal ditutup
+        $('#modalConfirmCancelBarcode').on('hidden.bs.modal', function() {
             cancelBarcodeData = null;
+            $('#btnConfirmCancelBarcode').prop('disabled', false).html('<i class="fas fa-check mr-1"></i>Ya, Cancel');
+            $('#btnCancelCancelBarcode').prop('disabled', false);
+            $('#cancelBarcodeLoading').hide();
         });
     </script>
 @endsection
