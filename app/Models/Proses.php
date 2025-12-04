@@ -23,16 +23,25 @@ class Proses extends Model
         'kode_warna',
         'kategori_warna',
         'qty',
-        'cycle_time', // integer (detik)
-        'cycle_time_actual', // integer (detik)
-        'barcode_kain',
-        'barcode_la',
-        'barcode_aux',
+        'cycle_time',
+        'cycle_time_actual',
         'mesin_id',
     ];
 
     public function mesin()
     {
         return $this->belongsTo(Mesin::class);
+    }
+    public function barcodeKains()
+    {
+        return $this->hasMany(BarcodeKain::class, 'proses_id', 'id');
+    }
+    public function barcodeLas()
+    {
+        return $this->hasMany(BarcodeLa::class, 'proses_id', 'id');
+    }
+    public function barcodeAuxs()
+    {
+        return $this->hasMany(BarcodeAux::class, 'proses_id', 'id');
     }
 }

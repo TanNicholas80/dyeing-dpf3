@@ -52,11 +52,10 @@
                                             <tr>
                                                 <td>{{ $mesin->jenis_mesin }}</td>
                                                 <td>
-                                                    <button
-                                                        class="btn btn-sm toggle-status {{ $mesin->status ? 'btn-success' : 'btn-secondary' }}"
+                                                    <span class="badge status-badge {{ $mesin->status ? 'badge-success' : 'badge-secondary' }}"
                                                         data-id="{{ $mesin->id }}">
                                                         {{ $mesin->status ? 'Hidup' : 'Mati' }}
-                                                    </button>
+                                                    </span>
                                                 </td>
                                                 <td>
                                                     <a href="{{ route('mesin.edit', $mesin->id) }}"
@@ -117,46 +116,20 @@
     <script>
         document.title = "Data Mesin";
 
-        document.addEventListener('DOMContentLoaded', function () {
-            document.querySelectorAll('.toggle-status').forEach(function (btn) {
-                btn.addEventListener('click', function (e) {
-                    e.preventDefault();
-                    var mesinId = this.getAttribute('data-id');
-                    var button = this;
-                    fetch('/mesin/' + mesinId + '/toggle-status', {
-                        method: 'POST',
-                        headers: {
-                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
-                            'Accept': 'application/json',
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({})
-                    })
+        document.addEventListener('DOMContentLoaded', function() {
+            setInterval(function() {
+                fetch('/mesin/statuses')
                     .then(response => response.json())
                     .then(data => {
-                        if (data.success) {
-                            button.textContent = data.label;
-                            button.classList.toggle('btn-success', data.status);
-                            button.classList.toggle('btn-secondary', !data.status);
-                        }
-                    });
-                });
-            });
-
-            // Perbarui status mesin setiap detik
-            setInterval(function () {
-                document.querySelectorAll('.toggle-status').forEach(function (btn) {
-                    var mesinId = btn.getAttribute('data-id');
-                    fetch('/mesin/' + mesinId + '/status')
-                        .then(response => response.json())
-                        .then(data => {
-                            if (typeof data.status !== 'undefined') {
-                                btn.textContent = data.label;
-                                btn.classList.toggle('btn-success', data.status);
-                                btn.classList.toggle('btn-secondary', !data.status);
+                        document.querySelectorAll('.status-badge').forEach(function(badge) {
+                            var mesinId = badge.getAttribute('data-id');
+                            if (data[mesinId]) {
+                                badge.textContent = data[mesinId].label;
+                                badge.classList.remove('badge-success', 'badge-secondary');
+                                badge.classList.add(data[mesinId].status ? 'badge-success' : 'badge-secondary');
                             }
                         });
-                });
+                    });
             }, 1000);
         });
     </script>

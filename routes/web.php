@@ -26,17 +26,18 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/user/update/{id}', [UserController::class, 'update'])->name('user.update');
         Route::delete('/user/delete/{id}', [UserController::class, 'destroy'])->name('user.delete');
 
-        Route::resource('mesin', MesinController::class);
-        Route::post('/mesin/{mesin}/toggle-status', [MesinController::class, 'toggleStatus'])->name('mesin.toggleStatus');
-        Route::get('/mesin/{mesin}/status', [MesinController::class, 'status'])->name('mesin.status');
-
+        Route::resource('mesin', MesinController::class)->except(['show']);
         Route::resource('proses', ProsesController::class);
     });
+
+    Route::get('/mesin/statuses', [MesinController::class, 'statuses'])->name('mesin.statuses');
 
     // Barcode proses (semua user login bisa akses)
     Route::post('/proses/{id}/barcode/kain', [ProsesController::class, 'barcodeKain'])->name('proses.barcode.kain');
     Route::post('/proses/{id}/barcode/la', [ProsesController::class, 'barcodeLa'])->name('proses.barcode.la');
     Route::post('/proses/{id}/barcode/aux', [ProsesController::class, 'barcodeAux'])->name('proses.barcode.aux');
+    Route::get('/proses/{id}/barcodes', [ProsesController::class, 'barcodes'])->name('proses.barcodes');
+    Route::post('/proses/{proses}/barcode/{type}/{barcode}/cancel', [ProsesController::class, 'cancelBarcode']);
 });
 
 // Tambahkan di luar middleware auth agar bisa diakses select2

@@ -18,4 +18,16 @@ class Mesin extends Model
     {
         return $this->hasMany(\App\Models\Proses::class, 'mesin_id');
     }
+    public function barcodeKains()
+    {
+        return $this->hasMany(BarcodeKain::class, 'mesin_id', 'id');
+    }
+    public function barcodeLas()
+    {
+        return $this->hasMany(BarcodeLa::class, 'mesin_id', 'id');
+    }
+    public function barcodeAuxs()
+    {
+        return $this->hasMany(BarcodeAux::class, 'mesin_id', 'id');
+    }
 }

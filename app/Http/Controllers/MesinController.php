@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Mesin;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class MesinController extends Controller
 {
@@ -11,18 +12,6 @@ class MesinController extends Controller
     {
         $mesins = Mesin::all();
         return view('mesin.index', compact('mesins'));
-    }
-
-    public function toggleStatus(Request $request, Mesin $mesin)
-    {
-        $mesin->status = !$mesin->status;
-        $mesin->save();
-
-        return response()->json([
-            'success' => true,
-            'status' => $mesin->status,
-            'label' => $mesin->status ? 'Hidup' : 'Mati',
-        ]);
     }
 
     public function create()
@@ -66,11 +55,20 @@ class MesinController extends Controller
         return redirect()->route('mesin.index')->with('success', 'Mesin berhasil dihapus.');
     }
 
-    public function status(Mesin $mesin)
+    public function statuses()
     {
-        return response()->json([
-            'status' => $mesin->status,
-            'label' => $mesin->status ? 'Hidup' : 'Mati',
-        ]);
+        try {
+            $mesins = Mesin::all(['id', 'status']);
+            $result = [];
+            foreach ($mesins as $mesin) {
+                $result[$mesin->id] = [
+                    'status' => (bool) $mesin->status,
+                    'label' => $mesin->status ? 'Hidup' : 'Mati',
+                ];
+            }
+            return response()->json($result);
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
     }
 }

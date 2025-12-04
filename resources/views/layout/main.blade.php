@@ -25,6 +25,22 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <style>
+        #datetime {
+            white-space: nowrap;
+            min-width: 220px;
+            text-align: center;
+            display: inline-block;
+        }
+
+        @media (max-width: 900px) {
+            #datetime {
+                min-width: 170px;
+                font-size: 13px;
+            }
+        }
+    </style>
 </head>
 
 <body class="hold-transition sidebar-collapse layout-top-nav">
@@ -232,7 +248,7 @@
     </div>
     <!-- ./wrapper -->
 
-    
+
     <!-- jQuery -->
     <script src="{{ asset('lte/plugins/jquery/jquery.min.js') }}"></script>
     <!-- Bootstrap 4 -->
@@ -351,7 +367,7 @@
                 position: 'top-end',
                 icon: 'success',
                 showConfirmButton: false,
-                timer: 2000,
+                timer: 3000,
                 timerProgressBar: true,
             });
             ToastSuccess.fire({
@@ -365,7 +381,7 @@
                 position: 'top-end',
                 icon: 'error',
                 showConfirmButton: false,
-                timer: 2000,
+                timer: 3000,
                 timerProgressBar: true,
             });
             ToastError.fire({
@@ -379,7 +395,7 @@
                 position: 'top-end',
                 icon: 'info',
                 showConfirmButton: false,
-                timer: 2000,
+                timer: 3000,
                 timerProgressBar: true,
             });
             ToastInfo.fire({

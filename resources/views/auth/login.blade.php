@@ -15,7 +15,7 @@
 
     <style>
         body {
-            background: url('{{ asset('images/bg.png') }}') no-repeat center center fixed;
+            background: url('{{ asset('images/a1.jpg') }}') no-repeat center center fixed;
             background-size: cover;
             background-color: #000;
             min-height: 100vh;

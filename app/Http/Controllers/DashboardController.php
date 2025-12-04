@@ -15,7 +15,7 @@ class DashboardController extends Controller
     {
         $mesins = Mesin::select('id', 'jenis_mesin')
             ->orderBy('id', 'asc')
-            ->paginate(5);
+            ->get();
 
         // Ambil nomor halaman dari query string jika ada (untuk redirect setelah tambah proses)
         $currentPage = $request->query('page', 1);
