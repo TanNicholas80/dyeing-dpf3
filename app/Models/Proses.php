@@ -23,6 +23,7 @@ class Proses extends Model
         'kode_warna',
         'kategori_warna',
         'qty',
+        'roll',
         'cycle_time',
         'cycle_time_actual',
         'mesin_id',

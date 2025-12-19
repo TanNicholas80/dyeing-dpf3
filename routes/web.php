@@ -38,6 +38,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/proses/{id}/barcode/aux', [ProsesController::class, 'barcodeAux'])->name('proses.barcode.aux');
     Route::get('/proses/{id}/barcodes', [ProsesController::class, 'barcodes'])->name('proses.barcodes');
     Route::post('/proses/{proses}/barcode/{type}/{barcode}/cancel', [ProsesController::class, 'cancelBarcode']);
+
 });
 
 // Tambahkan di luar middleware auth agar bisa diakses select2

@@ -22,6 +22,7 @@ return new class extends Migration {
             $table->string('kode_warna')->nullable();
             $table->string('kategori_warna')->nullable();
             $table->double('qty')->nullable();
+            $table->integer('roll')->nullable();
             $table->unsignedBigInteger('cycle_time')->nullable();
             $table->unsignedBigInteger('cycle_time_actual')->nullable();
             $table->dateTime('mulai')->nullable();

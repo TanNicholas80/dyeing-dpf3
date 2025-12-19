@@ -12,7 +12,7 @@ class BarcodeLa extends Model
     protected $table = 'barcode_la';
 
     protected $fillable = [
-        'no_op', 'no_partai', 'barcode', 'matdok', 'mesin_id', 'cancel'
+        'proses_id', 'no_op', 'no_partai', 'barcode', 'matdok', 'mesin_id', 'cancel'
     ];
 
     public function mesin()

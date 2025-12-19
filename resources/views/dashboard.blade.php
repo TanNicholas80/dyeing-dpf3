@@ -9,7 +9,7 @@
         }
 
         .card-date span,
-        .card-time span {
+        ..card-time span {
             white-space: nowrap;
         }
 
@@ -65,6 +65,7 @@
             background: #bbb;
             border-radius: 4px;
         }
+
     </style>
     <div class="content-wrapper">
         <!-- Content Header -->
@@ -75,8 +76,22 @@
                         <h1 class="m-0">Dashboard</h1>
                     </div>
                     <div class="col-sm-4 d-flex justify-content-center">
-                        {{-- Pagination Mesin --}}
-
+                        <form id="filter-mesin-form" method="get" action="{{ url('dashboard') }}"
+                            style="width:100%; display: flex; align-items: center; gap: 6px;">
+                            <select name="mesin[]" id="filter-mesin" class="form-control select2" multiple
+                                style="width:100%;" data-placeholder="Semua Mesin">
+                                @foreach ($mesins as $mesin)
+                                    <option value="{{ $mesin->id }}"
+                                        {{ in_array($mesin->id, $selectedMesinArr ?? []) ? 'selected' : '' }}>
+                                        {{ $mesin->jenis_mesin }}</option>
+                                @endforeach
+                            </select>
+                            <button type="button" id="clear-mesin-btn" class="btn btn-outline-secondary"
+                                title="Reset Mesin"
+                                style="margin-left:4px; font-weight:bold; padding: 0 10px; height:38px; line-height:1;">
+                                &times;
+                            </button>
+                        </form>
                     </div>
                     <div class="col-sm-4 d-flex justify-content-end">
                         <div id="dashboard-controls" style="display: flex; justify-content: flex-end; gap: 10px;">
@@ -135,8 +150,21 @@
                     @endphp
 
                     {{-- Loop mesin --}}
+                    @php
+                        // Ambil array mesin terpilih dari controller
+                        $selectedMesinArr = $selectedMesinArr ?? [];
+                        // Jika ada mesin terpilih, hanya tampilkan mesin tersebut, dan reset key agar foreach tidak skip
+                        $mesinList =
+                            count($selectedMesinArr) > 0
+                                ? $mesins
+                                    ->filter(function ($m) use ($selectedMesinArr) {
+                                        return in_array($m->id, $selectedMesinArr);
+                                    })
+                                    ->values()
+                                : $mesins;
+                    @endphp
                     <div class="row" id="machines-container" style="margin-left:0;margin-right:0;">
-                        @foreach ($mesins as $mesin)
+                        @foreach ($mesinList as $mesin)
                             <div class="machine-column">
                                 <div class="col-lg col-md-2 col-sm-4 col-6" style="padding: 2px;">
                                     <div class="machine-column" style="border-radius: 0; box-shadow: none;">
@@ -148,11 +176,9 @@
                                             style="background: #fff; padding: 0; min-height: 0;">
                                             <div style="height: 2px; background: #fff;"></div>
                                             @php
-                                                $prosesList = \App\Models\Proses::where('mesin_id', $mesin->id)
-                                                    ->orderBy('id') // ascending: id kecil di atas
-                                                    ->get();
+                                                $prosesMesin = $prosesList->where('mesin_id', $mesin->id);
                                             @endphp
-                                            @foreach ($prosesList as $proses)
+                                            @foreach ($prosesMesin as $proses)
                                                 @php
                                                     // Jenis proses: P/R/M
                                                     $type =
@@ -166,13 +192,33 @@
                                                         $blockColors = ['gray', 'gray', 'gray'];
                                                     } else {
                                                         // G: hijau jika ada minimal 1 barcode kain (cancel=false)
-                                                        $hasBarcodeKain = isset($proses->barcodeKains) && is_iterable($proses->barcodeKains)
-                                                            ? collect($proses->barcodeKains)->where('cancel', false)->count() > 0
-                                                            : (isset($proses->barcode_kain) && $proses->barcode_kain);
+                                                        $hasBarcodeKain =
+                                                            isset($proses->barcodeKains) &&
+                                                            is_iterable($proses->barcodeKains)
+                                                                ? collect($proses->barcodeKains)
+                                                                        ->where('cancel', false)
+                                                                        ->count() > 0
+                                                                : isset($proses->barcode_kain) && $proses->barcode_kain;
+                                                        // D: hijau jika ada minimal 1 barcode LA (cancel=false)
+                                                        $hasBarcodeLa =
+                                                            isset($proses->barcodeLas) &&
+                                                            is_iterable($proses->barcodeLas)
+                                                                ? collect($proses->barcodeLas)
+                                                                        ->where('cancel', false)
+                                                                        ->count() > 0
+                                                                : isset($proses->barcode_la) && $proses->barcode_la;
+                                                        // A: hijau jika ada minimal 1 barcode AUX (cancel=false)
+                                                        $hasBarcodeAux =
+                                                            isset($proses->barcodeAuxs) &&
+                                                            is_iterable($proses->barcodeAuxs)
+                                                                ? collect($proses->barcodeAuxs)
+                                                                        ->where('cancel', false)
+                                                                        ->count() > 0
+                                                                : isset($proses->barcode_aux) && $proses->barcode_aux;
                                                         $blockColors = [
                                                             $hasBarcodeKain ? 'green' : 'red',
-                                                            $proses->barcode_la ? 'green' : 'red',
-                                                            $proses->barcode_aux ? 'green' : 'red',
+                                                            $hasBarcodeLa ? 'green' : 'red',
+                                                            $hasBarcodeAux ? 'green' : 'red',
                                                         ];
                                                     }
                                                     $blocks = ['G', 'D', 'A'];
@@ -237,7 +283,7 @@
                                                     }
                                                 @endphp
                                                 <div class="status-card draggable" draggable="true"
-                                                    style="background: {{ $gradient }}; background-repeat: no-repeat; background-size: cover; border-radius: 0; color: #fff; margin: 2px 0 0 0; padding: 2px 2px; cursor: grab; box-shadow: 0 2px 6px rgba(0,0,0,0.2);"
+                                                    style="background: {{ $gradient }}; background-repeat: no-repeat; background-size: cover; border-radius: 0; color: #fff; margin: 5px 0 0 0; padding: 2px 2px; cursor: grab; box-shadow: 0 2px 6px rgba(0,0,0,0.2);"
                                                     data-proses='@json($proses)'>
                                                     {{-- Header --}}
                                                     <div class="card-header"
@@ -324,9 +370,14 @@
                                                         </div>
                                                         <div class="card-info"
                                                             style="font-size: 9px; margin: 2px 0; color: #fff; text-shadow: 0 1px 2px #0008;">
-                                                            <div>{{ $proses->warna ? $proses->warna : 'Warna' }} - {{ $proses->kategori_warna ? $proses->kategori_warna : 'Kategori' }} -
-                                                                {{ $proses->kode_warna ? $proses->kode_warna : 'Kode' }}</div>
-                                                            <div>{{ $proses->konstruksi ? $proses->konstruksi : 'Konstruksi' }}</div>
+                                                            <div>{{ $proses->warna ? $proses->warna : 'Warna' }} -
+                                                                {{ $proses->kategori_warna ? $proses->kategori_warna : 'Kategori' }}
+                                                                -
+                                                                {{ $proses->kode_warna ? $proses->kode_warna : 'Kode' }}
+                                                            </div>
+                                                            <div>
+                                                                {{ $proses->konstruksi ? $proses->konstruksi : 'Konstruksi' }}
+                                                            </div>
                                                         </div>
                                                         <div class="card-date"
                                                             style="display: flex; justify-content: space-between; font-size: 10px; color: #fff; text-shadow: 0 1px 2px #0008;">
@@ -391,7 +442,7 @@
                                 </div>
 
                                 <!-- No OP -->
-                                <div class="col-md-6">
+                                <div class="col-md-6 hide-if-maintenance">
                                     <div class="form-group">
                                         <label class="form-label fw-semibold">No. OP</label>
                                         <select name="no_op" id="no_op" class="form-control select2"
@@ -402,7 +453,7 @@
                                 </div>
 
                                 <!-- No Partai -->
-                                <div class="col-md-6">
+                                <div class="col-md-6 hide-if-maintenance">
                                     <div class="form-group">
                                         <label class="form-label fw-semibold">No. Partai</label>
                                         <select name="no_partai" id="no_partai" class="form-control select2"
@@ -427,24 +478,19 @@
                                     <div class="form-group">
                                         <label class="form-label fw-semibold">
                                             Cycle Time (jam:menit:detik)
-                                            <i class="fas fa-info-circle text-info ml-1"
-                                                data-toggle="tooltip"
+                                            <i class="fas fa-info-circle text-info ml-1" data-toggle="tooltip"
                                                 data-placement="top"
                                                 title="Isi dengan durasi proses, bukan jam selesai mesin.">
                                             </i>
                                         </label>
-                                        <input type="text"
-                                            name="cycle_time"
-                                            class="form-control"
-                                            placeholder="Jam:Menit:Detik"
-                                            pattern="^[0-9]{2}:[0-9]{2}:[0-9]{2}$"
-                                            title="Format durasi Jam:Menit:Detik"
-                                            required>
+                                        <input type="text" name="cycle_time" class="form-control"
+                                            placeholder="Jam:Menit:Detik" pattern="^[0-9]{2}:[0-9]{2}:[0-9]{2}$"
+                                            title="Format durasi Jam:Menit:Detik" required>
                                     </div>
                                 </div>
 
                                 <!-- Item OP (readonly) -->
-                                <div class="col-md-6">
+                                <div class="col-md-6 hide-if-maintenance">
                                     <div class="form-group">
                                         <label class="form-label fw-semibold">Item OP</label>
                                         <input type="text" name="item_op" class="form-control auto-field" readonly>
@@ -452,7 +498,7 @@
                                 </div>
 
                                 <!-- Kode Material (readonly) -->
-                                <div class="col-md-6">
+                                <div class="col-md-6 hide-if-maintenance">
                                     <div class="form-group">
                                         <label class="form-label fw-semibold">Kode Material</label>
                                         <input type="text" name="kode_material" class="form-control auto-field"
@@ -461,7 +507,7 @@
                                 </div>
 
                                 <!-- Konstruksi (readonly) -->
-                                <div class="col-md-6">
+                                <div class="col-md-6 hide-if-maintenance">
                                     <div class="form-group">
                                         <label class="form-label fw-semibold">Konstruksi</label>
                                         <input type="text" name="konstruksi" class="form-control auto-field" readonly>
@@ -469,7 +515,7 @@
                                 </div>
 
                                 <!-- Gramasi (readonly) -->
-                                <div class="col-md-6">
+                                <div class="col-md-6 hide-if-maintenance">
                                     <div class="form-group">
                                         <label class="form-label fw-semibold">Gramasi</label>
                                         <input type="text" name="gramasi" class="form-control auto-field" readonly>
@@ -477,15 +523,15 @@
                                 </div>
 
                                 <!-- Lebar (readonly) -->
-                                <div class="col-md-6">
+                                <div class="col-md-6 hide-if-maintenance">
                                     <div class="form-group">
                                         <label class="form-label fw-semibold">Lebar</label>
                                         <input type="text" name="lebar" class="form-control auto-field" readonly>
                                     </div>
                                 </div>
 
-                                <!-- HFeel (readonly) -->
-                                <div class="col-md-6">
+                                <!-- Hand Feel (readonly) -->
+                                <div class="col-md-6 hide-if-maintenance">
                                     <div class="form-group">
                                         <label class="form-label fw-semibold">Hand Feel</label>
                                         <input type="text" name="hfeel" class="form-control auto-field" readonly>
@@ -493,7 +539,7 @@
                                 </div>
 
                                 <!-- Warna (readonly) -->
-                                <div class="col-md-6">
+                                <div class="col-md-6 hide-if-maintenance">
                                     <div class="form-group">
                                         <label class="form-label fw-semibold">Warna</label>
                                         <input type="text" name="warna" class="form-control auto-field" readonly>
@@ -501,7 +547,7 @@
                                 </div>
 
                                 <!-- Kode Warna (readonly) -->
-                                <div class="col-md-6">
+                                <div class="col-md-6 hide-if-maintenance">
                                     <div class="form-group">
                                         <label class="form-label fw-semibold">Kode Warna</label>
                                         <input type="text" name="kode_warna" class="form-control auto-field" readonly>
@@ -509,7 +555,7 @@
                                 </div>
 
                                 <!-- Kategori Warna (readonly) -->
-                                <div class="col-md-6">
+                                <div class="col-md-6 hide-if-maintenance">
                                     <div class="form-group">
                                         <label class="form-label fw-semibold">Kategori Warna</label>
                                         <input type="text" name="kategori_warna" class="form-control auto-field"
@@ -518,10 +564,17 @@
                                 </div>
 
                                 <!-- QTY (readonly, 2 digit koma) -->
-                                <div class="col-md-6">
+                                <div class="col-md-6 hide-if-maintenance">
                                     <div class="form-group">
                                         <label class="form-label fw-semibold">Quantity</label>
                                         <input type="text" name="qty" class="form-control auto-field" readonly>
+                                    </div>
+                                </div>
+
+                                <div class="col-md-6 hide-if-maintenance">
+                                    <div class="form-group">
+                                        <label class="form-label fw-semibold">Roll</label>
+                                        <input type="text" name="roll" class="form-control auto-field" readonly>
                                     </div>
                                 </div>
 
@@ -798,6 +851,9 @@
                         qtyVal = parseFloat(qtyVal).toFixed(2);
                     }
                     $('[name="qty"]').val(qtyVal);
+                    // Roll dari API
+                    var rollVal = row.roll || '';
+                    $('[name="roll"]').val(rollVal);
                 } else {
                     $('.auto-field').val('');
                 }
@@ -866,6 +922,12 @@
             const proses = $(this).data('proses');
             if (!proses) return;
             const hiddenFields = ['id', 'created_at', 'updated_at', 'mesin_id'];
+            // Daftar field yang harus disembunyikan jika Maintenance
+            const maintenanceFields = [
+                'no_op', 'item_op', 'kode_material', 'konstruksi', 'no_partai',
+                'gramasi', 'lebar', 'hfeel', 'warna', 'kode_warna', 'kategori_warna', 'qty', 'roll'
+            ];
+
             function formatDetikToHMS(val) {
                 if (val === null || val === undefined || isNaN(val)) return '-';
                 val = parseInt(val);
@@ -884,11 +946,15 @@
             } catch {}
             // Hapus BARCODE KAINS dari detail proses
             const entries = Object.entries(proses)
-                .filter(([key]) => !hiddenFields.includes(key) && key !== 'barcode_kains')
+                .filter(([key]) => !hiddenFields.includes(key) && key !== 'barcode_kains' && key !==
+                    'barcode_las' && key !== 'barcode_auxs' && key !== 'mesin')
+                .filter(([key]) => !(proses.jenis === 'Maintenance' && maintenanceFields.includes(key)))
                 .map(([key, val]) => {
                     if (key === 'hfeel') return ['HAND FEEL', val];
                     if (key === 'matdok') return ['MATERIAL DOKUMEN', val];
-                    if (key === 'cycle_time' || key === 'cycle_time_actual') return [key.replace(/_/g, ' ').toUpperCase(), formatDetikToHMS(val)];
+                    if (key === 'cycle_time' || key === 'cycle_time_actual') return [key.replace(/_/g, ' ')
+                        .toUpperCase(), formatDetikToHMS(val)
+                    ];
                     return [key.replace(/_/g, ' ').toUpperCase(), val];
                 });
             entries.unshift(['JENIS MESIN', jenisMesin]);
@@ -903,44 +969,73 @@
                 }
                 html += '</tr>';
             }
-            // Barcode section
-            html += '<tr><th colspan="4" style="background:#f8f8f8;">Barcode Kain <button type="button" class="btn btn-sm btn-success scan-barcode-btn" data-barcode="barcode_kain" data-id="'+proses.id+'" style="float:right;"><i class="fas fa-barcode"></i> Scan</button></th></tr>';
-            html += '<tr><td colspan="4" id="barcode-kain-list">Loading...</td></tr>';
-            html += '<tr><th colspan="4" style="background:#f8f8f8;">Barcode LA <button type="button" class="btn btn-sm btn-success scan-barcode-btn" data-barcode="barcode_la" data-id="'+proses.id+'" style="float:right;"><i class="fas fa-barcode"></i> Scan</button></th></tr>';
-            html += '<tr><td colspan="4" id="barcode-la-list">Loading...</td></tr>';
-            html += '<tr><th colspan="4" style="background:#f8f8f8;">Barcode AUX <button type="button" class="btn btn-sm btn-success scan-barcode-btn" data-barcode="barcode_aux" data-id="'+proses.id+'" style="float:right;"><i class="fas fa-barcode"></i> Scan</button></th></tr>';
-            html += '<tr><td colspan="4" id="barcode-aux-list">Loading...</td></tr>';
-            $('#detail-proses-body').html(html);
-            // Ambil barcode dari relasi dan render di modal detail proses
-            $.ajax({
-                url: '/proses/' + proses.id + '/barcodes',
-                method: 'GET',
-                success: function(data) {
-                    function renderBarcodeGrid(barcodes, barcodeType, prosesId) {
-                        if (!barcodes || !barcodes.length) {
-                            return '<span style="color:#888;">Belum ada barcode.</span>';
-                        }
-                        let html = '<div style="display:flex;flex-wrap:wrap;gap:6px;">';
-                        barcodes.forEach(function(bk, idx) {
-                            if (bk.cancel) return; // Jangan tampilkan barcode yang sudah cancel
-                            html += `<div style="position:relative;flex:1 0 30%;max-width:32%;background:#f3f3f3;border-radius:6px;padding:6px 4px;margin-bottom:6px;text-align:center;font-weight:bold;font-size:13px;color:#222;box-shadow:0 1px 2px #0001;">
-                                <span style='position:absolute;top:2px;right:6px;cursor:pointer;font-weight:bold;color:#b00;font-size:16px;z-index:2;' class='cancel-barcode-btn' data-type='${barcodeType}' data-proses='${prosesId}' data-id='${bk.id}' data-matdok='${bk.matdok}' data-barcode='${bk.barcode}' title='Cancel barcode'>&times;</span>
-                                ${bk.barcode} ${(bk.matdok ? '<br><span style=\'font-size:11px;color:#888;\'>' + bk.matdok + '</span>' : '')}
-                            </div>`;
-                        });
-                        html += '</div>';
-                        return html;
-                    }
-                    $('#barcode-kain-list').html(renderBarcodeGrid(data.barcode_kain, 'kain', proses.id));
-                    $('#barcode-la-list').html(renderBarcodeGrid(data.barcode_la, 'la', proses.id));
-                    $('#barcode-aux-list').html(renderBarcodeGrid(data.barcode_aux, 'aux', proses.id));
-                },
-                error: function() {
-                    $('#barcode-kain-list').html('<span style="color:#888;">Belum ada barcode kain.</span>');
-                    $('#barcode-la-list').html('<span style="color:#888;">Belum ada barcode LA.</span>');
-                    $('#barcode-aux-list').html('<span style="color:#888;">Belum ada barcode AUX.</span>');
+            // Tampilkan barcode hanya jika proses.jenis !== 'Maintenance'
+            if (proses.jenis !== 'Maintenance') {
+                const showScanBtn = true;
+                html += '<tr><th colspan="4" style="background:#f8f8f8;">Barcode Kain';
+                if (showScanBtn) {
+                    html +=
+                        ' <button type="button" class="btn btn-sm btn-success scan-barcode-btn" data-barcode="barcode_kain" data-id="' +
+                        proses.id + '" style="float:right;"><i class="fas fa-barcode"></i> Scan</button>';
                 }
-            });
+                html += '</th></tr>';
+                html += '<tr><td colspan="4" id="barcode-kain-list">Loading...</td></tr>';
+                html += '<tr><th colspan="4" style="background:#f8f8f8;">Barcode LA';
+                if (showScanBtn) {
+                    html +=
+                        ' <button type="button" class="btn btn-sm btn-success scan-barcode-btn" data-barcode="barcode_la" data-id="' +
+                        proses.id + '" style="float:right;"><i class="fas fa-barcode"></i> Scan</button>';
+                }
+                html += '</th></tr>';
+                html += '<tr><td colspan="4" id="barcode-la-list">Loading...</td></tr>';
+                html += '<tr><th colspan="4" style="background:#f8f8f8;">Barcode AUX';
+                if (showScanBtn) {
+                    html +=
+                        ' <button type="button" class="btn btn-sm btn-success scan-barcode-btn" data-barcode="barcode_aux" data-id="' +
+                        proses.id + '" style="float:right;"><i class="fas fa-barcode"></i> Scan</button>';
+                }
+                html += '</th></tr>';
+                html += '<tr><td colspan="4" id="barcode-aux-list">Loading...</td></tr>';
+            }
+            $('#detail-proses-body').html(html);
+            // Ambil barcode dari relasi dan render di modal detail proses hanya jika bukan Maintenance
+            if (proses.jenis !== 'Maintenance') {
+                $.ajax({
+                    url: '/proses/' + proses.id + '/barcodes',
+                    method: 'GET',
+                    success: function(data) {
+                        function renderBarcodeGrid(barcodes, barcodeType, prosesId) {
+                            // Filter barcode yang belum cancel
+                            const activeBarcodes = (barcodes || []).filter(bk => !bk.cancel);
+                            if (!activeBarcodes.length) {
+                                return '<span style="color:#888;">Belum ada barcode.</span>';
+                            }
+                            let html = '<div style="display:flex;flex-wrap:wrap;gap:6px;">';
+                            activeBarcodes.forEach(function(bk, idx) {
+                                html += `<div style="position:relative;flex:1 0 30%;max-width:32%;background:#f3f3f3;border-radius:6px;padding:6px 4px;margin-bottom:6px;text-align:center;font-weight:bold;font-size:13px;color:#222;box-shadow:0 1px 2px #0001;">
+                                    <span style='position:absolute;top:2px;right:6px;cursor:pointer;font-weight:bold;color:#b00;font-size:16px;z-index:2;' class='cancel-barcode-btn' data-type='${barcodeType}' data-proses='${prosesId}' data-id='${bk.id}' data-matdok='${bk.matdok}' title='Cancel barcode'>&times;</span>
+                                    ${bk.barcode} ${(bk.matdok ? '<br><span style=\'font-size:11px;color:#888;\'>' + bk.matdok + '</span>' : '')}
+                                </div>`;
+                            });
+                            html += '</div>';
+                            return html;
+                        }
+                        $('#barcode-kain-list').html(renderBarcodeGrid(data.barcode_kain, 'kain', proses
+                            .id));
+                        $('#barcode-la-list').html(renderBarcodeGrid(data.barcode_la, 'la', proses.id));
+                        $('#barcode-aux-list').html(renderBarcodeGrid(data.barcode_aux, 'aux', proses
+                            .id));
+                    },
+                    error: function() {
+                        $('#barcode-kain-list').html(
+                            '<span style="color:#888;">Belum ada barcode kain.</span>');
+                        $('#barcode-la-list').html(
+                            '<span style="color:#888;">Belum ada barcode LA.</span>');
+                        $('#barcode-aux-list').html(
+                            '<span style="color:#888;">Belum ada barcode AUX.</span>');
+                    }
+                });
+            }
             $('#modalDetailProses').modal('show');
         });
 
@@ -1116,7 +1211,7 @@
         $(document).ready(function() {
             $('[name="jenis"]').on('change', function() {
                 var isMaintenance = $(this).val() === 'Maintenance';
-                
+
                 // Modifikasi: Handle No OP dan No Partai (Disable jika Maintenance)
                 var $noOp = $('#no_op');
                 var $noPartai = $('#no_partai');
@@ -1146,6 +1241,13 @@
                 // Mesin dan cycle_time tetap required
                 $('[name="mesin_id"]').attr('required', 'required');
                 $('[name="cycle_time"]').attr('required', 'required');
+
+                // Sembunyikan field tertentu jika Maintenance
+                if (isMaintenance) {
+                    $('.hide-if-maintenance').hide();
+                } else {
+                    $('.hide-if-maintenance').show();
+                }
             });
             // Trigger di awal
             $('[name="jenis"]').trigger('change');
@@ -1174,34 +1276,41 @@
             const barcodeId = $(this).data('id');
             const matdok = $(this).data('matdok');
             const barcode = $(this).data('barcode') || '';
-            
+
             if (!matdok) {
                 showToastNotification('error', 'Material document tidak tersedia!');
                 return;
             }
-            
+
             // Simpan data untuk konfirmasi
-            cancelBarcodeData = { barcodeType, prosesId, barcodeId, matdok, barcode };
-            
+            cancelBarcodeData = {
+                barcodeType,
+                prosesId,
+                barcodeId,
+                matdok,
+                barcode
+            };
+
             // Update informasi di modal
-            const typeLabel = barcodeType === 'kain' ? 'Barcode Kain' : 
-                            barcodeType === 'la' ? 'Barcode LA' : 'Barcode AUX';
+            const typeLabel = barcodeType === 'kain' ? 'Barcode Kain' :
+                barcodeType === 'la' ? 'Barcode LA' : 'Barcode AUX';
             const barcodeText = barcode ? `<strong>${barcode}</strong>` : 'barcode ini';
             const matdokText = matdok ? `<br><small class="text-muted">Material Document: ${matdok}</small>` : '';
-            
+
             $('#confirmCancelBarcodeText').html(
                 `Apakah Anda yakin ingin membatalkan ${typeLabel}?<br><br>` +
                 `${barcodeText}${matdokText}<br><br>` +
                 `<span class="text-danger"><i class="fas fa-exclamation-triangle"></i> Tindakan ini tidak dapat dibatalkan!</span>`
             );
-            
+
             // Reset loading state
-            $('#btnConfirmCancelBarcode').prop('disabled', false).html('<i class="fas fa-times mr-1"></i>Ya, Cancel');
-            
+            $('#btnConfirmCancelBarcode').prop('disabled', false).html(
+                '<i class="fas fa-times mr-1"></i>Ya, Cancel');
+
             // Tampilkan modal
             $('#modalConfirmCancelBarcode').modal('show');
         });
-        
+
         // Modal konfirmasi cancel barcode
         if (!document.getElementById('modalConfirmCancelBarcode')) {
             $(document.body).append(`
@@ -1240,77 +1349,102 @@
             </div>
             `);
         }
-        
+
         let cancelBarcodeData = null;
         let currentProsesForRefresh = null;
-        
+
         $(document).on('click', '#btnConfirmCancelBarcode', function() {
             if (!cancelBarcodeData) return;
-            
-            const { barcodeType, prosesId, barcodeId, matdok, barcode } = cancelBarcodeData;
-            
+
+            const {
+                barcodeType,
+                prosesId,
+                barcodeId,
+                matdok,
+                barcode
+            } = cancelBarcodeData;
+
             // Simpan proses ID untuk refresh
             currentProsesForRefresh = prosesId;
-            
+
             // Tampilkan loading dan disable button
-            $('#btnConfirmCancelBarcode').prop('disabled', true).html('<span class="spinner-border spinner-border-sm mr-1"></span>Memproses...');
+            $('#btnConfirmCancelBarcode').prop('disabled', true).html(
+                '<span class="spinner-border spinner-border-sm mr-1"></span>Memproses...');
             $('#btnCancelCancelBarcode').prop('disabled', true);
             $('#cancelBarcodeLoading').show();
-            
+
             // Request ke backend Laravel
             $.ajax({
                 url: `/proses/${prosesId}/barcode/${barcodeType}/${barcodeId}/cancel`,
                 method: 'POST',
-                headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
-                data: { matdok: matdok },
+                headers: {
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                },
+                data: {
+                    matdok: matdok
+                },
                 success: function(r) {
                     $('#modalConfirmCancelBarcode').modal('hide');
-                    
+
                     if (r && r.status === 'success') {
                         // Show success message
                         showToastNotification('success', 'Barcode berhasil di-cancel!');
-                        
+
                         // Refresh barcode list di modal detail proses jika masih terbuka
-                        if ($('#modalDetailProses').hasClass('show') || $('#modalDetailProses').is(':visible')) {
-                            // Simulasi double click pada card proses yang aktif untuk refresh
+                        if ($('#modalDetailProses').hasClass('show') || $('#modalDetailProses').is(
+                                ':visible')) {
+                            // Simulasi double click pada card proses yang aktif untuk refresh5
                             const activeProses = $('.status-card').filter(function() {
                                 const proses = $(this).data('proses');
                                 return proses && proses.id == currentProsesForRefresh;
                             }).first();
-                            
+
                             if (activeProses.length) {
                                 // Reload barcode data via AJAX
                                 $.ajax({
                                     url: '/proses/' + currentProsesForRefresh + '/barcodes',
                                     method: 'GET',
                                     success: function(data) {
-                                        function renderBarcodeGrid(barcodes, barcodeType, prosesId) {
-                                            if (!barcodes || !barcodes.length) {
+                                        function renderBarcodeGrid(barcodes, barcodeType,
+                                            prosesId) {
+                                            // Filter barcode yang belum cancel
+                                            const activeBarcodes = (barcodes || []).filter(
+                                                bk => !bk.cancel);
+                                            if (!activeBarcodes.length) {
                                                 return '<span style="color:#888;">Belum ada barcode.</span>';
                                             }
-                                            let html = '<div style="display:flex;flex-wrap:wrap;gap:6px;">';
-                                            barcodes.forEach(function(bk, idx) {
-                                                if (bk.cancel) return;
+                                            let html =
+                                                '<div style="display:flex;flex-wrap:wrap;gap:6px;">';
+                                            activeBarcodes.forEach(function(bk, idx) {
                                                 html += `<div style="position:relative;flex:1 0 30%;max-width:32%;background:#f3f3f3;border-radius:6px;padding:6px 4px;margin-bottom:6px;text-align:center;font-weight:bold;font-size:13px;color:#222;box-shadow:0 1px 2px #0001;">
-                                                    <span style='position:absolute;top:2px;right:6px;cursor:pointer;font-weight:bold;color:#b00;font-size:16px;z-index:2;' class='cancel-barcode-btn' data-type='${barcodeType}' data-proses='${prosesId}' data-id='${bk.id}' data-matdok='${bk.matdok}' data-barcode='${bk.barcode}' title='Cancel barcode'>&times;</span>
+                                                    <span style='position:absolute;top:2px;right:6px;cursor:pointer;font-weight:bold;color:#b00;font-size:16px;z-index:2;' class='cancel-barcode-btn' data-type='${barcodeType}' data-proses='${prosesId}' data-id='${bk.id}' data-matdok='${bk.matdok}' title='Cancel barcode'>&times;</span>
                                                     ${bk.barcode} ${(bk.matdok ? '<br><span style=\'font-size:11px;color:#888;\'>' + bk.matdok + '</span>' : '')}
                                                 </div>`;
                                             });
                                             html += '</div>';
                                             return html;
                                         }
-                                        $('#barcode-kain-list').html(renderBarcodeGrid(data.barcode_kain, 'kain', currentProsesForRefresh));
-                                        $('#barcode-la-list').html(renderBarcodeGrid(data.barcode_la, 'la', currentProsesForRefresh));
-                                        $('#barcode-aux-list').html(renderBarcodeGrid(data.barcode_aux, 'aux', currentProsesForRefresh));
+                                        $('#barcode-kain-list').html(renderBarcodeGrid(data
+                                            .barcode_kain, 'kain',
+                                            currentProsesForRefresh));
+                                        $('#barcode-la-list').html(renderBarcodeGrid(data
+                                            .barcode_la, 'la',
+                                            currentProsesForRefresh));
+                                        $('#barcode-aux-list').html(renderBarcodeGrid(data
+                                            .barcode_aux, 'aux',
+                                            currentProsesForRefresh));
                                     },
                                     error: function() {
-                                        showToastNotification('error', 'Gagal me-refresh data barcode. Silakan tutup dan buka kembali modal detail.');
+                                        showToastNotification('error',
+                                            'Gagal me-refresh data barcode. Silakan tutup dan buka kembali modal detail.'
+                                        );
                                     }
                                 });
                             }
                         }
                     } else {
-                        const errorMsg = 'Cancel barcode gagal: ' + (r && r.message ? r.message : 'Unknown error');
+                        const errorMsg = 'Cancel barcode gagal: ' + (r && r.message ? r.message :
+                            'Unknown error');
                         showToastNotification('error', errorMsg);
                     }
                 },
@@ -1330,20 +1464,36 @@
                 },
                 complete: function() {
                     // Reset loading state
-                    $('#btnConfirmCancelBarcode').prop('disabled', false).html('<i class="fas fa-check mr-1"></i>Ya, Cancel');
+                    $('#btnConfirmCancelBarcode').prop('disabled', false).html(
+                        '<i class="fas fa-check mr-1"></i>Ya, Cancel');
                     $('#btnCancelCancelBarcode').prop('disabled', false);
                     $('#cancelBarcodeLoading').hide();
                     cancelBarcodeData = null;
                 }
             });
         });
-        
+
         // Reset data saat modal ditutup
         $('#modalConfirmCancelBarcode').on('hidden.bs.modal', function() {
             cancelBarcodeData = null;
-            $('#btnConfirmCancelBarcode').prop('disabled', false).html('<i class="fas fa-check mr-1"></i>Ya, Cancel');
+            $('#btnConfirmCancelBarcode').prop('disabled', false).html(
+                '<i class="fas fa-check mr-1"></i>Ya, Cancel');
             $('#btnCancelCancelBarcode').prop('disabled', false);
             $('#cancelBarcodeLoading').hide();
+        });
+
+        $(document).ready(function() {
+            // Submit form filter mesin otomatis saat select berubah
+            $('#filter-mesin').on('change', function() {
+                $('#filter-mesin-form').submit();
+            });
+            // Tombol clear mesin
+            $('#clear-mesin-btn').on('click', function() {
+                $('#filter-mesin').val(null).trigger('change');
+                setTimeout(function() {
+                    $('#filter-mesin-form').submit();
+                }, 100);
+            });
         });
     </script>
 @endsection

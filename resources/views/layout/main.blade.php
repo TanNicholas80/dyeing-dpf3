@@ -66,22 +66,9 @@
                             <a class="nav-link" data-widget="pushmenu" href="#" role="button"><i
                                     class="fas fa-bars"></i></a>
                         </li>
-                        <li class="nav-item dropdown">
-                            <a id="dropdownSubMenu1" href="#" data-toggle="dropdown" aria-haspopup="true"
-                                aria-expanded="false" class="nav-link dropdown-toggle"
-                                title="Menu Dashboard">Dashboard</a>
-                            <ul aria-labelledby="dropdownSubMenu1" class="dropdown-menu border-0 shadow" role="menu">
-                                <li role="none"><a href="{{ route('dashboard') }}" class="dropdown-item"
-                                        role="menuitem" title="Lihat Semua Mesin">Semua Mesin</a></li>
-                                @if (isset($mesins))
-                                    @foreach ($mesins as $mesin)
-                                        <li role="none"><a href="{{ route('dashboard', ['mesin' => $mesin->id]) }}"
-                                                class="dropdown-item" role="menuitem"
-                                                title="Lihat {{ $mesin->jenis_mesin }}">{{ $mesin->jenis_mesin }}</a>
-                                        </li>
-                                    @endforeach
-                                @endif
-                            </ul>
+                        <li class="nav-item">
+                            <a href="{{ route('dashboard') }}" class="nav-link">Dashboard
+                            </a>
                         </li>
                         <li class="nav-item">
                             <a href="#" class="nav-link" title="Approval">Approval</a>
@@ -91,6 +78,9 @@
                         </li>
                         <li class="nav-item">
                             <a href="{{ route('mesin.index') }}" class="nav-link" title="Mesin">Mesin</a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="#" class="nav-link" title="Aux">Aux</a>
                         </li>
                         <li class="nav-item">
                             <a href="#" class="nav-link" title="Log">Log</a>
@@ -154,38 +144,16 @@
                     <ul class="nav nav-pills nav-sidebar flex-column" data-widget="treeview" role="menu"
                         data-accordion="false">
                         <li class="nav-item">
-                            <a href="#" class="nav-link">
+                            <a href="{{ route('dashboard') }}" class="nav-link">
                                 <i class="nav-icon fas fa-tachometer-alt"></i>
-                                <p>
-                                    Dashboard
-                                    <i class="right fas fa-angle-left"></i>
-                                </p>
+                                <p>Dashboard</p>
                             </a>
-                            <ul class="nav nav-treeview">
-                                <li class="nav-item">
-                                    <a href="{{ route('dashboard') }}" class="nav-link">
-                                        <i class="far fa-circle nav-icon"></i>
-                                        <p>Semua Mesin</p>
-                                    </a>
-                                </li>
-                                @if (isset($mesins))
-                                    @foreach ($mesins as $mesin)
-                                        <li class="nav-item">
-                                            <a href="{{ route('dashboard', ['mesin' => $mesin->id]) }}"
-                                                class="nav-link">
-                                                <i class="far fa-circle nav-icon"></i>
-                                                <p>{{ $mesin->jenis_mesin }}</p>
-                                            </a>
-                                        </li>
-                                    @endforeach
-                                @endif
-                            </ul>
                         </li>
 
                         <li class="nav-header">FACTORY MANAGER</li>
                         <li class="nav-item">
                             <a href="" class="nav-link">
-                                <i class="nav-icon fas fa-user"></i>
+                                <i class="nav-icon fas fa-clipboard-check"></i>
                                 <p>
                                     Approval FM
                                     <span class="badge badge-info right">2</span>
@@ -196,7 +164,7 @@
                         <li class="nav-header">USER</li>
                         <li class="nav-item">
                             <a href="{{ route('user.index') }}" class="nav-link">
-                                <i class="nav-icon fas fa-user"></i>
+                                <i class="nav-icon fas fa-users"></i>
                                 <p>
                                     Data User
                                 </p>
@@ -206,9 +174,19 @@
                         <li class="nav-header">MASTER DATA</li>
                         <li class="nav-item">
                             <a href="{{ route('mesin.index') }}" class="nav-link">
-                                <i class="nav-icon fas fa-history"></i>
+                                <i class="nav-icon fas fa-cogs"></i>
                                 <p>
                                     Mesin
+                                </p>
+                            </a>
+                        </li>
+
+                        <li class="nav-header">KIMIA</li>
+                        <li class="nav-item">
+                            <a href="#" class="nav-link">
+                                <i class="nav-icon fas fa-flask"></i>
+                                <p>
+                                    Auxiliary
                                 </p>
                             </a>
                         </li>
@@ -216,12 +194,13 @@
                         <li class="nav-header">LAINNYA</li>
                         <li class="nav-item">
                             <a href="../calendar.html" class="nav-link">
-                                <i class="nav-icon fas fa-history"></i>
+                                <i class="nav-icon fas fa-clipboard-list"></i>
                                 <p>
                                     Log Activity
                                 </p>
                             </a>
                         </li>
+
 
                     </ul>
                 </nav>
@@ -400,6 +379,21 @@
             });
             ToastInfo.fire({
                 title: "{{ session('info') }}"
+            });
+        @endif
+
+        @if ($errors->any())
+            const ToastValidation = Swal.mixin({
+                toast: true,
+                position: 'top-end',
+                icon: 'error',
+                showConfirmButton: false,
+                timer: 4000,
+                timerProgressBar: true,
+            });
+            let errorMsg = `{!! implode('<br>', $errors->all()) !!}`;
+            ToastValidation.fire({
+                html: errorMsg
             });
         @endif
     </script>

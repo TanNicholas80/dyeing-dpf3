@@ -36,6 +36,7 @@ class ProsesController extends Controller
                 'kode_warna' => 'required|string',
                 'kategori_warna' => 'required|string',
                 'qty' => 'required|numeric',
+                'roll' => 'required|integer',
             ];
         } else {
             $rules += [
@@ -51,6 +52,7 @@ class ProsesController extends Controller
                 'kode_warna' => 'nullable|string',
                 'kategori_warna' => 'nullable|string',
                 'qty' => 'nullable|numeric',
+                'roll' => 'nullable|integer',
             ];
         }
 
@@ -216,6 +218,8 @@ class ProsesController extends Controller
             $proses = Proses::findOrFail($id);
             $barcode = $request->barcode;
             $no_op = $proses->no_op;
+            $no_partai = $proses->no_partai;
+            $mesin_id = $proses->mesin_id;
             // Ambil data dari SQL Server
             $tickets = DB::connection('sqlsrv')
                 ->table('TICKET_DETAIL')
@@ -260,10 +264,16 @@ class ProsesController extends Controller
                 $errorMsg = $data[0]['stats'] ?: 'Barcode tidak dapat digunakan';
                 return back()->withInput()->with('error', $errorMsg);
             }
-            // Sukses, simpan barcode yang di scan dan mblnr ke proses
-            $proses->barcode_la = $barcode;
-            $proses->matdok_la = $data[0]['mblnr'] ?? null;
-            $proses->save();
+            // Sukses, simpan ke tabel barcode_la
+            \App\Models\BarcodeLa::create([
+                'proses_id' => $proses->id,
+                'no_op' => $no_op,
+                'no_partai' => $no_partai,
+                'barcode' => $barcode,
+                'matdok' => $data[0]['mblnr'] ?? null,
+                'mesin_id' => $mesin_id,
+                'cancel' => false,
+            ]);
             return redirect()->route('dashboard', ['page' => $page])
                 ->with('success', 'Barcode LA berhasil disimpan!');
         } catch (\Exception $e) {
