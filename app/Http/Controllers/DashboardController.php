@@ -9,6 +9,7 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
 {
@@ -32,10 +33,24 @@ class DashboardController extends Controller
         }
 
         // Ambil proses, filter jika mesin dipilih
-        $prosesQuery = Proses::with(['barcodeKains', 'barcodeLas', 'barcodeAuxs', 'mesin']);
+        $prosesQuery = Proses::with(['barcodeKains', 'barcodeLas', 'barcodeAuxs', 'mesin', 'approvals']);
         if (count($selectedMesinArr) > 0) {
             $prosesQuery->whereIn('mesin_id', $selectedMesinArr);
         }
+
+        // Sembunyikan proses Reproses yang masih menunggu approval VP (status pending)
+        $prosesQuery->whereNot(function ($q) {
+            $q->where('jenis', 'Reproses')
+              ->whereExists(function ($sub) {
+                  $sub->select(DB::raw(1))
+                      ->from('approvals')
+                      ->whereColumn('approvals.proses_id', 'proses.id')
+                      ->where('approvals.type', 'VP')
+                      ->where('approvals.action', 'create_reprocess')
+                      ->where('approvals.status', 'pending');
+              });
+        });
+
         $prosesList = $prosesQuery->orderBy('id', 'asc')->get();
 
         return view('dashboard', [

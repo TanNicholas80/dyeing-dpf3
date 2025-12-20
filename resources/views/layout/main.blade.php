@@ -70,8 +70,12 @@
                             <a href="{{ route('dashboard') }}" class="nav-link">Dashboard
                             </a>
                         </li>
-                        <li class="nav-item">
-                            <a href="#" class="nav-link" title="Approval">Approval</a>
+                        <li class="nav-item dropdown">
+                            <a id="dropdownSubMenu1" href="#" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" class="nav-link dropdown-toggle" title="Approval">Dropdown</a>
+                            <ul aria-labelledby="dropdownSubMenu1" class="dropdown-menu border-0 shadow">
+                                <li><a href="{{ route('approval.fm') }}" class="dropdown-item">Approval FM</a></li>
+                                <li><a href="{{ route('approval.vp') }}" class="dropdown-item">Approval VP</a></li>
+                            </ul>
                         </li>
                         <li class="nav-item">
                             <a href="{{ route('user.index') }}" class="nav-link" title="User">User</a>
@@ -152,10 +156,20 @@
 
                         <li class="nav-header">FACTORY MANAGER</li>
                         <li class="nav-item">
-                            <a href="" class="nav-link">
+                            <a href="{{ route('approval.fm') }}" class="nav-link">
                                 <i class="nav-icon fas fa-clipboard-check"></i>
                                 <p>
                                     Approval FM
+                                    <span class="badge badge-info right">2</span>
+                                </p>
+                            </a>
+                        </li>
+
+                        <li class="nav-item">
+                            <a href="{{ route('approval.vp') }}" class="nav-link">
+                                <i class="nav-icon fas fa-clipboard-check"></i>
+                                <p>
+                                    Approval VP
                                     <span class="badge badge-info right">2</span>
                                 </p>
                             </a>
@@ -298,6 +312,8 @@
             }
             initializeDataTable('#user');
             initializeDataTable('#mesin');
+            initializeDataTable('#approval_fm');
+            initializeDataTable('#approval_vp');
         });
 
         // Fullscreen global button logic
@@ -340,61 +356,61 @@
     </script>
 
     <script>
-        @if (session('success'))
-            const ToastSuccess = Swal.mixin({
-                toast: true,
-                position: 'top-end',
-                icon: 'success',
-                showConfirmButton: false,
-                timer: 3000,
-                timerProgressBar: true,
-            });
-            ToastSuccess.fire({
-                title: "{{ session('success') }}"
-            });
+        @if(session('success'))
+        const ToastSuccess = Swal.mixin({
+            toast: true,
+            position: 'top-end',
+            icon: 'success',
+            showConfirmButton: false,
+            timer: 3000,
+            timerProgressBar: true,
+        });
+        ToastSuccess.fire({
+            title: "{{ session('success') }}"
+        });
         @endif
 
-        @if (session('error'))
-            const ToastError = Swal.mixin({
-                toast: true,
-                position: 'top-end',
-                icon: 'error',
-                showConfirmButton: false,
-                timer: 3000,
-                timerProgressBar: true,
-            });
-            ToastError.fire({
-                title: "{{ session('error') }}"
-            });
+        @if(session('error'))
+        const ToastError = Swal.mixin({
+            toast: true,
+            position: 'top-end',
+            icon: 'error',
+            showConfirmButton: false,
+            timer: 3000,
+            timerProgressBar: true,
+        });
+        ToastError.fire({
+            title: "{{ session('error') }}"
+        });
         @endif
 
-        @if (session('info'))
-            const ToastInfo = Swal.mixin({
-                toast: true,
-                position: 'top-end',
-                icon: 'info',
-                showConfirmButton: false,
-                timer: 3000,
-                timerProgressBar: true,
-            });
-            ToastInfo.fire({
-                title: "{{ session('info') }}"
-            });
+        @if(session('info'))
+        const ToastInfo = Swal.mixin({
+            toast: true,
+            position: 'top-end',
+            icon: 'info',
+            showConfirmButton: false,
+            timer: 3000,
+            timerProgressBar: true,
+        });
+        ToastInfo.fire({
+            title: "{{ session('info') }}"
+        });
         @endif
 
-        @if ($errors->any())
-            const ToastValidation = Swal.mixin({
-                toast: true,
-                position: 'top-end',
-                icon: 'error',
-                showConfirmButton: false,
-                timer: 4000,
-                timerProgressBar: true,
-            });
-            let errorMsg = `{!! implode('<br>', $errors->all()) !!}`;
-            ToastValidation.fire({
-                html: errorMsg
-            });
+        @if($errors->any())
+        const ToastValidation = Swal.mixin({
+            toast: true,
+            position: 'top-end',
+            icon: 'error',
+            showConfirmButton: false,
+            timer: 4000,
+            timerProgressBar: true,
+        });
+        let errorMsg = `{!! implode('<br>', $errors->all()) !!}`;
+        ToastValidation.fire({
+            html: errorMsg
+        });
         @endif
     </script>
 
