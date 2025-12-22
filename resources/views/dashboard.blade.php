@@ -866,9 +866,16 @@
                     e.preventDefault();
                     return false;
                 }
+                
+                // Validasi tambahan: cek apakah proses sudah dimulai
+                const proses = $(draggable).data('proses');
+                if (proses && (proses.mulai !== null && proses.mulai !== undefined && proses.mulai !== '')) {
+                    e.preventDefault();
+                    return false;
+                }
+                
                 draggable.classList.add('dragging');
                 draggedCard = draggable;
-                const proses = $(draggable).data('proses');
                 if (proses && proses.mesin_id) {
                     sourceMesinId = proses.mesin_id;
                 }
@@ -923,10 +930,38 @@
                 if (!dragging) return;
                 
                 const canMove = dragging.getAttribute('data-can-move') === '1';
-                if (!canMove) return;
+                if (!canMove) {
+                    restoreCardToOriginalPosition(dragging);
+                    dragging.classList.remove('dragging');
+                    return;
+                }
 
                 const proses = $(dragging).data('proses');
-                if (!proses) return;
+                if (!proses) {
+                    restoreCardToOriginalPosition(dragging);
+                    dragging.classList.remove('dragging');
+                    return;
+                }
+
+                // Validasi tambahan: cek apakah proses sudah dimulai
+                if (proses.mulai !== null && proses.mulai !== undefined && proses.mulai !== '') {
+                    restoreCardToOriginalPosition(dragging);
+                    dragging.classList.remove('dragging');
+                    
+                    // Tampilkan notification error
+                    const ToastError = Swal.mixin({
+                        toast: true,
+                        position: 'top-end',
+                        icon: 'error',
+                        showConfirmButton: false,
+                        timer: 4000,
+                        timerProgressBar: true,
+                    });
+                    ToastError.fire({
+                        title: 'Tidak dapat memindahkan proses. Proses sudah dimulai.'
+                    });
+                    return;
+                }
 
                 const newMesinId = parseInt(container.getAttribute('data-mesin-id'));
                 const oldMesinId = proses.mesin_id;
@@ -1377,21 +1412,30 @@
         const hasPending = hasPendingApprovalFM(proses);
         const pendingInfo = getPendingApprovalInfo(proses);
         
+        // Cek apakah proses sudah dimulai (mulai tidak null)
+        const isStarted = proses.mulai !== null && proses.mulai !== undefined && proses.mulai !== '';
+        
         // Disable/enable tombol action
         const $btnEdit = $('.btn-edit-proses');
         const $btnMove = $('.btn-move-proses');
         const $btnDelete = $('.btn-delete-proses');
         
-        if (hasPending) {
+        // Disable jika ada pending approval ATAU proses sudah dimulai
+        if (hasPending || isStarted) {
             // Disable tombol
             $btnEdit.prop('disabled', true).addClass('disabled').css('cursor', 'not-allowed');
             $btnMove.prop('disabled', true).addClass('disabled').css('cursor', 'not-allowed');
             $btnDelete.prop('disabled', true).addClass('disabled').css('cursor', 'not-allowed');
             
-            // Tambahkan tooltip
-            const tooltipText = pendingInfo 
-                ? `Tidak dapat melakukan aksi. Masih ada permintaan ${pendingInfo.label} yang menunggu persetujuan FM.`
-                : 'Tidak dapat melakukan aksi. Masih ada permintaan yang menunggu persetujuan FM.';
+            // Tentukan pesan tooltip berdasarkan kondisi
+            let tooltipText = '';
+            if (isStarted) {
+                tooltipText = 'Tidak dapat melakukan aksi. Proses sudah dimulai.';
+            } else if (hasPending) {
+                tooltipText = pendingInfo 
+                    ? `Tidak dapat melakukan aksi. Masih ada permintaan ${pendingInfo.label} yang menunggu persetujuan FM.`
+                    : 'Tidak dapat melakukan aksi. Masih ada permintaan yang menunggu persetujuan FM.';
+            }
             
             $btnEdit.attr('title', tooltipText).attr('data-toggle', 'tooltip');
             $btnMove.attr('title', tooltipText).attr('data-toggle', 'tooltip');
@@ -1580,6 +1624,22 @@
         }
         const proses = $('#modalDetailProses').data('proses');
         if (!proses) return;
+        
+        // Validasi: cek apakah proses sudah dimulai
+        if (proses.mulai !== null && proses.mulai !== undefined && proses.mulai !== '') {
+            const ToastError = Swal.mixin({
+                toast: true,
+                position: 'top-end',
+                icon: 'error',
+                showConfirmButton: false,
+                timer: 4000,
+                timerProgressBar: true,
+            });
+            ToastError.fire({
+                title: 'Tidak dapat mengubah cycle time. Proses sudah dimulai.'
+            });
+            return false;
+        }
 
         const id = proses.id;
         const updateUrl = "{{ url('proses') }}/" + id;
@@ -1628,6 +1688,22 @@
         }
         const proses = $('#modalDetailProses').data('proses');
         if (!proses) return;
+        
+        // Validasi: cek apakah proses sudah dimulai
+        if (proses.mulai !== null && proses.mulai !== undefined && proses.mulai !== '') {
+            const ToastError = Swal.mixin({
+                toast: true,
+                position: 'top-end',
+                icon: 'error',
+                showConfirmButton: false,
+                timer: 4000,
+                timerProgressBar: true,
+            });
+            ToastError.fire({
+                title: 'Tidak dapat memindahkan proses. Proses sudah dimulai.'
+            });
+            return false;
+        }
 
         const id = proses.id;
         const moveUrl = "{{ url('proses') }}/" + id + "/move";
@@ -1779,6 +1855,22 @@
         }
         const proses = $('#modalDetailProses').data('proses');
         if (!proses) return;
+        
+        // Validasi: cek apakah proses sudah dimulai
+        if (proses.mulai !== null && proses.mulai !== undefined && proses.mulai !== '') {
+            const ToastError = Swal.mixin({
+                toast: true,
+                position: 'top-end',
+                icon: 'error',
+                showConfirmButton: false,
+                timer: 4000,
+                timerProgressBar: true,
+            });
+            ToastError.fire({
+                title: 'Tidak dapat menghapus proses. Proses sudah dimulai.'
+            });
+            return false;
+        }
 
         const id = proses.id;
         const deleteUrl = "{{ url('proses') }}/" + id + "/delete";

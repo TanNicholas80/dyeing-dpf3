@@ -133,8 +133,7 @@ class ProsesController extends Controller
                     ],
                     'note'         => null,
                     'requested_by' => Auth::id(),
-                    // sementara diisi requester; akan diganti saat VP approve/reject
-                    'approved_by'  => Auth::id(),
+                    'approved_by'  => null, // Akan diisi saat VP approve/reject
                 ]);
 
                 return redirect()->route('dashboard', ['page' => $page])
@@ -499,6 +498,20 @@ class ProsesController extends Controller
 
         $proses = Proses::findOrFail($id);
 
+        // Validasi: hanya bisa edit jika proses belum mulai (mulai masih null)
+        if ($proses->mulai !== null) {
+            $errorMessage = 'Tidak dapat mengubah cycle time. Proses sudah dimulai.';
+            
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => $errorMessage
+                ], 400);
+            }
+            
+            return back()->with('error', $errorMessage);
+        }
+
         // Konversi cycle_time input (HH:MM:SS) ke detik, sama seperti di store()
         $inputCycleTime = $request->input('cycle_time');
         $parts = explode(':', $inputCycleTime);
@@ -555,8 +568,7 @@ class ProsesController extends Controller
             ],
             'note'         => null,
             'requested_by' => Auth::id(),
-            // Sementara diisi requester agar tidak null; akan dioverride ketika FM approve/reject
-            'approved_by'  => Auth::id(),
+            'approved_by'  => null, // Akan diisi saat FM approve/reject
         ]);
 
         return redirect()->route('dashboard', ['page' => $page])
@@ -567,6 +579,21 @@ class ProsesController extends Controller
     public function move(Request $request, $id)
     {
         $proses = Proses::findOrFail($id);
+        
+        // Validasi: hanya bisa pindah jika proses belum mulai (mulai masih null)
+        if ($proses->mulai !== null) {
+            $errorMessage = 'Tidak dapat memindahkan proses. Proses sudah dimulai.';
+            
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => $errorMessage
+                ], 400);
+            }
+            
+            return back()->with('error', $errorMessage);
+        }
+        
         $currentMesinId = $proses->mesin_id;
 
         // Validasi mesin_id baru dengan custom rule untuk memastikan berbeda dari mesin saat ini
@@ -633,8 +660,7 @@ class ProsesController extends Controller
             ],
             'note'         => null,
             'requested_by' => Auth::id(),
-            // Sementara diisi requester agar tidak null; akan dioverride ketika FM approve/reject
-            'approved_by'  => Auth::id(),
+            'approved_by'  => null, // Akan diisi saat FM approve/reject
         ]);
 
         $successMessage = 'Permintaan pemindahan mesin telah dikirim dan menunggu persetujuan FM.';
@@ -656,6 +682,12 @@ class ProsesController extends Controller
     public function destroy(Request $request, $id)
     {
         $proses = Proses::findOrFail($id);
+
+        // Validasi: hanya bisa hapus jika proses belum mulai (mulai masih null)
+        if ($proses->mulai !== null) {
+            return back()
+                ->with('error', 'Tidak dapat menghapus proses. Proses sudah dimulai.');
+        }
 
         // Cek apakah sudah ada pending approval untuk proses ini
         if ($this->hasPendingApproval($proses->id)) {
@@ -695,8 +727,7 @@ class ProsesController extends Controller
             ],
             'note'         => null,
             'requested_by' => Auth::id(),
-            // Sementara diisi requester; akan dioverride ketika FM approve/reject
-            'approved_by'  => Auth::id(),
+            'approved_by'  => null, // Akan diisi saat FM approve/reject
         ]);
 
         return redirect()->route('dashboard', ['page' => $page])
