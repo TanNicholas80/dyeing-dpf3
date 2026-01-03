@@ -242,14 +242,24 @@
                                     $bg = '#757575';
                                     // Cek apakah ada approval pending untuk edit/delete/move -> kuning
                                     $hasPendingChange = false;
+                                    $hasPendingReprocessApproval = false;
                                     if (isset($proses->approvals) && is_iterable($proses->approvals)) {
+                                    // Cek pending approval FM untuk edit/delete/move
                                     $hasPendingChange = collect($proses->approvals)->contains(function ($appr) {
                                     return $appr->status === 'pending'
                                     && $appr->type === 'FM'
                                     && in_array($appr->action, ['edit_cycle_time', 'delete_proses', 'move_machine']);
                                     });
+                                    // Cek pending approval VP untuk Reproses
+                                    if ($proses->jenis === 'Reproses') {
+                                    $hasPendingReprocessApproval = collect($proses->approvals)->contains(function ($appr) {
+                                    return $appr->status === 'pending'
+                                    && $appr->type === 'VP'
+                                    && $appr->action === 'create_reprocess';
+                                    });
                                     }
-                                    if ($hasPendingChange) {
+                                    }
+                                    if ($hasPendingChange || $hasPendingReprocessApproval) {
                                     $bg = '#ffeb3b'; // kuning untuk menandai ada perubahan yang menunggu approval
                                     } elseif ($proses->jenis === 'Maintenance') {
                                     $bg = '#757575'; // selalu abu-abu untuk Maintenance
@@ -303,9 +313,9 @@
                                     $cycle_time_actual_str = detikKeWaktu($cycle_time_actual);
                                     }
                                     @endphp
-                                    <div class="status-card draggable" draggable="{{ ($bg === '#757575' && !$proses->mulai && !$hasPendingChange) ? 'true' : 'false' }}"
-                                        style="background: {{ $gradient }}; background-repeat: no-repeat; background-size: cover; border-radius: 0; color: #fff; margin: 5px 0 0 0; padding: 2px 2px; cursor: {{ ($bg === '#757575' && !$proses->mulai && !$hasPendingChange) ? 'grab' : 'default' }}; box-shadow: 0 2px 6px rgba(0,0,0,0.2);"
-                                        data-proses='@json($proses)' data-can-move="{{ ($bg === '#757575' && !$proses->mulai && !$hasPendingChange) ? '1' : '0' }}">
+                                    <div class="status-card draggable" draggable="{{ ($bg === '#757575' && !$proses->mulai && !$hasPendingChange && !$hasPendingReprocessApproval) ? 'true' : 'false' }}"
+                                        style="background: {{ $gradient }}; background-repeat: no-repeat; background-size: cover; border-radius: 0; color: #fff; margin: 5px 0 0 0; padding: 2px 2px; cursor: {{ ($bg === '#757575' && !$proses->mulai && !$hasPendingChange && !$hasPendingReprocessApproval) ? 'grab' : 'default' }}; box-shadow: 0 2px 6px rgba(0,0,0,0.2);"
+                                        data-proses='@json($proses)' data-can-move="{{ ($bg === '#757575' && !$proses->mulai && !$hasPendingChange && !$hasPendingReprocessApproval) ? '1' : '0' }}" data-has-pending-reprocess="{{ $hasPendingReprocessApproval ? '1' : '0' }}">
                                         {{-- Header --}}
                                         <div class="card-header"
                                             style="display: flex; flex-direction: row; align-items: center; padding: 0 10px 2px 10px; gap: 0; border-bottom: none;">
@@ -660,7 +670,6 @@
             <div class="modal-content shadow-lg border-0 rounded-3">
                 <form id="formEditProses" method="POST" action="">
                     @csrf
-                    @method('PUT')
                     <input type="hidden" name="proses_id" id="editProsesId">
                     <div class="modal-header bg-primary text-white">
                         <h5 class="modal-title fw-bold" id="modalEditProsesLabel">
@@ -843,6 +852,40 @@
         </div>
     </div>
 
+    <!-- Modal Konfirmasi Pindah Mesin (Drag & Drop) -->
+    <div class="modal fade" id="modalConfirmMoveDragDrop" tabindex="-1" aria-labelledby="modalConfirmMoveDragDropLabel"
+        aria-hidden="true">
+        <div class="modal-dialog modal-md modal-dialog-centered">
+            <div class="modal-content shadow-lg border-0 rounded-3">
+                <div class="modal-header bg-warning text-white">
+                    <h5 class="modal-title fw-bold" id="modalConfirmMoveDragDropLabel">
+                        <i class="fas fa-random mr-2"></i>Konfirmasi Pindah Mesin
+                    </h5>
+                    <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body py-3 px-4">
+                    <div class="alert alert-info py-2 mb-3" style="font-size: 13px;">
+                        Proses <strong>tidak akan langsung dipindah</strong>. Permintaan pindah mesin akan
+                        <strong>menunggu persetujuan FM</strong>.
+                    </div>
+                    <p id="confirmMoveDragDropInfo" style="font-size: 14px; margin-bottom: 0; color: #666;">
+                        Apakah Anda yakin ingin memindahkan proses ini ke mesin lain?
+                    </p>
+                </div>
+                <div class="modal-footer d-flex justify-content-between px-4">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal" id="btnCancelMoveDragDrop">
+                        <i class="fas fa-times mr-1"></i>Batal
+                    </button>
+                    <button type="button" class="btn btn-warning" id="btnConfirmMoveDragDrop">
+                        <i class="fas fa-check mr-1"></i>Ya, Pindahkan
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
 
 </div>
 @endsection
@@ -867,9 +910,15 @@
                     return false;
                 }
                 
-                // Validasi tambahan: cek apakah proses sudah dimulai
+                // Validasi tambahan: cek apakah proses sudah dimulai atau ada pending approval
                 const proses = $(draggable).data('proses');
                 if (proses && (proses.mulai !== null && proses.mulai !== undefined && proses.mulai !== '')) {
+                    e.preventDefault();
+                    return false;
+                }
+                // Cek pending approval VP untuk Reproses
+                const hasPendingReprocess = draggable.getAttribute('data-has-pending-reprocess') === '1';
+                if (hasPendingReprocess) {
                     e.preventDefault();
                     return false;
                 }
@@ -962,6 +1011,27 @@
                     });
                     return;
                 }
+                
+                // Validasi: cek pending approval VP untuk Reproses
+                const hasPendingReprocess = dragging.getAttribute('data-has-pending-reprocess') === '1';
+                if (hasPendingReprocess) {
+                    restoreCardToOriginalPosition(dragging);
+                    dragging.classList.remove('dragging');
+                    
+                    // Tampilkan notification error
+                    const ToastError = Swal.mixin({
+                        toast: true,
+                        position: 'top-end',
+                        icon: 'error',
+                        showConfirmButton: false,
+                        timer: 4000,
+                        timerProgressBar: true,
+                    });
+                    ToastError.fire({
+                        title: 'Tidak dapat memindahkan proses. Proses Reproses masih menunggu persetujuan VP.'
+                    });
+                    return;
+                }
 
                 const newMesinId = parseInt(container.getAttribute('data-mesin-id'));
                 const oldMesinId = proses.mesin_id;
@@ -973,101 +1043,35 @@
                     return;
                 }
 
-                // Simpan posisi asli sebelum AJAX
+                // Simpan data untuk modal konfirmasi
                 const originalParentId = dragging.getAttribute('data-original-parent');
                 const originalParent = document.querySelector(`[data-mesin-id="${originalParentId}"]`);
                 const originalNextSibling = dragging._originalNextSibling;
-
-                // Tandai bahwa sedang dalam proses AJAX
-                dragging.setAttribute('data-ajax-pending', 'true');
+                
+                // Cari nama mesin sumber dan tujuan
+                const sourceMesinName = originalParent ? originalParent.closest('.machine-column').querySelector('.machine-header').textContent.trim() : 'Mesin Sumber';
+                const targetMesinName = container.closest('.machine-column').querySelector('.machine-header').textContent.trim();
+                
+                // Simpan data ke window untuk digunakan saat konfirmasi
+                window.pendingMoveData = {
+                    dragging: dragging,
+                    proses: proses,
+                    newMesinId: newMesinId,
+                    oldMesinId: oldMesinId,
+                    originalParentId: originalParentId,
+                    originalParent: originalParent,
+                    originalNextSibling: originalNextSibling,
+                    sourceMesinName: sourceMesinName,
+                    targetMesinName: targetMesinName
+                };
 
                 // Kembalikan card ke posisi asli terlebih dahulu (visual feedback)
                 restoreCardToOriginalPosition(dragging);
 
-                // Kirim request ke server untuk membuat approval (sama seperti modal move)
-                $.ajax({
-                    url: `/proses/${proses.id}/move`,
-                    method: 'POST',
-                    headers: {
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                        'X-Requested-With': 'XMLHttpRequest',
-                        'Accept': 'application/json'
-                    },
-                    data: {
-                        mesin_id: newMesinId
-                    },
-                    success: function(response) {
-                        // Hapus flag AJAX pending
-                        dragging.removeAttribute('data-ajax-pending');
-                        dragging.classList.remove('dragging');
-                        
-                        // Nonaktifkan drag untuk card ini sampai di-approve
-                        dragging.setAttribute('draggable', 'false');
-                        dragging.setAttribute('data-can-move', '0');
-                        dragging.style.cursor = 'default';
-                        
-                        // Tampilkan notification success
-                        if (response && response.status === 'success' && response.message) {
-                            const ToastSuccess = Swal.mixin({
-                                toast: true,
-                                position: 'top-end',
-                                icon: 'success',
-                                showConfirmButton: false,
-                                timer: 3000,
-                                timerProgressBar: true,
-                            });
-                            ToastSuccess.fire({
-                                title: response.message
-                            });
-                        }
-                        
-                        // Update visual card untuk menandakan ada pending approval (ubah ke kuning)
-                        // Card akan tetap di posisi asli sampai di-approve
-                        updateCardPendingApproval(dragging);
-                        
-                        // Refresh halaman setelah delay untuk update data
-                        setTimeout(function() {
-                            if (response && response.redirect) {
-                                window.location.href = response.redirect;
-                            } else {
-                                window.location.reload();
-                            }
-                        }, 1000);
-                    },
-                    error: function(xhr) {
-                        // Hapus flag AJAX pending
-                        dragging.removeAttribute('data-ajax-pending');
-                        dragging.classList.remove('dragging');
-                        
-                        // Pastikan card sudah kembali ke posisi asli
-                        restoreCardToOriginalPosition(dragging);
-                        
-                        // Tampilkan notification error
-                        let errorMsg = 'Gagal mengirim permintaan pindah mesin.';
-                        
-                        if (xhr.responseJSON && xhr.responseJSON.message) {
-                            errorMsg = xhr.responseJSON.message;
-                        } else if (xhr.responseJSON && xhr.responseJSON.errors) {
-                            errorMsg = Object.values(xhr.responseJSON.errors).flat().join(', ');
-                        } else if (xhr.status === 422) {
-                            if (xhr.responseJSON && xhr.responseJSON.message) {
-                                errorMsg = xhr.responseJSON.message;
-                            }
-                        }
-                        
-                        const ToastError = Swal.mixin({
-                            toast: true,
-                            position: 'top-end',
-                            icon: 'error',
-                            showConfirmButton: false,
-                            timer: 4000,
-                            timerProgressBar: true,
-                        });
-                        ToastError.fire({
-                            title: errorMsg
-                        });
-                    }
-                });
+                // Tampilkan modal konfirmasi
+                const infoText = `Apakah Anda yakin ingin memindahkan proses <strong>${proses.no_op || 'MAINTENANCE'}</strong> dari <strong>${sourceMesinName}</strong> ke <strong>${targetMesinName}</strong>?`;
+                $('#confirmMoveDragDropInfo').html(infoText);
+                $('#modalConfirmMoveDragDrop').modal('show');
             });
         });
 
@@ -1121,6 +1125,161 @@
             // Setelah refresh, card akan otomatis berubah menjadi kuning
             // karena backend sudah mengecek pending approval
         }
+    });
+
+    // Handler konfirmasi pindah mesin (Drag & Drop)
+    $(document).on('click', '#btnConfirmMoveDragDrop', function() {
+        const moveData = window.pendingMoveData;
+        if (!moveData) {
+            $('#modalConfirmMoveDragDrop').modal('hide');
+            return;
+        }
+
+        const { dragging, proses, newMesinId, originalParentId, originalParent, originalNextSibling } = moveData;
+
+        // Disable tombol untuk mencegah double click
+        $('#btnConfirmMoveDragDrop').prop('disabled', true).html('<span class="spinner-border spinner-border-sm mr-1"></span>Memproses...');
+        $('#btnCancelMoveDragDrop').prop('disabled', true);
+
+        // Tandai bahwa sedang dalam proses AJAX
+        dragging.setAttribute('data-ajax-pending', 'true');
+
+        // Kirim request ke server untuk membuat approval
+        $.ajax({
+            url: `/proses/${proses.id}/move`,
+            method: 'POST',
+            headers: {
+                'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
+            },
+            data: {
+                mesin_id: newMesinId
+            },
+            success: function(response) {
+                // Tutup modal
+                $('#modalConfirmMoveDragDrop').modal('hide');
+                
+                // Tampilkan notification success dengan delay sangat singkat
+                if (response && response.status === 'success' && response.message) {
+                    const ToastSuccess = Swal.mixin({
+                        toast: true,
+                        position: 'top-end',
+                        icon: 'success',
+                        showConfirmButton: false,
+                        timer: 1500,
+                        timerProgressBar: true,
+                    });
+                    ToastSuccess.fire({
+                        title: response.message
+                    });
+                }
+                
+                // Langsung refresh halaman agar card berubah warna menjadi kuning (pending approval)
+                // Backend akan mengecek status pending approval dan merender card dengan warna yang sesuai
+                if (response && response.redirect) {
+                    window.location.href = response.redirect;
+                } else {
+                    window.location.reload();
+                }
+            },
+            error: function(xhr) {
+                $('#modalConfirmMoveDragDrop').modal('hide');
+                
+                // Hapus flag AJAX pending
+                dragging.removeAttribute('data-ajax-pending');
+                dragging.classList.remove('dragging');
+                
+                // Pastikan card sudah kembali ke posisi asli
+                const originalParentId = dragging.getAttribute('data-original-parent');
+                const originalParent = document.querySelector(`[data-mesin-id="${originalParentId}"]`);
+                if (originalParent && dragging.parentElement !== originalParent) {
+                    const originalNextSibling = dragging._originalNextSibling;
+                    if (originalNextSibling && originalNextSibling.parentElement === originalParent) {
+                        originalParent.insertBefore(dragging, originalNextSibling);
+                    } else {
+                        originalParent.appendChild(dragging);
+                    }
+                }
+                
+                // Tampilkan notification error
+                let errorMsg = 'Gagal mengirim permintaan pindah mesin.';
+                
+                if (xhr.responseJSON && xhr.responseJSON.message) {
+                    errorMsg = xhr.responseJSON.message;
+                } else if (xhr.responseJSON && xhr.responseJSON.errors) {
+                    errorMsg = Object.values(xhr.responseJSON.errors).flat().join(', ');
+                } else if (xhr.status === 422) {
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        errorMsg = xhr.responseJSON.message;
+                    }
+                }
+                
+                const ToastError = Swal.mixin({
+                    toast: true,
+                    position: 'top-end',
+                    icon: 'error',
+                    showConfirmButton: false,
+                    timer: 4000,
+                    timerProgressBar: true,
+                });
+                ToastError.fire({
+                    title: errorMsg
+                });
+            },
+            complete: function() {
+                // Reset tombol dan data
+                $('#btnConfirmMoveDragDrop').prop('disabled', false).html('<i class="fas fa-check mr-1"></i>Ya, Pindahkan');
+                $('#btnCancelMoveDragDrop').prop('disabled', false);
+                window.pendingMoveData = null;
+            }
+        });
+    });
+
+    // Handler cancel konfirmasi pindah mesin (Drag & Drop)
+    $(document).on('click', '#btnCancelMoveDragDrop', function() {
+        const moveData = window.pendingMoveData;
+        if (moveData && moveData.dragging) {
+            moveData.dragging.classList.remove('dragging');
+            const originalParentId = moveData.dragging.getAttribute('data-original-parent');
+            const originalParent = document.querySelector(`[data-mesin-id="${originalParentId}"]`);
+            if (originalParent && moveData.dragging.parentElement !== originalParent) {
+                const originalNextSibling = moveData.dragging._originalNextSibling;
+                if (originalNextSibling && originalNextSibling.parentElement === originalParent) {
+                    originalParent.insertBefore(moveData.dragging, originalNextSibling);
+                } else {
+                    originalParent.appendChild(moveData.dragging);
+                }
+            }
+        }
+        window.pendingMoveData = null;
+        $('#modalConfirmMoveDragDrop').modal('hide');
+    });
+
+    // Handler saat modal ditutup (untuk memastikan card dikembalikan jika modal ditutup dengan cara lain)
+    $('#modalConfirmMoveDragDrop').on('hidden.bs.modal', function() {
+        const moveData = window.pendingMoveData;
+        if (moveData && moveData.dragging) {
+            // Pastikan dragging class dihapus
+            moveData.dragging.classList.remove('dragging');
+            
+            // Kembalikan card ke posisi asli jika belum dikembalikan
+            const originalParentId = moveData.dragging.getAttribute('data-original-parent');
+            const originalParent = document.querySelector(`[data-mesin-id="${originalParentId}"]`);
+            if (originalParent && moveData.dragging.parentElement !== originalParent) {
+                const originalNextSibling = moveData.dragging._originalNextSibling;
+                if (originalNextSibling && originalNextSibling.parentElement === originalParent) {
+                    originalParent.insertBefore(moveData.dragging, originalNextSibling);
+                } else {
+                    originalParent.appendChild(moveData.dragging);
+                }
+            }
+            
+            // Reset tombol
+            $('#btnConfirmMoveDragDrop').prop('disabled', false).html('<i class="fas fa-check mr-1"></i>Ya, Pindahkan');
+            $('#btnCancelMoveDragDrop').prop('disabled', false);
+        }
+        window.pendingMoveData = null;
     });
 
     window.addEventListener('globalFullscreenToggle', function(e) {
@@ -1378,6 +1537,21 @@
         });
     }
 
+    // Fungsi helper untuk mengecek apakah ada pending approval VP untuk Reproses
+    function hasPendingReprocessApproval(proses) {
+        if (!proses || !proses.approvals || !Array.isArray(proses.approvals)) {
+            return false;
+        }
+        if (proses.jenis !== 'Reproses') {
+            return false;
+        }
+        return proses.approvals.some(function(approval) {
+            return approval.status === 'pending' 
+                && approval.type === 'VP' 
+                && approval.action === 'create_reprocess';
+        });
+    }
+
     // Fungsi untuk mendapatkan informasi pending approval
     function getPendingApprovalInfo(proses) {
         if (!proses || !proses.approvals || !Array.isArray(proses.approvals)) {
@@ -1410,6 +1584,7 @@
         
         // Cek apakah ada pending approval dan disable tombol jika ada
         const hasPending = hasPendingApprovalFM(proses);
+        const hasPendingReprocess = hasPendingReprocessApproval(proses);
         const pendingInfo = getPendingApprovalInfo(proses);
         
         // Cek apakah proses sudah dimulai (mulai tidak null)
@@ -1420,8 +1595,8 @@
         const $btnMove = $('.btn-move-proses');
         const $btnDelete = $('.btn-delete-proses');
         
-        // Disable jika ada pending approval ATAU proses sudah dimulai
-        if (hasPending || isStarted) {
+        // Disable jika ada pending approval FM ATAU pending approval VP Reproses ATAU proses sudah dimulai
+        if (hasPending || hasPendingReprocess || isStarted) {
             // Disable tombol
             $btnEdit.prop('disabled', true).addClass('disabled').css('cursor', 'not-allowed');
             $btnMove.prop('disabled', true).addClass('disabled').css('cursor', 'not-allowed');
@@ -1431,6 +1606,8 @@
             let tooltipText = '';
             if (isStarted) {
                 tooltipText = 'Tidak dapat melakukan aksi. Proses sudah dimulai.';
+            } else if (hasPendingReprocess) {
+                tooltipText = 'Tidak dapat melakukan aksi. Proses Reproses masih menunggu persetujuan VP.';
             } else if (hasPending) {
                 tooltipText = pendingInfo 
                     ? `Tidak dapat melakukan aksi. Masih ada permintaan ${pendingInfo.label} yang menunggu persetujuan FM.`
@@ -1640,9 +1817,26 @@
             });
             return false;
         }
+        
+        // Validasi: cek pending approval VP untuk Reproses
+        const hasPendingReprocess = hasPendingReprocessApproval(proses);
+        if (hasPendingReprocess) {
+            const ToastError = Swal.mixin({
+                toast: true,
+                position: 'top-end',
+                icon: 'error',
+                showConfirmButton: false,
+                timer: 4000,
+                timerProgressBar: true,
+            });
+            ToastError.fire({
+                title: 'Tidak dapat mengubah cycle time. Proses Reproses masih menunggu persetujuan VP.'
+            });
+            return false;
+        }
 
         const id = proses.id;
-        const updateUrl = "{{ url('proses') }}/" + id;
+        const updateUrl = "{{ url('proses') }}/" + id + "/update";
 
         // Format cycle_time detik ke HH:MM:SS
         let val = proses.cycle_time || 0;
@@ -1701,6 +1895,23 @@
             });
             ToastError.fire({
                 title: 'Tidak dapat memindahkan proses. Proses sudah dimulai.'
+            });
+            return false;
+        }
+        
+        // Validasi: cek pending approval VP untuk Reproses
+        const hasPendingReprocess = hasPendingReprocessApproval(proses);
+        if (hasPendingReprocess) {
+            const ToastError = Swal.mixin({
+                toast: true,
+                position: 'top-end',
+                icon: 'error',
+                showConfirmButton: false,
+                timer: 4000,
+                timerProgressBar: true,
+            });
+            ToastError.fire({
+                title: 'Tidak dapat memindahkan proses. Proses Reproses masih menunggu persetujuan VP.'
             });
             return false;
         }
@@ -1868,6 +2079,23 @@
             });
             ToastError.fire({
                 title: 'Tidak dapat menghapus proses. Proses sudah dimulai.'
+            });
+            return false;
+        }
+        
+        // Validasi: cek pending approval VP untuk Reproses
+        const hasPendingReprocess = hasPendingReprocessApproval(proses);
+        if (hasPendingReprocess) {
+            const ToastError = Swal.mixin({
+                toast: true,
+                position: 'top-end',
+                icon: 'error',
+                showConfirmButton: false,
+                timer: 4000,
+                timerProgressBar: true,
+            });
+            ToastError.fire({
+                title: 'Tidak dapat menghapus proses. Proses Reproses masih menunggu persetujuan VP.'
             });
             return false;
         }

@@ -74,8 +74,22 @@
                             <a id="dropdownSubMenu1" href="#" data-toggle="dropdown" aria-haspopup="true"
                                 aria-expanded="false" class="nav-link dropdown-toggle" title="Approval">Dropdown</a>
                             <ul aria-labelledby="dropdownSubMenu1" class="dropdown-menu border-0 shadow">
-                                <li><a href="{{ route('approval.fm') }}" class="dropdown-item">Approval FM</a></li>
-                                <li><a href="{{ route('approval.vp') }}" class="dropdown-item">Approval VP</a></li>
+                                <li>
+                                    <a href="{{ route('approval.fm') }}" class="dropdown-item">
+                                        Approval FM
+                                        @if($pendingApprovalFM > 0)
+                                        <span class="badge badge-warning float-right">{{ $pendingApprovalFM }}</span>
+                                        @endif
+                                    </a>
+                                </li>
+                                <li>
+                                    <a href="{{ route('approval.vp') }}" class="dropdown-item">
+                                        Approval VP
+                                        @if($pendingApprovalVP > 0)
+                                        <span class="badge badge-warning float-right">{{ $pendingApprovalVP }}</span>
+                                        @endif
+                                    </a>
+                                </li>
                             </ul>
                         </li>
                         <li class="nav-item">
@@ -161,7 +175,9 @@
                                 <i class="nav-icon fas fa-clipboard-check"></i>
                                 <p>
                                     Approval FM
-                                    <span class="badge badge-info right">2</span>
+                                    @if($pendingApprovalFM > 0)
+                                    <span class="badge badge-warning right">{{ $pendingApprovalFM }}</span>
+                                    @endif
                                 </p>
                             </a>
                         </li>
@@ -171,7 +187,9 @@
                                 <i class="nav-icon fas fa-clipboard-check"></i>
                                 <p>
                                     Approval VP
-                                    <span class="badge badge-info right">2</span>
+                                    @if($pendingApprovalVP > 0)
+                                    <span class="badge badge-warning right">{{ $pendingApprovalVP }}</span>
+                                    @endif
                                 </p>
                             </a>
                         </li>

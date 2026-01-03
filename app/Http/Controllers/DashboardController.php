@@ -38,18 +38,7 @@ class DashboardController extends Controller
             $prosesQuery->whereIn('mesin_id', $selectedMesinArr);
         }
 
-        // Sembunyikan proses Reproses yang masih menunggu approval VP (status pending)
-        $prosesQuery->whereNot(function ($q) {
-            $q->where('jenis', 'Reproses')
-              ->whereExists(function ($sub) {
-                  $sub->select(DB::raw(1))
-                      ->from('approvals')
-                      ->whereColumn('approvals.proses_id', 'proses.id')
-                      ->where('approvals.type', 'VP')
-                      ->where('approvals.action', 'create_reprocess')
-                      ->where('approvals.status', 'pending');
-              });
-        });
+        // Proses Reproses sekarang langsung ditampilkan dengan background kuning jika ada pending approval VP
 
         $prosesList = $prosesQuery->orderBy('id', 'asc')->get();
 
