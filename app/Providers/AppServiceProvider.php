@@ -6,6 +6,7 @@ use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\View;
 use Carbon\Carbon;
 use App\Models\Mesin;
+use App\Models\Approval;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -32,6 +33,18 @@ class AppServiceProvider extends ServiceProvider
 
         View::composer('layout.main', function ($view) {
             $view->with('mesins', Mesin::all());
+            
+            // Hitung jumlah pending approvals untuk FM dan VP
+            $pendingApprovalFM = Approval::where('type', 'FM')
+                ->where('status', 'pending')
+                ->count();
+            
+            $pendingApprovalVP = Approval::where('type', 'VP')
+                ->where('status', 'pending')
+                ->count();
+            
+            $view->with('pendingApprovalFM', $pendingApprovalFM);
+            $view->with('pendingApprovalVP', $pendingApprovalVP);
         });
     }
 }

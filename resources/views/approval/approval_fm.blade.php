@@ -119,9 +119,12 @@
                                             @else
                                             <span class="text-muted">Sudah diproses</span>
                                             @if($approval->note)
-                                            <br><small class="text-muted" title="{{ $approval->note }}">
+                                            <br>
+                                            <button type="button" class="btn btn-sm btn-link text-primary p-0 mt-1" 
+                                                data-toggle="modal" data-target="#modalNote{{ $approval->id }}"
+                                                style="font-size: 0.875rem;">
                                                 <i class="fas fa-comment"></i> Ada catatan
-                                            </small>
+                                            </button>
                                             @endif
                                             @endif
                                         </td>
@@ -388,6 +391,69 @@
                                                         </table>
                                                     </div>
                                                     @endif
+                                                </div>
+                                                <div class="modal-footer">
+                                                    <button type="button" class="btn btn-secondary" data-dismiss="modal">
+                                                        <i class="fas fa-times mr-1"></i>Tutup
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    @endif
+
+                                    <!-- Modal Catatan -->
+                                    @if($approval->note)
+                                    <div class="modal fade" id="modalNote{{ $approval->id }}" tabindex="-1">
+                                        <div class="modal-dialog">
+                                            <div class="modal-content">
+                                                <div class="modal-header {{ $approval->status === 'approved' ? 'bg-success' : 'bg-danger' }} text-white">
+                                                    <h5 class="modal-title">
+                                                        <i class="fas {{ $approval->status === 'approved' ? 'fa-check-circle' : 'fa-times-circle' }} mr-2"></i>
+                                                        Catatan {{ $approval->status === 'approved' ? 'Approve' : 'Reject' }}
+                                                    </h5>
+                                                    <button type="button" class="close text-white" data-dismiss="modal">
+                                                        <span>&times;</span>
+                                                    </button>
+                                                </div>
+                                                <div class="modal-body">
+                                                    <div class="mb-3">
+                                                        <strong>Status:</strong>
+                                                        @if($approval->status === 'approved')
+                                                        <span class="badge bg-success">Approved</span>
+                                                        @else
+                                                        <span class="badge bg-danger">Rejected</span>
+                                                        @endif
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <strong>No OP:</strong>
+                                                        <span>{{ $approval->proses->no_op ?? 'MAINTENANCE' }}</span>
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <strong>Action Type:</strong>
+                                                        <span class="badge bg-secondary">{{ $actionLabel }}</span>
+                                                    </div>
+                                                    @if($approval->approver)
+                                                    <div class="mb-3">
+                                                        <strong>Diproses Oleh:</strong>
+                                                        <div>
+                                                            {{ $approval->approver->nama }}<br>
+                                                            <small class="text-muted">{{ $approval->approver->username }}</small>
+                                                        </div>
+                                                    </div>
+                                                    @endif
+                                                    @if($approval->updated_at)
+                                                    <div class="mb-3">
+                                                        <strong>Tanggal Proses:</strong>
+                                                        <span>{{ $approval->updated_at->format('d-m-Y H:i:s') }}</span>
+                                                    </div>
+                                                    @endif
+                                                    <div class="form-group">
+                                                        <strong>Catatan:</strong>
+                                                        <div class="mt-2 p-3 bg-light rounded">
+                                                            <p class="mb-0" style="white-space: pre-wrap;">{{ $approval->note }}</p>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                                 <div class="modal-footer">
                                                     <button type="button" class="btn btn-secondary" data-dismiss="modal">

@@ -121,7 +121,7 @@ class ProsesController extends Controller
             // Buat Proses seperti biasa
             $proses = Proses::create($validated);
 
-            // Jika jenis = Reproses, buat approval ke VP dan sembunyikan dulu dari dashboard
+            // Jika jenis = Reproses, buat approval ke VP (proses langsung tampil dengan background kuning)
             if ($proses->jenis === 'Reproses') {
                 Approval::create([
                     'proses_id'    => $proses->id,
@@ -137,7 +137,7 @@ class ProsesController extends Controller
                 ]);
 
                 return redirect()->route('dashboard', ['page' => $page])
-                    ->with('success', 'Proses Reproses berhasil diajukan dan menunggu persetujuan VP.');
+                    ->with('success', 'Proses Reproses berhasil ditambahkan. Proses akan tampil dengan warna kuning dan menunggu persetujuan VP untuk dapat diubah/dihapus/dipindah.');
             }
 
             // Produksi / Maintenance langsung tampil
