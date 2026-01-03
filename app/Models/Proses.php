@@ -4,10 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Proses extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     protected $fillable = [
         'jenis',
@@ -32,6 +33,11 @@ class Proses extends Model
     public function mesin()
     {
         return $this->belongsTo(Mesin::class);
+    }
+
+    public function approvals()
+    {
+        return $this->hasMany(Approval::class, 'proses_id', 'id');
     }
     public function barcodeKains()
     {

@@ -7,13 +7,45 @@ use App\Models\Mesin;
 use App\Models\BarcodeKain;
 use App\Models\BarcodeLa;
 use App\Models\BarcodeAux;
+use App\Models\Approval;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Auth;
 
 
 class ProsesController extends Controller
 {
+    /**
+     * Cek apakah sudah ada pending approval untuk proses tertentu.
+     * 
+     * @param int $prosesId
+     * @return bool
+     */
+    private function hasPendingApproval($prosesId)
+    {
+        return Approval::where('proses_id', $prosesId)
+            ->where('status', 'pending')
+            ->where('type', 'FM')
+            ->whereIn('action', ['edit_cycle_time', 'delete_proses', 'move_machine'])
+            ->exists();
+    }
+
+    /**
+     * Ambil informasi pending approval untuk ditampilkan di pesan error.
+     * 
+     * @param int $prosesId
+     * @return Approval|null
+     */
+    private function getPendingApproval($prosesId)
+    {
+        return Approval::where('proses_id', $prosesId)
+            ->where('status', 'pending')
+            ->where('type', 'FM')
+            ->whereIn('action', ['edit_cycle_time', 'delete_proses', 'move_machine'])
+            ->first();
+    }
+
     public function store(Request $request)
     {
         $rules = [
@@ -72,21 +104,43 @@ class ProsesController extends Controller
             $validated['cycle_time'] = null;
         }
 
-        try {
-            Proses::create($validated);
-
-            // Ambil halaman asal dari referer jika ada
-            $referer = $request->headers->get('referer');
-            $page = 1;
-            if ($referer) {
-                $parsed = parse_url($referer);
-                if (isset($parsed['query'])) {
-                    parse_str($parsed['query'], $queryArr);
-                    if (isset($queryArr['page']) && is_numeric($queryArr['page'])) {
-                        $page = (int)$queryArr['page'];
-                    }
+        // Ambil halaman asal dari referer jika ada (untuk redirect konsisten)
+        $referer = $request->headers->get('referer');
+        $page = 1;
+        if ($referer) {
+            $parsed = parse_url($referer);
+            if (isset($parsed['query'])) {
+                parse_str($parsed['query'], $queryArr);
+                if (isset($queryArr['page']) && is_numeric($queryArr['page'])) {
+                    $page = (int)$queryArr['page'];
                 }
             }
+        }
+
+        try {
+            // Buat Proses seperti biasa
+            $proses = Proses::create($validated);
+
+            // Jika jenis = Reproses, buat approval ke VP dan sembunyikan dulu dari dashboard
+            if ($proses->jenis === 'Reproses') {
+                Approval::create([
+                    'proses_id'    => $proses->id,
+                    'status'       => 'pending',
+                    'type'         => 'VP',
+                    'action'       => 'create_reprocess',
+                    'history_data' => [
+                        'proses_snapshot' => $proses->toArray(),
+                    ],
+                    'note'         => null,
+                    'requested_by' => Auth::id(),
+                    'approved_by'  => null, // Akan diisi saat VP approve/reject
+                ]);
+
+                return redirect()->route('dashboard', ['page' => $page])
+                    ->with('success', 'Proses Reproses berhasil diajukan dan menunggu persetujuan VP.');
+            }
+
+            // Produksi / Maintenance langsung tampil
             return redirect()->route('dashboard', ['page' => $page])
                 ->with('success', 'Proses berhasil ditambahkan');
         } catch (\Exception $e) {
@@ -432,5 +486,251 @@ class ProsesController extends Controller
             Log::error('Cancel barcode gagal: Exception', ['matdok' => $matdok, 'error' => $e->getMessage()]);
             return response()->json(['status' => 'error', 'message' => 'Gagal request ke SAP API: ' . $e->getMessage()], 500);
         }
+    }
+
+    // Edit Proses
+    public function update(Request $request, $id)
+    {
+        // Hanya izinkan perubahan cycle_time, simpan sebagai request approval FM
+        $request->validate([
+            'cycle_time' => 'required|string',
+        ]);
+
+        $proses = Proses::findOrFail($id);
+
+        // Validasi: hanya bisa edit jika proses belum mulai (mulai masih null)
+        if ($proses->mulai !== null) {
+            $errorMessage = 'Tidak dapat mengubah cycle time. Proses sudah dimulai.';
+            
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => $errorMessage
+                ], 400);
+            }
+            
+            return back()->with('error', $errorMessage);
+        }
+
+        // Konversi cycle_time input (HH:MM:SS) ke detik, sama seperti di store()
+        $inputCycleTime = $request->input('cycle_time');
+        $parts = explode(':', $inputCycleTime);
+        if (count($parts) === 3) {
+            $newCycleTime = ((int) $parts[0]) * 3600 + ((int) $parts[1]) * 60 + ((int) $parts[2]);
+        } elseif (count($parts) === 2) {
+            $newCycleTime = ((int) $parts[0]) * 3600 + ((int) $parts[1]) * 60;
+        } else {
+            $newCycleTime = (int) $inputCycleTime;
+        }
+
+        // Jika tidak ada perubahan nilai, langsung kembali
+        if ($proses->cycle_time == $newCycleTime) {
+            return back()->with('info', 'Cycle time tidak berubah, tidak ada permintaan approval yang dibuat.');
+        }
+
+        // Cek apakah sudah ada pending approval untuk proses ini
+        if ($this->hasPendingApproval($proses->id)) {
+            $pendingApproval = $this->getPendingApproval($proses->id);
+            $actionLabels = [
+                'edit_cycle_time' => 'perubahan cycle time',
+                'delete_proses' => 'penghapusan proses',
+                'move_machine' => 'pemindahan mesin',
+            ];
+            $actionLabel = $actionLabels[$pendingApproval->action] ?? 'perubahan';
+            
+            return back()
+                ->with('error', "Tidak dapat mengajukan permintaan baru. Masih ada permintaan {$actionLabel} yang menunggu persetujuan FM.");
+        }
+
+        // Ambil halaman asal dari referer jika ada (supaya UX konsisten)
+        $referer = $request->headers->get('referer');
+        $page = 1;
+        if ($referer) {
+            $parsed = parse_url($referer);
+            if (isset($parsed['query'])) {
+                parse_str($parsed['query'], $queryArr);
+                if (isset($queryArr['page']) && is_numeric($queryArr['page'])) {
+                    $page = (int) $queryArr['page'];
+                }
+            }
+        }
+
+        // Buat record approval untuk FM (edit cycle time)
+        Approval::create([
+            'proses_id'    => $proses->id,
+            'status'       => 'pending',
+            'type'         => 'FM',
+            'action'       => 'edit_cycle_time',
+            'history_data' => [
+                'old_cycle_time' => $proses->cycle_time,
+                'new_cycle_time' => $newCycleTime,
+                'input_format'   => $inputCycleTime,
+            ],
+            'note'         => null,
+            'requested_by' => Auth::id(),
+            'approved_by'  => null, // Akan diisi saat FM approve/reject
+        ]);
+
+        return redirect()->route('dashboard', ['page' => $page])
+            ->with('success', 'Permintaan perubahan cycle time telah dikirim dan menunggu persetujuan FM.');
+    }
+    
+    // Pindah proses ke mesin lain
+    public function move(Request $request, $id)
+    {
+        $proses = Proses::findOrFail($id);
+        
+        // Validasi: hanya bisa pindah jika proses belum mulai (mulai masih null)
+        if ($proses->mulai !== null) {
+            $errorMessage = 'Tidak dapat memindahkan proses. Proses sudah dimulai.';
+            
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => $errorMessage
+                ], 400);
+            }
+            
+            return back()->with('error', $errorMessage);
+        }
+        
+        $currentMesinId = $proses->mesin_id;
+
+        // Validasi mesin_id baru dengan custom rule untuk memastikan berbeda dari mesin saat ini
+        $request->validate([
+            'mesin_id' => [
+                'required',
+                'exists:mesins,id',
+                function ($attribute, $value, $fail) use ($currentMesinId) {
+                    $newMesinId = (int) $value;
+                    if ($newMesinId == $currentMesinId) {
+                        $fail('Mesin tujuan harus berbeda dari mesin saat ini.');
+                    }
+                },
+            ],
+        ]);
+
+        $newMesinId = (int) $request->input('mesin_id');
+
+        // Cek apakah sudah ada pending approval untuk proses ini
+        if ($this->hasPendingApproval($proses->id)) {
+            $pendingApproval = $this->getPendingApproval($proses->id);
+            $actionLabels = [
+                'edit_cycle_time' => 'perubahan cycle time',
+                'delete_proses' => 'penghapusan proses',
+                'move_machine' => 'pemindahan mesin',
+            ];
+            $actionLabel = $actionLabels[$pendingApproval->action] ?? 'perubahan';
+            
+            $errorMessage = "Tidak dapat mengajukan permintaan baru. Masih ada permintaan {$actionLabel} yang menunggu persetujuan FM.";
+            
+            // Jika request adalah AJAX, kembalikan JSON response
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => $errorMessage
+                ], 400);
+            }
+            
+            return back()->with('error', $errorMessage);
+        }
+
+        // Ambil halaman asal dari referer jika ada (supaya UX konsisten)
+        $referer = $request->headers->get('referer');
+        $page = 1;
+        if ($referer) {
+            $parsed = parse_url($referer);
+            if (isset($parsed['query'])) {
+                parse_str($parsed['query'], $queryArr);
+                if (isset($queryArr['page']) && is_numeric($queryArr['page'])) {
+                    $page = (int) $queryArr['page'];
+                }
+            }
+        }
+
+        // Buat record approval untuk FM (move machine)
+        Approval::create([
+            'proses_id'    => $proses->id,
+            'status'       => 'pending',
+            'type'         => 'FM',
+            'action'       => 'move_machine',
+            'history_data' => [
+                'old_mesin_id' => $proses->mesin_id,
+                'new_mesin_id' => $newMesinId,
+            ],
+            'note'         => null,
+            'requested_by' => Auth::id(),
+            'approved_by'  => null, // Akan diisi saat FM approve/reject
+        ]);
+
+        $successMessage = 'Permintaan pemindahan mesin telah dikirim dan menunggu persetujuan FM.';
+        
+        // Jika request adalah AJAX, kembalikan JSON response
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json([
+                'status' => 'success',
+                'message' => $successMessage,
+                'redirect' => route('dashboard', ['page' => $page])
+            ]);
+        }
+
+        return redirect()->route('dashboard', ['page' => $page])
+            ->with('success', $successMessage);
+    }
+    
+    // Hapus Proses
+    public function destroy(Request $request, $id)
+    {
+        $proses = Proses::findOrFail($id);
+
+        // Validasi: hanya bisa hapus jika proses belum mulai (mulai masih null)
+        if ($proses->mulai !== null) {
+            return back()
+                ->with('error', 'Tidak dapat menghapus proses. Proses sudah dimulai.');
+        }
+
+        // Cek apakah sudah ada pending approval untuk proses ini
+        if ($this->hasPendingApproval($proses->id)) {
+            $pendingApproval = $this->getPendingApproval($proses->id);
+            $actionLabels = [
+                'edit_cycle_time' => 'perubahan cycle time',
+                'delete_proses' => 'penghapusan proses',
+                'move_machine' => 'pemindahan mesin',
+            ];
+            $actionLabel = $actionLabels[$pendingApproval->action] ?? 'perubahan';
+            
+            return back()
+                ->with('error', "Tidak dapat mengajukan permintaan baru. Masih ada permintaan {$actionLabel} yang menunggu persetujuan FM.");
+        }
+
+        // Ambil halaman asal dari referer jika ada
+        $referer = $request->headers->get('referer');
+        $page = 1;
+        if ($referer) {
+            $parsed = parse_url($referer);
+            if (isset($parsed['query'])) {
+                parse_str($parsed['query'], $queryArr);
+                if (isset($queryArr['page']) && is_numeric($queryArr['page'])) {
+                    $page = (int) $queryArr['page'];
+                }
+            }
+        }
+
+        // Buat record approval untuk FM (delete proses), belum menghapus data
+        Approval::create([
+            'proses_id'    => $proses->id,
+            'status'       => 'pending',
+            'type'         => 'FM',
+            'action'       => 'delete_proses',
+            'history_data' => [
+                'proses_snapshot' => $proses->toArray(),
+            ],
+            'note'         => null,
+            'requested_by' => Auth::id(),
+            'approved_by'  => null, // Akan diisi saat FM approve/reject
+        ]);
+
+        return redirect()->route('dashboard', ['page' => $page])
+            ->with('success', 'Permintaan penghapusan proses telah dikirim dan menunggu persetujuan FM.');
     }
 }

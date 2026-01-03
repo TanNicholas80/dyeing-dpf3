@@ -7,6 +7,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\MesinController;
 use App\Http\Controllers\ProsesController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\ApprovalController;
 
 
 Route::get('/', [AuthController::class, 'login'])->name('login');
@@ -28,7 +29,7 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('/user/delete/{id}', [UserController::class, 'destroy'])->name('user.delete');
 
         Route::resource('mesin', MesinController::class)->except(['show']);
-        Route::resource('proses', ProsesController::class);
+        Route::resource('proses', ProsesController::class)->except(['update', 'destroy']);
     });
 
     Route::get('/mesin/statuses', [MesinController::class, 'statuses'])->name('mesin.statuses');
@@ -39,6 +40,14 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/proses/{id}/barcode/aux', [ProsesController::class, 'barcodeAux'])->name('proses.barcode.aux');
     Route::get('/proses/{id}/barcodes', [ProsesController::class, 'barcodes'])->name('proses.barcodes');
     Route::post('/proses/{proses}/barcode/{type}/{barcode}/cancel', [ProsesController::class, 'cancelBarcode']);
+    Route::post('/proses/{id}/update', [ProsesController::class, 'update'])->name('proses.update');
+    Route::post('/proses/{id}/move', [ProsesController::class, 'move'])->name('proses.move');
+    Route::delete('/proses/{id}/delete', [ProsesController::class, 'destroy'])->name('proses.delete');
+
+    // Approval routes
+    Route::get('/approval/fm', [ApprovalController::class, 'approval_fm'])->name('approval.fm');
+    Route::get('/approval/vp', [ApprovalController::class, 'approval_vp'])->name('approval.vp');
+    Route::post('/approval/status', [ApprovalController::class, 'approval_status'])->name('approval.status');
 
     Route::resource('aux', AuxlController::class);
 });
