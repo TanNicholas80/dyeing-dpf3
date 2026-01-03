@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\AuxlController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\MesinController;
 use App\Http\Controllers\ProsesController;
@@ -39,6 +40,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/proses/{id}/barcodes', [ProsesController::class, 'barcodes'])->name('proses.barcodes');
     Route::post('/proses/{proses}/barcode/{type}/{barcode}/cancel', [ProsesController::class, 'cancelBarcode']);
 
+    Route::resource('aux', AuxlController::class);
 });
 
 // Tambahkan di luar middleware auth agar bisa diakses select2

@@ -80,7 +80,7 @@
                             <a href="{{ route('mesin.index') }}" class="nav-link" title="Mesin">Mesin</a>
                         </li>
                         <li class="nav-item">
-                            <a href="#" class="nav-link" title="Aux">Aux</a>
+                            <a href="{{ route('aux.index') }}" class="nav-link" title="Aux">Aux</a>
                         </li>
                         <li class="nav-item">
                             <a href="#" class="nav-link" title="Log">Log</a>
@@ -183,7 +183,7 @@
 
                         <li class="nav-header">KIMIA</li>
                         <li class="nav-item">
-                            <a href="#" class="nav-link">
+                            <a href="{{ route('aux.index') }}" class="nav-link">
                                 <i class="nav-icon fas fa-flask"></i>
                                 <p>
                                     Auxiliary
