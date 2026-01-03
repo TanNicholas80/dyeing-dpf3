@@ -670,7 +670,6 @@
             <div class="modal-content shadow-lg border-0 rounded-3">
                 <form id="formEditProses" method="POST" action="">
                     @csrf
-                    @method('PUT')
                     <input type="hidden" name="proses_id" id="editProsesId">
                     <div class="modal-header bg-primary text-white">
                         <h5 class="modal-title fw-bold" id="modalEditProsesLabel">
@@ -1837,7 +1836,7 @@
         }
 
         const id = proses.id;
-        const updateUrl = "{{ url('proses') }}/" + id;
+        const updateUrl = "{{ url('proses') }}/" + id + "/update";
 
         // Format cycle_time detik ke HH:MM:SS
         let val = proses.cycle_time || 0;

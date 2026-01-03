@@ -132,6 +132,9 @@
 
                                     <!-- Modal History Data -->
                                     @if($approval->history_data)
+                                    @php
+                                    $history = $approval->history_data;
+                                    @endphp
                                     <div class="modal fade" id="modalHistory{{ $approval->id }}" tabindex="-1">
                                         <div class="modal-dialog modal-lg">
                                             <div class="modal-content">
@@ -220,7 +223,7 @@
                                                             </div>
                                                             @php
                                                             $prosesSnapshot = $history['proses_snapshot'] ?? [];
-                                                            $mesin = isset($prosesSnapshot['mesin_id']) ? \App\Models\Mesin::find($prosesSnapshot['mesin_id']) : null;
+                                                            $oldMesin = isset($prosesSnapshot['mesin_id']) ? \App\Models\Mesin::find($prosesSnapshot['mesin_id']) : null;
                                                             @endphp
                                                             <div class="card border-warning mb-3">
                                                                 <div class="card-header bg-warning text-dark">
@@ -248,34 +251,16 @@
                                                                             <span>{{ $prosesSnapshot['item_op'] }}</span>
                                                                         </div>
                                                                         @endif
-                                                                        @if(!empty($prosesSnapshot['kode_material']))
-                                                                        <div class="col-md-6 mb-3">
-                                                                            <strong class="text-muted d-block">Kode Material</strong>
-                                                                            <span class="small">{{ $prosesSnapshot['kode_material'] }}</span>
-                                                                        </div>
-                                                                        @endif
                                                                         @if(!empty($prosesSnapshot['konstruksi']))
                                                                         <div class="col-md-6 mb-3">
                                                                             <strong class="text-muted d-block">Konstruksi</strong>
                                                                             <span>{{ $prosesSnapshot['konstruksi'] }}</span>
                                                                         </div>
                                                                         @endif
-                                                                        @if(!empty($prosesSnapshot['gramasi']))
+                                                                        @if(!empty($prosesSnapshot['kode_material']))
                                                                         <div class="col-md-6 mb-3">
-                                                                            <strong class="text-muted d-block">Gramasi</strong>
-                                                                            <span>{{ $prosesSnapshot['gramasi'] }}</span>
-                                                                        </div>
-                                                                        @endif
-                                                                        @if(!empty($prosesSnapshot['lebar']))
-                                                                        <div class="col-md-6 mb-3">
-                                                                            <strong class="text-muted d-block">Lebar</strong>
-                                                                            <span>{{ $prosesSnapshot['lebar'] }}</span>
-                                                                        </div>
-                                                                        @endif
-                                                                        @if(!empty($prosesSnapshot['hfeel']))
-                                                                        <div class="col-md-6 mb-3">
-                                                                            <strong class="text-muted d-block">Hand Feel</strong>
-                                                                            <span>{{ $prosesSnapshot['hfeel'] }}</span>
+                                                                            <strong class="text-muted d-block">Kode Material</strong>
+                                                                            <span class="small">{{ $prosesSnapshot['kode_material'] }}</span>
                                                                         </div>
                                                                         @endif
                                                                         @if(!empty($prosesSnapshot['warna']) || !empty($prosesSnapshot['kode_warna']))
@@ -287,12 +272,6 @@
                                                                                 <small class="text-muted">({{ $prosesSnapshot['kode_warna'] }})</small>
                                                                                 @endif
                                                                             </span>
-                                                                        </div>
-                                                                        @endif
-                                                                        @if(!empty($prosesSnapshot['kategori_warna']))
-                                                                        <div class="col-md-6 mb-3">
-                                                                            <strong class="text-muted d-block">Kategori Warna</strong>
-                                                                            <span>{{ $prosesSnapshot['kategori_warna'] }}</span>
                                                                         </div>
                                                                         @endif
                                                                         @if(!empty($prosesSnapshot['qty']) || !empty($prosesSnapshot['roll']))
@@ -315,8 +294,8 @@
                                                                         @if(!empty($prosesSnapshot['mesin_id']))
                                                                         <div class="col-md-6 mb-3">
                                                                             <strong class="text-muted d-block">Mesin</strong>
-                                                                            @if($mesin)
-                                                                            <span class="badge badge-info">{{ $mesin->jenis_mesin }}</span>
+                                                                            @if($oldMesin)
+                                                                            <span class="badge badge-info">{{ $oldMesin->jenis_mesin }}</span>
                                                                             @else
                                                                             <span class="text-muted">ID: {{ $prosesSnapshot['mesin_id'] }}</span>
                                                                             @endif
