@@ -71,7 +71,8 @@
                             </a>
                         </li>
                         <li class="nav-item dropdown">
-                            <a id="dropdownSubMenu1" href="#" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" class="nav-link dropdown-toggle" title="Approval">Dropdown</a>
+                            <a id="dropdownSubMenu1" href="#" data-toggle="dropdown" aria-haspopup="true"
+                                aria-expanded="false" class="nav-link dropdown-toggle" title="Approval">Dropdown</a>
                             <ul aria-labelledby="dropdownSubMenu1" class="dropdown-menu border-0 shadow">
                                 <li><a href="{{ route('approval.fm') }}" class="dropdown-item">Approval FM</a></li>
                                 <li><a href="{{ route('approval.vp') }}" class="dropdown-item">Approval VP</a></li>
@@ -316,6 +317,23 @@
             initializeDataTable('#approval_vp');
         });
 
+        $(document).ready(function() {
+            function initializeDataTable(tableId) {
+                $(tableId).DataTable({
+                    "paging": true,
+                    "responsive": false,
+                    "lengthChange": true,
+                    "autoWidth": false,
+                    "scrollX": true,
+                    "searching": true,
+                    "ordering": true,
+                    "info": true,
+                }).buttons().container().appendTo($(tableId + '_wrapper .col-md-6:eq(0)'));
+            }
+            initializeDataTable('#auxl');
+        });
+
+
         // Fullscreen global button logic
         document.addEventListener('DOMContentLoaded', function() {
             const fsBtn = document.getElementById('global-fullscreen-btn');
@@ -356,61 +374,61 @@
     </script>
 
     <script>
-        @if(session('success'))
-        const ToastSuccess = Swal.mixin({
-            toast: true,
-            position: 'top-end',
-            icon: 'success',
-            showConfirmButton: false,
-            timer: 3000,
-            timerProgressBar: true,
-        });
-        ToastSuccess.fire({
-            title: "{{ session('success') }}"
-        });
+        @if (session('success'))
+            const ToastSuccess = Swal.mixin({
+                toast: true,
+                position: 'top-end',
+                icon: 'success',
+                showConfirmButton: false,
+                timer: 3000,
+                timerProgressBar: true,
+            });
+            ToastSuccess.fire({
+                title: "{{ session('success') }}"
+            });
         @endif
 
-        @if(session('error'))
-        const ToastError = Swal.mixin({
-            toast: true,
-            position: 'top-end',
-            icon: 'error',
-            showConfirmButton: false,
-            timer: 3000,
-            timerProgressBar: true,
-        });
-        ToastError.fire({
-            title: "{{ session('error') }}"
-        });
+        @if (session('error'))
+            const ToastError = Swal.mixin({
+                toast: true,
+                position: 'top-end',
+                icon: 'error',
+                showConfirmButton: false,
+                timer: 3000,
+                timerProgressBar: true,
+            });
+            ToastError.fire({
+                title: "{{ session('error') }}"
+            });
         @endif
 
-        @if(session('info'))
-        const ToastInfo = Swal.mixin({
-            toast: true,
-            position: 'top-end',
-            icon: 'info',
-            showConfirmButton: false,
-            timer: 3000,
-            timerProgressBar: true,
-        });
-        ToastInfo.fire({
-            title: "{{ session('info') }}"
-        });
+        @if (session('info'))
+            const ToastInfo = Swal.mixin({
+                toast: true,
+                position: 'top-end',
+                icon: 'info',
+                showConfirmButton: false,
+                timer: 3000,
+                timerProgressBar: true,
+            });
+            ToastInfo.fire({
+                title: "{{ session('info') }}"
+            });
         @endif
 
-        @if($errors->any())
-        const ToastValidation = Swal.mixin({
-            toast: true,
-            position: 'top-end',
-            icon: 'error',
-            showConfirmButton: false,
-            timer: 4000,
-            timerProgressBar: true,
-        });
-        let errorMsg = `{!! implode('<br>', $errors->all()) !!}`;
-        ToastValidation.fire({
-            html: errorMsg
-        });
+        @if ($errors->any())
+            const ToastValidation = Swal.mixin({
+                toast: true,
+                position: 'top-end',
+                icon: 'error',
+                showConfirmButton: false,
+                timer: 4000,
+                timerProgressBar: true,
+            });
+            let errorMsg = `{!! implode('<br>', $errors->all()) !!}`;
+            ToastValidation.fire({
+                html: errorMsg
+            });
         @endif
     </script>
 

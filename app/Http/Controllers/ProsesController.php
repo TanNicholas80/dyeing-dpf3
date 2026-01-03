@@ -285,7 +285,7 @@ class ProsesController extends Controller
                 return back()->withInput()->with('error', $errorMsg);
             }
             // Format body untuk API
-            $details = $tickets->map(function($row) {
+            $details = $tickets->map(function ($row) {
                 return $row->PRODUCT_CODE . '/' . ($row->ACTUAL_WT ?? 0);
             })->implode('|');
             $body = '"' . $no_op . ';' . $details . '"';
@@ -354,46 +354,84 @@ class ProsesController extends Controller
         }
         try {
             $proses = Proses::findOrFail($id);
-            $proses->barcode_aux = $request->barcode;
-            $proses->save();
-            $successMsg = 'Barcode AUX berhasil disimpan!';
-            if ($request->ajax()) {
-                return response()->json([
-                    'redirect' => route('dashboard', ['page' => $page]),
-                    'message' => $successMsg,
-                    'status' => 'success',
-                ]);
+            $barcode = $request->barcode;
+            // Cari data auxl berdasarkan barcode (hanya untuk validasi & relasi detail)
+            $auxl = \App\Models\Auxl::where('barcode', $barcode)->first();
+            if (!$auxl) {
+                return back()->withInput()->with('error', 'Barcode tidak ditemukan di data auxiliary!');
             }
+            // Ambil detail auxiliary
+            $details = $auxl->details;
+            if ($details->isEmpty()) {
+                return back()->withInput()->with('error', 'Data detail auxiliary tidak ditemukan!');
+            }
+            // Format: auxiliary/konsentrasi (konsentrasi dalam gram)
+            $detailStr = $details->map(function ($d) {
+                $aux = $d->auxiliary;
+                $kons = (float)$d->konsentrasi * 1000; // kg ke gram
+                return $aux . '/' . (int)$kons;
+            })->implode('|');
+            $body = '"' . $proses->no_op . ';' . $detailStr . '"';
+            // Kirim ke API SAP
+            $client = new \GuzzleHttp\Client();
+            $response = $client->post(
+                'http://18.140.227.2:8000/sap/bc/zdyes/zterima_kimia?sap-client=310',
+                [
+                    'headers' => [
+                        'Authorization' => 'Basic RFRfRFZEOkFxdWluYWxkbzc=',
+                        'Content-Type' => 'text/plain',
+                        'Accept' => 'application/json',
+                    ],
+                    'body' => $body,
+                    'timeout' => 10,
+                ]
+            );
+            $rawResponse = $response->getBody()->getContents();
+            Log::info('API Response for barcode AUX:', ['body' => $body, 'response' => $rawResponse]);
+            $data = json_decode($rawResponse, true);
+            if (empty($data)) {
+                return back()->withInput()->with('error', 'Barcode atau detail auxiliary tidak dikenali oleh sistem SAP (API response kosong)');
+            }
+            if (!is_array($data) || !isset($data[0]['stats'])) {
+                return back()->withInput()->with('error', 'Gagal validasi barcode: response tidak valid');
+            }
+            if ($data[0]['stats'] !== 'success') {
+                $errorMsg = $data[0]['stats'] ?: 'Barcode tidak dapat digunakan';
+                return back()->withInput()->with('error', $errorMsg);
+            }
+            // Sukses, simpan ke tabel barcode_aux
+            \App\Models\BarcodeAux::create([
+                'proses_id' => $proses->id,
+                'no_op' => $proses->no_op,
+                'no_partai' => $proses->no_partai,
+                'barcode' => $barcode,
+                'matdok' => $data[0]['mblnr'] ?? null,
+                'mesin_id' => $proses->mesin_id,
+                'cancel' => false,
+            ]);
             return redirect()->route('dashboard', ['page' => $page])
-                ->with('success', $successMsg);
+                ->with('success', 'Barcode AUX berhasil disimpan & dikirim ke SAP!');
         } catch (\Exception $e) {
             $errorMsg = 'Gagal menyimpan barcode AUX: ' . $e->getMessage();
-            if ($request->ajax()) {
-                return response()->json([
-                    'message' => $errorMsg,
-                    'status' => 'error',
-                ], 500);
-            }
-            return back()
-                ->withInput()
-                ->with('error', $errorMsg);
+            return back()->withInput()->with('error', $errorMsg);
         }
     }
+
 
     // Endpoint untuk ambil semua barcode berdasarkan proses_id
     public function barcodes($id)
     {
         $proses = Proses::findOrFail($id);
         // Pastikan field matdok selalu ada di response
-        $barcodeKain = $proses->barcodeKains()->get()->map(function($b) {
+        $barcodeKain = $proses->barcodeKains()->get()->map(function ($b) {
             $b->matdok = $b->matdok ?? '';
             return $b;
         });
-        $barcodeLa = $proses->barcodeLas()->get()->map(function($b) {
+        $barcodeLa = $proses->barcodeLas()->get()->map(function ($b) {
             $b->matdok = $b->matdok ?? '';
             return $b;
         });
-        $barcodeAux = $proses->barcodeAuxs()->get()->map(function($b) {
+        $barcodeAux = $proses->barcodeAuxs()->get()->map(function ($b) {
             $b->matdok = $b->matdok ?? '';
             return $b;
         });
@@ -501,14 +539,14 @@ class ProsesController extends Controller
         // Validasi: hanya bisa edit jika proses belum mulai (mulai masih null)
         if ($proses->mulai !== null) {
             $errorMessage = 'Tidak dapat mengubah cycle time. Proses sudah dimulai.';
-            
+
             if ($request->ajax() || $request->wantsJson()) {
                 return response()->json([
                     'status' => 'error',
                     'message' => $errorMessage
                 ], 400);
             }
-            
+
             return back()->with('error', $errorMessage);
         }
 
@@ -537,7 +575,7 @@ class ProsesController extends Controller
                 'move_machine' => 'pemindahan mesin',
             ];
             $actionLabel = $actionLabels[$pendingApproval->action] ?? 'perubahan';
-            
+
             return back()
                 ->with('error', "Tidak dapat mengajukan permintaan baru. Masih ada permintaan {$actionLabel} yang menunggu persetujuan FM.");
         }
@@ -574,26 +612,26 @@ class ProsesController extends Controller
         return redirect()->route('dashboard', ['page' => $page])
             ->with('success', 'Permintaan perubahan cycle time telah dikirim dan menunggu persetujuan FM.');
     }
-    
+
     // Pindah proses ke mesin lain
     public function move(Request $request, $id)
     {
         $proses = Proses::findOrFail($id);
-        
+
         // Validasi: hanya bisa pindah jika proses belum mulai (mulai masih null)
         if ($proses->mulai !== null) {
             $errorMessage = 'Tidak dapat memindahkan proses. Proses sudah dimulai.';
-            
+
             if ($request->ajax() || $request->wantsJson()) {
                 return response()->json([
                     'status' => 'error',
                     'message' => $errorMessage
                 ], 400);
             }
-            
+
             return back()->with('error', $errorMessage);
         }
-        
+
         $currentMesinId = $proses->mesin_id;
 
         // Validasi mesin_id baru dengan custom rule untuk memastikan berbeda dari mesin saat ini
@@ -621,9 +659,9 @@ class ProsesController extends Controller
                 'move_machine' => 'pemindahan mesin',
             ];
             $actionLabel = $actionLabels[$pendingApproval->action] ?? 'perubahan';
-            
+
             $errorMessage = "Tidak dapat mengajukan permintaan baru. Masih ada permintaan {$actionLabel} yang menunggu persetujuan FM.";
-            
+
             // Jika request adalah AJAX, kembalikan JSON response
             if ($request->ajax() || $request->wantsJson()) {
                 return response()->json([
@@ -631,7 +669,7 @@ class ProsesController extends Controller
                     'message' => $errorMessage
                 ], 400);
             }
-            
+
             return back()->with('error', $errorMessage);
         }
 
@@ -664,7 +702,7 @@ class ProsesController extends Controller
         ]);
 
         $successMessage = 'Permintaan pemindahan mesin telah dikirim dan menunggu persetujuan FM.';
-        
+
         // Jika request adalah AJAX, kembalikan JSON response
         if ($request->ajax() || $request->wantsJson()) {
             return response()->json([
@@ -677,7 +715,7 @@ class ProsesController extends Controller
         return redirect()->route('dashboard', ['page' => $page])
             ->with('success', $successMessage);
     }
-    
+
     // Hapus Proses
     public function destroy(Request $request, $id)
     {
@@ -698,7 +736,7 @@ class ProsesController extends Controller
                 'move_machine' => 'pemindahan mesin',
             ];
             $actionLabel = $actionLabels[$pendingApproval->action] ?? 'perubahan';
-            
+
             return back()
                 ->with('error', "Tidak dapat mengajukan permintaan baru. Masih ada permintaan {$actionLabel} yang menunggu persetujuan FM.");
         }

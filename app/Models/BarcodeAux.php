@@ -12,7 +12,7 @@ class BarcodeAux extends Model
     protected $table = 'barcode_aux';
 
     protected $fillable = [
-        'no_op', 'no_partai', 'barcode', 'matdok', 'mesin_id', 'cancel'
+        'proses_id', 'no_op', 'no_partai', 'barcode', 'matdok', 'mesin_id', 'cancel'
     ];
 
     public function mesin()
