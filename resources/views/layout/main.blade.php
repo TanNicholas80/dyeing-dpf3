@@ -72,7 +72,7 @@
                         </li>
                         <li class="nav-item dropdown">
                             <a id="dropdownSubMenu1" href="#" data-toggle="dropdown" aria-haspopup="true"
-                                aria-expanded="false" class="nav-link dropdown-toggle" title="Approval">Dropdown</a>
+                                aria-expanded="false" class="nav-link dropdown-toggle" title="Approval">Approval</a>
                             <ul aria-labelledby="dropdownSubMenu1" class="dropdown-menu border-0 shadow">
                                 <li>
                                     <a href="{{ route('approval.fm') }}" class="dropdown-item">
@@ -169,7 +169,7 @@
                             </a>
                         </li>
 
-                        <li class="nav-header">FACTORY MANAGER</li>
+                        <li class="nav-header">APPROVAL</li>
                         <li class="nav-item">
                             <a href="{{ route('approval.fm') }}" class="nav-link">
                                 <i class="nav-icon fas fa-clipboard-check"></i>
