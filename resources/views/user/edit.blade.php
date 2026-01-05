@@ -64,6 +64,8 @@
                                             'ppic' => 'PPIC',
                                             'mesin' => 'Mesin',
                                             'ds' => 'DS',
+                                            'fm' => 'FM',
+                                            'vp' => 'VP',
                                         ];
                                     @endphp
                                     @foreach ($roles as $value => $label)

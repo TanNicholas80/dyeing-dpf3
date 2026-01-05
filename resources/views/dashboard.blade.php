@@ -1106,7 +1106,7 @@
             // Cek apakah next sibling masih ada dan masih di parent yang sama
             if (originalNextSibling && 
                 originalNextSibling.parentElement === originalParent && 
-                originalNextSibling.parentElement.contains(originalNextSibling)) {
+                originalParent.contains(originalNextSibling)) {
                 originalParent.insertBefore(card, originalNextSibling);
             } else {
                 // Jika next sibling tidak ada atau sudah pindah, append di akhir
@@ -1642,7 +1642,7 @@
                 $btnDelete.tooltip('dispose');
             }
         }
-        const hiddenFields = ['id', 'created_at', 'updated_at', 'mesin_id'];
+        const hiddenFields = ['id', 'created_at', 'updated_at', 'deleted_at', 'mesin_id'];
         // Daftar field yang harus disembunyikan jika Maintenance
         const maintenanceFields = [
             'no_op', 'item_op', 'kode_material', 'konstruksi', 'no_partai',

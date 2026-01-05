@@ -66,6 +66,8 @@
                                     <option value="ppic" {{ old('role') == 'ppic' ? 'selected' : '' }}>PPIC</option>
                                     <option value="mesin" {{ old('role') == 'mesin' ? 'selected' : '' }}>Mesin</option>
                                     <option value="ds" {{ old('role') == 'ds' ? 'selected' : '' }}>DS</option>
+                                    <option value="fm" {{ old('role') == 'fm' ? 'selected' : '' }}>FM</option>
+                                    <option value="vp" {{ old('role') == 'vp' ? 'selected' : '' }}>VP</option>
                                 </select>
                                 @error('role')
                                     <small class="text-danger">{{ $message }}</small>
