@@ -73,6 +73,78 @@
         opacity: 0.6;
         pointer-events: none;
     }
+
+    /* Styling untuk card-dropzone dengan vertical scroll untuk semua konten (history + proses aktif) */
+    .card-dropzone {
+        display: flex;
+        flex-direction: column;
+        max-height: calc(100vh - 200px);
+        overflow-y: auto;
+        overflow-x: hidden;
+    }
+
+    /* Container untuk proses aktif - tidak perlu scroll sendiri */
+    .proses-aktif-container {
+        flex-shrink: 0;
+    }
+
+    /* Styling untuk history wrapper */
+    .proses-history-wrapper {
+        margin-bottom: 8px;
+        flex-shrink: 0;
+    }
+
+    /* Container untuk history - tidak perlu scroll sendiri, scroll bersama parent */
+    .proses-history-container {
+        background: #f9f9f9;
+        border-radius: 4px;
+        padding: 5px;
+        margin-top: 5px;
+    }
+
+    /* Styling untuk history card */
+    .history-card {
+        opacity: 0.85;
+        transition: opacity 0.2s;
+    }
+
+    .history-card:hover {
+        opacity: 1;
+    }
+
+    /* Scrollbar styling untuk card-dropzone (vertical) */
+    .card-dropzone::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    .card-dropzone::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 4px;
+    }
+
+    .card-dropzone::-webkit-scrollbar-thumb {
+        background: #888;
+        border-radius: 4px;
+    }
+
+    .card-dropzone::-webkit-scrollbar-thumb:hover {
+        background: #555;
+    }
+
+    /* Tombol toggle history */
+    .btn-toggle-history {
+        width: 100%;
+        margin-top: 5px;
+        font-size: 12px;
+        padding: 4px 8px;
+    }
+
+    /* Pastikan machine-column memiliki height yang sesuai */
+    .machine-column > div > div {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+    }
 </style>
 <div class="content-wrapper">
     <!-- Content Header -->
@@ -119,6 +191,40 @@
 
                 @php
                 use Illuminate\Support\Str;
+                use App\Models\Approval;
+
+                // Ambil semua proses ID yang terlibat dalam swap position approval
+                // Termasuk swapped_proses_id dan affected_proses_ids (semua proses yang terpengaruh)
+                // Sama seperti di DashboardController untuk konsistensi
+                $affectedProsesIds = [];
+                try {
+                    $swapApprovals = Approval::where('status', 'pending')
+                        ->where('type', 'FM')
+                        ->where('action', 'swap_position')
+                        ->get();
+                    
+                    foreach ($swapApprovals as $appr) {
+                        $historyData = $appr->history_data;
+                        if (is_string($historyData)) {
+                            $historyData = json_decode($historyData, true);
+                        }
+                        if (is_array($historyData)) {
+                            // Tambahkan swapped_proses_id (untuk backward compatibility)
+                            if (isset($historyData['swapped_proses_id'])) {
+                                $affectedProsesIds[] = (int)$historyData['swapped_proses_id'];
+                            }
+                            // Tambahkan semua affected_proses_ids (proses yang akan bergeser)
+                            if (isset($historyData['affected_proses_ids']) && is_array($historyData['affected_proses_ids'])) {
+                                foreach ($historyData['affected_proses_ids'] as $id) {
+                                    $affectedProsesIds[] = (int)$id;
+                                }
+                            }
+                        }
+                    }
+                    $affectedProsesIds = array_unique($affectedProsesIds);
+                } catch (\Exception $e) {
+                    $affectedProsesIds = [];
+                }
 
                 // --- Fungsi helper untuk menentukan gradient dan warna teks otomatis ---
                 function getGradient($bg)
@@ -133,7 +239,7 @@
                 '#002b80' => 'linear-gradient(180deg, #6dd5ed 0%, #2193b0 60%, #002b80 100%)',
                 // Hijau (selesai normal)
                 '#00c853' => 'linear-gradient(180deg, #b2f7c1 0%, #56ab2f 60%, #378a1b 100%)',
-                // Merah (selesai overtime)
+                // Merah (selesai overtime atau barcode belum lengkap)
                 '#e53935' => 'linear-gradient(180deg, #ffb3b3 0%, #e53935 60%, #b71c1c 100%)',
                 ];
                 return $map[$bg] ?? $map['#757575'];
@@ -187,8 +293,291 @@
                                     <div style="height: 2px; background: #fff;"></div>
                                     @php
                                     $prosesMesin = $prosesList->where('mesin_id', $mesin->id);
+                                    
+                                    // PISAHKAN: Proses Aktif vs History
+                                    $prosesAktif = $prosesMesin->filter(function($p) {
+                                        // Aktif = belum selesai (selesai === null)
+                                        return $p->selesai === null;
+                                    })->sort(function($a, $b) {
+                                        // Urutkan berdasarkan order untuk proses pending (belum mulai)
+                                        if (!$a->mulai && !$b->mulai) {
+                                            $orderA = (int)($a->order ?? 0);
+                                            $orderB = (int)($b->order ?? 0);
+                                            if ($orderA !== $orderB) {
+                                                return $orderA <=> $orderB;
+                                            }
+                                        }
+                                        // Fallback ke created_at dan id
+                                        if ($a->created_at != $b->created_at) {
+                                            return $a->created_at <=> $b->created_at;
+                                        }
+                                        return $a->id <=> $b->id;
+                                    });
+                                    
+                                    $prosesHistory = $prosesMesin->filter(function($p) {
+                                        // History = sudah selesai
+                                        return $p->selesai !== null;
+                                    })->sortByDesc('selesai'); // Urutkan terbaru di atas
                                     @endphp
-                                    @foreach ($prosesMesin as $proses)
+                                    
+                                    {{-- PROSES HISTORY (Button di atas, Hidden by default, scroll bersama parent) --}}
+                                    @if($prosesHistory->count() > 0)
+                                    <div class="proses-history-wrapper" style="margin-bottom: 8px;">
+                                        <button class="btn-toggle-history btn btn-sm btn-secondary" 
+                                                data-mesin-id="{{ $mesin->id }}"
+                                                type="button">
+                                            <i class="fas fa-history"></i> Tampilkan History ({{ $prosesHistory->count() }})
+                                        </button>
+                                        <div class="proses-history-container" 
+                                             id="history-{{ $mesin->id }}"
+                                             style="display: none;">
+                                            @foreach ($prosesHistory as $proses)
+                                            @php
+                                            // Reuse logic yang sama untuk history card
+                                            $type =
+                                            $proses->jenis === 'Produksi'
+                                            ? 'P'
+                                            : ($proses->jenis === 'Reproses'
+                                            ? 'R'
+                                            : 'M');
+                                            if ($proses->jenis === 'Maintenance') {
+                                            $blockColors = ['gray', 'gray', 'gray'];
+                                            } else {
+                                            $hasBarcodeKain =
+                                            isset($proses->barcodeKains) &&
+                                            is_iterable($proses->barcodeKains)
+                                            ? collect($proses->barcodeKains)
+                                            ->where('cancel', false)
+                                            ->count() > 0
+                                            : isset($proses->barcode_kain) && $proses->barcode_kain;
+                                            $hasBarcodeLa =
+                                            isset($proses->barcodeLas) &&
+                                            is_iterable($proses->barcodeLas)
+                                            ? collect($proses->barcodeLas)
+                                            ->where('cancel', false)
+                                            ->count() > 0
+                                            : isset($proses->barcode_la) && $proses->barcode_la;
+                                            $hasBarcodeAux =
+                                            isset($proses->barcodeAuxs) &&
+                                            is_iterable($proses->barcodeAuxs)
+                                            ? collect($proses->barcodeAuxs)
+                                            ->where('cancel', false)
+                                            ->count() > 0
+                                            : isset($proses->barcode_aux) && $proses->barcode_aux;
+                                            $blockColors = [
+                                            $hasBarcodeKain ? 'green' : 'red',
+                                            $hasBarcodeLa ? 'green' : 'red',
+                                            $hasBarcodeAux ? 'green' : 'red',
+                                            ];
+                                            }
+                                            $blocks = ['G', 'D', 'A'];
+                                            if ($proses->mulai && !$proses->selesai) {
+                                            $light = 'green';
+                                            } else {
+                                            $light = 'red';
+                                            }
+                                            $bg = '#757575';
+                                            $hasPendingChange = false;
+                                            $hasPendingReprocessApproval = false;
+                                            if (isset($proses->approvals) && is_iterable($proses->approvals)) {
+                                            $hasPendingChange = collect($proses->approvals)->contains(function ($appr) {
+                                            return $appr->status === 'pending'
+                                            && $appr->type === 'FM'
+                                            && in_array($appr->action, ['edit_cycle_time', 'delete_proses', 'move_machine', 'swap_position']);
+                                            });
+                                            if ($proses->jenis === 'Reproses') {
+                                            $hasPendingReprocessApproval = collect($proses->approvals)->contains(function ($appr) {
+                                            return $appr->status === 'pending'
+                                            && $appr->action === 'create_reprocess'
+                                            && ($appr->type === 'FM' || $appr->type === 'VP');
+                                            });
+                                            }
+                                            }
+                                            // Cek apakah proses ini terlibat dalam swap position approval dari proses lain
+                                            // (sebagai swapped_proses_id atau affected_proses_ids di history_data approval swap_position)
+                                            if (!$hasPendingChange && in_array($proses->id, $affectedProsesIds)) {
+                                            $hasPendingChange = true;
+                                            }
+                                            if ($hasPendingChange || $hasPendingReprocessApproval) {
+                                            $bg = '#ffeb3b';
+                                            } elseif ($proses->jenis === 'Maintenance') {
+                                            $bg = '#757575';
+                                            } elseif (!$proses->mulai) {
+                                            $bg = '#757575';
+                                            } elseif ($proses->selesai) {
+                                            $mulai = \Carbon\Carbon::parse($proses->mulai);
+                                            $selesai = \Carbon\Carbon::parse($proses->selesai);
+                                            $cycle_time_actual = max(
+                                            0,
+                                            $mulai->diffInSeconds($selesai, false),
+                                            );
+                                            $cycle_time = $proses->cycle_time
+                                            ? (int) $proses->cycle_time
+                                            : 0;
+                                            $cycle_time_actual = $proses->cycle_time_actual
+                                            ? (int) $proses->cycle_time_actual
+                                            : 0;
+                                            if ($cycle_time_actual > $cycle_time + 3600) {
+                                            $bg = '#e53935';
+                                            } else {
+                                            $bg = '#00c853';
+                                            }
+                                            } else {
+                                            // Proses sedang berjalan (mulai ada, selesai belum)
+                                            // Cek barcode menggunakan relasi yang sama seperti DashboardController
+                                            $hasBarcodeKain = $proses->barcodeKains ? $proses->barcodeKains->where('cancel', false)->count() > 0 : false;
+                                            $hasBarcodeLa = $proses->barcodeLas ? $proses->barcodeLas->where('cancel', false)->count() > 0 : false;
+                                            $hasBarcodeAux = $proses->barcodeAuxs ? $proses->barcodeAuxs->where('cancel', false)->count() > 0 : false;
+                                            if ($proses->jenis !== 'Maintenance' && (!$hasBarcodeKain || !$hasBarcodeLa || !$hasBarcodeAux)) {
+                                            $bg = '#e53935'; // merah (barcode belum lengkap)
+                                            } else {
+                                            $bg = '#002b80'; // biru (berjalan dengan barcode lengkap)
+                                            }
+                                            }
+                                            $gradient = getGradient($bg);
+                                            $estimasi_selesai = null;
+                                            if ($proses->mulai && !$proses->selesai && $proses->cycle_time) {
+                                            $estimasi_selesai = \Carbon\Carbon::parse(
+                                            $proses->mulai,
+                                            )->addSeconds((int) $proses->cycle_time);
+                                            }
+                                            $cycle_time_actual_str = '00:00:00';
+                                            if ($proses->mulai && $proses->selesai) {
+                                            $mulai = \Carbon\Carbon::parse($proses->mulai);
+                                            $selesai = \Carbon\Carbon::parse($proses->selesai);
+                                            $cycle_time_actual = max(
+                                            0,
+                                            $mulai->diffInSeconds($selesai, false),
+                                            );
+                                            $cycle_time_actual_str = detikKeWaktu($cycle_time_actual);
+                                            }
+                                            @endphp
+                                            <div class="status-card history-card draggable" draggable="false"
+                                                style="background: {{ $gradient }}; background-repeat: no-repeat; background-size: cover; border-radius: 0; color: #fff; margin: 5px 0 0 0; padding: 2px 2px; cursor: default; box-shadow: 0 2px 6px rgba(0,0,0,0.2);"
+                                                data-proses='@json($proses)' data-proses-id="{{ $proses->id }}" data-can-move="0" data-has-pending-reprocess="{{ $hasPendingReprocessApproval ? '1' : '0' }}" data-bg-color="{{ $bg }}">
+                                                {{-- Header --}}
+                                                <div class="card-header"
+                                                    style="display: flex; flex-direction: row; align-items: center; padding: 0 10px 2px 10px; gap: 0; border-bottom: none;">
+                                                    <div style="flex: 1; text-align: left;">
+                                                        <span class="status-type"
+                                                            style="font-weight: bold; font-size: 32px; color: #111; text-shadow: 0 1px 4px #fff8;">
+                                                            {{ $type }}
+                                                        </span>
+                                                    </div>
+                                                    <div
+                                                        style="flex: 2; text-align: center; display: flex; justify-content: center; gap: 6px;">
+                                                        @foreach ($blocks as $i => $b)
+                                                        @php
+                                                        $color = $blockColors[$i];
+                                                        if ($proses->jenis === 'Maintenance') {
+                                                        $blockBg = '#e0e0e0';
+                                                        $blockBorder = '#757575';
+                                                        } else {
+                                                        $blockBg =
+                                                        $color === 'green' ? '#d4f8e8' : '#ffb3b3';
+                                                        $blockBorder =
+                                                        $color === 'green' ? '#43a047' : '#c62828';
+                                                        }
+                                                        @endphp
+                                                        <span
+                                                            style="display: inline-block; background: {{ $blockBg }}; color: #111; font-weight: bold; font-size: 22px; padding: 2px 10px; border-radius: 6px; border: 2.5px solid {{ $blockBorder }}; box-shadow: 0 1px 4px rgba(0,0,0,0.10); letter-spacing: 1px; text-shadow: 0 1px 2px #fff8;">
+                                                            {{ $b }}
+                                                        </span>
+                                                        @endforeach
+                                                    </div>
+                                                    <div style="flex: 1; text-align: right;">
+                                                        <div class="status-light"
+                                                            style="width: 24px; height: 24px; border-radius: 50%; background: {{ $light == 'green' ? '#00ff1a' : '#ff2a2a' }}; display: inline-block; border: 3px solid #fff; box-shadow: 0 0 0 0 transparent; transition: background 0.2s;">
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                {{-- Body --}}
+                                                <div class="card-body"
+                                                    style="text-align: center; font-size: 12px; padding: 2px 10px; color: #fff;">
+                                                    <div class="card-id"
+                                                        style="font-weight: bold; color: #111; font-size: 22px; letter-spacing: 2px; text-shadow: 0 1px 4px #fff8;">
+                                                        {{ $proses->no_op ? $proses->no_op : 'MAINTENANCE' }}
+                                                    </div>
+                                                    <div class="card-time"
+                                                        style="display: flex; justify-content: space-between; font-size: 12px; margin: 2px 0; color: #fff; text-shadow: 0 1px 2px #0008;">
+                                                        <span>
+                                                            @php
+                                                            $showTime = '00:00:00';
+                                                            if ($proses->cycle_time_actual) {
+                                                            $showTime = detikKeWaktu(
+                                                            $proses->cycle_time_actual,
+                                                            );
+                                                            } elseif ($proses->mulai && $proses->selesai) {
+                                                            $mulai = \Carbon\Carbon::parse($proses->mulai);
+                                                            $selesai = \Carbon\Carbon::parse(
+                                                            $proses->selesai,
+                                                            );
+                                                            $showTime = detikKeWaktu(
+                                                            max(
+                                                            0,
+                                                            $mulai->diffInSeconds($selesai, false),
+                                                            ),
+                                                            );
+                                                            } elseif ($proses->mulai && !$proses->selesai) {
+                                                            $now = \Carbon\Carbon::now();
+                                                            $mulai = \Carbon\Carbon::parse($proses->mulai);
+                                                            $showTime = detikKeWaktu(
+                                                            max(0, $mulai->diffInSeconds($now)),
+                                                            );
+                                                            }
+                                                            @endphp
+                                                            {{ $showTime }}
+                                                        </span>
+                                                        <span>/</span>
+                                                        <span>
+                                                            @if ($proses->cycle_time)
+                                                            {{ detikKeWaktu($proses->cycle_time) }}
+                                                            @else
+                                                            -
+                                                            @endif
+                                                        </span>
+                                                    </div>
+                                                    <div class="card-info"
+                                                        style="font-size: 9px; margin: 2px 0; color: #fff; text-shadow: 0 1px 2px #0008;">
+                                                        <div>{{ $proses->warna ? $proses->warna : 'Warna' }} -
+                                                            {{ $proses->kategori_warna ? $proses->kategori_warna : 'Kategori' }}
+                                                            -
+                                                            {{ $proses->kode_warna ? $proses->kode_warna : 'Kode' }}
+                                                        </div>
+                                                        <div>
+                                                            {{ $proses->konstruksi ? $proses->konstruksi : 'Konstruksi' }}
+                                                        </div>
+                                                    </div>
+                                                    <div class="card-date"
+                                                        style="display: flex; justify-content: space-between; font-size: 10px; color: #fff; text-shadow: 0 1px 2px #0008;">
+                                                        <span>
+                                                            @if ($proses->mulai)
+                                                            {{ \Carbon\Carbon::parse($proses->mulai)->format('d-m-Y H:i:s') }}
+                                                            @else
+                                                            DD-MM-YYYY HH:MM:SS
+                                                            @endif
+                                                        </span>
+                                                        <span>|</span>
+                                                        <span>
+                                                            @if ($proses->selesai)
+                                                            {{ \Carbon\Carbon::parse($proses->selesai)->format('d-m-Y H:i:s') }}
+                                                            @elseif ($estimasi_selesai)
+                                                            Est: {{ $estimasi_selesai->format('d-m-Y H:i:s') }}
+                                                            @else
+                                                            DD-MM-YYYY HH:MM:SS
+                                                            @endif
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                    @endif
+                                    
+                                    {{-- PROSES AKTIF (Default Visible, scroll bersama parent) --}}
+                                    <div class="proses-aktif-container">
+                                    @foreach ($prosesAktif as $proses)
                                     @php
                                     // Jenis proses: P/R/M
                                     $type =
@@ -244,20 +633,25 @@
                                     $hasPendingChange = false;
                                     $hasPendingReprocessApproval = false;
                                     if (isset($proses->approvals) && is_iterable($proses->approvals)) {
-                                    // Cek pending approval FM untuk edit/delete/move
+                                    // Cek pending approval FM untuk edit/delete/move/swap
                                     $hasPendingChange = collect($proses->approvals)->contains(function ($appr) {
                                     return $appr->status === 'pending'
                                     && $appr->type === 'FM'
-                                    && in_array($appr->action, ['edit_cycle_time', 'delete_proses', 'move_machine']);
+                                    && in_array($appr->action, ['edit_cycle_time', 'delete_proses', 'move_machine', 'swap_position']);
                                     });
-                                    // Cek pending approval VP untuk Reproses
+                                    // Cek pending approval FM atau VP untuk Reproses (2 tahap approval: FM dulu, baru VP)
                                     if ($proses->jenis === 'Reproses') {
                                     $hasPendingReprocessApproval = collect($proses->approvals)->contains(function ($appr) {
                                     return $appr->status === 'pending'
-                                    && $appr->type === 'VP'
-                                    && $appr->action === 'create_reprocess';
+                                    && $appr->action === 'create_reprocess'
+                                    && ($appr->type === 'FM' || $appr->type === 'VP');
                                     });
                                     }
+                                    }
+                                    // Cek apakah proses ini terlibat dalam swap position approval dari proses lain
+                                    // (sebagai swapped_proses_id atau affected_proses_ids di history_data approval swap_position)
+                                    if (!$hasPendingChange && in_array($proses->id, $affectedProsesIds)) {
+                                    $hasPendingChange = true;
                                     }
                                     if ($hasPendingChange || $hasPendingReprocessApproval) {
                                     $bg = '#ffeb3b'; // kuning untuk menandai ada perubahan yang menunggu approval
@@ -266,32 +660,30 @@
                                     } elseif (!$proses->mulai) {
                                     $bg = '#757575'; // abu2
                                     } elseif ($proses->selesai) {
+                                    // Hitung cycle_time_actual jika belum ada
+                                    $cycle_time_actual = $proses->cycle_time_actual;
+                                    if (!$cycle_time_actual && $proses->mulai && $proses->selesai) {
                                     $mulai = \Carbon\Carbon::parse($proses->mulai);
                                     $selesai = \Carbon\Carbon::parse($proses->selesai);
-                                    $cycle_time_actual = max(
-                                    0,
-                                    $mulai->diffInSeconds($selesai, false),
-                                    );
-                                    $cycle_time = $proses->cycle_time
-                                    ? (int) $proses->cycle_time
-                                    : 0;
-                                    $cycle_time_actual = $proses->cycle_time_actual
-                                    ? (int) $proses->cycle_time_actual
-                                    : 0;
+                                    $cycle_time_actual = max(0, $mulai->diffInSeconds($selesai, false));
+                                    }
+                                    $cycle_time = $proses->cycle_time ? (int) $proses->cycle_time : 0;
+                                    $cycle_time_actual = $cycle_time_actual ? (int) $cycle_time_actual : 0;
                                     if ($cycle_time_actual > $cycle_time + 3600) {
-                                    $bg = '#e53935'; // merah
+                                    $bg = '#e53935'; // merah (overtime)
                                     } else {
-                                    $bg = '#00c853'; // hijau
+                                    $bg = '#00c853'; // hijau (selesai normal)
                                     }
                                     } else {
-                                    if (
-                                    !$proses->barcode_kain ||
-                                    !$proses->barcode_la ||
-                                    !$proses->barcode_aux
-                                    ) {
-                                    $bg = '#e53935'; // merah
+                                    // Proses sedang berjalan (mulai ada, selesai belum)
+                                    // Cek barcode menggunakan relasi yang sama seperti DashboardController
+                                    $hasBarcodeKain = $proses->barcodeKains ? $proses->barcodeKains->where('cancel', false)->count() > 0 : false;
+                                    $hasBarcodeLa = $proses->barcodeLas ? $proses->barcodeLas->where('cancel', false)->count() > 0 : false;
+                                    $hasBarcodeAux = $proses->barcodeAuxs ? $proses->barcodeAuxs->where('cancel', false)->count() > 0 : false;
+                                    if ($proses->jenis !== 'Maintenance' && (!$hasBarcodeKain || !$hasBarcodeLa || !$hasBarcodeAux)) {
+                                    $bg = '#e53935'; // merah (barcode belum lengkap)
                                     } else {
-                                    $bg = '#002b80'; // biru
+                                    $bg = '#002b80'; // biru (berjalan dengan barcode lengkap)
                                     }
                                     }
                                     $gradient = getGradient($bg);
@@ -315,7 +707,7 @@
                                     @endphp
                                     <div class="status-card draggable" draggable="{{ ($bg === '#757575' && !$proses->mulai && !$hasPendingChange && !$hasPendingReprocessApproval) ? 'true' : 'false' }}"
                                         style="background: {{ $gradient }}; background-repeat: no-repeat; background-size: cover; border-radius: 0; color: #fff; margin: 5px 0 0 0; padding: 2px 2px; cursor: {{ ($bg === '#757575' && !$proses->mulai && !$hasPendingChange && !$hasPendingReprocessApproval) ? 'grab' : 'default' }}; box-shadow: 0 2px 6px rgba(0,0,0,0.2);"
-                                        data-proses='@json($proses)' data-can-move="{{ ($bg === '#757575' && !$proses->mulai && !$hasPendingChange && !$hasPendingReprocessApproval) ? '1' : '0' }}" data-has-pending-reprocess="{{ $hasPendingReprocessApproval ? '1' : '0' }}">
+                                        data-proses='@json($proses)' data-proses-id="{{ $proses->id }}" data-can-move="{{ ($bg === '#757575' && !$proses->mulai && !$hasPendingChange && !$hasPendingReprocessApproval) ? '1' : '0' }}" data-has-pending-reprocess="{{ $hasPendingReprocessApproval ? '1' : '0' }}" data-bg-color="{{ $bg }}">
                                         {{-- Header --}}
                                         <div class="card-header"
                                             style="display: flex; flex-direction: row; align-items: center; padding: 0 10px 2px 10px; gap: 0; border-bottom: none;">
@@ -433,6 +825,7 @@
                                         </div>
                                     </div>
                                     @endforeach
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -663,6 +1056,36 @@
         </div>
     </div>
 
+    <!-- Modal Detail Proses dengan Pending Approval -->
+    <div class="modal fade" id="modalDetailProsesPending" tabindex="-1" aria-labelledby="modalDetailProsesPendingLabel"
+        aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content shadow-lg border-0 rounded-3">
+                <div class="modal-header bg-warning text-dark">
+                    <h5 class="modal-title fw-bold" id="modalDetailProsesPendingLabel">Detail Proses - Menunggu Approval</h5>
+                    <button type="button" class="close text-dark" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body py-3 px-4">
+                    <!-- Informasi Pending Approval -->
+                    <div id="pending-approval-info" class="mb-3">
+                        <!-- Diisi via JS -->
+                    </div>
+                    <!-- Detail Proses -->
+                    <table class="table table-bordered table-sm mb-0">
+                        <tbody id="detail-proses-pending-body">
+                            <!-- Diisi via JS -->
+                        </tbody>
+                    </table>
+                </div>
+                <div class="modal-footer d-flex justify-content-end px-4">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Tutup</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal Edit Proses (tampilkan semua info, hanya Cycle Time bisa diubah) -->
     <div class="modal fade" id="modalEditProses" tabindex="-1" aria-labelledby="modalEditProsesLabel"
         aria-hidden="true">
@@ -886,6 +1309,40 @@
         </div>
     </div>
 
+    <!-- Modal Konfirmasi Swap Position (Drag & Drop) -->
+    <div class="modal fade" id="modalConfirmSwapDragDrop" tabindex="-1" aria-labelledby="modalConfirmSwapDragDropLabel"
+        aria-hidden="true">
+        <div class="modal-dialog modal-md modal-dialog-centered">
+            <div class="modal-content shadow-lg border-0 rounded-3">
+                <div class="modal-header bg-warning text-dark">
+                    <h5 class="modal-title fw-bold" id="modalConfirmSwapDragDropLabel">
+                        <i class="fas fa-exchange-alt mr-2"></i>Konfirmasi Tukar Posisi
+                    </h5>
+                    <button type="button" class="close text-dark" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body py-3 px-4">
+                    <div class="alert alert-warning py-2 mb-3" style="font-size: 13px;">
+                        Proses <strong>tidak akan langsung ditukar posisinya</strong>. Permintaan tukar posisi akan
+                        <strong>menunggu persetujuan FM</strong>.
+                    </div>
+                    <p id="confirmSwapDragDropInfo" style="font-size: 14px; margin-bottom: 0; color: #666;">
+                        Apakah Anda yakin ingin menukar posisi proses ini?
+                    </p>
+                </div>
+                <div class="modal-footer d-flex justify-content-between px-4">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal" id="btnCancelSwapDragDrop">
+                        <i class="fas fa-times mr-1"></i>Batal
+                    </button>
+                    <button type="button" class="btn btn-warning" id="btnConfirmSwapDragDrop">
+                        <i class="fas fa-check mr-1"></i>Ya, Tukar Posisi
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
 
 </div>
 @endsection
@@ -901,6 +1358,7 @@
         let draggedCard = null;
         let sourceMesinId = null;
         let targetMesinId = null;
+        let dropTargetElement = null; // Simpan elemen target yang tepat di posisi drop
 
         draggables.forEach(draggable => {
             draggable.addEventListener('dragstart', (e) => {
@@ -925,6 +1383,7 @@
                 
                 draggable.classList.add('dragging');
                 draggedCard = draggable;
+                dropTargetElement = null; // Reset drop target element
                 if (proses && proses.mesin_id) {
                     sourceMesinId = proses.mesin_id;
                 }
@@ -949,6 +1408,7 @@
                     draggedCard = null;
                     sourceMesinId = null;
                     targetMesinId = null;
+                    dropTargetElement = null; // Reset drop target element
                 }
             });
         });
@@ -965,10 +1425,76 @@
                 const targetMesin = container.getAttribute('data-mesin-id');
                 targetMesinId = targetMesin ? parseInt(targetMesin) : null;
 
-                const afterElement = getDragAfterElement(container, e.clientY);
+                // Validasi: proses yang belum mulai tidak boleh diletakkan di atas proses yang sudah selesai atau sedang berjalan
+                const draggedProses = $(dragging).data('proses');
+                const isDraggedNotStarted = draggedProses && (draggedProses.mulai === null || draggedProses.mulai === undefined || draggedProses.mulai === '');
+                
+                if (isDraggedNotStarted) {
+                    // Cek semua elemen sebelum afterElement untuk memastikan tidak ada proses yang sudah selesai atau sedang berjalan
+                    const allElements = [...container.querySelectorAll('.draggable:not(.dragging)')];
+                    const afterElement = getDragAfterElement(container, e.clientY, dragging);
+                    
+                    if (afterElement) {
+                        // Cek apakah afterElement adalah proses yang sudah selesai atau sedang berjalan
+                        const afterProses = $(afterElement).data('proses');
+                        if (afterProses) {
+                            const isAfterFinished = afterProses.selesai !== null && afterProses.selesai !== undefined && afterProses.selesai !== '';
+                            const isAfterRunning = afterProses.mulai !== null && afterProses.mulai !== undefined && afterProses.mulai !== '' && 
+                                                  (afterProses.selesai === null || afterProses.selesai === undefined || afterProses.selesai === '');
+                            
+                            if (isAfterFinished || isAfterRunning) {
+                                // Cari posisi yang valid (di atas proses yang belum mulai atau di akhir)
+                                let validPosition = null;
+                                let validTargetElement = null;
+                                for (let i = 0; i < allElements.length; i++) {
+                                    if (allElements[i] === afterElement) {
+                                        // Cari elemen sebelumnya yang belum mulai
+                                        for (let j = i - 1; j >= 0; j--) {
+                                            const prevProses = $(allElements[j]).data('proses');
+                                            if (prevProses && (prevProses.mulai === null || prevProses.mulai === undefined || prevProses.mulai === '')) {
+                                                validPosition = allElements[j].nextSibling;
+                                                validTargetElement = allElements[j];
+                                                break;
+                                            }
+                                        }
+                                        if (!validPosition) {
+                                            // Jika tidak ada posisi valid sebelumnya, letakkan di akhir
+                                            validPosition = null;
+                                            const allCards = [...container.querySelectorAll('.status-card:not(.dragging):not(.history-card)')];
+                                            validTargetElement = allCards.length > 0 ? allCards[allCards.length - 1] : null;
+                                        }
+                                        break;
+                                    }
+                                }
+                                
+                                // Simpan drop target element
+                                dropTargetElement = validTargetElement;
+                                
+                                if (validPosition === null) {
+                                    container.appendChild(dragging);
+                                } else {
+                                    container.insertBefore(dragging, validPosition);
+                                }
+                                return;
+                            }
+                        }
+                    }
+                }
+
+                const afterElement = getDragAfterElement(container, e.clientY, dragging);
+                
+                // Simpan drop target element untuk digunakan saat drop
+                // Target adalah elemen yang tepat di posisi drop (afterElement atau elemen terakhir)
                 if (afterElement == null) {
+                    // Jika tidak ada afterElement, cek elemen terakhir di container
+                    const allCards = [...container.querySelectorAll('.status-card:not(.dragging):not(.history-card)')];
+                    dropTargetElement = allCards.length > 0 ? allCards[allCards.length - 1] : null;
                     container.appendChild(dragging);
                 } else {
+                    // Target adalah elemen sebelum afterElement (karena dragging akan di-insert sebelum afterElement)
+                    const allCards = [...container.querySelectorAll('.status-card:not(.dragging):not(.history-card)')];
+                    const afterIndex = allCards.indexOf(afterElement);
+                    dropTargetElement = afterIndex > 0 ? allCards[afterIndex - 1] : afterElement;
                     container.insertBefore(dragging, afterElement);
                 }
             });
@@ -1033,13 +1559,191 @@
                     return;
                 }
 
+                // Validasi: proses yang belum mulai tidak boleh dipindah ke atas proses yang sudah selesai atau sedang berjalan
+                const isDraggedNotStarted = proses.mulai === null || proses.mulai === undefined || proses.mulai === '';
+                if (isDraggedNotStarted) {
+                    // Cek proses yang tepat setelah posisi drop (next element sibling setelah dragging)
+                    const nextElement = dragging.nextElementSibling;
+                    if (nextElement && nextElement.classList && nextElement.classList.contains('status-card')) {
+                        const nextProses = $(nextElement).data('proses');
+                        if (nextProses) {
+                            const isNextFinished = nextProses.selesai !== null && nextProses.selesai !== undefined && nextProses.selesai !== '';
+                            const isNextRunning = nextProses.mulai !== null && nextProses.mulai !== undefined && nextProses.mulai !== '' && 
+                                                 (nextProses.selesai === null || nextProses.selesai === undefined || nextProses.selesai === '');
+                            
+                            if (isNextFinished || isNextRunning) {
+                                restoreCardToOriginalPosition(dragging);
+                                dragging.classList.remove('dragging');
+                                
+                                // Tampilkan notification error
+                                const ToastError = Swal.mixin({
+                                    toast: true,
+                                    position: 'top-end',
+                                    icon: 'error',
+                                    showConfirmButton: false,
+                                    timer: 4000,
+                                    timerProgressBar: true,
+                                });
+                                ToastError.fire({
+                                    title: 'Tidak dapat memindahkan proses. Proses yang belum mulai tidak dapat diletakkan di atas proses yang sudah selesai atau sedang berjalan.'
+                                });
+                                return;
+                            }
+                        }
+                    }
+                }
+
                 const newMesinId = parseInt(container.getAttribute('data-mesin-id'));
                 const oldMesinId = proses.mesin_id;
 
-                // Jika dipindah ke mesin yang sama, kembalikan ke posisi semula
+                // DETECT: Jika dipindah ke mesin yang sama = SWAP POSITION (reorder)
+                // Jika dipindah ke mesin berbeda = MOVE MACHINE
                 if (newMesinId === oldMesinId) {
+                    // SWAP POSITION: Cari proses target (proses yang ada di posisi drop)
+                    // Gunakan dropTargetElement yang sudah disimpan saat dragover untuk akurasi lebih baik
+                    let targetProses = null;
+                    let targetCard = null;
+                    
+                    // Prioritas 1: Gunakan dropTargetElement yang sudah disimpan (paling akurat)
+                    if (dropTargetElement && 
+                        dropTargetElement.classList && 
+                        dropTargetElement.classList.contains('status-card') && 
+                        !dropTargetElement.classList.contains('history-card')) {
+                        const targetProsesData = $(dropTargetElement).data('proses');
+                        if (targetProsesData && 
+                            targetProsesData.id !== proses.id &&
+                            targetProsesData.mulai === null && 
+                            targetProsesData.selesai === null &&
+                            targetProsesData.mesin_id == newMesinId) {
+                            targetProses = targetProsesData;
+                            targetCard = dropTargetElement;
+                        }
+                    }
+                    
+                    // Prioritas 2: Jika dropTargetElement tidak valid, cek next sibling (proses setelah posisi drop)
+                    if (!targetProses) {
+                        const nextSibling = dragging.nextElementSibling;
+                        if (nextSibling && nextSibling.classList && nextSibling.classList.contains('status-card') && !nextSibling.classList.contains('history-card')) {
+                            const nextProses = $(nextSibling).data('proses');
+                            if (nextProses && 
+                                nextProses.id !== proses.id &&
+                                nextProses.mulai === null && 
+                                nextProses.selesai === null &&
+                                nextProses.mesin_id == newMesinId) {
+                                targetProses = nextProses;
+                                targetCard = nextSibling;
+                            }
+                        }
+                    }
+                    
+                    // Prioritas 3: Jika tidak ada next sibling, cek previous sibling
+                    if (!targetProses) {
+                        const prevSibling = dragging.previousElementSibling;
+                        if (prevSibling && prevSibling.classList && prevSibling.classList.contains('status-card') && !prevSibling.classList.contains('history-card')) {
+                            const prevProses = $(prevSibling).data('proses');
+                            if (prevProses && 
+                                prevProses.id !== proses.id &&
+                                prevProses.mulai === null && 
+                                prevProses.selesai === null &&
+                                prevProses.mesin_id == newMesinId) {
+                                targetProses = prevProses;
+                                targetCard = prevSibling;
+                            }
+                        }
+                    }
+                    
+                    // Prioritas 4: Jika masih tidak ada target, cari dari semua card di container yang valid
+                    // Cari card yang paling dekat dengan posisi drop berdasarkan index
+                    if (!targetProses) {
+                        const allCards = [...container.querySelectorAll('.status-card:not(.dragging):not(.history-card)')];
+                        const draggingIndex = Array.from(container.children).indexOf(dragging);
+                        
+                        // Cari card terdekat berdasarkan index
+                        let closestCard = null;
+                        let closestDistance = Infinity;
+                        
+                        for (let card of allCards) {
+                            const cardProses = $(card).data('proses');
+                            if (cardProses && 
+                                cardProses.id !== proses.id && 
+                                cardProses.mulai === null && 
+                                cardProses.selesai === null &&
+                                cardProses.mesin_id == newMesinId) {
+                                const cardIndex = Array.from(container.children).indexOf(card);
+                                const distance = Math.abs(cardIndex - draggingIndex);
+                                if (distance < closestDistance) {
+                                    closestDistance = distance;
+                                    closestCard = card;
+                                }
+                            }
+                        }
+                        
+                        if (closestCard) {
+                            targetProses = $(closestCard).data('proses');
+                            targetCard = closestCard;
+                        }
+                    }
+                    
+                    if (!targetProses || !targetCard) {
+                        // Tidak ada target yang valid, kembalikan ke posisi semula
+                        restoreCardToOriginalPosition(dragging);
+                        dragging.classList.remove('dragging');
+                        
+                        const ToastError = Swal.mixin({
+                            toast: true,
+                            position: 'top-end',
+                            icon: 'error',
+                            showConfirmButton: false,
+                            timer: 4000,
+                            timerProgressBar: true,
+                        });
+                        ToastError.fire({
+                            title: 'Tidak ada proses yang valid untuk ditukar posisinya.'
+                        });
+                        return;
+                    }
+                    
+                    // Validasi: cek pending approval untuk kedua proses
+                    const hasPending1 = hasPendingApprovalFM(proses);
+                    const hasPending2 = hasPendingApprovalFM(targetProses);
+                    
+                    if (hasPending1 || hasPending2) {
+                        restoreCardToOriginalPosition(dragging);
+                        dragging.classList.remove('dragging');
+                        
+                        const ToastError = Swal.mixin({
+                            toast: true,
+                            position: 'top-end',
+                            icon: 'error',
+                            showConfirmButton: false,
+                            timer: 4000,
+                            timerProgressBar: true,
+                        });
+                        ToastError.fire({
+                            title: 'Salah satu proses masih memiliki permintaan yang menunggu persetujuan FM.'
+                        });
+                        return;
+                    }
+                    
+                    // Simpan data untuk swap position
+                    window.pendingSwapData = {
+                        dragging: dragging,
+                        targetCard: targetCard,
+                        proses1: proses,
+                        proses2: targetProses,
+                        mesinId: newMesinId,
+                        originalParentId: dragging.getAttribute('data-original-parent'),
+                        originalParent: document.querySelector(`[data-mesin-id="${oldMesinId}"]`),
+                        originalNextSibling: dragging._originalNextSibling
+                    };
+                    
+                    // Kembalikan card ke posisi asli terlebih dahulu (visual feedback)
                     restoreCardToOriginalPosition(dragging);
-                    dragging.classList.remove('dragging');
+                    
+                    // Tampilkan modal konfirmasi swap position
+                    const infoText = `Apakah Anda yakin ingin menukar posisi proses <strong>${proses.no_op || 'MAINTENANCE'}</strong> dengan proses <strong>${targetProses.no_op || 'MAINTENANCE'}</strong>?<br><br><small class="text-muted">Permintaan ini akan menunggu persetujuan FM.</small>`;
+                    $('#confirmSwapDragDropInfo').html(infoText);
+                    $('#modalConfirmSwapDragDrop').modal('show');
                     return;
                 }
 
@@ -1075,9 +1779,30 @@
             });
         });
 
-        function getDragAfterElement(container, y) {
+        function getDragAfterElement(container, y, draggingCard) {
             const draggableElements = [...container.querySelectorAll('.draggable:not(.dragging)')];
+            
+            // Ambil data proses yang sedang di-drag
+            const draggedProses = draggingCard ? $(draggingCard).data('proses') : null;
+            const isDraggedNotStarted = draggedProses && (draggedProses.mulai === null || draggedProses.mulai === undefined || draggedProses.mulai === '');
+            
             return draggableElements.reduce((closest, child) => {
+                // Jika proses yang di-drag belum mulai, skip proses yang sudah selesai atau sedang berjalan
+                if (isDraggedNotStarted) {
+                    const childProses = $(child).data('proses');
+                    if (childProses) {
+                        // Skip jika proses sudah selesai (selesai !== null)
+                        if (childProses.selesai !== null && childProses.selesai !== undefined && childProses.selesai !== '') {
+                            return closest;
+                        }
+                        // Skip jika proses sedang berjalan (mulai !== null && selesai === null)
+                        if (childProses.mulai !== null && childProses.mulai !== undefined && childProses.mulai !== '' && 
+                            (childProses.selesai === null || childProses.selesai === undefined || childProses.selesai === '')) {
+                            return closest;
+                        }
+                    }
+                }
+                
                 const box = child.getBoundingClientRect();
                 const offset = y - box.top - box.height / 2;
                 return (offset < 0 && offset > closest.offset) ? {
@@ -1254,6 +1979,238 @@
         }
         window.pendingMoveData = null;
         $('#modalConfirmMoveDragDrop').modal('hide');
+    });
+
+    // Handler konfirmasi swap position (Drag & Drop)
+    $(document).on('click', '#btnConfirmSwapDragDrop', function() {
+        const swapData = window.pendingSwapData;
+        if (!swapData) {
+            $('#modalConfirmSwapDragDrop').modal('hide');
+            return;
+        }
+
+        const { dragging, targetCard, proses1, proses2 } = swapData;
+
+        // Disable tombol untuk mencegah double click
+        $('#btnConfirmSwapDragDrop').prop('disabled', true).html('<span class="spinner-border spinner-border-sm mr-1"></span>Memproses...');
+        $('#btnCancelSwapDragDrop').prop('disabled', true);
+
+        // Tandai bahwa sedang dalam proses AJAX
+        dragging.setAttribute('data-ajax-pending', 'true');
+        if (targetCard) {
+            targetCard.setAttribute('data-ajax-pending', 'true');
+        }
+
+        // Kirim request ke server untuk membuat approval swap position
+        $.ajax({
+            url: `/proses/${proses1.id}/swap`,
+            method: 'POST',
+            headers: {
+                'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
+            },
+            data: {
+                swapped_proses_id: proses2.id
+            },
+            success: function(response) {
+                // Tutup modal
+                $('#modalConfirmSwapDragDrop').modal('hide');
+                
+                // Tampilkan notification success
+                if (response && response.status === 'success' && response.message) {
+                    const ToastSuccess = Swal.mixin({
+                        toast: true,
+                        position: 'top-end',
+                        icon: 'success',
+                        showConfirmButton: false,
+                        timer: 1500,
+                        timerProgressBar: true,
+                    });
+                    ToastSuccess.fire({
+                        title: response.message
+                    });
+                }
+                
+                // Update visual: tandai semua proses yang terpengaruh dengan pending approval (kuning)
+                // Fungsi untuk update card menjadi kuning (pending approval)
+                function markCardAsPending(card) {
+                    if (!card) return;
+                    const gradient = 'linear-gradient(180deg, #fff9c4 0%,rgb(183, 168, 33) 60%,rgb(202, 161, 57) 100%)';
+                    card.style.background = gradient;
+                    card.setAttribute('data-bg-color', '#ffeb3b');
+                    // Update data proses untuk menambahkan pending approval
+                    const proses = $(card).data('proses');
+                    if (proses) {
+                        if (!proses.approvals) {
+                            proses.approvals = [];
+                        }
+                        // Tambahkan pending approval untuk swap_position jika belum ada
+                        const hasSwapPending = proses.approvals.some(function(approval) {
+                            return approval.status === 'pending' 
+                                && approval.type === 'FM' 
+                                && approval.action === 'swap_position';
+                        });
+                        if (!hasSwapPending) {
+                            proses.approvals.push({
+                                status: 'pending',
+                                type: 'FM',
+                                action: 'swap_position'
+                            });
+                        }
+                        $(card).data('proses', proses);
+                    }
+                }
+                
+                // Tandai kedua card sebagai pending (proses yang langsung terlibat dalam swap)
+                markCardAsPending(dragging);
+                markCardAsPending(targetCard);
+                
+                // Tandai semua proses pending di mesin yang sama yang belum mulai
+                // Karena reorder bisa mempengaruhi semua proses di antara posisi lama dan baru
+                const mesinId = swapData.mesinId;
+                const container = document.querySelector(`[data-mesin-id="${mesinId}"]`);
+                if (container) {
+                    const allCards = container.querySelectorAll('.status-card:not(.history-card)');
+                    allCards.forEach(function(card) {
+                        const cardProses = $(card).data('proses');
+                        if (cardProses && 
+                            cardProses.mulai === null && 
+                            cardProses.selesai === null &&
+                            cardProses.mesin_id == mesinId) {
+                            // Tandai semua proses pending yang belum mulai di mesin yang sama
+                            // Backend akan menentukan proses mana yang benar-benar terpengaruh saat approval
+                            markCardAsPending(card);
+                        }
+                    });
+                    
+                    // Reorder card berdasarkan order yang baru (jika ada di response)
+                    if (response && response.affected_orders) {
+                        // Update order di data-proses untuk setiap card
+                        allCards.forEach(function(card) {
+                            const cardProses = $(card).data('proses');
+                            if (cardProses && response.affected_orders[cardProses.id] !== undefined) {
+                                cardProses.order = response.affected_orders[cardProses.id];
+                                $(card).data('proses', cardProses);
+                            }
+                        });
+                        
+                        // Reorder card berdasarkan order baru
+                        reorderCardsByOrder(container);
+                    }
+                }
+                
+                // Langsung refresh halaman agar card berubah warna menjadi kuning (pending approval)
+                // Backend akan mengecek status pending approval dan merender card dengan warna yang sesuai
+                // Tapi tunggu sebentar untuk menampilkan visual reorder terlebih dahulu
+                setTimeout(function() {
+                    if (response && response.redirect) {
+                        window.location.href = response.redirect;
+                    } else {
+                        window.location.reload();
+                    }
+                }, 500);
+            },
+            error: function(xhr) {
+                $('#modalConfirmSwapDragDrop').modal('hide');
+                
+                // Hapus flag AJAX pending
+                dragging.removeAttribute('data-ajax-pending');
+                dragging.classList.remove('dragging');
+                if (targetCard) {
+                    targetCard.removeAttribute('data-ajax-pending');
+                }
+                
+                // Pastikan card sudah kembali ke posisi asli
+                const originalParentId = dragging.getAttribute('data-original-parent');
+                const originalParent = document.querySelector(`[data-mesin-id="${originalParentId}"]`);
+                if (originalParent && dragging.parentElement !== originalParent) {
+                    const originalNextSibling = dragging._originalNextSibling;
+                    if (originalNextSibling && originalNextSibling.parentElement === originalParent) {
+                        originalParent.insertBefore(dragging, originalNextSibling);
+                    } else {
+                        originalParent.appendChild(dragging);
+                    }
+                }
+                
+                // Tampilkan notification error
+                let errorMsg = 'Gagal mengirim permintaan tukar posisi.';
+                
+                if (xhr.responseJSON && xhr.responseJSON.message) {
+                    errorMsg = xhr.responseJSON.message;
+                } else if (xhr.responseJSON && xhr.responseJSON.errors) {
+                    errorMsg = Object.values(xhr.responseJSON.errors).flat().join(', ');
+                } else if (xhr.status === 422) {
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        errorMsg = xhr.responseJSON.message;
+                    }
+                }
+                
+                const ToastError = Swal.mixin({
+                    toast: true,
+                    position: 'top-end',
+                    icon: 'error',
+                    showConfirmButton: false,
+                    timer: 4000,
+                    timerProgressBar: true,
+                });
+                ToastError.fire({
+                    title: errorMsg
+                });
+            },
+            complete: function() {
+                // Reset tombol dan data
+                $('#btnConfirmSwapDragDrop').prop('disabled', false).html('<i class="fas fa-check mr-1"></i>Ya, Tukar Posisi');
+                $('#btnCancelSwapDragDrop').prop('disabled', false);
+                window.pendingSwapData = null;
+            }
+        });
+    });
+
+    // Handler cancel konfirmasi swap position (Drag & Drop)
+    $(document).on('click', '#btnCancelSwapDragDrop', function() {
+        const swapData = window.pendingSwapData;
+        if (swapData && swapData.dragging) {
+            swapData.dragging.classList.remove('dragging');
+            const originalParentId = swapData.dragging.getAttribute('data-original-parent');
+            const originalParent = document.querySelector(`[data-mesin-id="${originalParentId}"]`);
+            if (originalParent && swapData.dragging.parentElement !== originalParent) {
+                const originalNextSibling = swapData.dragging._originalNextSibling;
+                if (originalNextSibling && originalNextSibling.parentElement === originalParent) {
+                    originalParent.insertBefore(swapData.dragging, originalNextSibling);
+                } else {
+                    originalParent.appendChild(swapData.dragging);
+                }
+            }
+        }
+        window.pendingSwapData = null;
+        $('#modalConfirmSwapDragDrop').modal('hide');
+    });
+
+    // Handler saat modal swap ditutup (untuk memastikan card dikembalikan jika modal ditutup dengan cara lain)
+    $('#modalConfirmSwapDragDrop').on('hidden.bs.modal', function() {
+        const swapData = window.pendingSwapData;
+        if (swapData && swapData.dragging) {
+            // Pastikan dragging class dihapus
+            swapData.dragging.classList.remove('dragging');
+            
+            // Kembalikan card ke posisi asli jika belum dikembalikan
+            const originalParentId = swapData.dragging.getAttribute('data-original-parent');
+            const originalParent = document.querySelector(`[data-mesin-id="${originalParentId}"]`);
+            if (originalParent && swapData.dragging.parentElement !== originalParent) {
+                const originalNextSibling = swapData.dragging._originalNextSibling;
+                if (originalNextSibling && originalNextSibling.parentElement === originalParent) {
+                    originalParent.insertBefore(swapData.dragging, originalNextSibling);
+                } else {
+                    originalParent.appendChild(swapData.dragging);
+                }
+            }
+            
+            // Reset tombol
+            $('#btnConfirmSwapDragDrop').prop('disabled', false).html('<i class="fas fa-check mr-1"></i>Ya, Tukar Posisi');
+            $('#btnCancelSwapDragDrop').prop('disabled', false);
+        }
+        window.pendingSwapData = null;
     });
 
     // Handler saat modal ditutup (untuk memastikan card dikembalikan jika modal ditutup dengan cara lain)
@@ -1533,11 +2490,11 @@
         return proses.approvals.some(function(approval) {
             return approval.status === 'pending' 
                 && approval.type === 'FM' 
-                && ['edit_cycle_time', 'delete_proses', 'move_machine'].includes(approval.action);
+                && ['edit_cycle_time', 'delete_proses', 'move_machine', 'swap_position'].includes(approval.action);
         });
     }
 
-    // Fungsi helper untuk mengecek apakah ada pending approval VP untuk Reproses
+    // Fungsi helper untuk mengecek apakah ada pending approval FM atau VP untuk Reproses (2 tahap approval)
     function hasPendingReprocessApproval(proses) {
         if (!proses || !proses.approvals || !Array.isArray(proses.approvals)) {
             return false;
@@ -1547,8 +2504,8 @@
         }
         return proses.approvals.some(function(approval) {
             return approval.status === 'pending' 
-                && approval.type === 'VP' 
-                && approval.action === 'create_reprocess';
+                && approval.action === 'create_reprocess'
+                && (approval.type === 'FM' || approval.type === 'VP');
         });
     }
 
@@ -1560,14 +2517,15 @@
         const pendingApproval = proses.approvals.find(function(approval) {
             return approval.status === 'pending' 
                 && approval.type === 'FM' 
-                && ['edit_cycle_time', 'delete_proses', 'move_machine'].includes(approval.action);
+                && ['edit_cycle_time', 'delete_proses', 'move_machine', 'swap_position'].includes(approval.action);
         });
         if (!pendingApproval) return null;
         
         const actionLabels = {
             'edit_cycle_time': 'perubahan cycle time',
             'delete_proses': 'penghapusan proses',
-            'move_machine': 'pemindahan mesin'
+            'move_machine': 'pemindahan mesin',
+            'swap_position': 'tukar posisi'
         };
         return {
             action: pendingApproval.action,
@@ -1575,16 +2533,142 @@
         };
     }
 
+    // Fungsi untuk mendapatkan semua pending approval dengan detail
+    function getAllPendingApprovals(proses) {
+        if (!proses || !proses.approvals || !Array.isArray(proses.approvals)) {
+            return [];
+        }
+        const pendingApprovals = proses.approvals.filter(function(approval) {
+            return approval.status === 'pending';
+        });
+        
+        const actionLabels = {
+            'edit_cycle_time': 'Edit Cycle Time',
+            'delete_proses': 'Hapus Proses',
+            'move_machine': 'Pindah Mesin',
+            'swap_position': 'Tukar Posisi',
+            'create_reprocess': 'Buat Reproses'
+        };
+        
+        const typeLabels = {
+            'FM': 'Factory Manager (FM)',
+            'VP': 'Vice President (VP)'
+        };
+        
+        return pendingApprovals.map(function(approval) {
+            return {
+                id: approval.id,
+                type: approval.type,
+                typeLabel: typeLabels[approval.type] || approval.type,
+                action: approval.action,
+                actionLabel: actionLabels[approval.action] || approval.action,
+                requested_by: approval.requested_by,
+                created_at: approval.created_at
+            };
+        });
+    }
+
     // Double click card proses untuk detail
     $(document).on('dblclick', '.status-card', function() {
         const proses = $(this).data('proses');
         if (!proses) return;
+        
+        // Cek apakah card berwarna kuning (menunggu approval)
+        const bgColor = $(this).data('bg-color');
+        const isYellowCard = bgColor === '#ffeb3b' || bgColor === 'rgb(255, 235, 59)' || $(this).css('background-color') === 'rgb(255, 235, 59)';
+        
+        // Cek apakah ada pending approval (FM untuk edit/delete/move atau FM/VP untuk reproses)
+        const hasPending = hasPendingApprovalFM(proses);
+        const hasPendingReprocess = hasPendingReprocessApproval(proses);
+        const hasAnyPending = hasPending || hasPendingReprocess || isYellowCard;
+        
+        // Jika ada pending approval atau card berwarna kuning, tampilkan modal khusus pending approval
+        if (hasAnyPending) {
+            let pendingApprovals = getAllPendingApprovals(proses);
+            
+            // Jika card kuning tapi tidak ada approval langsung, kemungkinan terkena swap_position dari proses lain
+            // Tampilkan pesan generic untuk kasus ini
+            if (isYellowCard && pendingApprovals.length === 0) {
+                pendingApprovals = [{
+                    id: null,
+                    type: 'FM',
+                    typeLabel: 'Factory Manager (FM)',
+                    action: 'swap_position',
+                    actionLabel: 'Tukar Posisi',
+                    requested_by: null,
+                    created_at: null
+                }];
+            }
+            
+            // Format detail proses tanpa barcode
+            const hiddenFields = ['id', 'created_at', 'updated_at', 'deleted_at', 'mesin_id'];
+            const maintenanceFields = [
+                'no_op', 'item_op', 'kode_material', 'konstruksi', 'no_partai',
+                'gramasi', 'lebar', 'hfeel', 'warna', 'kode_warna', 'kategori_warna', 'qty', 'roll'
+            ];
+
+            function formatDetikToHMS(val) {
+                if (val === null || val === undefined || isNaN(val)) return '-';
+                val = parseInt(val);
+                const jam = Math.floor(val / 3600);
+                const menit = Math.floor((val % 3600) / 60);
+                const detik = val % 60;
+                return `${jam.toString().padStart(2, '0')}:${menit.toString().padStart(2, '0')}:${detik.toString().padStart(2, '0')}`;
+            }
+            
+            let jenisMesin = '-';
+            try {
+                const mesinSelect = document.getElementById('mesin_id');
+                if (mesinSelect && proses.mesin_id) {
+                    const opt = mesinSelect.querySelector(`option[value="${proses.mesin_id}"]`);
+                    if (opt) jenisMesin = opt.textContent;
+                }
+            } catch {}
+            
+            const entries = Object.entries(proses)
+                .filter(([key]) => !hiddenFields.includes(key) && key !== 'barcode_kains' && key !== 'barcode_las' && key !== 'barcode_auxs' && key !== 'mesin' && key !== 'approvals')
+                .filter(([key]) => !(proses.jenis === 'Maintenance' && maintenanceFields.includes(key)))
+                .map(([key, val]) => {
+                    if (key === 'hfeel') return ['HAND FEEL', val];
+                    if (key === 'matdok') return ['MATERIAL DOKUMEN', val];
+                    if (key === 'cycle_time' || key === 'cycle_time_actual') return [key.replace(/_/g, ' ').toUpperCase(), formatDetikToHMS(val)];
+                    return [key.replace(/_/g, ' ').toUpperCase(), val];
+                });
+            entries.unshift(['JENIS MESIN', jenisMesin]);
+            
+            let detailHtml = '';
+            for (let i = 0; i < entries.length; i += 2) {
+                detailHtml += '<tr>';
+                detailHtml += `<th style="width:180px;">${entries[i][0]}</th><td>${entries[i][1] ?? '-'}</td>`;
+                if (entries[i + 1]) {
+                    detailHtml += `<th style="width:180px;">${entries[i+1][0]}</th><td>${entries[i+1][1] ?? '-'}</td>`;
+                } else {
+                    detailHtml += '<th></th><td></td>';
+                }
+                detailHtml += '</tr>';
+            }
+            $('#detail-proses-pending-body').html(detailHtml);
+            
+            // Format informasi pending approval
+            let approvalHtml = '<div class="alert alert-warning mb-3">';
+            approvalHtml += '<h6 class="font-weight-bold mb-2"><i class="fas fa-clock mr-2"></i>Status Approval Pending</h6>';
+            approvalHtml += '<p class="mb-2">Proses ini sedang menunggu persetujuan dari:</p>';
+            approvalHtml += '<ul class="mb-0 pl-3">';
+            pendingApprovals.forEach(function(approval) {
+                approvalHtml += `<li><strong>${approval.typeLabel}</strong> - ${approval.actionLabel}</li>`;
+            });
+            approvalHtml += '</ul>';
+            approvalHtml += '</div>';
+            $('#pending-approval-info').html(approvalHtml);
+            
+            $('#modalDetailProsesPending').modal('show');
+            return;
+        }
+        
+        // Jika tidak ada pending approval, tampilkan modal normal
         // Simpan proses aktif ke modal detail untuk kebutuhan edit/delete
         $('#modalDetailProses').data('proses', proses);
         
-        // Cek apakah ada pending approval dan disable tombol jika ada
-        const hasPending = hasPendingApprovalFM(proses);
-        const hasPendingReprocess = hasPendingReprocessApproval(proses);
         const pendingInfo = getPendingApprovalInfo(proses);
         
         // Cek apakah proses sudah dimulai (mulai tidak null)
@@ -2291,6 +3375,212 @@
         updateRunningTimes(); // jalankan sekali di awal
     });
 
+    // Real-time update warna card berdasarkan status mulai/selesai
+    $(document).ready(function() {
+        // Fungsi untuk mendapatkan gradient berdasarkan warna background
+        // Konsisten dengan function getGradient di PHP (blade template)
+        // Mapping warna sama persis dengan DashboardController::prosesStatuses()
+        function getGradient(bg) {
+            const gradientMap = {
+                // Abu (belum mulai atau Maintenance)
+                '#757575': 'linear-gradient(180deg, #bdbdbd 0%, #757575 100%)',
+                // Kuning (menunggu approval perubahan: edit_cycle_time, delete_proses, move_machine, swap_position)
+                '#ffeb3b': 'linear-gradient(180deg, #fff9c4 0%,rgb(183, 168, 33) 60%,rgb(202, 161, 57) 100%)',
+                // Biru (berjalan dengan barcode lengkap)
+                '#002b80': 'linear-gradient(180deg, #6dd5ed 0%, #2193b0 60%, #002b80 100%)',
+                // Hijau (selesai normal)
+                '#00c853': 'linear-gradient(180deg, #b2f7c1 0%, #56ab2f 60%, #378a1b 100%)',
+                // Merah (selesai overtime atau barcode belum lengkap)
+                '#e53935': 'linear-gradient(180deg, #ffb3b3 0%, #e53935 60%, #b71c1c 100%)'
+            };
+            return gradientMap[bg] || gradientMap['#757575'];
+        }
+
+        // Fungsi untuk memindahkan card dari aktif ke history saat proses selesai
+        function moveToHistory($card, statusData) {
+            const mesinId = $card.closest('.card-dropzone').data('mesin-id');
+            const $dropzone = $card.closest('.card-dropzone');
+            let historyContainer = $(`#history-${mesinId}`);
+            
+            // Jika history container belum ada, buat di atas (sebelum proses aktif container)
+            if (historyContainer.length === 0) {
+                const $prosesAktifContainer = $dropzone.find('.proses-aktif-container').first();
+                const newHistoryWrapper = $(`
+                    <div class="proses-history-wrapper" data-mesin-id="${mesinId}" style="margin-bottom: 8px;">
+                        <button class="btn-toggle-history btn btn-sm btn-secondary" 
+                                data-mesin-id="${mesinId}" type="button">
+                            <i class="fas fa-history"></i> Tampilkan History
+                        </button>
+                        <div class="proses-history-container" id="history-${mesinId}" style="display: none;">
+                        </div>
+                    </div>
+                `);
+                // Insert sebelum proses aktif container
+                if ($prosesAktifContainer.length > 0) {
+                    $prosesAktifContainer.before(newHistoryWrapper);
+                } else {
+                    // Fallback: append jika proses aktif container tidak ditemukan
+                    $dropzone.prepend(newHistoryWrapper);
+                }
+                historyContainer = $(`#history-${mesinId}`);
+            }
+            
+            // Pindahkan card ke history (prepend agar terbaru di atas)
+            $card.addClass('history-card');
+            $card.attr('draggable', 'false');
+            $card.attr('data-can-move', '0');
+            $card.css('cursor', 'default');
+            historyContainer.prepend($card);
+            
+            // Update count di button
+            const count = historyContainer.find('.status-card').length;
+            $(`.btn-toggle-history[data-mesin-id="${mesinId}"]`)
+                .html(`<i class="fas fa-history"></i> Tampilkan History (${count})`);
+        }
+
+        // Fungsi untuk reorder card berdasarkan order
+        function reorderCardsByOrder(container) {
+            if (!container) return;
+            
+            const $container = $(container);
+            const mesinId = $container.data('mesin-id');
+            if (!mesinId) return;
+            
+            // Ambil semua card proses aktif (bukan history) di mesin ini
+            const $cards = $container.find('.status-card:not(.history-card)');
+            if ($cards.length === 0) return;
+            
+            // Sort card berdasarkan order dari data-proses
+            const sortedCards = $cards.toArray().sort(function(a, b) {
+                const prosesA = $(a).data('proses');
+                const prosesB = $(b).data('proses');
+                
+                if (!prosesA || !prosesB) return 0;
+                
+                // Hanya reorder jika kedua proses belum mulai (pending)
+                if (!prosesA.mulai && !prosesB.mulai && !prosesA.selesai && !prosesB.selesai) {
+                    const orderA = parseInt(prosesA.order || 0);
+                    const orderB = parseInt(prosesB.order || 0);
+                    if (orderA !== orderB) {
+                        return orderA - orderB;
+                    }
+                }
+                
+                // Fallback: tetap urutkan berdasarkan posisi DOM saat ini
+                return 0;
+            });
+            
+            // Cek apakah urutan sudah benar
+            let needsReorder = false;
+            for (let i = 0; i < sortedCards.length; i++) {
+                if (sortedCards[i] !== $cards[i]) {
+                    needsReorder = true;
+                    break;
+                }
+            }
+            
+            // Reorder jika diperlukan
+            if (needsReorder) {
+                const $prosesAktifContainer = $container.find('.proses-aktif-container').first();
+                if ($prosesAktifContainer.length > 0) {
+                    // Detach semua card terlebih dahulu
+                    const cardsToReorder = sortedCards.map(card => $(card).detach());
+                    // Append kembali sesuai urutan baru
+                    cardsToReorder.forEach(function($card) {
+                        $prosesAktifContainer.append($card);
+                    });
+                }
+            }
+        }
+
+        // Fungsi untuk update warna card berdasarkan status dari API
+        function updateProsesStatuses() {
+            // Ambil parameter mesin dari URL jika ada (untuk filter)
+            const urlParams = new URLSearchParams(window.location.search);
+            const mesinParams = urlParams.get('mesin');
+            let apiUrl = '/dashboard/proses-statuses';
+            if (mesinParams) {
+                apiUrl += '?mesin=' + encodeURIComponent(mesinParams);
+            }
+
+            fetch(apiUrl)
+                .then(response => response.json())
+                .then(data => {
+                    // Group card by mesin untuk reorder
+                    const cardsByMesin = {};
+                    
+                    $('.status-card').each(function() {
+                        const $card = $(this);
+                        const prosesId = $card.attr('data-proses-id');
+                        if (!prosesId || !data[prosesId]) return;
+
+                        const statusData = data[prosesId];
+                        const currentBgColor = $card.attr('data-bg-color');
+                        const proses = $card.data('proses');
+                        
+                        if (!proses) return;
+                        
+                        // CEK: Jika proses baru selesai, pindahkan ke history
+                        const wasNotFinished = !proses.selesai || proses.selesai === null;
+                        const isNowFinished = statusData.selesai && statusData.selesai !== null;
+                        
+                        if (wasNotFinished && isNowFinished && !$card.hasClass('history-card')) {
+                            // Proses baru selesai, pindahkan ke history container
+                            moveToHistory($card, statusData);
+                            return; // Skip update warna karena sudah dipindahkan
+                        }
+                        
+                        // Update data proses untuk mulai, selesai, dan order
+                        const oldOrder = parseInt(proses.order || 0);
+                        proses.mulai = statusData.mulai;
+                        proses.selesai = statusData.selesai;
+                        proses.order = statusData.order || 0;
+                        $card.data('proses', proses);
+                        
+                        // Track card untuk reorder jika order berubah
+                        if (!proses.selesai && !proses.mulai && statusData.order !== undefined) {
+                            const newOrder = parseInt(statusData.order || 0);
+                            if (oldOrder !== newOrder) {
+                                const mesinId = proses.mesin_id;
+                                if (!cardsByMesin[mesinId]) {
+                                    cardsByMesin[mesinId] = [];
+                                }
+                                cardsByMesin[mesinId].push($card);
+                            }
+                        }
+                        
+                        // Update warna jika berbeda
+                        if (currentBgColor !== statusData.bg_color) {
+                            const gradient = getGradient(statusData.bg_color);
+                            $card.css('background', gradient);
+                            $card.attr('data-bg-color', statusData.bg_color);
+                        }
+                    });
+                    
+                    // Reorder card di setiap mesin yang terpengaruh
+                    Object.keys(cardsByMesin).forEach(function(mesinId) {
+                        const container = document.querySelector(`[data-mesin-id="${mesinId}"]`);
+                        if (container) {
+                            reorderCardsByOrder(container);
+                        }
+                    });
+                    
+                    // Reorder semua mesin untuk memastikan urutan sesuai dengan order terbaru
+                    // (untuk menangani kasus order berubah dari API)
+                    $('.card-dropzone').each(function() {
+                        reorderCardsByOrder(this);
+                    });
+                })
+                .catch(error => {
+                    // Silent fail, jangan tampilkan error di console
+                });
+        }
+
+        // Polling setiap 1 detik untuk update status
+        setInterval(updateProsesStatuses, 1000);
+        updateProsesStatuses(); // jalankan sekali di awal
+    });
+
     $(document).ready(function() {
         $('[name="jenis"]').on('change', function() {
             var isMaintenance = $(this).val() === 'Maintenance';
@@ -2577,6 +3867,24 @@
                 $('#filter-mesin-form').submit();
             }, 100);
         });
+    });
+
+    // Toggle history per mesin
+    $(document).on('click', '.btn-toggle-history', function() {
+        const mesinId = $(this).data('mesin-id');
+        const historyContainer = $(`#history-${mesinId}`);
+        const btn = $(this);
+        
+        if (historyContainer.is(':visible')) {
+            // Sembunyikan
+            historyContainer.slideUp(300);
+            const count = historyContainer.find('.status-card').length;
+            btn.html(`<i class="fas fa-history"></i> Tampilkan History (${count})`);
+        } else {
+            // Tampilkan
+            historyContainer.slideDown(300);
+            btn.html(`<i class="fas fa-chevron-up"></i> Sembunyikan History`);
+        }
     });
 </script>
 @endsection

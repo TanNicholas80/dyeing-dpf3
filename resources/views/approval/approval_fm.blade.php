@@ -75,7 +75,8 @@
                                                 'move_machine' => 'Pindah Mesin',
                                                 'edit_cycle_time' => 'Edit Cycle Time',
                                                 'delete_proses' => 'Hapus Proses',
-                                                'create_reprocess' => 'Buat Reproses'
+                                                'create_reprocess' => 'Buat Reproses',
+                                                'swap_position' => 'Tukar Posisi'
                                             ];
                                             $actionLabel = $actionLabels[$approval->action] ?? ucfirst(str_replace('_', ' ', $approval->action));
                                             @endphp
@@ -359,6 +360,259 @@
                                                                 <i class="fas fa-info-circle mr-2"></i>
                                                                 <strong>Informasi:</strong> Proses akan dipindahkan dari mesin lama ke mesin baru jika disetujui.
                                                             </div>
+                                                        </div>
+                                                    </div>
+                                                    @elseif($approval->action === 'create_reprocess')
+                                                    <!-- Tampilan khusus untuk Create Reproses (Tahap 1: FM Approval) -->
+                                                    <div class="row">
+                                                        <div class="col-md-12">
+                                                            <div class="alert alert-warning">
+                                                                <i class="fas fa-exclamation-triangle mr-2"></i>
+                                                                <strong>Informasi:</strong> Proses reproses berikut akan menunggu persetujuan VP setelah disetujui oleh FM.
+                                                            </div>
+                                                            @php
+                                                            $prosesSnapshot = $history['proses_snapshot'] ?? [];
+                                                            $oldMesin = isset($prosesSnapshot['mesin_id']) ? \App\Models\Mesin::find($prosesSnapshot['mesin_id']) : null;
+                                                            @endphp
+                                                            <div class="card border-warning mb-3">
+                                                                <div class="card-header bg-warning text-dark">
+                                                                    <h6 class="mb-0"><i class="fas fa-redo mr-2"></i>Detail Proses Reproses (Tahap 1: Approval FM)</h6>
+                                                                </div>
+                                                                <div class="card-body">
+                                                                    <div class="row">
+                                                                        <div class="col-md-6 mb-3">
+                                                                            <strong class="text-muted d-block">No OP</strong>
+                                                                            <h5 class="mb-0">{{ $prosesSnapshot['no_op'] ?? '-' }}</h5>
+                                                                        </div>
+                                                                        <div class="col-md-6 mb-3">
+                                                                            <strong class="text-muted d-block">Jenis</strong>
+                                                                            <span class="badge badge-warning">{{ $prosesSnapshot['jenis'] ?? 'Reproses' }}</span>
+                                                                        </div>
+                                                                        @if(!empty($prosesSnapshot['no_partai']))
+                                                                        <div class="col-md-6 mb-3">
+                                                                            <strong class="text-muted d-block">No Partai</strong>
+                                                                            <span>{{ $prosesSnapshot['no_partai'] }}</span>
+                                                                        </div>
+                                                                        @endif
+                                                                        @if(!empty($prosesSnapshot['item_op']))
+                                                                        <div class="col-md-6 mb-3">
+                                                                            <strong class="text-muted d-block">Item OP</strong>
+                                                                            <span>{{ $prosesSnapshot['item_op'] }}</span>
+                                                                        </div>
+                                                                        @endif
+                                                                        @if(!empty($prosesSnapshot['konstruksi']))
+                                                                        <div class="col-md-6 mb-3">
+                                                                            <strong class="text-muted d-block">Konstruksi</strong>
+                                                                            <span>{{ $prosesSnapshot['konstruksi'] }}</span>
+                                                                        </div>
+                                                                        @endif
+                                                                        @if(!empty($prosesSnapshot['kode_material']))
+                                                                        <div class="col-md-6 mb-3">
+                                                                            <strong class="text-muted d-block">Kode Material</strong>
+                                                                            <span class="small">{{ $prosesSnapshot['kode_material'] }}</span>
+                                                                        </div>
+                                                                        @endif
+                                                                        @if(!empty($prosesSnapshot['warna']) || !empty($prosesSnapshot['kode_warna']))
+                                                                        <div class="col-md-6 mb-3">
+                                                                            <strong class="text-muted d-block">Warna</strong>
+                                                                            <span>
+                                                                                {{ $prosesSnapshot['warna'] ?? '-' }}
+                                                                                @if(!empty($prosesSnapshot['kode_warna']))
+                                                                                <small class="text-muted">({{ $prosesSnapshot['kode_warna'] }})</small>
+                                                                                @endif
+                                                                            </span>
+                                                                        </div>
+                                                                        @endif
+                                                                        @if(!empty($prosesSnapshot['qty']) || !empty($prosesSnapshot['roll']))
+                                                                        <div class="col-md-6 mb-3">
+                                                                            <strong class="text-muted d-block">Qty / Roll</strong>
+                                                                            <span>
+                                                                                {{ !empty($prosesSnapshot['qty']) ? number_format($prosesSnapshot['qty'], 2) : '-' }}
+                                                                                @if(!empty($prosesSnapshot['roll']))
+                                                                                / {{ $prosesSnapshot['roll'] }} roll
+                                                                                @endif
+                                                                            </span>
+                                                                        </div>
+                                                                        @endif
+                                                                        @if(!empty($prosesSnapshot['cycle_time']))
+                                                                        <div class="col-md-6 mb-3">
+                                                                            <strong class="text-muted d-block">Cycle Time</strong>
+                                                                            <span class="badge badge-info">{{ detikKeWaktu($prosesSnapshot['cycle_time']) }}</span>
+                                                                        </div>
+                                                                        @endif
+                                                                        @if(!empty($prosesSnapshot['mesin_id']))
+                                                                        <div class="col-md-6 mb-3">
+                                                                            <strong class="text-muted d-block">Mesin</strong>
+                                                                            @if($oldMesin)
+                                                                            <span class="badge badge-info">{{ $oldMesin->jenis_mesin }}</span>
+                                                                            @else
+                                                                            <span class="text-muted">ID: {{ $prosesSnapshot['mesin_id'] }}</span>
+                                                                            @endif
+                                                                        </div>
+                                                                        @endif
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            <div class="alert alert-info mb-0">
+                                                                <i class="fas fa-info-circle mr-2"></i>
+                                                                <strong>Catatan:</strong> Setelah disetujui oleh FM, proses reproses akan menunggu persetujuan VP (tahap 2) sebelum dapat digunakan.
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    @elseif($approval->action === 'swap_position')
+                                                    <!-- Tampilan khusus untuk Swap Position (Reorder) - Versi Ringkas -->
+                                                    <div class="row">
+                                                        <div class="col-md-12">
+                                                            @php
+                                                            $proses1Id = $history['proses1_id'] ?? null;
+                                                            $proses2Id = $history['proses2_id'] ?? null;
+                                                            $oldOrder1 = $history['old_order1'] ?? null;
+                                                            $oldOrder2 = $history['old_order2'] ?? null;
+                                                            $affectedProsesIds = $history['affected_proses_ids'] ?? [];
+                                                            
+                                                            $proses1 = $proses1Id ? \App\Models\Proses::find($proses1Id) : null;
+                                                            $proses2 = $proses2Id ? \App\Models\Proses::find($proses2Id) : null;
+                                                            
+                                                            // Ambil semua proses yang terpengaruh untuk ditampilkan
+                                                            $affectedProses = collect();
+                                                            if (is_array($affectedProsesIds) && count($affectedProsesIds) > 0) {
+                                                                $affectedProses = \App\Models\Proses::whereIn('id', $affectedProsesIds)
+                                                                    ->orderBy('order')
+                                                                    ->orderBy('id')
+                                                                    ->get();
+                                                            }
+                                                            
+                                                            $newOrder1 = $oldOrder2;
+                                                            $newOrder2 = $oldOrder1;
+                                                            $affectedCount = is_array($affectedProsesIds) ? count($affectedProsesIds) : 0;
+                                                            @endphp
+                                                            
+                                                            <!-- Ringkasan Perubahan -->
+                                                            <div class="card mb-3" style="border-left: 4px solid #ffc107;">
+                                                                <div class="card-body">
+                                                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                                                        <div>
+                                                                            <h6 class="mb-1"><i class="fas fa-exchange-alt mr-2"></i>Tukar Posisi Proses</h6>
+                                                                            <small class="text-muted">{{ $affectedCount }} proses akan terpengaruh</small>
+                                                                        </div>
+                                                                        <div class="text-right">
+                                                                            <span class="badge badge-warning">Order {{ $oldOrder1 ?? '-' }} → {{ $newOrder1 ?? '-' }}</span>
+                                                                        </div>
+                                                                    </div>
+                                                                    
+                                                                    <!-- Proses yang Dipindahkan -->
+                                                                    <div class="row mb-3">
+                                                                        <div class="col-md-6">
+                                                                            <div class="p-3 bg-light rounded border-left border-warning border-3">
+                                                                                <small class="text-muted d-block mb-1">Proses yang Dipindahkan</small>
+                                                                                <h6 class="mb-1">
+                                                                                    <strong>{{ $proses1->no_op ?? 'MAINTENANCE' }}</strong>
+                                                                                    @if($proses1 && $proses1->jenis !== 'Maintenance' && $proses1->warna)
+                                                                                    <br><small class="text-muted">{{ $proses1->warna }}</small>
+                                                                                    @endif
+                                                                                </h6>
+                                                                                <div class="mt-2">
+                                                                                    <span class="badge badge-danger">Posisi {{ $oldOrder1 ?? '-' }}</span>
+                                                                                    <i class="fas fa-arrow-right mx-2 text-muted"></i>
+                                                                                    <span class="badge badge-success">Posisi {{ $newOrder1 ?? '-' }}</span>
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                        
+                                                                        <!-- Proses Tujuan -->
+                                                                        <div class="col-md-6">
+                                                                            <div class="p-3 bg-light rounded border-left border-info border-3">
+                                                                                <small class="text-muted d-block mb-1">Proses Tujuan</small>
+                                                                                <h6 class="mb-1">
+                                                                                    <strong>{{ $proses2->no_op ?? 'MAINTENANCE' }}</strong>
+                                                                                    @if($proses2 && $proses2->jenis !== 'Maintenance' && $proses2->warna)
+                                                                                    <br><small class="text-muted">{{ $proses2->warna }}</small>
+                                                                                    @endif
+                                                                                </h6>
+                                                                                <div class="mt-2">
+                                                                                    <span class="badge badge-danger">Posisi {{ $oldOrder2 ?? '-' }}</span>
+                                                                                    <i class="fas fa-arrow-right mx-2 text-muted"></i>
+                                                                                    <span class="badge badge-success">Posisi {{ $newOrder2 ?? '-' }}</span>
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                    
+                                                                    <!-- Daftar Proses Terpengaruh (Ringkas) -->
+                                                                    @if($affectedCount > 2)
+                                                                    <div class="alert alert-warning mb-0 py-2">
+                                                                        <i class="fas fa-exclamation-triangle mr-2"></i>
+                                                                        <strong>Catatan:</strong> {{ $affectedCount - 2 }} proses lain akan ikut bergeser posisinya.
+                                                                    </div>
+                                                                    @endif
+                                                                </div>
+                                                            </div>
+                                                            
+                                                            <!-- Perubahan Urutan (Visual) -->
+                                                            @if($oldOrder1 && $oldOrder2 && $oldOrder1 != $oldOrder2)
+                                                            <div class="card mb-0" style="border-left: 4px solid #6c757d;">
+                                                                <div class="card-header bg-secondary text-white py-2">
+                                                                    <h6 class="mb-0"><i class="fas fa-sort mr-2"></i>Perubahan Urutan</h6>
+                                                                </div>
+                                                                <div class="card-body">
+                                                                    <div class="row">
+                                                                        <div class="col-md-6">
+                                                                            <small class="text-muted d-block mb-2"><i class="fas fa-arrow-left mr-1"></i>Sebelum:</small>
+                                                                            <div class="p-2 bg-light rounded">
+                                                                                @foreach($affectedProses->sortBy('order') as $p)
+                                                                                <div class="mb-1">
+                                                                                    <span class="badge badge-secondary">#{{ $p->order ?? '-' }}</span> 
+                                                                                    <strong class="{{ $p->id == $proses1Id ? 'text-warning' : ($p->id == $proses2Id ? 'text-info' : '') }}">
+                                                                                        {{ $p->no_op ?? 'MAINTENANCE' }}
+                                                                                    </strong>
+                                                                                    @if($p->id == $proses1Id)
+                                                                                    <small class="badge badge-warning">Akan dipindah</small>
+                                                                                    @endif
+                                                                                </div>
+                                                                                @endforeach
+                                                                            </div>
+                                                                        </div>
+                                                                        <div class="col-md-6">
+                                                                            <small class="text-muted d-block mb-2"><i class="fas fa-arrow-right mr-1"></i>Sesudah:</small>
+                                                                            <div class="p-2 bg-light rounded">
+                                                                                @php
+                                                                                // Simulasi urutan setelah reorder
+                                                                                $sortedAfter = collect();
+                                                                                foreach ($affectedProses->sortBy('order') as $p) {
+                                                                                    if ($p->id == $proses1Id) {
+                                                                                        $sortedAfter->push((object)['order' => $newOrder1, 'proses' => $p, 'isMoved' => true]);
+                                                                                    } elseif ($p->id == $proses2Id) {
+                                                                                        $sortedAfter->push((object)['order' => $newOrder2, 'proses' => $p, 'isMoved' => false]);
+                                                                                    } elseif ($oldOrder1 < $oldOrder2 && $p->order > $oldOrder1 && $p->order < $oldOrder2) {
+                                                                                        $sortedAfter->push((object)['order' => $p->order + 1, 'proses' => $p, 'isMoved' => false]);
+                                                                                    } elseif ($oldOrder1 > $oldOrder2 && $p->order > $oldOrder2 && $p->order < $oldOrder1) {
+                                                                                        $sortedAfter->push((object)['order' => $p->order - 1, 'proses' => $p, 'isMoved' => false]);
+                                                                                    } else {
+                                                                                        $sortedAfter->push((object)['order' => $p->order, 'proses' => $p, 'isMoved' => false]);
+                                                                                    }
+                                                                                }
+                                                                                $sortedAfter = $sortedAfter->sortBy('order');
+                                                                                @endphp
+                                                                                @foreach($sortedAfter as $item)
+                                                                                @php $p = $item->proses; @endphp
+                                                                                <div class="mb-1">
+                                                                                    <span class="badge {{ $item->isMoved ? 'badge-success' : 'badge-secondary' }}">#{{ $item->order }}</span> 
+                                                                                    <strong class="{{ $p->id == $proses1Id ? 'text-success' : ($p->id == $proses2Id ? 'text-info' : '') }}">
+                                                                                        {{ $p->no_op ?? 'MAINTENANCE' }}
+                                                                                    </strong>
+                                                                                    @if($p->id == $proses1Id)
+                                                                                    <small class="badge badge-success">Dipindah</small>
+                                                                                    @elseif($p->order != $item->order)
+                                                                                    <small class="badge badge-secondary">Bergeser</small>
+                                                                                    @endif
+                                                                                </div>
+                                                                                @endforeach
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            @endif
                                                         </div>
                                                     </div>
                                                     @else

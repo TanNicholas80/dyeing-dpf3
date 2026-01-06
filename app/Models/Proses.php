@@ -28,6 +28,7 @@ class Proses extends Model
         'cycle_time',
         'cycle_time_actual',
         'mesin_id',
+        'order',
     ];
 
     public function mesin()

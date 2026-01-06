@@ -33,6 +33,7 @@ Route::middleware(['auth'])->group(function () {
     });
 
     Route::get('/mesin/statuses', [MesinController::class, 'statuses'])->name('mesin.statuses');
+    Route::get('/dashboard/proses-statuses', [DashboardController::class, 'prosesStatuses'])->name('dashboard.proses-statuses');
 
     // Barcode proses (semua user login bisa akses)
     Route::post('/proses/{id}/barcode/kain', [ProsesController::class, 'barcodeKain'])->name('proses.barcode.kain');
@@ -42,6 +43,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/proses/{proses}/barcode/{type}/{barcode}/cancel', [ProsesController::class, 'cancelBarcode']);
     Route::post('/proses/{id}/update', [ProsesController::class, 'update'])->name('proses.update');
     Route::post('/proses/{id}/move', [ProsesController::class, 'move'])->name('proses.move');
+    Route::post('/proses/{id}/swap', [ProsesController::class, 'swap'])->name('proses.swap');
     Route::delete('/proses/{id}/delete', [ProsesController::class, 'destroy'])->name('proses.delete');
 
     // Approval routes

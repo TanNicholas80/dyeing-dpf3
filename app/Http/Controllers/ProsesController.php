@@ -27,7 +27,7 @@ class ProsesController extends Controller
         return Approval::where('proses_id', $prosesId)
             ->where('status', 'pending')
             ->where('type', 'FM')
-            ->whereIn('action', ['edit_cycle_time', 'delete_proses', 'move_machine'])
+            ->whereIn('action', ['edit_cycle_time', 'delete_proses', 'move_machine', 'swap_position'])
             ->exists();
     }
 
@@ -42,7 +42,7 @@ class ProsesController extends Controller
         return Approval::where('proses_id', $prosesId)
             ->where('status', 'pending')
             ->where('type', 'FM')
-            ->whereIn('action', ['edit_cycle_time', 'delete_proses', 'move_machine'])
+            ->whereIn('action', ['edit_cycle_time', 'delete_proses', 'move_machine', 'swap_position'])
             ->first();
     }
 
@@ -118,26 +118,34 @@ class ProsesController extends Controller
         }
 
         try {
+            // Set order untuk proses baru (order = max order + 1 untuk proses pending di mesin yang sama)
+            $maxOrder = Proses::where('mesin_id', $validated['mesin_id'])
+                ->whereNull('mulai')
+                ->whereNull('selesai')
+                ->max('order') ?? 0;
+
+            $validated['order'] = $maxOrder + 1;
+            
             // Buat Proses seperti biasa
             $proses = Proses::create($validated);
 
-            // Jika jenis = Reproses, buat approval ke VP (proses langsung tampil dengan background kuning)
+            // Jika jenis = Reproses, buat approval ke FM terlebih dahulu (2 tahap: FM dulu, baru VP)
             if ($proses->jenis === 'Reproses') {
                 Approval::create([
                     'proses_id'    => $proses->id,
                     'status'       => 'pending',
-                    'type'         => 'VP',
+                    'type'         => 'FM',
                     'action'       => 'create_reprocess',
                     'history_data' => [
                         'proses_snapshot' => $proses->toArray(),
                     ],
                     'note'         => null,
                     'requested_by' => Auth::id(),
-                    'approved_by'  => null, // Akan diisi saat VP approve/reject
+                    'approved_by'  => null, // Akan diisi saat FM approve/reject
                 ]);
 
                 return redirect()->route('dashboard', ['page' => $page])
-                    ->with('success', 'Proses Reproses berhasil ditambahkan. Proses akan tampil dengan warna kuning dan menunggu persetujuan VP untuk dapat diubah/dihapus/dipindah.');
+                    ->with('success', 'Proses Reproses berhasil ditambahkan. Proses akan tampil dengan warna kuning dan menunggu persetujuan FM terlebih dahulu, kemudian VP.');
             }
 
             // Produksi / Maintenance langsung tampil
@@ -573,6 +581,7 @@ class ProsesController extends Controller
                 'edit_cycle_time' => 'perubahan cycle time',
                 'delete_proses' => 'penghapusan proses',
                 'move_machine' => 'pemindahan mesin',
+                'swap_position' => 'penukaran posisi',
             ];
             $actionLabel = $actionLabels[$pendingApproval->action] ?? 'perubahan';
 
@@ -657,6 +666,7 @@ class ProsesController extends Controller
                 'edit_cycle_time' => 'perubahan cycle time',
                 'delete_proses' => 'penghapusan proses',
                 'move_machine' => 'pemindahan mesin',
+                'swap_position' => 'penukaran posisi',
             ];
             $actionLabel = $actionLabels[$pendingApproval->action] ?? 'perubahan';
 
@@ -716,6 +726,281 @@ class ProsesController extends Controller
             ->with('success', $successMessage);
     }
 
+    // Swap posisi dua proses di mesin yang sama
+    public function swap(Request $request, $id)
+    {
+        $proses1 = Proses::findOrFail($id);
+
+        // Validasi: hanya bisa swap jika proses belum mulai (mulai masih null)
+        if ($proses1->mulai !== null) {
+            $errorMessage = 'Tidak dapat menukar posisi proses. Proses sudah dimulai.';
+
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => $errorMessage
+                ], 400);
+            }
+
+            return back()->with('error', $errorMessage);
+        }
+
+        // Validasi proses_id kedua proses
+        $request->validate([
+            'swapped_proses_id' => [
+                'required',
+                'integer',
+                'exists:proses,id',
+                function ($attribute, $value, $fail) use ($id) {
+                    if ((int) $value == (int) $id) {
+                        $fail('Proses kedua harus berbeda dari proses pertama.');
+                    }
+                },
+            ],
+        ]);
+
+        $proses2Id = (int) $request->input('swapped_proses_id');
+        $proses2 = Proses::findOrFail($proses2Id);
+
+        // Validasi: proses kedua juga belum mulai
+        if ($proses2->mulai !== null) {
+            $errorMessage = 'Tidak dapat menukar posisi proses. Proses kedua sudah dimulai.';
+
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => $errorMessage
+                ], 400);
+            }
+
+            return back()->with('error', $errorMessage);
+        }
+
+        // Validasi: kedua proses harus di mesin yang sama
+        if ($proses1->mesin_id !== $proses2->mesin_id) {
+            $errorMessage = 'Tidak dapat menukar posisi proses. Kedua proses harus berada di mesin yang sama.';
+
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => $errorMessage
+                ], 400);
+            }
+
+            return back()->with('error', $errorMessage);
+        }
+
+        // Cek apakah sudah ada pending approval untuk proses pertama
+        if ($this->hasPendingApproval($proses1->id)) {
+            $pendingApproval = $this->getPendingApproval($proses1->id);
+            $actionLabels = [
+                'edit_cycle_time' => 'perubahan cycle time',
+                'delete_proses' => 'penghapusan proses',
+                'move_machine' => 'pemindahan mesin',
+                'swap_position' => 'penukaran posisi',
+            ];
+            $actionLabel = $actionLabels[$pendingApproval->action] ?? 'perubahan';
+
+            $errorMessage = "Tidak dapat mengajukan permintaan baru. Masih ada permintaan {$actionLabel} yang menunggu persetujuan FM untuk proses pertama.";
+
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => $errorMessage
+                ], 400);
+            }
+
+            return back()->with('error', $errorMessage);
+        }
+
+        // Cek apakah sudah ada pending approval untuk proses kedua
+        if ($this->hasPendingApproval($proses2->id)) {
+            $pendingApproval = $this->getPendingApproval($proses2->id);
+            $actionLabels = [
+                'edit_cycle_time' => 'perubahan cycle time',
+                'delete_proses' => 'penghapusan proses',
+                'move_machine' => 'pemindahan mesin',
+                'swap_position' => 'penukaran posisi',
+            ];
+            $actionLabel = $actionLabels[$pendingApproval->action] ?? 'perubahan';
+
+            $errorMessage = "Tidak dapat mengajukan permintaan baru. Masih ada permintaan {$actionLabel} yang menunggu persetujuan FM untuk proses kedua.";
+
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => $errorMessage
+                ], 400);
+            }
+
+            return back()->with('error', $errorMessage);
+        }
+
+        // Cek apakah sudah ada pending swap_position approval yang melibatkan salah satu proses
+        $proses1Id = $proses1->id;
+        $existingSwapApproval = Approval::where('status', 'pending')
+            ->where('type', 'FM')
+            ->where('action', 'swap_position')
+            ->where(function ($query) use ($proses1Id, $proses2Id) {
+                $query->where('proses_id', $proses1Id)
+                    ->orWhere('proses_id', $proses2Id);
+            })
+            ->first();
+
+        if ($existingSwapApproval) {
+            $errorMessage = 'Salah satu proses sudah terlibat dalam permintaan penukaran posisi yang menunggu persetujuan FM.';
+
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => $errorMessage
+                ], 400);
+            }
+
+            return back()->with('error', $errorMessage);
+        }
+
+        // Ambil halaman asal dari referer jika ada (supaya UX konsisten)
+        $referer = $request->headers->get('referer');
+        $page = 1;
+        if ($referer) {
+            $parsed = parse_url($referer);
+            if (isset($parsed['query'])) {
+                parse_str($parsed['query'], $queryArr);
+                if (isset($queryArr['page']) && is_numeric($queryArr['page'])) {
+                    $page = (int) $queryArr['page'];
+                }
+            }
+        }
+
+        // Ambil order saat ini dari kedua proses
+        $order1 = $proses1->order ?? 0;
+        $order2 = $proses2->order ?? 0;
+
+        // Cari semua proses yang akan terpengaruh oleh reorder ini
+        // (proses yang berada di antara oldOrder dan newOrder akan bergeser)
+        $affectedProsesIds = [$proses1->id, $proses2Id]; // Minimal kedua proses yang langsung terlibat
+        $mesinId = $proses1->mesin_id;
+        $affectedProses = collect([$proses1, $proses2]); // Inisialisasi dengan kedua proses yang terlibat
+        
+        // Ambil semua proses pending di mesin yang sama untuk normalisasi order jika perlu
+        $allPendingProses = Proses::where('mesin_id', $mesinId)
+            ->whereNull('mulai')
+            ->whereNull('selesai')
+            ->orderBy('order')
+            ->orderBy('id')
+            ->get();
+        
+        // Jika order belum jelas, normalisasi dulu
+        if ($order1 === 0 || $order2 === 0 || $allPendingProses->count() !== $allPendingProses->where('order', '>', 0)->count()) {
+            $idx = 1;
+            foreach ($allPendingProses as $p) {
+                $p->order = $idx++;
+                $p->save();
+            }
+            
+            $proses1->refresh();
+            $proses2->refresh();
+            $order1 = (int) ($proses1->order ?? 0);
+            $order2 = (int) ($proses2->order ?? 0);
+        }
+        
+        // Tentukan rentang order yang akan terpengaruh
+        if ($order1 !== $order2 && $order1 > 0 && $order2 > 0) {
+            $minOrder = min($order1, $order2);
+            $maxOrder = max($order1, $order2);
+            
+            // Ambil semua proses yang berada di rentang tersebut (akan bergeser)
+            // Termasuk proses yang berada di batas minOrder dan maxOrder
+            $affectedProses = Proses::where('mesin_id', $mesinId)
+                ->whereNull('mulai')
+                ->whereNull('selesai')
+                ->where('order', '>=', $minOrder)
+                ->where('order', '<=', $maxOrder)
+                ->get();
+            
+            $affectedProsesIds = $affectedProses->pluck('id')->toArray();
+            $affectedProsesIds = array_unique($affectedProsesIds);
+            
+            // Pastikan kedua proses yang langsung terlibat selalu ada di daftar
+            if (!in_array($proses1->id, $affectedProsesIds)) {
+                $affectedProsesIds[] = $proses1->id;
+                // Tambahkan juga ke affectedProses collection
+                $affectedProses->push($proses1);
+            }
+            if (!in_array($proses2Id, $affectedProsesIds)) {
+                $affectedProsesIds[] = $proses2Id;
+                // Tambahkan juga ke affectedProses collection
+                $affectedProses->push($proses2);
+            }
+            $affectedProsesIds = array_unique($affectedProsesIds);
+        }
+
+        // Buat record approval untuk FM (swap position) - hanya 1 approval untuk proses pertama
+        // Approval ini akan menukar posisi kedua proses saat di-approve
+        Approval::create([
+            'proses_id'    => $proses1->id,
+            'status'       => 'pending',
+            'type'         => 'FM',
+            'action'       => 'swap_position',
+            'history_data' => [
+                'proses1_id' => $proses1->id,
+                'proses2_id' => $proses2Id,
+                'old_order1' => $order1,
+                'old_order2' => $order2,
+                'swapped_proses_id' => $proses2Id, // Untuk tracking di dashboard
+                'affected_proses_ids' => $affectedProsesIds, // Semua proses yang terpengaruh (akan bergeser)
+            ],
+            'note'         => null,
+            'requested_by' => Auth::id(),
+            'approved_by'  => null, // Akan diisi saat FM approve/reject
+        ]);
+
+        // Hitung order baru untuk semua proses yang terpengaruh (untuk preview di frontend)
+        $affectedOrders = [];
+        if ($order1 !== $order2 && $order1 > 0 && $order2 > 0 && isset($affectedProses)) {
+            $newOrder1 = $order2; // Proses1 akan pindah ke posisi order2
+            $newOrder2 = $order1; // Proses2 akan pindah ke posisi order1
+            
+            foreach ($affectedProses as $p) {
+                if ($p->id == $proses1->id) {
+                    $affectedOrders[$p->id] = $newOrder1;
+                } elseif ($p->id == $proses2Id) {
+                    $affectedOrders[$p->id] = $newOrder2;
+                } elseif ($order1 < $order2) {
+                    // Proses1 pindah ke bawah (order naik), proses di antara bergeser ke atas (order +1)
+                    if ($p->order > $order1 && $p->order < $order2) {
+                        $affectedOrders[$p->id] = $p->order + 1;
+                    } else {
+                        $affectedOrders[$p->id] = $p->order;
+                    }
+                } else {
+                    // Proses1 pindah ke atas (order turun), proses di antara bergeser ke bawah (order -1)
+                    if ($p->order > $order2 && $p->order < $order1) {
+                        $affectedOrders[$p->id] = $p->order - 1;
+                    } else {
+                        $affectedOrders[$p->id] = $p->order;
+                    }
+                }
+            }
+        }
+
+        $successMessage = 'Permintaan penukaran posisi proses telah dikirim dan menunggu persetujuan FM.';
+
+        // Jika request adalah AJAX, kembalikan JSON response
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json([
+                'status' => 'success',
+                'affected_orders' => $affectedOrders, // Order baru untuk preview di frontend
+                'message' => $successMessage,
+                'redirect' => route('dashboard', ['page' => $page])
+            ]);
+        }
+
+        return redirect()->route('dashboard', ['page' => $page])
+            ->with('success', $successMessage);
+    }
+
     // Hapus Proses
     public function destroy(Request $request, $id)
     {
@@ -734,6 +1019,7 @@ class ProsesController extends Controller
                 'edit_cycle_time' => 'perubahan cycle time',
                 'delete_proses' => 'penghapusan proses',
                 'move_machine' => 'pemindahan mesin',
+                'swap_position' => 'penukaran posisi',
             ];
             $actionLabel = $actionLabels[$pendingApproval->action] ?? 'perubahan';
 

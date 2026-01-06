@@ -170,9 +170,116 @@ class ApprovalController extends Controller
                 break;
 
             case 'create_reprocess':
-                // Untuk create_reprocess, proses sudah dibuat sebelumnya
-                // Tidak perlu action tambahan, hanya approval saja
-                // Proses akan otomatis muncul di dashboard setelah di-approve
+                // Untuk create_reprocess dengan type FM: setelah FM approve, buat approval VP
+                if ($approval->type === 'FM') {
+                    // Cek apakah sudah ada approval VP untuk proses ini
+                    $existingVpApproval = Approval::where('proses_id', $proses->id)
+                        ->where('type', 'VP')
+                        ->where('action', 'create_reprocess')
+                        ->first();
+                    
+                    // Jika belum ada approval VP, buat approval VP baru
+                    if (!$existingVpApproval) {
+                        Approval::create([
+                            'proses_id'    => $proses->id,
+                            'status'       => 'pending',
+                            'type'         => 'VP',
+                            'action'       => 'create_reprocess',
+                            'history_data' => [
+                                'proses_snapshot' => $proses->toArray(),
+                                'fm_approval_id'  => $approval->id, // Track approval FM yang sudah approve
+                            ],
+                            'note'         => null,
+                            'requested_by' => $approval->requested_by, // Tetap dari user yang request awal
+                            'approved_by'  => null, // Akan diisi saat VP approve/reject
+                        ]);
+                    }
+                } 
+                break;
+
+            case 'swap_position':
+                /**
+                 * Modifikasi: selain support tukar posisi 2 proses,
+                 * juga support "reorder" (pindahkan proses ke posisi proses lain,
+                 * dan proses di antaranya ikut bergeser).
+                 *
+                 * Cara kerja:
+                 *  - proses1_id  : proses yang dipindahkan
+                 *  - proses2_id  : proses tujuan (proses1 akan pindah ke posisi proses2)
+                 *
+                 * Contoh:
+                 *   Urutan awal: P1(1), P2(2), P3(3)
+                 *   User pilih: proses1 = P3, proses2 = P1
+                 *   Hasil akhir: P3(1), P1(2), P2(3)
+                 */
+                if (isset($history['proses1_id']) && isset($history['proses2_id'])) {
+                    $proses1Id = (int) $history['proses1_id'];
+                    $proses2Id = (int) $history['proses2_id'];
+
+                    // Ambil kedua proses (pakai fresh data saat approval)
+                    $proses1 = Proses::find($proses1Id);
+                    $proses2 = Proses::find($proses2Id);
+
+                    if (!$proses1 || !$proses2) {
+                        throw new \Exception("Salah satu atau kedua proses tidak ditemukan untuk swap/reorder position.");
+                    }
+
+                    // Validasi: kedua proses harus di mesin yang sama
+                    if ($proses1->mesin_id !== $proses2->mesin_id) {
+                        throw new \Exception("Kedua proses harus berada di mesin yang sama untuk swap/reorder position.");
+                    }
+
+                    $mesinId  = $proses1->mesin_id;
+                    $oldOrder = (int) ($proses1->order ?? 0);
+                    $newOrder = (int) ($proses2->order ?? 0);
+
+                    // Jika belum ada order yang jelas, normalisasi dulu berdasarkan ID
+                    if ($oldOrder === 0 || $newOrder === 0) {
+                        $allProses = Proses::where('mesin_id', $mesinId)
+                            ->orderBy('order')
+                            ->orderBy('id')
+                            ->get();
+
+                        $idx = 1;
+                        foreach ($allProses as $p) {
+                            $p->order = $idx++;
+                            $p->save();
+                        }
+
+                        // Refresh nilai order setelah normalisasi
+                        $proses1->refresh();
+                        $proses2->refresh();
+                        $oldOrder = (int) $proses1->order;
+                        $newOrder = (int) $proses2->order;
+                    }
+
+                    if ($oldOrder === $newOrder) {
+                        // Tidak ada perubahan posisi
+                        break;
+                    }
+
+                    DB::transaction(function () use ($mesinId, $proses1, $oldOrder, $newOrder) {
+                        // Pindahkan proses1 ke posisi newOrder
+                        if ($newOrder < $oldOrder) {
+                            // Contoh: 3 -> 1  => geser 1..2 jadi 2..3
+                            Proses::where('mesin_id', $mesinId)
+                                ->where('id', '!=', $proses1->id)
+                                ->whereBetween('order', [$newOrder, $oldOrder - 1])
+                                ->increment('order');
+                        } else {
+                            // Contoh: 1 -> 3  => geser 2..3 jadi 1..2
+                            Proses::where('mesin_id', $mesinId)
+                                ->where('id', '!=', $proses1->id)
+                                ->whereBetween('order', [$oldOrder + 1, $newOrder])
+                                ->decrement('order');
+                        }
+
+                        $proses1->order = $newOrder;
+                        $proses1->save();
+                    });
+                } else {
+                    throw new \Exception("Data 'proses1_id' atau 'proses2_id' tidak ditemukan dalam history_data untuk swap_position.");
+                }
                 break;
 
             default:
@@ -188,7 +295,8 @@ class ApprovalController extends Controller
     {
         switch ($approval->action) {
             case 'create_reprocess':
-                // Jika create_reprocess di-reject, hapus proses yang baru dibuat
+                // Jika create_reprocess di-reject oleh FM, hapus proses yang baru dibuat
+                // Jika di-reject oleh VP, juga hapus proses
                 $proses = $approval->proses;
                 if ($proses) {
                     $proses->delete();
@@ -198,6 +306,7 @@ class ApprovalController extends Controller
             case 'edit_cycle_time':
             case 'delete_proses':
             case 'move_machine':
+            case 'swap_position':
                 // Untuk action lain, tidak perlu action khusus saat reject
                 // Data tetap seperti semula (tidak ada perubahan)
                 break;

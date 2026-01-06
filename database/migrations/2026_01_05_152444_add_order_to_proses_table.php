@@ -12,10 +12,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('proses', function (Blueprint $table) {
-            $table->softDeletes();
-            // Composite index untuk query trigger (mesin_id, mulai, selesai)
-            // Index ini akan mempercepat query SELECT di trigger
-            $table->index(['mesin_id', 'mulai', 'selesai'], 'idx_proses_mesin_status');
+            $table->unsignedInteger('order')->default(0)->after('mesin_id');
+            $table->index(['mesin_id', 'order']);
         });
     }
 
@@ -25,8 +23,8 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('proses', function (Blueprint $table) {
-            $table->dropSoftDeletes();
-            $table->dropIndex('idx_proses_mesin_status');
+            $table->dropColumn('order');
+            $table->dropIndex(['mesin_id', 'order']);
         });
     }
 };

@@ -214,12 +214,12 @@
                                                         </div>
                                                     </div>
                                                     @elseif($approval->action === 'create_reprocess')
-                                                    <!-- Tampilan khusus untuk Create Reproses -->
+                                                    <!-- Tampilan khusus untuk Create Reproses (Tahap 2: VP Approval) -->
                                                     <div class="row">
                                                         <div class="col-md-12">
                                                             <div class="alert alert-warning">
                                                                 <i class="fas fa-exclamation-triangle mr-2"></i>
-                                                                <strong>Informasi:</strong> Proses reproses berikut akan dibuat jika disetujui.
+                                                                <strong>Informasi:</strong> Proses reproses berikut telah disetujui oleh FM (tahap 1) dan menunggu persetujuan VP (tahap 2). Proses reproses akan aktif jika disetujui.
                                                             </div>
                                                             @php
                                                             $prosesSnapshot = $history['proses_snapshot'] ?? [];
@@ -227,7 +227,7 @@
                                                             @endphp
                                                             <div class="card border-warning mb-3">
                                                                 <div class="card-header bg-warning text-dark">
-                                                                    <h6 class="mb-0"><i class="fas fa-redo mr-2"></i>Detail Proses Reproses yang Akan Dibuat</h6>
+                                                                    <h6 class="mb-0"><i class="fas fa-redo mr-2"></i>Detail Proses Reproses (Tahap 2: Approval VP)</h6>
                                                                 </div>
                                                                 <div class="card-body">
                                                                     <div class="row">
