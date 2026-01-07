@@ -66,44 +66,76 @@
                             <a class="nav-link" data-widget="pushmenu" href="#" role="button"><i
                                     class="fas fa-bars"></i></a>
                         </li>
+                        @php
+                            $role = Auth::user()->role ?? null;
+                            $canDashboard = !in_array($role, ['aux']); // Semua role bisa akses dashboard kecuali aux
+                            $canApprovalFm = in_array($role, ['super_admin', 'fm', 'owner']);
+                            $canApprovalVp = in_array($role, ['super_admin', 'vp', 'owner']);
+                            $canUser = in_array($role, ['super_admin', 'owner']);
+                            $canMesin = in_array($role, ['super_admin', 'fm', 'vp', 'ppic', 'owner']);
+                            $canAux = in_array($role, ['super_admin', 'aux', 'owner']);
+                            $canLog = in_array($role, ['super_admin', 'fm', 'vp']);
+                        @endphp
+
+                        @if ($canDashboard)
                         <li class="nav-item">
                             <a href="{{ route('dashboard') }}" class="nav-link">Dashboard
                             </a>
                         </li>
-                        <li class="nav-item dropdown">
-                            <a id="dropdownSubMenu1" href="#" data-toggle="dropdown" aria-haspopup="true"
-                                aria-expanded="false" class="nav-link dropdown-toggle" title="Approval">Approval</a>
-                            <ul aria-labelledby="dropdownSubMenu1" class="dropdown-menu border-0 shadow">
-                                <li>
-                                    <a href="{{ route('approval.fm') }}" class="dropdown-item">
-                                        Approval FM
-                                        @if($pendingApprovalFM > 0)
-                                        <span class="badge badge-warning float-right">{{ $pendingApprovalFM }}</span>
-                                        @endif
-                                    </a>
-                                </li>
-                                <li>
-                                    <a href="{{ route('approval.vp') }}" class="dropdown-item">
-                                        Approval VP
-                                        @if($pendingApprovalVP > 0)
-                                        <span class="badge badge-warning float-right">{{ $pendingApprovalVP }}</span>
-                                        @endif
-                                    </a>
-                                </li>
-                            </ul>
-                        </li>
-                        <li class="nav-item">
-                            <a href="{{ route('user.index') }}" class="nav-link" title="User">User</a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="{{ route('mesin.index') }}" class="nav-link" title="Mesin">Mesin</a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="{{ route('aux.index') }}" class="nav-link" title="Aux">Aux</a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="#" class="nav-link" title="Log">Log</a>
-                        </li>
+                        @endif
+
+                        @if ($canApprovalFm || $canApprovalVp)
+                            <li class="nav-item dropdown">
+                                <a id="dropdownSubMenu1" href="#" data-toggle="dropdown" aria-haspopup="true"
+                                    aria-expanded="false" class="nav-link dropdown-toggle" title="Approval">Approval</a>
+                                <ul aria-labelledby="dropdownSubMenu1" class="dropdown-menu border-0 shadow">
+                                    @if ($canApprovalFm)
+                                        <li>
+                                            <a href="{{ route('approval.fm') }}" class="dropdown-item">
+                                                Approval FM
+                                                @if($pendingApprovalFM > 0)
+                                                <span class="badge badge-warning float-right">{{ $pendingApprovalFM }}</span>
+                                                @endif
+                                            </a>
+                                        </li>
+                                    @endif
+                                    @if ($canApprovalVp)
+                                        <li>
+                                            <a href="{{ route('approval.vp') }}" class="dropdown-item">
+                                                Approval VP
+                                                @if($pendingApprovalVP > 0)
+                                                <span class="badge badge-warning float-right">{{ $pendingApprovalVP }}</span>
+                                                @endif
+                                            </a>
+                                        </li>
+                                    @endif
+                                </ul>
+                            </li>
+                        @endif
+
+                        @if ($canUser)
+                            <li class="nav-item">
+                                <a href="{{ route('user.index') }}" class="nav-link" title="User">User</a>
+                            </li>
+                        @endif
+
+                        @if ($canMesin)
+                            <li class="nav-item">
+                                <a href="{{ route('mesin.index') }}" class="nav-link" title="Mesin">Mesin</a>
+                            </li>
+                        @endif
+
+                        @if ($canAux)
+                            <li class="nav-item">
+                                <a href="{{ route('aux.index') }}" class="nav-link" title="Aux">Aux</a>
+                            </li>
+                        @endif
+
+                        @if ($canLog)
+                            <li class="nav-item">
+                                <a href="{{ route('activity-log.index') }}" class="nav-link" title="Log">Log</a>
+                            </li>
+                        @endif
                     </ul>
 
                 </div>
@@ -162,77 +194,103 @@
                 <nav class="mt-2">
                     <ul class="nav nav-pills nav-sidebar flex-column" data-widget="treeview" role="menu"
                         data-accordion="false">
+                        @php
+                            $role = Auth::user()->role ?? null;
+                            $canDashboard = !in_array($role, ['aux']); // Semua role bisa akses dashboard kecuali aux
+                            $canApprovalFm = in_array($role, ['super_admin', 'fm', 'owner']);
+                            $canApprovalVp = in_array($role, ['super_admin', 'vp', 'owner']);
+                            $canUser = in_array($role, ['super_admin', 'owner']);
+                            $canMesin = in_array($role, ['super_admin', 'fm', 'vp', 'ppic', 'owner']);
+                            $canAux = in_array($role, ['super_admin', 'aux', 'owner']);
+                            $canLog = in_array($role, ['super_admin', 'fm', 'vp']);
+                        @endphp
+
+                        @if ($canDashboard)
                         <li class="nav-item">
                             <a href="{{ route('dashboard') }}" class="nav-link">
                                 <i class="nav-icon fas fa-tachometer-alt"></i>
                                 <p>Dashboard</p>
                             </a>
                         </li>
+                        @endif
 
-                        <li class="nav-header">APPROVAL</li>
-                        <li class="nav-item">
-                            <a href="{{ route('approval.fm') }}" class="nav-link">
-                                <i class="nav-icon fas fa-clipboard-check"></i>
-                                <p>
-                                    Approval FM
-                                    @if($pendingApprovalFM > 0)
-                                    <span class="badge badge-warning right">{{ $pendingApprovalFM }}</span>
-                                    @endif
-                                </p>
-                            </a>
-                        </li>
+                        @if ($canApprovalFm || $canApprovalVp)
+                            <li class="nav-header">APPROVAL</li>
+                            @if ($canApprovalFm)
+                                <li class="nav-item">
+                                    <a href="{{ route('approval.fm') }}" class="nav-link">
+                                        <i class="nav-icon fas fa-clipboard-check"></i>
+                                        <p>
+                                            Approval FM
+                                            @if($pendingApprovalFM > 0)
+                                            <span class="badge badge-warning right">{{ $pendingApprovalFM }}</span>
+                                            @endif
+                                        </p>
+                                    </a>
+                                </li>
+                            @endif
+                            @if ($canApprovalVp)
+                                <li class="nav-item">
+                                    <a href="{{ route('approval.vp') }}" class="nav-link">
+                                        <i class="nav-icon fas fa-clipboard-check"></i>
+                                        <p>
+                                            Approval VP
+                                            @if($pendingApprovalVP > 0)
+                                            <span class="badge badge-warning right">{{ $pendingApprovalVP }}</span>
+                                            @endif
+                                        </p>
+                                    </a>
+                                </li>
+                            @endif
+                        @endif
 
-                        <li class="nav-item">
-                            <a href="{{ route('approval.vp') }}" class="nav-link">
-                                <i class="nav-icon fas fa-clipboard-check"></i>
-                                <p>
-                                    Approval VP
-                                    @if($pendingApprovalVP > 0)
-                                    <span class="badge badge-warning right">{{ $pendingApprovalVP }}</span>
-                                    @endif
-                                </p>
-                            </a>
-                        </li>
+                        @if ($canUser)
+                            <li class="nav-header">USER</li>
+                            <li class="nav-item">
+                                <a href="{{ route('user.index') }}" class="nav-link">
+                                    <i class="nav-icon fas fa-users"></i>
+                                    <p>
+                                        Data User
+                                    </p>
+                                </a>
+                            </li>
+                        @endif
 
-                        <li class="nav-header">USER</li>
-                        <li class="nav-item">
-                            <a href="{{ route('user.index') }}" class="nav-link">
-                                <i class="nav-icon fas fa-users"></i>
-                                <p>
-                                    Data User
-                                </p>
-                            </a>
-                        </li>
+                        @if ($canMesin)
+                            <li class="nav-header">MASTER DATA</li>
+                            <li class="nav-item">
+                                <a href="{{ route('mesin.index') }}" class="nav-link">
+                                    <i class="nav-icon fas fa-cogs"></i>
+                                    <p>
+                                        Mesin
+                                    </p>
+                                </a>
+                            </li>
+                        @endif
 
-                        <li class="nav-header">MASTER DATA</li>
-                        <li class="nav-item">
-                            <a href="{{ route('mesin.index') }}" class="nav-link">
-                                <i class="nav-icon fas fa-cogs"></i>
-                                <p>
-                                    Mesin
-                                </p>
-                            </a>
-                        </li>
+                        @if ($canAux)
+                            <li class="nav-header">KIMIA</li>
+                            <li class="nav-item">
+                                <a href="{{ route('aux.index') }}" class="nav-link">
+                                    <i class="nav-icon fas fa-flask"></i>
+                                    <p>
+                                        Auxiliary
+                                    </p>
+                                </a>
+                            </li>
+                        @endif
 
-                        <li class="nav-header">KIMIA</li>
-                        <li class="nav-item">
-                            <a href="{{ route('aux.index') }}" class="nav-link">
-                                <i class="nav-icon fas fa-flask"></i>
-                                <p>
-                                    Auxiliary
-                                </p>
-                            </a>
-                        </li>
-
-                        <li class="nav-header">LAINNYA</li>
-                        <li class="nav-item">
-                            <a href="../calendar.html" class="nav-link">
-                                <i class="nav-icon fas fa-clipboard-list"></i>
-                                <p>
-                                    Log Activity
-                                </p>
-                            </a>
-                        </li>
+                        @if ($canLog)
+                            <li class="nav-header">LAINNYA</li>
+                            <li class="nav-item">
+                                <a href="{{ route('activity-log.index') }}" class="nav-link">
+                                    <i class="nav-icon fas fa-clipboard-list"></i>
+                                    <p>
+                                        Log Activity
+                                    </p>
+                                </a>
+                            </li>
+                        @endif
 
 
                     </ul>
@@ -289,9 +347,41 @@
     <script src="{{ asset('lte/plugins/sweetalert2/sweetalert2.min.js') }}"></script>
 
     <script>
+        // Setup CSRF Token untuk AJAX (selalu ambil dari meta tag yang fresh)
+        $.ajaxSetup({
+            headers: {
+                'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+            }
+        });
+
+        // Update CSRF token setiap kali halaman di-load atau refresh
+        function updateCsrfToken() {
+            // Ambil token baru dari meta tag
+            const newToken = $('meta[name="csrf-token"]').attr('content');
+            if (newToken) {
+                // Update jQuery AJAX setup
+                $.ajaxSetup({
+                    headers: {
+                        'X-CSRF-TOKEN': newToken
+                    }
+                });
+            }
+        }
+
+        // Update token saat document ready
         $(document).ready(function() {
-            //Initialize Select2 Elements
-            $('.select2').select2()
+            updateCsrfToken();
+            
+            // Initialize Select2 Elements
+            $('.select2').select2();
+        });
+
+        // Update token setiap kali meta tag berubah (setelah logout/login)
+        $(document).ajaxComplete(function(event, xhr, settings) {
+            // Jika mendapat 419 error, refresh token dari meta tag
+            if (xhr.status === 419) {
+                updateCsrfToken();
+            }
         });
 
         function updateDateTime() {
@@ -349,6 +439,7 @@
                 }).buttons().container().appendTo($(tableId + '_wrapper .col-md-6:eq(0)'));
             }
             initializeDataTable('#auxl');
+            initializeDataTable('#activity_log');
         });
 
 

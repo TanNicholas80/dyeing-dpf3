@@ -27,12 +27,18 @@
                         <div class="card">
                             <div class="card-header">
                                 <h3 class="card-title">Data Auxiliary </h3>
+                                @php
+                                    $userRole = Auth::user()->role ?? null;
+                                    $canManageAuxl = strtolower($userRole) !== 'owner';
+                                @endphp
                                 <div class="d-flex justify-content-end" style="gap: 0.75rem;">
                                     <button type="button" class="btn btn-info btn-sm" id="bulkPrintBtn"><i
                                             class="fas fa-print"></i> Print Barcode</button>
+                                    @if($canManageAuxl)
                                     <a href="{{ route('aux.create') }}" class="btn-sm btn-primary">
                                         <i class="fas fa-plus"></i> Tambah
                                     </a>
+                                    @endif
                                 </div>
                             </div>
                             <div class="card-body">
@@ -54,7 +60,11 @@
                                         </thead>
                                         <tbody>
                                             @foreach ($auxls->sortBy('barcode') as $auxl)
-                                                <tr>
+                                                @php
+                                                    $pendingApproval = $auxl->pendingApproval ?? null;
+                                                    $waitingLabel = $pendingApproval ? strtoupper($pendingApproval->type) : null;
+                                                @endphp
+                                                <tr class="{{ $pendingApproval ? 'table-warning' : '' }}">
                                                     <td><input type="checkbox" class="barcode-checkbox"
                                                             value="{{ $auxl->barcode }}" data-code="{{ $auxl->code }}"
                                                             data-customer="{{ $auxl->customer }}"
@@ -68,49 +78,57 @@
                                                     <td>{{ $auxl->date }}</td>
                                                     <td>{{ $auxl->color }}</td>
                                                     <td>
-                                                        <a href="{{ route('aux.show', $auxl->id) }}"
-                                                            class="btn btn-info btn-sm mr-1">
-                                                            <i class="fas fa-eye"></i> Detail
-                                                        </a>
-                                                        <a href="{{ route('aux.edit', $auxl->id) }}"
-                                                            class="btn btn-warning btn-sm mr-1">
-                                                            <i class="fas fa-pen"></i> Edit
-                                                        </a>
-                                                        <a href="#" data-toggle="modal"
-                                                            data-target="#modal-hapus{{ $auxl->id }}"
-                                                            class="btn btn-danger btn-sm">
-                                                            <i class="fas fa-trash-alt"></i> Hapus
-                                                        </a>
-                                                        <!-- Modal Hapus -->
-                                                        <div class="modal fade" id="modal-hapus{{ $auxl->id }}">
-                                                            <div class="modal-dialog">
-                                                                <div class="modal-content">
-                                                                    <div class="modal-header">
-                                                                        <h4 class="modal-title">Konfirmasi Hapus Data
-                                                                            </h4>
-                                                                        <button type="button" class="close"
-                                                                            data-dismiss="modal" aria-label="Close">
-                                                                            <span aria-hidden="true">&times;</span>
-                                                                        </button>
-                                                                    </div>
-                                                                    <div class="modal-body">
-                                                                        <p>Yakin ingin menghapus data auxiliary
-                                                                            <b>{{ $auxl->barcode }}</b>?</p>
-                                                                    </div>
-                                                                    <div class="modal-footer justify-content-between">
-                                                                        <button type="button" class="btn btn-secondary"
-                                                                            data-dismiss="modal">Batal</button>
-                                                                        <form action="{{ route('aux.destroy', $auxl->id) }}"
-                                                                            method="POST" style="display:inline-block;">
-                                                                            @csrf
-                                                                            @method('DELETE')
-                                                                            <button type="submit"
-                                                                                class="btn btn-danger">Hapus</button>
-                                                                        </form>
+                                                        @if ($pendingApproval)
+                                                            <span class="badge badge-warning text-dark">
+                                                                Menunggu approval {{ $waitingLabel }}
+                                                            </span>
+                                                        @else
+                                                            <a href="{{ route('aux.show', $auxl->id) }}"
+                                                                class="btn btn-info btn-sm mr-1">
+                                                                <i class="fas fa-eye"></i> Detail
+                                                            </a>
+                                                            @if($canManageAuxl)
+                                                            <a href="{{ route('aux.edit', $auxl->id) }}"
+                                                                class="btn btn-warning btn-sm mr-1">
+                                                                <i class="fas fa-pen"></i> Edit
+                                                            </a>
+                                                            <a href="#" data-toggle="modal"
+                                                                data-target="#modal-hapus{{ $auxl->id }}"
+                                                                class="btn btn-danger btn-sm">
+                                                                <i class="fas fa-trash-alt"></i> Hapus
+                                                            </a>
+                                                            <!-- Modal Hapus -->
+                                                            <div class="modal fade" id="modal-hapus{{ $auxl->id }}">
+                                                                <div class="modal-dialog">
+                                                                    <div class="modal-content">
+                                                                        <div class="modal-header">
+                                                                            <h4 class="modal-title">Konfirmasi Hapus Data
+                                                                                </h4>
+                                                                            <button type="button" class="close"
+                                                                                data-dismiss="modal" aria-label="Close">
+                                                                                <span aria-hidden="true">&times;</span>
+                                                                            </button>
+                                                                        </div>
+                                                                        <div class="modal-body">
+                                                                            <p>Yakin ingin menghapus data auxiliary
+                                                                                <b>{{ $auxl->barcode }}</b>?</p>
+                                                                        </div>
+                                                                        <div class="modal-footer justify-content-between">
+                                                                            <button type="button" class="btn btn-secondary"
+                                                                                data-dismiss="modal">Batal</button>
+                                                                            <form action="{{ route('aux.destroy', $auxl->id) }}"
+                                                                                method="POST" style="display:inline-block;">
+                                                                                @csrf
+                                                                                @method('DELETE')
+                                                                                <button type="submit"
+                                                                                    class="btn btn-danger">Hapus</button>
+                                                                            </form>
+                                                                        </div>
                                                                     </div>
                                                                 </div>
                                                             </div>
-                                                        </div>
+                                                            @endif
+                                                        @endif
                                                     </td>
                                                 </tr>
                                             @endforeach

@@ -61,7 +61,7 @@
                                     <option value="super_admin" {{ old('role') == 'super_admin' ? 'selected' : '' }}>Super
                                         Admin</option>
                                     <option value="owner" {{ old('role') == 'owner' ? 'selected' : '' }}>Owner</option>
-                                    <option value="manager" {{ old('role') == 'manager' ? 'selected' : '' }}>Manager
+                                    <option value="aux" {{ old('role') == 'aux' ? 'selected' : '' }}>Aux
                                     </option>
                                     <option value="ppic" {{ old('role') == 'ppic' ? 'selected' : '' }}>PPIC</option>
                                     <option value="mesin" {{ old('role') == 'mesin' ? 'selected' : '' }}>Mesin</option>
@@ -74,7 +74,7 @@
                                 @enderror
                             </div>
 
-                            <div class="form-group">
+                            <div class="form-group" id="mesin-group" style="display: none;">
                                 <label>Mesin <small class="text-muted">(kosongkan jika akses semua mesin)</small></label>
                                 <select name="mesin" class="form-control" id="mesin-select">
                                     <option value="" {{ old('mesin') ? '' : 'selected' }}>-- Pilih Mesin --</option>
@@ -102,12 +102,14 @@
     <script>
         const roleSelect = document.querySelector('select[name="role"]');
         const mesinSelect = document.getElementById('mesin-select');
+        const mesinGroup = document.getElementById('mesin-group');
 
         function toggleMesinRequired() {
-            if (roleSelect.value === 'mesin') {
-                mesinSelect.required = true;
-            } else {
-                mesinSelect.required = false;
+            const isMesin = roleSelect.value === 'mesin';
+            mesinGroup.style.display = isMesin ? 'block' : 'none';
+            mesinSelect.required = isMesin;
+            if (!isMesin) {
+                mesinSelect.value = '';
             }
         }
 

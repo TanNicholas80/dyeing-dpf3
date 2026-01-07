@@ -175,10 +175,12 @@
                 </div>
                 <div class="col-sm-4 d-flex justify-content-end">
                     <div id="dashboard-controls" style="display: flex; justify-content: flex-end; gap: 10px;">
+                        @if($canAddProses ?? true)
                         <button id="add-card-btn" class="btn btn-success" style="font-weight:bold;" data-toggle="modal"
                             data-target="#modalProses">
                             + Tambah Proses
                         </button>
+                        @endif
                     </div>
                 </div>
             </div>
@@ -705,9 +707,12 @@
                                     $cycle_time_actual_str = detikKeWaktu($cycle_time_actual);
                                     }
                                     @endphp
-                                    <div class="status-card draggable" draggable="{{ ($bg === '#757575' && !$proses->mulai && !$hasPendingChange && !$hasPendingReprocessApproval) ? 'true' : 'false' }}"
-                                        style="background: {{ $gradient }}; background-repeat: no-repeat; background-size: cover; border-radius: 0; color: #fff; margin: 5px 0 0 0; padding: 2px 2px; cursor: {{ ($bg === '#757575' && !$proses->mulai && !$hasPendingChange && !$hasPendingReprocessApproval) ? 'grab' : 'default' }}; box-shadow: 0 2px 6px rgba(0,0,0,0.2);"
-                                        data-proses='@json($proses)' data-proses-id="{{ $proses->id }}" data-can-move="{{ ($bg === '#757575' && !$proses->mulai && !$hasPendingChange && !$hasPendingReprocessApproval) ? '1' : '0' }}" data-has-pending-reprocess="{{ $hasPendingReprocessApproval ? '1' : '0' }}" data-bg-color="{{ $bg }}">
+                                    @php
+                                        $canDragDrop = ($bg === '#757575' && !$proses->mulai && !$hasPendingChange && !$hasPendingReprocessApproval) && ($canSwapProses ?? true);
+                                    @endphp
+                                    <div class="status-card draggable" draggable="{{ $canDragDrop ? 'true' : 'false' }}"
+                                        style="background: {{ $gradient }}; background-repeat: no-repeat; background-size: cover; border-radius: 0; color: #fff; margin: 5px 0 0 0; padding: 2px 2px; cursor: {{ $canDragDrop ? 'grab' : 'default' }}; box-shadow: 0 2px 6px rgba(0,0,0,0.2);"
+                                        data-proses='@json($proses)' data-proses-id="{{ $proses->id }}" data-can-move="{{ $canDragDrop ? '1' : '0' }}" data-has-pending-reprocess="{{ $hasPendingReprocessApproval ? '1' : '0' }}" data-bg-color="{{ $bg }}">
                                         {{-- Header --}}
                                         <div class="card-header"
                                             style="display: flex; flex-direction: row; align-items: center; padding: 0 10px 2px 10px; gap: 0; border-bottom: none;">
@@ -1040,15 +1045,21 @@
                 </div>
                 <div class="modal-footer d-flex justify-content-between px-4">
                     <div>
+                        @if($canEditProses ?? true)
                         <button type="button" class="btn btn-primary btn-edit-proses mr-2">
                             <i class="fas fa-edit mr-1"></i>Edit
                         </button>
+                        @endif
+                        @if($canMoveProses ?? true)
                         <button type="button" class="btn btn-warning btn-move-proses mr-2">
                             <i class="fas fa-random mr-1"></i>Pindah Mesin
                         </button>
+                        @endif
+                        @if($canDeleteProses ?? true)
                         <button type="button" class="btn btn-danger btn-delete-proses">
                             <i class="fas fa-trash mr-1"></i>Hapus
                         </button>
+                        @endif
                     </div>
                     <button type="button" class="btn btn-secondary" data-dismiss="modal">Tutup</button>
                 </div>
@@ -1342,8 +1353,6 @@
             </div>
         </div>
     </div>
-
-
 </div>
 @endsection
 
@@ -1352,6 +1361,16 @@
 <script>
     // Simpan data mesin ke variabel global untuk digunakan di modal pindah mesin
     window.mesinsData = @json($mesins->map(function($m) { return ['id' => $m->id, 'jenis_mesin' => $m->jenis_mesin]; }));
+    
+    // Simpan role user dan permission flags (dari controller)
+    window.userRole = @json($userRole ?? null);
+    window.canCancelBarcode = @json($canCancelBarcode ?? false);
+    window.canAddProses = @json($canAddProses ?? true);
+    window.canEditProses = @json($canEditProses ?? true);
+    window.canDeleteProses = @json($canDeleteProses ?? true);
+    window.canMoveProses = @json($canMoveProses ?? true);
+    window.canSwapProses = @json($canSwapProses ?? true);
+    window.canScanBarcode = @json($canScanBarcode ?? true);
     document.addEventListener('DOMContentLoaded', () => {
         const draggables = document.querySelectorAll('.draggable');
         const containers = document.querySelectorAll('.card-dropzone');
@@ -1362,6 +1381,11 @@
 
         draggables.forEach(draggable => {
             draggable.addEventListener('dragstart', (e) => {
+                // Cek permission swap dari controller
+                if (window.canSwapProses === false) {
+                    e.preventDefault();
+                    return false;
+                }
                 const canMove = draggable.getAttribute('data-can-move') === '1';
                 if (!canMove) {
                     e.preventDefault();
@@ -1416,6 +1440,10 @@
         containers.forEach(container => {
             container.addEventListener('dragover', e => {
                 e.preventDefault();
+                // Cek permission swap dari controller
+                if (window.canSwapProses === false) {
+                    return;
+                }
                 const dragging = document.querySelector('.draggable.dragging');
                 if (!dragging) return;
                 
@@ -1501,6 +1529,15 @@
 
             container.addEventListener('drop', (e) => {
                 e.preventDefault();
+                // Cek permission swap dari controller
+                if (window.canSwapProses === false) {
+                    const dragging = document.querySelector('.draggable.dragging');
+                    if (dragging) {
+                        restoreCardToOriginalPosition(dragging);
+                        dragging.classList.remove('dragging');
+                    }
+                    return;
+                }
                 const dragging = document.querySelector('.draggable.dragging');
                 if (!dragging) return;
                 
@@ -1874,7 +1911,6 @@
             url: `/proses/${proses.id}/move`,
             method: 'POST',
             headers: {
-                'X-CSRF-TOKEN': '{{ csrf_token() }}',
                 'X-Requested-With': 'XMLHttpRequest',
                 'Accept': 'application/json'
             },
@@ -2006,7 +2042,6 @@
             url: `/proses/${proses1.id}/swap`,
             method: 'POST',
             headers: {
-                'X-CSRF-TOKEN': '{{ csrf_token() }}',
                 'X-Requested-With': 'XMLHttpRequest',
                 'Accept': 'application/json'
             },
@@ -2304,9 +2339,6 @@
                     type: 'POST',
                     dataType: 'json',
                     delay: 500,
-                    headers: {
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                    },
                     data: function(params) {
                         return {
                             no_op: params.term
@@ -2679,8 +2711,9 @@
         const $btnMove = $('.btn-move-proses');
         const $btnDelete = $('.btn-delete-proses');
         
-        // Disable jika ada pending approval FM ATAU pending approval VP Reproses ATAU proses sudah dimulai
-        if (hasPending || hasPendingReprocess || isStarted) {
+        // Disable jika role restricted (FM/VP) ATAU ada pending approval ATAU proses sudah dimulai
+        const isRoleRestricted = window.canEditProses === false || window.canDeleteProses === false || window.canMoveProses === false;
+        if (isRoleRestricted || hasPending || hasPendingReprocess || isStarted) {
             // Disable tombol
             $btnEdit.prop('disabled', true).addClass('disabled').css('cursor', 'not-allowed');
             $btnMove.prop('disabled', true).addClass('disabled').css('cursor', 'not-allowed');
@@ -2688,7 +2721,9 @@
             
             // Tentukan pesan tooltip berdasarkan kondisi
             let tooltipText = '';
-            if (isStarted) {
+            if (isRoleRestricted) {
+                tooltipText = 'Anda tidak memiliki izin untuk melakukan aksi ini. (Role: ' + (window.userRole || 'Unknown') + ')';
+            } else if (isStarted) {
                 tooltipText = 'Tidak dapat melakukan aksi. Proses sudah dimulai.';
             } else if (hasPendingReprocess) {
                 tooltipText = 'Tidak dapat melakukan aksi. Proses Reproses masih menunggu persetujuan VP.';
@@ -2776,7 +2811,7 @@
         }
         // Tampilkan barcode hanya jika proses.jenis !== 'Maintenance'
         if (proses.jenis !== 'Maintenance') {
-            const showScanBtn = true;
+            const showScanBtn = window.canScanBarcode !== false;
             html += '<tr><th colspan="4" style="background:#f8f8f8;">Barcode Kain';
             if (showScanBtn) {
                 html +=
@@ -2815,10 +2850,16 @@
                         if (!activeBarcodes.length) {
                             return '<span style="color:#888;">Belum ada barcode.</span>';
                         }
+                        // Cek apakah user bisa cancel barcode
+                        const canCancel = window.canCancelBarcode !== false;
                         let html = '<div style="display:flex;flex-wrap:wrap;gap:6px;">';
                         activeBarcodes.forEach(function(bk, idx) {
+                            // Hanya tampilkan button cancel jika user memiliki akses
+                            const cancelButton = canCancel ? 
+                                `<span style='position:absolute;top:2px;right:6px;cursor:pointer;font-weight:bold;color:#b00;font-size:16px;z-index:2;' class='cancel-barcode-btn' data-type='${barcodeType}' data-proses='${prosesId}' data-id='${bk.id}' data-matdok='${bk.matdok}' title='Cancel barcode'>&times;</span>` : 
+                                '';
                             html += `<div style="position:relative;flex:1 0 30%;max-width:32%;background:#f3f3f3;border-radius:6px;padding:6px 4px;margin-bottom:6px;text-align:center;font-weight:bold;font-size:13px;color:#222;box-shadow:0 1px 2px #0001;">
-                                    <span style='position:absolute;top:2px;right:6px;cursor:pointer;font-weight:bold;color:#b00;font-size:16px;z-index:2;' class='cancel-barcode-btn' data-type='${barcodeType}' data-proses='${prosesId}' data-id='${bk.id}' data-matdok='${bk.matdok}' title='Cancel barcode'>&times;</span>
+                                    ${cancelButton}
                                     ${bk.barcode} ${(bk.matdok ? '<br><span style=\'font-size:11px;color:#888;\'>' + bk.matdok + '</span>' : '')}
                                 </div>`;
                         });
@@ -3076,7 +3117,6 @@
             url: url,
             method: 'POST',
             headers: {
-                'X-CSRF-TOKEN': '{{ csrf_token() }}',
                 'X-Requested-With': 'XMLHttpRequest',
                 'Accept': 'application/json'
             },
@@ -3750,9 +3790,6 @@
         $.ajax({
             url: `/proses/${prosesId}/barcode/${barcodeType}/${barcodeId}/cancel`,
             method: 'POST',
-            headers: {
-                'X-CSRF-TOKEN': '{{ csrf_token() }}'
-            },
             data: {
                 matdok: matdok
             },
@@ -3786,11 +3823,17 @@
                                         if (!activeBarcodes.length) {
                                             return '<span style="color:#888;">Belum ada barcode.</span>';
                                         }
+                                        // Cek apakah user bisa cancel barcode
+                                        const canCancel = window.canCancelBarcode !== false;
                                         let html =
                                             '<div style="display:flex;flex-wrap:wrap;gap:6px;">';
                                         activeBarcodes.forEach(function(bk, idx) {
+                                            // Hanya tampilkan button cancel jika user memiliki akses
+                                            const cancelButton = canCancel ? 
+                                                `<span style='position:absolute;top:2px;right:6px;cursor:pointer;font-weight:bold;color:#b00;font-size:16px;z-index:2;' class='cancel-barcode-btn' data-type='${barcodeType}' data-proses='${prosesId}' data-id='${bk.id}' data-matdok='${bk.matdok}' title='Cancel barcode'>&times;</span>` : 
+                                                '';
                                             html += `<div style="position:relative;flex:1 0 30%;max-width:32%;background:#f3f3f3;border-radius:6px;padding:6px 4px;margin-bottom:6px;text-align:center;font-weight:bold;font-size:13px;color:#222;box-shadow:0 1px 2px #0001;">
-                                                    <span style='position:absolute;top:2px;right:6px;cursor:pointer;font-weight:bold;color:#b00;font-size:16px;z-index:2;' class='cancel-barcode-btn' data-type='${barcodeType}' data-proses='${prosesId}' data-id='${bk.id}' data-matdok='${bk.matdok}' title='Cancel barcode'>&times;</span>
+                                                    ${cancelButton}
                                                     ${bk.barcode} ${(bk.matdok ? '<br><span style=\'font-size:11px;color:#888;\'>' + bk.matdok + '</span>' : '')}
                                                 </div>`;
                                         });

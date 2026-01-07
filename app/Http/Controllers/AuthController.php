@@ -13,6 +13,11 @@ class AuthController extends Controller
     public function login()
     {
         if (Auth::check()) {
+            $user = Auth::user();
+            // Redirect berdasarkan role
+            if ($user->role === 'aux') {
+                return redirect()->route('aux.index');
+            }
             return redirect()->route('dashboard');
         }
 
@@ -34,10 +39,19 @@ class AuthController extends Controller
 
         if (Auth::attempt($credentials, $remember)) {
             $request->session()->regenerate();
-
+            // Pastikan tidak ada URL intended tersisa yang bisa mengarahkan ke route yang tidak diizinkan
+            $request->session()->forget('url.intended');
+            
+            // Redirect berdasarkan role
+            $user = Auth::user();
+            $redirectRoute = 'dashboard';
+            if ($user->role === 'aux') {
+                $redirectRoute = 'aux.index';
+            }
+            
             return redirect()
-                ->intended(route('dashboard'))
-                ->with('success', 'Login berhasil. Selamat datang, ' . Auth::user()->nama . '!');
+                ->route($redirectRoute)
+                ->with('success', 'Login berhasil. Selamat datang, ' . $user->nama . '!');
         }
 
         return back()

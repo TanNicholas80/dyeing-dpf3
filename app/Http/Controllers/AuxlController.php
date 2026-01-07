@@ -4,13 +4,33 @@ namespace App\Http\Controllers;
 
 use App\Models\Auxl;
 use App\Models\AuxlDetail;
+use App\Models\Approval;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class AuxlController extends Controller
 {
     public function index()
     {
         $auxls = Auxl::with('details')->orderByDesc('created_at')->get();
+
+        // Tandai auxl yang masih menunggu approval (FM atau VP) untuk jenis reproses
+        if ($auxls->isNotEmpty()) {
+            $pendingApprovals = Approval::whereIn('auxl_id', $auxls->pluck('id'))
+                ->where('action', 'create_aux_reprocess')
+                ->where('status', 'pending')
+                ->orderByDesc('created_at')
+                ->get()
+                ->groupBy('auxl_id');
+
+            $auxls->transform(function ($auxl) use ($pendingApprovals) {
+                $auxlCollection = $pendingApprovals->get($auxl->id);
+                $auxl->pendingApproval = $auxlCollection ? $auxlCollection->first() : null;
+                return $auxl;
+            });
+        }
+
         return view('auxl.index', compact('auxls'));
     }
 
@@ -33,16 +53,32 @@ class AuxlController extends Controller
             'details.*.auxiliary' => 'required',
             'details.*.konsentrasi' => 'required|numeric',
         ]);
-        // Generate barcode unik: AUX-[running number 10 digit]
-        $last = Auxl::orderByDesc('id')->first();
-        $nextNumber = $last ? ($last->id + 1) : 1;
-        $barcode = 'AUX-' . str_pad($nextNumber, 10, '0', STR_PAD_LEFT);
-        $data['barcode'] = $barcode;
-        $auxl = Auxl::create($data);
-        foreach ($data['details'] as $detail) {
-            $auxl->details()->create($detail);
-        }
-        return redirect()->route('aux.index')->with('success', 'Data Auxl berhasil disimpan. Barcode: ' . $barcode);
+
+        return DB::transaction(function () use ($data) {
+            // Generate barcode unik: AUX-[running number 10 digit]
+            $last = Auxl::orderByDesc('id')->first();
+            $nextNumber = $last ? ($last->id + 1) : 1;
+            $barcode = 'AUX-' . str_pad($nextNumber, 10, '0', STR_PAD_LEFT);
+            $data['barcode'] = $barcode;
+
+            $auxl = Auxl::create($data);
+            foreach ($data['details'] as $detail) {
+                $auxl->details()->create($detail);
+            }
+
+            // Jika jenis reproses, trigger approval 2 step (FM lalu VP)
+            if ($auxl->jenis === 'reproses') {
+                $this->createReprocessApproval($auxl);
+
+                return redirect()
+                    ->route('aux.index')
+                    ->with('success', 'Data Auxl disimpan dengan status menunggu approval FM & VP. Barcode: ' . $barcode);
+            }
+
+            return redirect()
+                ->route('aux.index')
+                ->with('success', 'Data Auxl berhasil disimpan. Barcode: ' . $barcode);
+        });
     }
 
     public function show($id)
@@ -87,5 +123,36 @@ class AuxlController extends Controller
         $auxl = Auxl::findOrFail($id);
         $auxl->delete();
         return redirect()->route('aux.index')->with('success', 'Data Auxl berhasil dihapus.');
+    }
+
+    /**
+     * Membuat approval awal untuk alur reproses:
+     * 1) Pending FM
+     * 2) Setelah FM approve, otomatis dibuat approval VP (di ApprovalController)
+     */
+    private function createReprocessApproval(Auxl $auxl): void
+    {
+        // Cegah duplikasi approval FM yang masih pending
+        $existingPending = Approval::where('auxl_id', $auxl->id)
+            ->where('action', 'create_aux_reprocess')
+            ->where('type', 'FM')
+            ->where('status', 'pending')
+            ->first();
+
+        if ($existingPending) {
+            return;
+        }
+
+        Approval::create([
+            'auxl_id'     => $auxl->id,
+            'status'      => 'pending',
+            'type'        => 'FM',
+            'action'      => 'create_aux_reprocess',
+            'history_data'=> [
+                'auxl_snapshot' => $auxl->toArray(),
+                'details'       => $auxl->details()->get()->toArray(),
+            ],
+            'requested_by'=> Auth::id(),
+        ]);
     }
 }

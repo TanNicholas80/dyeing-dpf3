@@ -18,7 +18,8 @@ class Approval extends Model
      * Kolom yang boleh diisi mass-assignment.
      */
     protected $fillable = [
-        'proses_id',
+        'proses_id', 
+        'auxl_id',
         'status',
         'type',
         'action',
@@ -41,6 +42,14 @@ class Approval extends Model
     public function proses()
     {
         return $this->belongsTo(Proses::class, 'proses_id')->withTrashed();
+    }
+
+    /**
+     * Relasi ke Auxl (untuk approval terkait auxiliary).
+     */
+    public function auxl()
+    {
+        return $this->belongsTo(Auxl::class, 'auxl_id');
     }
 
     /**

@@ -60,7 +60,7 @@
                                         $roles = [
                                             'super_admin' => 'Super Admin',
                                             'owner' => 'Owner',
-                                            'manager' => 'Manager',
+                                            'aux' => 'Aux',
                                             'ppic' => 'PPIC',
                                             'mesin' => 'Mesin',
                                             'ds' => 'DS',
@@ -79,7 +79,7 @@
                                 @enderror
                             </div>
 
-                            <div class="form-group">
+                            <div class="form-group" id="mesin-group" style="display: none;">
                                 <label>Mesin <small class="text-muted">(kosongkan jika akses semua mesin)</small></label>
                                 <select name="mesin" class="form-control" id="mesin-select">
                                     <option value="">-- Pilih Mesin --</option>
@@ -105,12 +105,14 @@
     <script>
         const roleSelect = document.querySelector('select[name="role"]');
         const mesinSelect = document.getElementById('mesin-select');
+        const mesinGroup = document.getElementById('mesin-group');
 
         function toggleMesinRequired() {
-            if (roleSelect.value === 'mesin') {
-                mesinSelect.required = true;
-            } else {
-                mesinSelect.required = false;
+            const isMesin = roleSelect.value === 'mesin';
+            mesinGroup.style.display = isMesin ? 'block' : 'none';
+            mesinSelect.required = isMesin;
+            if (!isMesin) {
+                mesinSelect.value = '';
             }
         }
 

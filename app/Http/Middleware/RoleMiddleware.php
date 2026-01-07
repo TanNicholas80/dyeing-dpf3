@@ -25,6 +25,12 @@ class RoleMiddleware
             return $next($request);
         }
 
-        return redirect()->route('dashboard')->with('error', 'Anda tidak memiliki akses');
+        // Redirect berdasarkan role jika tidak memiliki akses
+        $redirectRoute = 'dashboard';
+        if ($user->role === 'aux') {
+            $redirectRoute = 'aux.index';
+        }
+
+        return redirect()->route($redirectRoute)->with('error', 'Anda tidak memiliki akses');
     }
 }

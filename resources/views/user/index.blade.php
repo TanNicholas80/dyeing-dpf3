@@ -28,7 +28,11 @@
                             <div class="card-header">
                                 <h3 class="card-title">Data User</h3>
 
-                                @if (Auth::user()->role != 'owner')
+                                @php
+                                    $canManageUsers = (Auth::user()->role ?? null) !== 'owner';
+                                @endphp
+
+                                @if ($canManageUsers)
                                     <div class="d-flex justify-content-end">
                                         <a href="{{ route('user.create') }}" class="btn-sm btn-primary">
                                             <i class="fas fa-plus"></i> Tambah
@@ -45,7 +49,9 @@
                                             <th>Mesin</th>
                                             <th>Username</th>
                                             <th>Role</th>
+                                            @if ($canManageUsers)
                                             <th>Action</th>
+                                            @endif
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -67,6 +73,7 @@
                                                         {{ ucfirst($u->role) }}
                                                     @endif
                                                 </td>
+                                                @if ($canManageUsers)
                                                 <td>
                                                     <a href="{{ route('user.edit', ['id' => $u->id]) }}"
                                                         class="btn btn-warning btn-sm mr-2">
@@ -78,9 +85,11 @@
                                                         <i class="fas fa-trash-alt"></i> Hapus
                                                     </a>
                                                 </td>
+                                                @endif
 
                                             </tr>
 
+                                            @if ($canManageUsers)
                                             <!-- Modal Hapus -->
                                             <div class="modal fade" id="modal-hapus{{ $u->id }}">
                                                 <div class="modal-dialog">
@@ -111,6 +120,7 @@
                                                     </div>
                                                 </div>
                                             </div>
+                                            @endif
                                         @endforeach
                                     </tbody>
                                 </table>

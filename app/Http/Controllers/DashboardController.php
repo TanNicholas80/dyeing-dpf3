@@ -16,7 +16,20 @@ class DashboardController extends Controller
 {
     public function dashboard(Request $request)
     {
-        $mesins = Mesin::select('id', 'jenis_mesin')
+        $user = $request->user();
+
+        // Jika user role mesin dan memiliki mesin spesifik, batasi daftar mesin
+        $restrictedMesinIds = [];
+        $mesinsQuery = Mesin::select('id', 'jenis_mesin');
+        if ($user && $user->role === 'mesin' && $user->mesin) {
+            $mesinsQuery->where('jenis_mesin', $user->mesin);
+            $mesinRecord = Mesin::where('jenis_mesin', $user->mesin)->first();
+            if ($mesinRecord) {
+                $restrictedMesinIds = [$mesinRecord->id];
+            }
+        }
+
+        $mesins = $mesinsQuery
             ->orderBy('id', 'asc')
             ->get();
 
@@ -25,7 +38,10 @@ class DashboardController extends Controller
         // Ambil parameter mesin dari query string, support multi-mesin (mesin=1,2,3)
         $selectedMesin = $request->query('mesin');
         $selectedMesinArr = [];
-        if ($selectedMesin) {
+        if (count($restrictedMesinIds) > 0) {
+            // User mesin hanya boleh melihat mesin yang di-assign
+            $selectedMesinArr = $restrictedMesinIds;
+        } elseif ($selectedMesin) {
             if (is_array($selectedMesin)) {
                 $selectedMesinArr = $selectedMesin;
             } else {
@@ -35,7 +51,9 @@ class DashboardController extends Controller
 
         // Ambil proses, filter jika mesin dipilih
         $prosesQuery = Proses::with(['barcodeKains', 'barcodeLas', 'barcodeAuxs', 'mesin', 'approvals']);
-        if (count($selectedMesinArr) > 0) {
+        if (count($restrictedMesinIds) > 0) {
+            $prosesQuery->whereIn('mesin_id', $restrictedMesinIds);
+        } elseif (count($selectedMesinArr) > 0) {
             $prosesQuery->whereIn('mesin_id', $selectedMesinArr);
         }
 
@@ -57,11 +75,32 @@ class DashboardController extends Controller
             return $a->id <=> $b->id;
         })->values();
 
+        // Ambil role user dan permission untuk optimasi (hindari checking di view)
+        $userRole = $user ? $user->role : null;
+        $canCancelBarcode = !in_array($userRole, ['ds', 'mesin', 'ppic', 'vp', 'fm', 'owner']);
+        
+        // Restrict untuk FM & VP: tidak bisa tambah proses, edit, delete, swap, scan barcode, cancel barcode
+        $isRestrictedRole = in_array($userRole, ['fm', 'vp', 'owner']);
+        $canAddProses = !$isRestrictedRole;
+        $canEditProses = !$isRestrictedRole;
+        $canDeleteProses = !$isRestrictedRole;
+        $canMoveProses = !$isRestrictedRole;
+        $canSwapProses = !$isRestrictedRole;
+        $canScanBarcode = !$isRestrictedRole;
+
         return view('dashboard', [
             'mesins' => $mesins,
             'currentPage' => $currentPage,
             'prosesList' => $prosesList,
             'selectedMesinArr' => $selectedMesinArr,
+            'userRole' => $userRole,
+            'canCancelBarcode' => $canCancelBarcode,
+            'canAddProses' => $canAddProses,
+            'canEditProses' => $canEditProses,
+            'canDeleteProses' => $canDeleteProses,
+            'canMoveProses' => $canMoveProses,
+            'canSwapProses' => $canSwapProses,
+            'canScanBarcode' => $canScanBarcode,
         ]);
     }
 
@@ -72,10 +111,23 @@ class DashboardController extends Controller
     public function prosesStatuses(Request $request)
     {
         try {
+            $user = $request->user();
+
+            // Batasi mesin jika user role mesin
+            $restrictedMesinIds = [];
+            if ($user && $user->role === 'mesin' && $user->mesin) {
+                $mesinRecord = Mesin::where('jenis_mesin', $user->mesin)->first();
+                if ($mesinRecord) {
+                    $restrictedMesinIds = [$mesinRecord->id];
+                }
+            }
+
             // Ambil parameter mesin dari query string (sama seperti dashboard)
             $selectedMesin = $request->query('mesin');
             $selectedMesinArr = [];
-            if ($selectedMesin) {
+            if (count($restrictedMesinIds) > 0) {
+                $selectedMesinArr = $restrictedMesinIds;
+            } elseif ($selectedMesin) {
                 if (is_array($selectedMesin)) {
                     $selectedMesinArr = $selectedMesin;
                 } else {
@@ -85,7 +137,9 @@ class DashboardController extends Controller
 
             // Query proses dengan relasi approvals untuk cek pending
             $prosesQuery = Proses::with(['approvals', 'barcodeKains', 'barcodeLas', 'barcodeAuxs']);
-            if (count($selectedMesinArr) > 0) {
+            if (count($restrictedMesinIds) > 0) {
+                $prosesQuery->whereIn('mesin_id', $restrictedMesinIds);
+            } elseif (count($selectedMesinArr) > 0) {
                 $prosesQuery->whereIn('mesin_id', $selectedMesinArr);
             }
 

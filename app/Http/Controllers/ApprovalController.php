@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Approval;
+use App\Models\Auxl;
 use App\Models\Proses;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -17,7 +18,7 @@ class ApprovalController extends Controller
      */
     public function approval_fm()
     {
-        $approvals = Approval::with(['proses', 'requester', 'approver'])
+        $approvals = Approval::with(['proses', 'auxl', 'requester', 'approver'])
             ->where('type', 'FM')
             ->orderByRaw("FIELD(status, 'pending','approved','rejected')")
             ->orderByDesc('created_at')
@@ -31,7 +32,7 @@ class ApprovalController extends Controller
      */
     public function approval_vp()
     {
-        $approvals = Approval::with(['proses', 'requester', 'approver'])
+        $approvals = Approval::with(['proses', 'auxl', 'requester', 'approver'])
             ->where('type', 'VP')
             ->orderByRaw("FIELD(status, 'pending','approved','rejected')")
             ->orderByDesc('created_at')
@@ -102,6 +103,9 @@ class ApprovalController extends Controller
                         // Proses sudah dihapus, tidak perlu load
                     }
                 }
+                if ($approval->auxl_id) {
+                    $approval->load('auxl');
+                }
                 
                 return response()->json([
                     'status'  => 'success',
@@ -134,6 +138,50 @@ class ApprovalController extends Controller
      */
     private function executeApprovedAction(Approval $approval)
     {
+        if ($approval->action === 'create_aux_reprocess') {
+            $auxl = Auxl::find($approval->auxl_id);
+
+            if (! $auxl) {
+                throw new \Exception("Data Auxl tidak ditemukan untuk approval ini.");
+            }
+
+            // Setelah FM approve, otomatis buat approval VP jika belum ada
+            if ($approval->type === 'FM') {
+                $existingVpApproval = Approval::where('auxl_id', $auxl->id)
+                    ->where('type', 'VP')
+                    ->where('action', 'create_aux_reprocess')
+                    ->first();
+
+                if (! $existingVpApproval) {
+                    // Ambil details dari auxl yang masih ada
+                    $auxlDetails = $auxl->details ? $auxl->details->toArray() : [];
+                    
+                    // Jika tidak ada details di auxl, coba ambil dari approval FM sebelumnya
+                    if (empty($auxlDetails) && $approval->history_data && isset($approval->history_data['details'])) {
+                        $auxlDetails = $approval->history_data['details'];
+                    }
+                    
+                    Approval::create([
+                        'auxl_id'     => $auxl->id,
+                        'status'      => 'pending',
+                        'type'        => 'VP',
+                        'action'      => 'create_aux_reprocess',
+                        'history_data'=> [
+                            'auxl_snapshot' => $auxl->toArray(),
+                            'details'       => $auxlDetails,
+                            'fm_approval_id'=> $approval->id,
+                        ],
+                        'note'        => null,
+                        'requested_by'=> $approval->requested_by,
+                        'approved_by' => null,
+                    ]);
+                }
+            }
+
+            // Tidak ada eksekusi lanjutan untuk VP selain mencatat approval
+            return;
+        }
+
         $proses = $approval->proses;
         
         // Jika proses tidak ditemukan (sudah dihapus), throw exception
@@ -294,6 +342,20 @@ class ApprovalController extends Controller
     private function executeRejectedAction(Approval $approval)
     {
         switch ($approval->action) {
+            case 'create_aux_reprocess':
+                // Jika approval Auxl ditolak, hapus Auxl dan approval VP yang masih pending
+                $auxl = Auxl::find($approval->auxl_id);
+                if ($auxl) {
+                    $auxl->delete();
+                }
+
+                Approval::where('auxl_id', $approval->auxl_id)
+                    ->where('action', 'create_aux_reprocess')
+                    ->where('type', 'VP')
+                    ->where('status', 'pending')
+                    ->delete();
+                break;
+
             case 'create_reprocess':
                 // Jika create_reprocess di-reject oleh FM, hapus proses yang baru dibuat
                 // Jika di-reject oleh VP, juga hapus proses

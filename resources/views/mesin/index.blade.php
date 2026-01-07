@@ -29,7 +29,13 @@
                             <div class="card-header">
                                 <h3 class="card-title">Data Mesin</h3>
 
-                                @if (Auth::user()->role != 'owner')
+                                @php
+                                    $userRole = Auth::user()->role ?? null;
+                                    $restrictedRoles = ['fm', 'vp', 'ppic', 'owner'];
+                                    $canManageMesin = !in_array(strtolower($userRole), $restrictedRoles);
+                                @endphp
+
+                                @if ($canManageMesin)
                                     <div class="d-flex justify-content-end">
                                         <a href="{{ route('mesin.create') }}" class="btn btn-primary btn-sm">
                                             <i class="fas fa-plus"></i> Tambah
@@ -44,7 +50,9 @@
                                         <tr>
                                             <th>Jenis Mesin</th>
                                             <th>Status</th>
+                                            @if ($canManageMesin)
                                             <th>Aksi</th>
+                                            @endif
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -57,6 +65,7 @@
                                                         {{ $mesin->status ? 'Hidup' : 'Mati' }}
                                                     </span>
                                                 </td>
+                                                @if ($canManageMesin)
                                                 <td>
                                                     <a href="{{ route('mesin.edit', $mesin->id) }}"
                                                         class="btn btn-warning btn-sm mr-2">
@@ -68,8 +77,10 @@
                                                         <i class="fas fa-trash-alt"></i> Hapus
                                                     </a>
                                                 </td>
+                                                @endif
                                             </tr>
 
+                                            @if ($canManageMesin)
                                             <!-- Modal Hapus -->
                                             <div class="modal fade" id="modal-hapus{{ $mesin->id }}">
                                                 <div class="modal-dialog">
@@ -100,6 +111,7 @@
                                                     </div>
                                                 </div>
                                             </div>
+                                            @endif
                                         @endforeach
                                     </tbody>
                                 </table>
