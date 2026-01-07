@@ -15,7 +15,7 @@ Route::post('/login-proses', [AuthController::class, 'login_proses'])->name('log
 
 Route::middleware(['auth'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
-    
+
     // Dashboard: Semua role bisa akses kecuali aux
     Route::middleware('role:super_admin,ds,mesin,ppic,fm,vp,owner')->group(function () {
         Route::get('/dashboard', [DashboardController::class, 'dashboard'])->name('dashboard');
@@ -30,10 +30,9 @@ Route::middleware(['auth'])->group(function () {
      * - SuperAdmin: full CRUD user
      * - Owner: hanya melihat daftar user
      */
-    Route::middleware('role:super_admin,owner')->group(function () {
-        Route::get('/user', [UserController::class, 'index'])->name('user.index');
-    });
+
     Route::middleware('role:super_admin')->group(function () {
+        Route::get('/user', [UserController::class, 'index'])->name('user.index');
         Route::get('/user/create', [UserController::class, 'create'])->name('user.create');
         Route::post('/user/store', [UserController::class, 'store'])->name('user.store');
         Route::get('/user/edit/{id}', [UserController::class, 'edit'])->name('user.edit');
@@ -90,10 +89,10 @@ Route::middleware(['auth'])->group(function () {
      * - VP: approval VP + activity log
      * - Owner: melihat approval FM/VP (GET saja)
      */
-    Route::middleware('role:super_admin,fm,owner')->group(function () {
+    Route::middleware('role:super_admin,fm')->group(function () {
         Route::get('/approval/fm', [ApprovalController::class, 'approval_fm'])->name('approval.fm');
     });
-    Route::middleware('role:super_admin,vp,owner')->group(function () {
+    Route::middleware('role:super_admin,vp')->group(function () {
         Route::get('/approval/vp', [ApprovalController::class, 'approval_vp'])->name('approval.vp');
     });
     // Ubah status approval hanya oleh SuperAdmin, FM, VP
@@ -112,8 +111,12 @@ Route::middleware(['auth'])->group(function () {
      * - SuperAdmin: akses penuh AUX
      * - Owner: minimal bisa melihat AUX (sementara pakai resource penuh, jika perlu bisa dibatasi di controller)
      */
-    Route::middleware('role:super_admin,aux,owner')->group(function () {
-        Route::resource('aux', AuxlController::class);
+    Route::middleware('role:super_admin,aux')->group(function () {
+        Route::resource('aux', AuxlController::class)->except(['destroy']);
+    });
+    Route::middleware('role:super_admin')->group(function () {
+        Route::delete('aux/{aux}', [AuxlController::class, 'destroy'])
+            ->name('aux.destroy');
     });
 });
 

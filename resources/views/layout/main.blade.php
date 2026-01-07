@@ -69,11 +69,11 @@
                         @php
                             $role = Auth::user()->role ?? null;
                             $canDashboard = !in_array($role, ['aux']); // Semua role bisa akses dashboard kecuali aux
-                            $canApprovalFm = in_array($role, ['super_admin', 'fm', 'owner']);
-                            $canApprovalVp = in_array($role, ['super_admin', 'vp', 'owner']);
-                            $canUser = in_array($role, ['super_admin', 'owner']);
+                            $canApprovalFm = in_array($role, ['super_admin', 'fm']);
+                            $canApprovalVp = in_array($role, ['super_admin', 'vp']);
+                            $canUser = in_array($role, ['super_admin']);
                             $canMesin = in_array($role, ['super_admin', 'fm', 'vp', 'ppic', 'owner']);
-                            $canAux = in_array($role, ['super_admin', 'aux', 'owner']);
+                            $canAux = in_array($role, ['super_admin', 'aux']);
                             $canLog = in_array($role, ['super_admin', 'fm', 'vp']);
                         @endphp
 
