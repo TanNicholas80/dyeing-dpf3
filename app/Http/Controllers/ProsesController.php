@@ -495,7 +495,6 @@ class ProsesController extends Controller
                         'Accept' => 'application/json',
                     ],
                     'body' => $body,
-                    'timeout' => 10,
                 ]
             );
             $rawResponse = $response->getBody()->getContents();
@@ -506,7 +505,12 @@ class ProsesController extends Controller
                 Log::error('Cancel barcode gagal: SAP API response kosong', ['matdok' => $matdok, 'response' => $data]);
                 return response()->json(['status' => 'error', 'message' => 'Material document tidak ditemukan di SAP atau sudah dicancel.'], 400);
             }
-            if ($stats === 'Success') {
+            // Anggap sukses baik untuk response 'Success' maupun pesan bahwa semua item sudah dicancel/reversed
+            $alreadyCanceled = is_string($stats)
+                && stripos($stats, 'already') !== false
+                && (stripos($stats, 'cancel') !== false || stripos($stats, 'reverse') !== false || stripos($stats, 'reversed') !== false);
+
+            if ($stats === 'Success' || $alreadyCanceled) {
                 if (!isset($barcodeObj)) {
                     if ($type === 'kain') {
                         $barcodeObj = \App\Models\BarcodeKain::find($barcode);
@@ -519,7 +523,12 @@ class ProsesController extends Controller
                 if ($barcodeObj) {
                     $barcodeObj->cancel = true;
                     $barcodeObj->save();
-                    return response()->json(['status' => 'success']);
+                    return response()->json([
+                        'status' => 'success',
+                        'message' => $alreadyCanceled
+                            ? 'Barcode sudah pernah dicancel / reversed di SAP. Status lokal diperbarui menjadi cancel.'
+                            : 'Barcode berhasil dicancel di SAP.'
+                    ]);
                 } else {
                     Log::error('Cancel barcode gagal: barcode tidak ditemukan', compact('type', 'barcode'));
                     return response()->json(['status' => 'error', 'message' => 'Barcode tidak ditemukan'], 404);

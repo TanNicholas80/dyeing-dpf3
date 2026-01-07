@@ -77,7 +77,7 @@ class DashboardController extends Controller
 
         // Ambil role user dan permission untuk optimasi (hindari checking di view)
         $userRole = $user ? $user->role : null;
-        $canCancelBarcode = !in_array($userRole, ['ds', 'mesin', 'ppic', 'vp', 'fm', 'owner']);
+        $canCancelBarcode = !in_array($userRole, ['ds', 'mesin', 'vp', 'fm', 'owner']);
         
         // Restrict untuk FM & VP: tidak bisa tambah proses, edit, delete, swap, scan barcode, cancel barcode
         $isRestrictedRole = in_array($userRole, ['fm', 'vp', 'owner']);

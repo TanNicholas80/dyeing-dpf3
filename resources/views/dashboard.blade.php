@@ -131,6 +131,26 @@
         background: #555;
     }
 
+    /* Efek kelap-kelip halus untuk indikator hijau (proses berjalan) */
+    @keyframes pulse-soft-green {
+        0% {
+            opacity: 1;
+            box-shadow: 0 0 8px rgba(0, 255, 26, 0.6);
+        }
+        50% {
+            opacity: 0.45;
+            box-shadow: 0 0 2px rgba(0, 255, 26, 0.25);
+        }
+        100% {
+            opacity: 1;
+            box-shadow: 0 0 8px rgba(0, 255, 26, 0.6);
+        }
+    }
+
+    .status-light.running-light {
+        animation: pulse-soft-green 1.4s ease-in-out infinite;
+    }
+
     /* Tombol toggle history */
     .btn-toggle-history {
         width: 100%;
@@ -468,7 +488,7 @@
                                                     </div>
                                                     <div
                                                         style="flex: 2; text-align: center; display: flex; justify-content: center; gap: 6px;">
-                                                        @foreach ($blocks as $i => $b)
+                                            @foreach ($blocks as $i => $b)
                                                         @php
                                                         $color = $blockColors[$i];
                                                         if ($proses->jenis === 'Maintenance') {
@@ -481,15 +501,16 @@
                                                         $color === 'green' ? '#43a047' : '#c62828';
                                                         }
                                                         @endphp
-                                                        <span
+                                            <span class="gda-block"
+                                                data-block-type="{{ $b }}"
                                                             style="display: inline-block; background: {{ $blockBg }}; color: #111; font-weight: bold; font-size: 22px; padding: 2px 10px; border-radius: 6px; border: 2.5px solid {{ $blockBorder }}; box-shadow: 0 1px 4px rgba(0,0,0,0.10); letter-spacing: 1px; text-shadow: 0 1px 2px #fff8;">
                                                             {{ $b }}
                                                         </span>
                                                         @endforeach
                                                     </div>
                                                     <div style="flex: 1; text-align: right;">
-                                                        <div class="status-light"
-                                                            style="width: 24px; height: 24px; border-radius: 50%; background: {{ $light == 'green' ? '#00ff1a' : '#ff2a2a' }}; display: inline-block; border: 3px solid #fff; box-shadow: 0 0 0 0 transparent; transition: background 0.2s;">
+                                                <div class="status-light {{ $light == 'green' ? 'running-light' : '' }}"
+                                                    style="width: 24px; height: 24px; border-radius: 50%; background: {{ $light == 'green' ? '#00ff1a' : '#ff2a2a' }}; display: inline-block; border: 3px solid #fff; box-shadow: 0 0 0 0 transparent; transition: background 0.2s;">
                                                         </div>
                                                     </div>
                                                 </div>
@@ -737,14 +758,15 @@
                                                 $color === 'green' ? '#43a047' : '#c62828';
                                                 }
                                                 @endphp
-                                                <span
+                                                <span class="gda-block"
+                                                    data-block-type="{{ $b }}"
                                                     style="display: inline-block; background: {{ $blockBg }}; color: #111; font-weight: bold; font-size: 22px; padding: 2px 10px; border-radius: 6px; border: 2.5px solid {{ $blockBorder }}; box-shadow: 0 1px 4px rgba(0,0,0,0.10); letter-spacing: 1px; text-shadow: 0 1px 2px #fff8;">
                                                     {{ $b }}
                                                 </span>
                                                 @endforeach
                                             </div>
                                             <div style="flex: 1; text-align: right;">
-                                                <div class="status-light"
+                                                <div class="status-light {{ $light == 'green' ? 'running-light' : '' }}"
                                                     style="width: 24px; height: 24px; border-radius: 50%; background: {{ $light == 'green' ? '#00ff1a' : '#ff2a2a' }}; display: inline-block; border: 3px solid #fff; box-shadow: 0 0 0 0 transparent; transition: background 0.2s;">
                                                 </div>
                                             </div>
@@ -2844,6 +2866,37 @@
                 url: '/proses/' + proses.id + '/barcodes',
                 method: 'GET',
                 success: function(data) {
+                    // Helper untuk update warna blok G, D, A di card utama setelah perubahan barcode
+                    function updateGDAIndicators(prosesId, hasKain, hasLa, hasAux) {
+                        const $cards = $(`.status-card[data-proses-id="${prosesId}"]`);
+                        if (!$cards.length) return;
+
+                        $cards.each(function() {
+                            const $card = $(this);
+                            const prosesData = $card.data('proses');
+                            if (!prosesData || prosesData.jenis === 'Maintenance') {
+                                return; // Tidak ada G/D/A untuk Maintenance
+                            }
+
+                            // Update warna blok berdasarkan status barcode
+                            function setBlockColor(blockType, ok) {
+                                const $block = $card.find(`.gda-block[data-block-type="${blockType}"]`);
+                                if (!$block.length) return;
+
+                                const blockBg = ok ? '#d4f8e8' : '#ffb3b3';
+                                const blockBorder = ok ? '#43a047' : '#c62828';
+                                $block.css({
+                                    background: blockBg,
+                                    borderColor: blockBorder
+                                });
+                            }
+
+                            setBlockColor('G', !!hasKain);
+                            setBlockColor('D', !!hasLa);
+                            setBlockColor('A', !!hasAux);
+                        });
+                    }
+
                     function renderBarcodeGrid(barcodes, barcodeType, prosesId) {
                         // Filter barcode yang belum cancel
                         const activeBarcodes = (barcodes || []).filter(bk => !bk.cancel);
@@ -2866,11 +2919,16 @@
                         html += '</div>';
                         return html;
                     }
-                    $('#barcode-kain-list').html(renderBarcodeGrid(data.barcode_kain, 'kain', proses
-                        .id));
+                    // Render ulang list barcode di modal
+                    $('#barcode-kain-list').html(renderBarcodeGrid(data.barcode_kain, 'kain', proses.id));
                     $('#barcode-la-list').html(renderBarcodeGrid(data.barcode_la, 'la', proses.id));
-                    $('#barcode-aux-list').html(renderBarcodeGrid(data.barcode_aux, 'aux', proses
-                        .id));
+                    $('#barcode-aux-list').html(renderBarcodeGrid(data.barcode_aux, 'aux', proses.id));
+
+                    // Hitung status barcode aktif per jenis untuk update G/D/A di card utama
+                    const hasKainActive = (data.barcode_kain || []).some(bk => !bk.cancel);
+                    const hasLaActive = (data.barcode_la || []).some(bk => !bk.cancel);
+                    const hasAuxActive = (data.barcode_aux || []).some(bk => !bk.cancel);
+                    updateGDAIndicators(proses.id, hasKainActive, hasLaActive, hasAuxActive);
                 },
                 error: function() {
                     $('#barcode-kain-list').html(
@@ -3840,6 +3898,37 @@
                                         html += '</div>';
                                         return html;
                                     }
+                                    // Helper untuk update warna blok G, D, A di card utama setelah perubahan barcode
+                                    function updateGDAIndicators(prosesId, hasKain, hasLa, hasAux) {
+                                        const $cards = $(`.status-card[data-proses-id="${prosesId}"]`);
+                                        if (!$cards.length) return;
+
+                                        $cards.each(function() {
+                                            const $card = $(this);
+                                            const prosesData = $card.data('proses');
+                                            if (!prosesData || prosesData.jenis === 'Maintenance') {
+                                                return; // Tidak ada G/D/A untuk Maintenance
+                                            }
+
+                                            function setBlockColor(blockType, ok) {
+                                                const $block = $card.find(`.gda-block[data-block-type="${blockType}"]`);
+                                                if (!$block.length) return;
+
+                                                const blockBg = ok ? '#d4f8e8' : '#ffb3b3';
+                                                const blockBorder = ok ? '#43a047' : '#c62828';
+                                                $block.css({
+                                                    background: blockBg,
+                                                    borderColor: blockBorder
+                                                });
+                                            }
+
+                                            setBlockColor('G', !!hasKain);
+                                            setBlockColor('D', !!hasLa);
+                                            setBlockColor('A', !!hasAux);
+                                        });
+                                    }
+
+                                    // Render ulang list barcode di modal
                                     $('#barcode-kain-list').html(renderBarcodeGrid(data
                                         .barcode_kain, 'kain',
                                         currentProsesForRefresh));
@@ -3849,6 +3938,12 @@
                                     $('#barcode-aux-list').html(renderBarcodeGrid(data
                                         .barcode_aux, 'aux',
                                         currentProsesForRefresh));
+
+                                    // Hitung status barcode aktif per jenis untuk update G/D/A di card utama
+                                    const hasKainActive = (data.barcode_kain || []).some(bk => !bk.cancel);
+                                    const hasLaActive = (data.barcode_la || []).some(bk => !bk.cancel);
+                                    const hasAuxActive = (data.barcode_aux || []).some(bk => !bk.cancel);
+                                    updateGDAIndicators(currentProsesForRefresh, hasKainActive, hasLaActive, hasAuxActive);
                                 },
                                 error: function() {
                                     showToastNotification('error',
