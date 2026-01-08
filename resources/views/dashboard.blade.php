@@ -1434,8 +1434,12 @@
                     sourceMesinId = proses.mesin_id;
                 }
                 // Store original position dan next sibling untuk fallback
-                const parent = draggedCard.parentElement;
-                draggedCard.setAttribute('data-original-parent', parent.getAttribute('data-mesin-id'));
+                // const parent = draggedCard.parentElement;
+                // draggedCard.setAttribute('data-original-parent', parent.getAttribute('data-mesin-id'));
+                const mesintContainer = draggedCard.closest('.card-dropzone');
+                if (mesintContainer) {
+                    draggedCard.setAttribute('data-original-parent', mesintContainer.getAttribute('data-mesin-id'));
+                }
                 const nextSibling = draggedCard.nextSibling;
                 if (nextSibling) {
                     draggedCard.setAttribute('data-original-next-sibling-id', nextSibling.id || '');
@@ -1523,7 +1527,24 @@
                                 if (validPosition === null) {
                                     container.appendChild(dragging);
                                 } else {
-                                    container.insertBefore(dragging, validPosition);
+                                    // Pastikan validPosition masih merupakan child dari container sebelum insertBefore
+                                    if (container.contains(validPosition) && validPosition.parentElement === container) {
+                                        container.insertBefore(dragging, validPosition);
+                                    } else {
+                                        // Jika validPosition tidak valid, cari ulang posisi yang valid
+                                        const allCards = [...container.querySelectorAll('.status-card:not(.dragging):not(.history-card)')];
+                                        if (validTargetElement && container.contains(validTargetElement)) {
+                                            // Cari nextSibling dari validTargetElement yang masih di container
+                                            const validNextSibling = validTargetElement.nextSibling;
+                                            if (validNextSibling && container.contains(validNextSibling)) {
+                                                container.insertBefore(dragging, validNextSibling);
+                                            } else {
+                                                container.appendChild(dragging);
+                                            }
+                                        } else {
+                                            container.appendChild(dragging);
+                                        }
+                                    }
                                 }
                                 return;
                             }
@@ -1541,11 +1562,19 @@
                     dropTargetElement = allCards.length > 0 ? allCards[allCards.length - 1] : null;
                     container.appendChild(dragging);
                 } else {
-                    // Target adalah elemen sebelum afterElement (karena dragging akan di-insert sebelum afterElement)
-                    const allCards = [...container.querySelectorAll('.status-card:not(.dragging):not(.history-card)')];
-                    const afterIndex = allCards.indexOf(afterElement);
-                    dropTargetElement = afterIndex > 0 ? allCards[afterIndex - 1] : afterElement;
-                    container.insertBefore(dragging, afterElement);
+                    // Pastikan afterElement masih merupakan child dari container sebelum insertBefore
+                    if (container.contains(afterElement) && afterElement.parentElement === container) {
+                        // Target adalah elemen sebelum afterElement (karena dragging akan di-insert sebelum afterElement)
+                        const allCards = [...container.querySelectorAll('.status-card:not(.dragging):not(.history-card)')];
+                        const afterIndex = allCards.indexOf(afterElement);
+                        dropTargetElement = afterIndex > 0 ? allCards[afterIndex - 1] : afterElement;
+                        container.insertBefore(dragging, afterElement);
+                    } else {
+                        // Jika afterElement tidak valid, cari ulang atau append di akhir
+                        const allCards = [...container.querySelectorAll('.status-card:not(.dragging):not(.history-card)')];
+                        dropTargetElement = allCards.length > 0 ? allCards[allCards.length - 1] : null;
+                        container.appendChild(dragging);
+                    }
                 }
             });
 
@@ -1830,6 +1859,28 @@
 
                 // Kembalikan card ke posisi asli terlebih dahulu (visual feedback)
                 restoreCardToOriginalPosition(dragging);
+                
+                // Pastikan card benar-benar sudah kembali ke mesin asal setelah restore
+                // Tunggu sebentar untuk memastikan DOM sudah update
+                setTimeout(function() {
+                    const currentMesinContainer = dragging.closest('[data-mesin-id]');
+                    const currentMesinId = currentMesinContainer ? currentMesinContainer.getAttribute('data-mesin-id') : null;
+                    
+                    if (currentMesinId !== originalParentId && originalParent) {
+                        // Jika card masih tidak di mesin yang benar, paksa pindahkan
+                        const prosesAktifContainer = originalParent.querySelector('.proses-aktif-container');
+                        const targetContainer = prosesAktifContainer || originalParent;
+                        
+                        if (originalNextSibling && 
+                            originalNextSibling.parentElement === targetContainer && 
+                            targetContainer.contains(originalNextSibling) &&
+                            document.contains(originalNextSibling)) {
+                            targetContainer.insertBefore(dragging, originalNextSibling);
+                        } else {
+                            targetContainer.appendChild(dragging);
+                        }
+                    }
+                }, 10);
 
                 // Tampilkan modal konfirmasi
                 const infoText = `Apakah Anda yakin ingin memindahkan proses <strong>${proses.no_op || 'MAINTENANCE'}</strong> dari <strong>${sourceMesinName}</strong> ke <strong>${targetMesinName}</strong>?`;
@@ -1876,25 +1927,44 @@
         // Fungsi untuk mengembalikan card ke posisi asli
         function restoreCardToOriginalPosition(card) {
             const originalParentId = card.getAttribute('data-original-parent');
-            if (!originalParentId) return;
-            
-            const originalParent = document.querySelector(`[data-mesin-id="${originalParentId}"]`);
-            if (!originalParent) return;
-            
-            // Jika card sudah di parent yang benar, tidak perlu restore
-            if (card.parentElement === originalParent) {
+    
+            // Safety check: Jika ID null (karena bug sebelumnya), stop.
+            if (!originalParentId) {
+                console.error("Original parent ID missing"); 
                 return;
             }
-            
+    
+            // Cari elemen dropzone mesin asal
+            const originalDropzone = document.querySelector(`.card-dropzone[data-mesin-id="${originalParentId}"]`);
+            if (!originalDropzone) return;
+    
+            // Cari container spesifik untuk proses aktif di dalam dropzone
+            // (Karena struktur HTML Anda memisahkan history dan proses aktif)
+            const prosesAktifContainer = originalDropzone.querySelector('.proses-aktif-container') || originalDropzone;
+    
+            // Cek apakah card sudah ada di tempat yang benar
+            if (card.parentElement === prosesAktifContainer) {
+                // Jika sudah benar, urutkan kembali berdasarkan sibling jika perlu
+                const originalNextSibling = card._originalNextSibling;
+                if (originalNextSibling && originalNextSibling.parentElement === prosesAktifContainer) {
+                    prosesAktifContainer.insertBefore(card, originalNextSibling);
+                }
+                return;
+            }
+    
+            // --- LOGIKA PENGEMBALIAN ---
+    
             const originalNextSibling = card._originalNextSibling;
-            // Cek apakah next sibling masih ada dan masih di parent yang sama
+    
+            // Cek 1: Kembalikan ke sebelah sibling aslinya (jika sibling masih ada di sana)
             if (originalNextSibling && 
-                originalNextSibling.parentElement === originalParent && 
-                originalParent.contains(originalNextSibling)) {
-                originalParent.insertBefore(card, originalNextSibling);
-            } else {
-                // Jika next sibling tidak ada atau sudah pindah, append di akhir
-                originalParent.appendChild(card);
+                originalNextSibling.parentElement === prosesAktifContainer && 
+                document.contains(originalNextSibling)) {
+                prosesAktifContainer.insertBefore(card, originalNextSibling);
+            } 
+            // Cek 2: Jika sibling hilang/pindah, taruh di paling akhir container
+            else {
+                prosesAktifContainer.appendChild(card);
             }
         }
 
@@ -2020,22 +2090,13 @@
     });
 
     // Handler cancel konfirmasi pindah mesin (Drag & Drop)
+    // Hanya tutup modal, handler hidden.bs.modal yang akan mengembalikan card
     $(document).on('click', '#btnCancelMoveDragDrop', function() {
         const moveData = window.pendingMoveData;
         if (moveData && moveData.dragging) {
             moveData.dragging.classList.remove('dragging');
-            const originalParentId = moveData.dragging.getAttribute('data-original-parent');
-            const originalParent = document.querySelector(`[data-mesin-id="${originalParentId}"]`);
-            if (originalParent && moveData.dragging.parentElement !== originalParent) {
-                const originalNextSibling = moveData.dragging._originalNextSibling;
-                if (originalNextSibling && originalNextSibling.parentElement === originalParent) {
-                    originalParent.insertBefore(moveData.dragging, originalNextSibling);
-                } else {
-                    originalParent.appendChild(moveData.dragging);
-                }
-            }
         }
-        window.pendingMoveData = null;
+        // Tidak perlu hapus pendingMoveData di sini, biarkan handler hidden.bs.modal yang menangani
         $('#modalConfirmMoveDragDrop').modal('hide');
     });
 
@@ -2270,22 +2331,51 @@
         window.pendingSwapData = null;
     });
 
-    // Handler saat modal ditutup (untuk memastikan card dikembalikan jika modal ditutup dengan cara lain)
+    // Handler saat modal ditutup (untuk memastikan card dikembalikan jika modal ditutup dengan cara apapun)
+    // Event ini akan selalu dipanggil saat modal ditutup (cancel, X, ESC, klik luar, dll)
     $('#modalConfirmMoveDragDrop').on('hidden.bs.modal', function() {
         const moveData = window.pendingMoveData;
         if (moveData && moveData.dragging) {
             // Pastikan dragging class dihapus
             moveData.dragging.classList.remove('dragging');
             
-            // Kembalikan card ke posisi asli jika belum dikembalikan
-            const originalParentId = moveData.dragging.getAttribute('data-original-parent');
-            const originalParent = document.querySelector(`[data-mesin-id="${originalParentId}"]`);
-            if (originalParent && moveData.dragging.parentElement !== originalParent) {
-                const originalNextSibling = moveData.dragging._originalNextSibling;
-                if (originalNextSibling && originalNextSibling.parentElement === originalParent) {
-                    originalParent.insertBefore(moveData.dragging, originalNextSibling);
+            // Cari container mesin asal berdasarkan originalParentId
+            const originalParentId = moveData.originalParentId;
+            let originalParent = moveData.originalParent;
+            
+            // Pastikan originalParent masih valid, jika tidak cari ulang
+            if (!originalParent || !document.contains(originalParent)) {
+                originalParent = document.querySelector(`[data-mesin-id="${originalParentId}"]`);
+            }
+            
+            if (originalParent) {
+                // SELALU cek dan kembalikan card ke mesin asal, tidak peduli kondisinya saat ini
+                const currentMesinContainer = moveData.dragging.closest('[data-mesin-id]');
+                const currentMesinId = currentMesinContainer ? currentMesinContainer.getAttribute('data-mesin-id') : null;
+                
+                // Jika card tidak di mesin yang benar, SELALU pindahkan ke mesin asal
+                if (currentMesinId !== originalParentId) {
+                    // Cari proses-aktif-container di mesin asal
+                    const prosesAktifContainer = originalParent.querySelector('.proses-aktif-container');
+                    const targetContainer = prosesAktifContainer || originalParent;
+                    
+                    // Gunakan originalNextSibling jika masih valid
+                    const originalNextSibling = moveData.originalNextSibling;
+                    if (originalNextSibling && 
+                        originalNextSibling.parentElement === targetContainer && 
+                        targetContainer.contains(originalNextSibling) &&
+                        document.contains(originalNextSibling)) {
+                        targetContainer.insertBefore(moveData.dragging, originalNextSibling);
+                    } else {
+                        // Jika next sibling tidak valid, append di akhir proses-aktif-container
+                        targetContainer.appendChild(moveData.dragging);
+                    }
                 } else {
-                    originalParent.appendChild(moveData.dragging);
+                    // Card sudah di mesin yang benar, pastikan berada di proses-aktif-container
+                    const prosesAktifContainer = originalParent.querySelector('.proses-aktif-container');
+                    if (prosesAktifContainer && !prosesAktifContainer.contains(moveData.dragging)) {
+                        prosesAktifContainer.appendChild(moveData.dragging);
+                    }
                 }
             }
             
@@ -2293,6 +2383,8 @@
             $('#btnConfirmMoveDragDrop').prop('disabled', false).html('<i class="fas fa-check mr-1"></i>Ya, Pindahkan');
             $('#btnCancelMoveDragDrop').prop('disabled', false);
         }
+        
+        // Hapus pendingMoveData setelah semua proses selesai
         window.pendingMoveData = null;
     });
 
