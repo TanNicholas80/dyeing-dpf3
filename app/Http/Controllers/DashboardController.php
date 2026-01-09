@@ -78,15 +78,17 @@ class DashboardController extends Controller
         // Ambil role user dan permission untuk optimasi (hindari checking di view)
         $userRole = $user ? $user->role : null;
         $canCancelBarcode = !in_array($userRole, ['ds', 'mesin', 'vp', 'fm', 'owner']);
+
+        $cantModifyStructure = in_array($userRole, ['fm', 'vp', 'ds', 'mesin', 'owner']);
         
-        // Restrict untuk FM & VP: tidak bisa tambah proses, edit, delete, swap, scan barcode, cancel barcode
-        $isRestrictedRole = in_array($userRole, ['fm', 'vp', 'owner']);
-        $canAddProses = !$isRestrictedRole;
-        $canEditProses = !$isRestrictedRole;
-        $canDeleteProses = !$isRestrictedRole;
-        $canMoveProses = !$isRestrictedRole;
-        $canSwapProses = !$isRestrictedRole;
-        $canScanBarcode = !$isRestrictedRole;
+        $cantScan = in_array($userRole, ['fm', 'vp', 'ds', 'owner']);
+        $canAddProses    = !$cantModifyStructure;
+        $canEditProses   = !$cantModifyStructure;
+        $canDeleteProses = !$cantModifyStructure;
+        $canMoveProses   = !$cantModifyStructure;
+        $canSwapProses   = !$cantModifyStructure;
+
+        $canScanBarcode  = !$cantScan;
 
         return view('dashboard', [
             'mesins' => $mesins,

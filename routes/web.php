@@ -58,19 +58,21 @@ Route::middleware(['auth'])->group(function () {
      * - SuperAdmin, DS, Mesin, PPIC: kelola proses & tambah barcode
      * - PPIC: cancel barcode
      */
-    Route::middleware('role:super_admin,ds,mesin,ppic')->group(function () {
+    Route::middleware('role:super_admin,ppic')->group(function () {
         Route::resource('proses', ProsesController::class)->except(['update', 'destroy']);
-
-        // Tambah barcode
-        Route::post('/proses/{id}/barcode/kain', [ProsesController::class, 'barcodeKain'])->name('proses.barcode.kain');
-        Route::post('/proses/{id}/barcode/la', [ProsesController::class, 'barcodeLa'])->name('proses.barcode.la');
-        Route::post('/proses/{id}/barcode/aux', [ProsesController::class, 'barcodeAux'])->name('proses.barcode.aux');
 
         // Update / pindah / tukar / delete proses
         Route::post('/proses/{id}/update', [ProsesController::class, 'update'])->name('proses.update');
         Route::post('/proses/{id}/move', [ProsesController::class, 'move'])->name('proses.move');
         Route::post('/proses/{id}/swap', [ProsesController::class, 'swap'])->name('proses.swap');
         Route::delete('/proses/{id}/delete', [ProsesController::class, 'destroy'])->name('proses.delete');
+    });
+
+    Route::middleware('role:super_admin,mesin,ppic')->group(function () {
+        // Tambah barcode
+        Route::post('/proses/{id}/barcode/kain', [ProsesController::class, 'barcodeKain'])->name('proses.barcode.kain');
+        Route::post('/proses/{id}/barcode/la', [ProsesController::class, 'barcodeLa'])->name('proses.barcode.la');
+        Route::post('/proses/{id}/barcode/aux', [ProsesController::class, 'barcodeAux'])->name('proses.barcode.aux');
     });
 
     // View barcode: SuperAdmin, DS, Mesin, PPIC, FM, VP, Owner (untuk melihat barcode yang sudah ditambahkan)
