@@ -1,5 +1,30 @@
 @extends('layout.main')
 @section('content')
+    <style>
+        .select2-container .select2-selection--single {
+            height: 38px;
+        }
+
+        .select2-container--default .select2-selection--single .select2-selection__rendered {
+            line-height: 36px;
+        }
+
+        .select2-container--default .select2-selection--single .select2-selection__arrow {
+            height: 36px;
+        }
+
+        .detail-row {
+            align-items: center;
+        }
+
+        .btn-remove-detail {
+            height: 38px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+    </style>
+
     <div class="content-wrapper">
         <div class="content-header">
             <div class="container-fluid">
@@ -135,8 +160,10 @@
                                 @else
                                     <div class="row detail-row mb-2">
                                         <div class="col-md-6 col-12 mb-2 mb-md-0">
-                                            <input type="text" name="details[0][auxiliary]" class="form-control"
-                                                placeholder="Nama Auxiliary" required>
+                                            <select name="details[0][auxiliary]" class="form-control select2-auxiliary"
+                                                required>
+                                                <option value="" disabled selected>-- Pilih Auxiliary --</option>
+                                            </select>
                                         </div>
                                         <div class="col-md-6 col-12">
                                             <div class="input-group">
@@ -163,52 +190,145 @@
             </div>
         </section>
     </div>
+@endsection
 
+@section('scripts')
     <script>
-        let detailIndex = {{ max(1, count(old('details', []))) }};
-        document.getElementById('btn-add-detail').onclick = function() {
-            const list = document.getElementById('details-list');
-            const row = document.createElement('div');
-            row.className = 'row detail-row mb-2';
-            row.innerHTML = `
-                <div class=\"col-md-6 col-12 mb-2 mb-md-0\">
-                    <input type=\"text\" name=\"details[${detailIndex}][auxiliary]\" class=\"form-control\" placeholder=\"Nama Auxiliary\" required>
-                </div>
-                <div class=\"col-md-6 col-12\">
-                    <div class=\"input-group\">
-                        <input type=\"number\" step=\"0.01\" name=\"details[${detailIndex}][konsentrasi]\" class=\"form-control\" placeholder=\"Konsentrasi (kg)\" readonly required>
-                        <div class=\"input-group-append\">
-                            <button type=\"button\" class=\"btn btn-danger btn-remove-detail ms-2\" title=\"Hapus\"><i class=\"fas fa-trash\"></i></button>
+        $(document).ready(function() {
+            // Fungsi untuk inisialisasi Select2 pada detail rows
+            function initAuxiliarySelect2(selector) {
+                $(selector).select2({
+                    placeholder: '-- Pilih Auxiliary --',
+                    minimumInputLength: 3,
+                    ajax: {
+                        url: '/api/proxy-auxiliary',
+                        type: 'POST',
+                        dataType: 'json',
+                        delay: 500,
+                        data: function(params) {
+                            return {
+                                q: params.term
+                            };
+                        },
+                        processResults: function(data) {
+                            if (Array.isArray(data.results)) {
+                                return {
+                                    results: data.results
+                                };
+                            } else {
+                                return {
+                                    results: []
+                                };
+                            }
+                        },
+                        error: function(xhr, status, error) {
+                            console.error('Error loading auxiliary data:', error);
+                            return {
+                                results: []
+                            };
+                        }
+                    }
+                });
+            }
+
+            // Inisialisasi Select2 untuk detail rows yang sudah ada
+            $('.select2-auxiliary').each(function() {
+                initAuxiliarySelect2(this);
+            });
+
+            let detailIndex = {{ max(1, count(old('details', []))) }};
+
+            // Handler untuk menambah detail row
+            $('#btn-add-detail').on('click', function() {
+                const newRow = $(`
+                    <div class="row detail-row mb-2">
+                        <div class="col-md-6 col-12 mb-2 mb-md-0">
+                            <select name="details[${detailIndex}][auxiliary]" class="form-control select2-auxiliary" required></select>
+                        </div>
+                        <div class="col-md-6 col-12">
+                            <div class="input-group">
+                                <input type="number" step="0.01" name="details[${detailIndex}][konsentrasi]" class="form-control" placeholder="Konsentrasi (kg)" readonly required>
+                                <div class="input-group-append">
+                                    <button type="button" class="btn btn-danger btn-remove-detail ms-2" title="Hapus">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                </div>
-            `;
-            list.appendChild(row);
-            detailIndex++;
-        };
-        document.addEventListener('click', function(e) {
-            if (e.target.closest('.btn-remove-detail')) {
-                const row = e.target.closest('.detail-row');
-                if (row) row.remove();
-            }
-        });
-        document.title = "Tambah Auxiliary";
+                `);
 
-        // === POLLING DATA TIMBANGAN ===
-        async function fetchWeight() {
-            try {
-                const res = await fetch('http://localhost:8000/api/weight');
-                if (!res.ok) return;
-                const data = await res.json();
-                if (typeof data.weight !== 'undefined') {
-                    // Cari input konsentrasi terakhir yang readonly
-                    const konsInputs = document.querySelectorAll('input[name^="details"][name$="[konsentrasi]"]');
-                    if (konsInputs.length > 0) {
-                        konsInputs[konsInputs.length - 1].value = data.weight;
+                $('#details-list').append(newRow);
+                initAuxiliarySelect2(newRow.find('.select2-auxiliary'));
+                detailIndex++;
+            });
+
+            // Handler untuk menghapus detail row
+            $(document).on('click', '.btn-remove-detail', function() {
+                $(this).closest('.detail-row').remove();
+            });
+
+            // Fungsi untuk mengambil data berat dari timbangan
+            async function fetchWeight() {
+                try {
+                    const res = await fetch('https://dpf3dunia.com/api/weight');
+                    if (!res.ok) return;
+
+                    const data = await res.json();
+                    if (typeof data.weight !== 'undefined' && !isNaN(parseFloat(data.weight))) {
+                        // Cari input konsentrasi terakhir yang readonly
+                        const konsInputs = document.querySelectorAll(
+                            'input[name^="details"][name$="[konsentrasi]"]');
+                        if (konsInputs.length > 0) {
+                            // Update hanya input yang terakhir (untuk input baru)
+                            konsInputs[konsInputs.length - 1].value = parseFloat(data.weight).toFixed(2);
+                        }
                     }
+                } catch (error) {
+                    console.error('Error fetching weight:', error);
                 }
-            } catch {}
-        }
-        setInterval(fetchWeight, 1000); // polling tiap 1 detik
+            }
+
+            // Mulai polling setiap 1 detik
+            const weightPolling = setInterval(fetchWeight, 1000);
+
+            // Set document title
+            document.title = "Tambah Auxiliary";
+
+            // Validasi form sebelum submit
+            $('form').on('submit', function(e) {
+                // Validasi bahwa setidaknya ada satu detail auxiliary
+                const detailRows = $('.detail-row').length;
+                if (detailRows === 0) {
+                    e.preventDefault();
+                    alert('Harap tambahkan minimal satu auxiliary detail.');
+                    return false;
+                }
+
+                // Validasi bahwa semua auxiliary terpilih
+                let isValid = true;
+                $('.select2-auxiliary').each(function() {
+                    if (!$(this).val()) {
+                        isValid = false;
+                        $(this).closest('.col-md-6').find('.select2-container').css('border-color',
+                            '#dc3545');
+                    } else {
+                        $(this).closest('.col-md-6').find('.select2-container').css('border-color',
+                            '');
+                    }
+                });
+
+                if (!isValid) {
+                    e.preventDefault();
+                    alert('Harap pilih auxiliary untuk semua detail.');
+                    return false;
+                }
+            });
+
+            // Clear error styling ketika user memilih auxiliary
+            $(document).on('select2:select', '.select2-auxiliary', function() {
+                $(this).closest('.col-md-6').find('.select2-container').css('border-color', '');
+            });
+        });
     </script>
 @endsection

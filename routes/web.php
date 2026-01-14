@@ -124,3 +124,5 @@ Route::middleware(['auth'])->group(function () {
 
 // Tambahkan di luar middleware auth agar bisa diakses select2
 Route::post('/api/proxy-op', [App\Http\Controllers\ProsesController::class, 'proxyOpSearch']);
+// Tambahkan route API proxy auxiliary untuk select2
+Route::post('/api/proxy-auxiliary', [\App\Http\Controllers\AuxlController::class, 'proxyAuxiliary']);
