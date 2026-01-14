@@ -50,7 +50,7 @@ class DashboardController extends Controller
         }
 
         // Ambil proses, filter jika mesin dipilih
-        $prosesQuery = Proses::with(['barcodeKains', 'barcodeLas', 'barcodeAuxs', 'mesin', 'approvals']);
+        $prosesQuery = Proses::with(['mesin', 'approvals', 'details.barcodeKains', 'details.barcodeLas', 'details.barcodeAuxs']);
         if (count($restrictedMesinIds) > 0) {
             $prosesQuery->whereIn('mesin_id', $restrictedMesinIds);
         } elseif (count($selectedMesinArr) > 0) {
@@ -138,15 +138,15 @@ class DashboardController extends Controller
             }
 
             // Query proses dengan relasi approvals untuk cek pending
-            $prosesQuery = Proses::with(['approvals', 'barcodeKains', 'barcodeLas', 'barcodeAuxs']);
+            $prosesQuery = Proses::select('id', 'jenis', 'mulai', 'selesai', 'cycle_time', 'cycle_time_actual', 'mesin_id', 'order')
+                ->with(['approvals', 'details.barcodeKains', 'details.barcodeLas', 'details.barcodeAuxs']);
             if (count($restrictedMesinIds) > 0) {
                 $prosesQuery->whereIn('mesin_id', $restrictedMesinIds);
             } elseif (count($selectedMesinArr) > 0) {
                 $prosesQuery->whereIn('mesin_id', $selectedMesinArr);
             }
 
-            $prosesList = $prosesQuery->select('id', 'jenis', 'mulai', 'selesai', 'cycle_time', 'cycle_time_actual', 'mesin_id', 'order')
-                ->get()
+            $prosesList = $prosesQuery->get()
                 ->sort(function($a, $b) {
                     // Proses pending (belum mulai) diurutkan berdasarkan order
                     if (!$a->mulai && !$b->mulai) {
@@ -223,9 +223,43 @@ class DashboardController extends Controller
                 }
 
                 // Cek barcode (untuk menentukan warna biru atau merah)
-                $hasBarcodeKain = $proses->barcodeKains ? $proses->barcodeKains->where('cancel', false)->count() > 0 : false;
-                $hasBarcodeLa = $proses->barcodeLas ? $proses->barcodeLas->where('cancel', false)->count() > 0 : false;
-                $hasBarcodeAux = $proses->barcodeAuxs ? $proses->barcodeAuxs->where('cancel', false)->count() > 0 : false;
+                // Ambil barcode melalui DetailProses
+                $hasBarcodeKain = false;
+                $hasBarcodeLa = false;
+                $hasBarcodeAux = false;
+                
+                // Array untuk menyimpan status GDA per detail proses
+                $gdaDetails = [];
+                
+                if ($proses->details) {
+                    foreach ($proses->details as $detail) {
+                        // Cek status barcode per detail
+                        $detailHasKain = false;
+                        $detailHasLa = false;
+                        $detailHasAux = false;
+                        
+                        if ($detail->barcodeKains) {
+                            $detailHasKain = $detail->barcodeKains->where('cancel', false)->count() > 0;
+                            $hasBarcodeKain = $hasBarcodeKain || $detailHasKain;
+                        }
+                        if ($detail->barcodeLas) {
+                            $detailHasLa = $detail->barcodeLas->where('cancel', false)->count() > 0;
+                            $hasBarcodeLa = $hasBarcodeLa || $detailHasLa;
+                        }
+                        if ($detail->barcodeAuxs) {
+                            $detailHasAux = $detail->barcodeAuxs->where('cancel', false)->count() > 0;
+                            $hasBarcodeAux = $hasBarcodeAux || $detailHasAux;
+                        }
+                        
+                        // Simpan status GDA per detail untuk update real-time
+                        $gdaDetails[] = [
+                            'detail_id' => $detail->id,
+                            'has_kain' => $detailHasKain,
+                            'has_la' => $detailHasLa,
+                            'has_aux' => $detailHasAux,
+                        ];
+                    }
+                }
 
                 // Tentukan warna background (sama seperti logika di blade)
                 $bg = '#757575'; // default abu-abu
@@ -265,6 +299,7 @@ class DashboardController extends Controller
                     'bg_color' => $bg,
                     'jenis' => $proses->jenis,
                     'order' => (int)($proses->order ?? 0),
+                    'gda_details' => $gdaDetails, // Status GDA per detail proses untuk update real-time
                 ];
             }
 

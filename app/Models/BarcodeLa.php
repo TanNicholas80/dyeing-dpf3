@@ -16,7 +16,7 @@ class BarcodeLa extends Model
     protected $table = 'barcode_la';
 
     protected $fillable = [
-        'proses_id', 'no_op', 'no_partai', 'barcode', 'matdok', 'mesin_id', 'cancel'
+        'detail_proses_id', 'no_op', 'no_partai', 'barcode', 'matdok', 'mesin_id', 'cancel'
     ];
 
     public function mesin()
@@ -24,9 +24,9 @@ class BarcodeLa extends Model
         return $this->belongsTo(Mesin::class);
     }
     
-    public function proses()
+    public function detailProses()
     {
-        return $this->belongsTo(Proses::class, 'mesin_id');
+        return $this->belongsTo(DetailProses::class, 'detail_proses_id', 'id');
     }
 
                 /**
@@ -34,7 +34,7 @@ class BarcodeLa extends Model
      */
     public function getActivitylogOptions(): LogOptions
     {
-        $logFields = ['proses_id', 'no_op', 'no_partai', 'barcode', 'matdok', 'mesin_id', 'cancel'];
+        $logFields = ['detail_proses_id', 'no_op', 'no_partai', 'barcode', 'matdok', 'mesin_id', 'cancel'];
 
         return LogOptions::defaults()
             ->useLogName('Manajemen BarcodeLa')
@@ -74,7 +74,7 @@ class BarcodeLa extends Model
         ];
 
         $baseData = [
-            'proses_id' => $this->proses_id,
+            'detail_proses_id' => $this->detail_proses_id,
             'no_op' => $this->no_op,
             'no_partai' => $this->no_partai,
             'barcode' => $this->barcode,

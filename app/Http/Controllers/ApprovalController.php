@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Approval;
 use App\Models\Auxl;
 use App\Models\Proses;
+use App\Models\DetailProses;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -12,13 +13,37 @@ use Illuminate\Support\Facades\DB;
 class ApprovalController extends Controller
 {
     /**
+     * Normalisasi ulang kolom order untuk semua proses pending
+     * pada satu mesin (mulai = null, selesai = null).
+     */
+    private function reorderPendingProcessesForMachine($mesinId): void
+    {
+        if (!$mesinId) {
+            return;
+        }
+
+        $pending = Proses::where('mesin_id', $mesinId)
+            ->whereNull('mulai')
+            ->whereNull('selesai')
+            ->orderBy('order')
+            ->orderBy('id')
+            ->get();
+
+        $i = 1;
+        foreach ($pending as $proses) {
+            $proses->order = $i++;
+            $proses->save();
+        }
+    }
+
+    /**
      * Daftar approval untuk FM (filter type = FM).
      * Biasanya hanya menampilkan data dengan status pending,
      * tetapi bisa disesuaikan jika ingin menampilkan semua.
      */
     public function approval_fm()
     {
-        $approvals = Approval::with(['proses', 'auxl', 'requester', 'approver'])
+        $approvals = Approval::with(['proses.details', 'auxl', 'requester', 'approver'])
             ->where('type', 'FM')
             ->orderByRaw("FIELD(status, 'pending','approved','rejected')")
             ->orderByDesc('created_at')
@@ -32,7 +57,7 @@ class ApprovalController extends Controller
      */
     public function approval_vp()
     {
-        $approvals = Approval::with(['proses', 'auxl', 'requester', 'approver'])
+        $approvals = Approval::with(['proses.details', 'auxl', 'requester', 'approver'])
             ->where('type', 'VP')
             ->orderByRaw("FIELD(status, 'pending','approved','rejected')")
             ->orderByDesc('created_at')
@@ -208,13 +233,23 @@ class ApprovalController extends Controller
                 break;
 
             case 'move_machine':
-                // Update mesin_id di Proses
-                if (isset($history['new_mesin_id'])) {
-                    $proses->mesin_id = $history['new_mesin_id'];
-                    $proses->save();
-                } else {
-                    throw new \Exception("Data 'new_mesin_id' tidak ditemukan dalam history_data.");
+                // Update mesin_id di Proses dan normalisasi ulang urutan (order)
+                if (!isset($history['new_mesin_id']) || !isset($history['old_mesin_id'])) {
+                    throw new \Exception("Data 'old_mesin_id' atau 'new_mesin_id' tidak ditemukan dalam history_data.");
                 }
+
+                $oldMesinId = (int) $history['old_mesin_id'];
+                $newMesinId = (int) $history['new_mesin_id'];
+
+                DB::transaction(function () use ($proses, $oldMesinId, $newMesinId) {
+                    // Pindahkan proses ke mesin baru
+                    $proses->mesin_id = $newMesinId;
+                    $proses->save();
+
+                    // Normalisasi ulang order di mesin asal dan mesin tujuan
+                    $this->reorderPendingProcessesForMachine($oldMesinId);
+                    $this->reorderPendingProcessesForMachine($newMesinId);
+                });
                 break;
 
             case 'create_reprocess':
@@ -228,6 +263,18 @@ class ApprovalController extends Controller
                     
                     // Jika belum ada approval VP, buat approval VP baru
                     if (!$existingVpApproval) {
+                        // Ambil snapshot DetailProses dari history_data FM approval atau dari database
+                        $detailProsesSnapshots = [];
+                        if (isset($history['detail_proses_snapshot']) && is_array($history['detail_proses_snapshot'])) {
+                            $detailProsesSnapshots = $history['detail_proses_snapshot'];
+                        } else {
+                            // Fallback: ambil dari database jika tidak ada di history_data
+                            $detailProsesList = DetailProses::where('proses_id', $proses->id)->get();
+                            $detailProsesSnapshots = $detailProsesList->map(function ($detail) {
+                                return $detail->toArray();
+                            })->toArray();
+                        }
+                        
                         Approval::create([
                             'proses_id'    => $proses->id,
                             'status'       => 'pending',
@@ -235,6 +282,7 @@ class ApprovalController extends Controller
                             'action'       => 'create_reprocess',
                             'history_data' => [
                                 'proses_snapshot' => $proses->toArray(),
+                                'detail_proses_snapshot' => $detailProsesSnapshots, // Snapshot DetailProses untuk history lengkap
                                 'fm_approval_id'  => $approval->id, // Track approval FM yang sudah approve
                             ],
                             'note'         => null,

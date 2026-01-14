@@ -9,7 +9,7 @@ return new class extends Migration {
     {
         Schema::create('barcode_aux', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('proses_id');
+            $table->unsignedBigInteger('detail_proses_id');
             $table->string('no_op', 12);
             $table->string('no_partai')->nullable();
             $table->string('barcode')->nullable();
@@ -17,7 +17,7 @@ return new class extends Migration {
             $table->foreignId('mesin_id')->constrained('mesins')->restrictOnDelete();
             $table->boolean('cancel')->default(false);
             $table->timestamps();
-            $table->foreign('proses_id')->references('id')->on('proses')->onDelete('cascade');
+            $table->foreign('detail_proses_id')->references('id')->on('detail_proses')->onDelete('cascade');
         });
     }
 

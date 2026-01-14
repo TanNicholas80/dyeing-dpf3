@@ -18,6 +18,114 @@
             flex-wrap: nowrap !important;
         }
 
+        /* Tampilan list OP untuk proses Multiple (klik/double click per OP) */
+        .op-list {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin: 6px 0;
+        }
+
+        .op-row {
+            background: rgba(255, 255, 255, 0.12);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            border-radius: 8px;
+            padding: 6px 8px;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .op-row:hover {
+            background: rgba(255, 255, 255, 0.18);
+        }
+
+        .op-row-gda {
+            display: flex;
+            justify-content: center;
+            gap: 6px;
+            margin-bottom: 4px;
+        }
+
+        .op-row-noop {
+            font-weight: 800;
+            color: #111;
+            font-size: 18px;
+            letter-spacing: 1.5px;
+            text-shadow: 0 1px 4px #fff8;
+            text-align: center;
+            margin-bottom: 2px;
+        }
+
+        .op-row-info {
+            font-size: 10px;
+            color: #fff;
+            text-shadow: 0 1px 2px #0008;
+            text-align: center;
+            line-height: 1.25;
+        }
+
+        /* Fix untuk Select2 di Modal */
+        #modalProses {
+            overflow: visible !important;
+        }
+
+        #modalProses .modal-dialog {
+            overflow: visible !important;
+            position: relative;
+        }
+
+        #modalProses .modal-content {
+            overflow: visible !important;
+            position: relative;
+        }
+
+        #modalProses .modal-body {
+            overflow-y: auto;
+            max-height: calc(100vh - 200px);
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* Pastikan Select2 dropdown berada di atas modal */
+        .select2-container--open {
+            z-index: 9999 !important;
+        }
+
+        .select2-dropdown {
+            z-index: 9999 !important;
+            position: absolute !important;
+        }
+
+        /* Pastikan Select2 dropdown mengikuti scroll modal */
+        #modalProses .select2-container {
+            z-index: 9999;
+        }
+
+        /* Fix untuk Select2 di dalam card detail */
+        #modalProses .card-body {
+            position: relative;
+        }
+
+        /* Pastikan Select2 dropdown modal memiliki z-index tinggi */
+        .select2-dropdown-modal {
+            z-index: 9999 !important;
+        }
+
+        /* Fix untuk Select2 results agar bisa di-scroll */
+        .select2-results__options {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        /* Pastikan modal backdrop tidak menutupi Select2 */
+        .modal-backdrop {
+            z-index: 1040;
+        }
+
+        #modalProses {
+            z-index: 1050;
+        }
+
         /* Perbaiki lebar card proses di tablet */
         @media (max-width: 1200px) {
             .status-card {
@@ -375,30 +483,39 @@
                                                                 if ($proses->jenis === 'Maintenance') {
                                                                     $blockColors = ['gray', 'gray', 'gray'];
                                                                 } else {
-                                                                    $hasBarcodeKain =
-                                                                        isset($proses->barcodeKains) &&
-                                                                        is_iterable($proses->barcodeKains)
-                                                                            ? collect($proses->barcodeKains)
-                                                                                    ->where('cancel', false)
-                                                                                    ->count() > 0
-                                                                            : isset($proses->barcode_kain) &&
-                                                                                $proses->barcode_kain;
-                                                                    $hasBarcodeLa =
-                                                                        isset($proses->barcodeLas) &&
-                                                                        is_iterable($proses->barcodeLas)
-                                                                            ? collect($proses->barcodeLas)
-                                                                                    ->where('cancel', false)
-                                                                                    ->count() > 0
-                                                                            : isset($proses->barcode_la) &&
-                                                                                $proses->barcode_la;
-                                                                    $hasBarcodeAux =
-                                                                        isset($proses->barcodeAuxs) &&
-                                                                        is_iterable($proses->barcodeAuxs)
-                                                                            ? collect($proses->barcodeAuxs)
-                                                                                    ->where('cancel', false)
-                                                                                    ->count() > 0
-                                                                            : isset($proses->barcode_aux) &&
-                                                                                $proses->barcode_aux;
+                                                                    // Barcode sekarang terhubung via DetailProses (detail_proses_id)
+                                                                    $hasBarcodeKain = false;
+                                                                    $hasBarcodeLa = false;
+                                                                    $hasBarcodeAux = false;
+                                                                    if (isset($proses->details) && is_iterable($proses->details)) {
+                                                                        foreach ($proses->details as $d) {
+                                                                            if (isset($d->barcodeKains)) {
+                                                                                $hasBarcodeKain =
+                                                                                    $hasBarcodeKain ||
+                                                                                    $d->barcodeKains->where('cancel', false)->count() > 0;
+                                                                            }
+                                                                            if (isset($d->barcodeLas)) {
+                                                                                $hasBarcodeLa =
+                                                                                    $hasBarcodeLa ||
+                                                                                    $d->barcodeLas->where('cancel', false)->count() > 0;
+                                                                            }
+                                                                            if (isset($d->barcodeAuxs)) {
+                                                                                $hasBarcodeAux =
+                                                                                    $hasBarcodeAux ||
+                                                                                    $d->barcodeAuxs->where('cancel', false)->count() > 0;
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                    // Fallback backward compatibility jika masih ada kolom lama
+                                                                    if (!$hasBarcodeKain && isset($proses->barcode_kain)) {
+                                                                        $hasBarcodeKain = (bool) $proses->barcode_kain;
+                                                                    }
+                                                                    if (!$hasBarcodeLa && isset($proses->barcode_la)) {
+                                                                        $hasBarcodeLa = (bool) $proses->barcode_la;
+                                                                    }
+                                                                    if (!$hasBarcodeAux && isset($proses->barcode_aux)) {
+                                                                        $hasBarcodeAux = (bool) $proses->barcode_aux;
+                                                                    }
                                                                     $blockColors = [
                                                                         $hasBarcodeKain ? 'green' : 'red',
                                                                         $hasBarcodeLa ? 'green' : 'red',
@@ -476,21 +593,28 @@
                                                                 } else {
                                                                     // Proses sedang berjalan (mulai ada, selesai belum)
                                                                     // Cek barcode menggunakan relasi yang sama seperti DashboardController
-                                                                    $hasBarcodeKain = $proses->barcodeKains
-                                                                        ? $proses->barcodeKains
-                                                                                ->where('cancel', false)
-                                                                                ->count() > 0
-                                                                        : false;
-                                                                    $hasBarcodeLa = $proses->barcodeLas
-                                                                        ? $proses->barcodeLas
-                                                                                ->where('cancel', false)
-                                                                                ->count() > 0
-                                                                        : false;
-                                                                    $hasBarcodeAux = $proses->barcodeAuxs
-                                                                        ? $proses->barcodeAuxs
-                                                                                ->where('cancel', false)
-                                                                                ->count() > 0
-                                                                        : false;
+                                                                    $hasBarcodeKain = false;
+                                                                    $hasBarcodeLa = false;
+                                                                    $hasBarcodeAux = false;
+                                                                    if (isset($proses->details) && is_iterable($proses->details)) {
+                                                                        foreach ($proses->details as $d) {
+                                                                            if (isset($d->barcodeKains)) {
+                                                                                $hasBarcodeKain =
+                                                                                    $hasBarcodeKain ||
+                                                                                    $d->barcodeKains->where('cancel', false)->count() > 0;
+                                                                            }
+                                                                            if (isset($d->barcodeLas)) {
+                                                                                $hasBarcodeLa =
+                                                                                    $hasBarcodeLa ||
+                                                                                    $d->barcodeLas->where('cancel', false)->count() > 0;
+                                                                            }
+                                                                            if (isset($d->barcodeAuxs)) {
+                                                                                $hasBarcodeAux =
+                                                                                    $hasBarcodeAux ||
+                                                                                    $d->barcodeAuxs->where('cancel', false)->count() > 0;
+                                                                            }
+                                                                        }
+                                                                    }
                                                                     if (
                                                                         $proses->jenis !== 'Maintenance' &&
                                                                         (!$hasBarcodeKain ||
@@ -577,9 +701,118 @@
                                                                 {{-- Body --}}
                                                                 <div class="card-body"
                                                                     style="text-align: center; font-size: 12px; padding: 2px 10px; color: #fff;">
-                                                                    <div class="card-id"
-                                                                        style="font-weight: bold; color: #111; font-size: 22px; letter-spacing: 2px; text-shadow: 0 1px 4px #fff8;">
-                                                                        {{ $proses->no_op ? $proses->no_op : 'MAINTENANCE' }}
+                                                                    @php
+                                                                        $detailList = $proses->jenis === 'Maintenance'
+                                                                            ? collect()
+                                                                            : ($proses->details ?? collect());
+                                                                        $isMultipleOp = $detailList->count() > 1;
+                                                                    @endphp
+                                                                    <div class="op-list">
+                                                                        @if ($proses->jenis === 'Maintenance' || $detailList->isEmpty())
+                                                                            {{-- Maintenance atau tidak ada detail --}}
+                                                                            <div class="op-row" data-detail-id="">
+                                                                                <div class="op-row-noop"
+                                                                                    style="font-weight: bold; color: #111; font-size: 22px; letter-spacing: 2px; text-shadow: 0 1px 4px #fff8;">
+                                                                                    MAINTENANCE
+                                                                                </div>
+                                                                            </div>
+                                                                        @elseif ($isMultipleOp)
+                                                                            {{-- Multiple OP: OP pertama dengan header lengkap, OP kedua+ dengan garis pemisah --}}
+                                                                            @php
+                                                                                $firstDetail = $detailList->first();
+                                                                            @endphp
+                                                                            {{-- OP Pertama: Detail lengkap dengan No OP dan Info --}}
+                                                                            <div class="op-row" data-detail-id="{{ $firstDetail->id }}">
+                                                                                <div class="op-row-noop"
+                                                                                    style="font-weight: bold; color: #111; font-size: 22px; letter-spacing: 2px; text-shadow: 0 1px 4px #fff8; margin-bottom: 4px;">
+                                                                                    {{ $firstDetail->no_op ?? '-' }}
+                                                                                </div>
+                                                                                <div class="op-row-info"
+                                                                                    style="font-size: 9px; margin: 2px 0; color: #fff; text-shadow: 0 1px 2px #0008;">
+                                                                                    <div>
+                                                                                        {{ $firstDetail->warna ?? 'Warna' }} -
+                                                                                        {{ $firstDetail->kategori_warna ?? 'Kategori' }} -
+                                                                                        {{ $firstDetail->kode_warna ?? 'Kode' }}
+                                                                                    </div>
+                                                                                    <div>{{ $firstDetail->konstruksi ?? 'Konstruksi' }}</div>
+                                                                                </div>
+                                                                            </div>
+                                                                            
+                                                                            {{-- Loop OP kedua dan seterusnya dengan garis pemisah --}}
+                                                                            @foreach ($detailList->skip(1) as $d)
+                                                                                @php
+                                                                                    $subHasKain = isset($d->barcodeKains)
+                                                                                        ? $d->barcodeKains->where('cancel', false)->count() > 0
+                                                                                        : false;
+                                                                                    $subHasLa = isset($d->barcodeLas)
+                                                                                        ? $d->barcodeLas->where('cancel', false)->count() > 0
+                                                                                        : false;
+                                                                                    $subHasAux = isset($d->barcodeAuxs)
+                                                                                        ? $d->barcodeAuxs->where('cancel', false)->count() > 0
+                                                                                        : false;
+                                                                                    $subMap = [
+                                                                                        'G' => $subHasKain ? 'green' : 'red',
+                                                                                        'D' => $subHasLa ? 'green' : 'red',
+                                                                                        'A' => $subHasAux ? 'green' : 'red',
+                                                                                    ];
+                                                                                @endphp
+                                                                                {{-- Garis pemisah --}}
+                                                                                <div style="border-top: 1px solid rgba(255,255,255,0.3); margin: 8px 0; padding-top: 8px;"></div>
+                                                                                {{-- GDA per OP (di luar detail OP, ukuran sama dengan header) --}}
+                                                                                <div style="display: flex; justify-content: center; gap: 6px; margin-bottom: 6px;">
+                                                                                    @foreach ($blocks as $b)
+                                                                                        @php
+                                                                                            $color = $subMap[$b] ?? 'red';
+                                                                                            $blockBg = $color === 'green' ? '#d4f8e8' : '#ffb3b3';
+                                                                                            $blockBorder = $color === 'green' ? '#43a047' : '#c62828';
+                                                                                        @endphp
+                                                                                        <span class="gda-block"
+                                                                                            data-block-type="{{ $b }}"
+                                                                                            style="display: inline-block; background: {{ $blockBg }}; color: #111; font-weight: bold; font-size: 22px; padding: 2px 10px; border-radius: 6px; border: 2.5px solid {{ $blockBorder }}; box-shadow: 0 1px 4px rgba(0,0,0,0.10); letter-spacing: 1px; text-shadow: 0 1px 2px #fff8;">
+                                                                                            {{ $b }}
+                                                                                        </span>
+                                                                                    @endforeach
+                                                                                </div>
+                                                                                {{-- Detail OP (No OP + Info) --}}
+                                                                                <div class="op-row" data-detail-id="{{ $d->id }}">
+                                                                                    {{-- No OP --}}
+                                                                                    <div class="op-row-noop"
+                                                                                        style="font-weight: bold; color: #111; font-size: 22px; letter-spacing: 2px; text-shadow: 0 1px 4px #fff8; margin-bottom: 4px;">
+                                                                                        {{ $d->no_op ?? '-' }}
+                                                                                    </div>
+                                                                                    {{-- Info warna/kategori/konstruksi --}}
+                                                                                    <div class="op-row-info"
+                                                                                        style="font-size: 9px; margin: 2px 0; color: #fff; text-shadow: 0 1px 2px #0008;">
+                                                                                        <div>
+                                                                                            {{ $d->warna ?? 'Warna' }} -
+                                                                                            {{ $d->kategori_warna ?? 'Kategori' }} -
+                                                                                            {{ $d->kode_warna ?? 'Kode' }}
+                                                                                        </div>
+                                                                                        <div>{{ $d->konstruksi ?? 'Konstruksi' }}</div>
+                                                                                    </div>
+                                                                                </div>
+                                                                            @endforeach
+                                                                        @else
+                                                                            {{-- Single OP: Tampilan normal dengan semua komponen --}}
+                                                                            @php
+                                                                                $singleDetail = $detailList->first();
+                                                                            @endphp
+                                                                            <div class="op-row" data-detail-id="{{ $singleDetail->id }}">
+                                                                                <div class="op-row-noop"
+                                                                                    style="font-weight: bold; color: #111; font-size: 22px; letter-spacing: 2px; text-shadow: 0 1px 4px #fff8;">
+                                                                                    {{ $singleDetail->no_op ?? '-' }}
+                                                                                </div>
+                                                                                <div class="op-row-info"
+                                                                                    style="font-size: 9px; margin: 2px 0; color: #fff; text-shadow: 0 1px 2px #0008;">
+                                                                                    <div>
+                                                                                        {{ $singleDetail->warna ?? 'Warna' }} -
+                                                                                        {{ $singleDetail->kategori_warna ?? 'Kategori' }} -
+                                                                                        {{ $singleDetail->kode_warna ?? 'Kode' }}
+                                                                                    </div>
+                                                                                    <div>{{ $singleDetail->konstruksi ?? 'Konstruksi' }}</div>
+                                                                                </div>
+                                                                            </div>
+                                                                        @endif
                                                                     </div>
                                                                     <div class="card-time"
                                                                         style="display: flex; justify-content: space-between; font-size: 12px; margin: 2px 0; color: #fff; text-shadow: 0 1px 2px #0008;">
@@ -636,19 +869,6 @@
                                                                             @endif
                                                                         </span>
                                                                     </div>
-                                                                    <div class="card-info"
-                                                                        style="font-size: 9px; margin: 2px 0; color: #fff; text-shadow: 0 1px 2px #0008;">
-                                                                        <div>
-                                                                            {{ $proses->warna ? $proses->warna : 'Warna' }}
-                                                                            -
-                                                                            {{ $proses->kategori_warna ? $proses->kategori_warna : 'Kategori' }}
-                                                                            -
-                                                                            {{ $proses->kode_warna ? $proses->kode_warna : 'Kode' }}
-                                                                        </div>
-                                                                        <div>
-                                                                            {{ $proses->konstruksi ? $proses->konstruksi : 'Konstruksi' }}
-                                                                        </div>
-                                                                    </div>
                                                                     <div class="card-date"
                                                                         style="display: flex; justify-content: space-between; font-size: 10px; color: #fff; text-shadow: 0 1px 2px #0008;">
                                                                         <span>
@@ -693,31 +913,38 @@
                                                             $blockColors = ['gray', 'gray', 'gray'];
                                                         } else {
                                                             // G: hijau jika ada minimal 1 barcode kain (cancel=false)
-                                                            $hasBarcodeKain =
-                                                                isset($proses->barcodeKains) &&
-                                                                is_iterable($proses->barcodeKains)
-                                                                    ? collect($proses->barcodeKains)
-                                                                            ->where('cancel', false)
-                                                                            ->count() > 0
-                                                                    : isset($proses->barcode_kain) &&
-                                                                        $proses->barcode_kain;
+                                                            $hasBarcodeKain = false;
+                                                            $hasBarcodeLa = false;
+                                                            $hasBarcodeAux = false;
+                                                            if (isset($proses->details) && is_iterable($proses->details)) {
+                                                                foreach ($proses->details as $d) {
+                                                                    if (isset($d->barcodeKains)) {
+                                                                        $hasBarcodeKain =
+                                                                            $hasBarcodeKain ||
+                                                                            $d->barcodeKains->where('cancel', false)->count() > 0;
+                                                                    }
+                                                                    if (isset($d->barcodeLas)) {
+                                                                        $hasBarcodeLa =
+                                                                            $hasBarcodeLa ||
+                                                                            $d->barcodeLas->where('cancel', false)->count() > 0;
+                                                                    }
+                                                                    if (isset($d->barcodeAuxs)) {
+                                                                        $hasBarcodeAux =
+                                                                            $hasBarcodeAux ||
+                                                                            $d->barcodeAuxs->where('cancel', false)->count() > 0;
+                                                                    }
+                                                                }
+                                                            }
+                                                            if (!$hasBarcodeKain && isset($proses->barcode_kain)) {
+                                                                $hasBarcodeKain = (bool) $proses->barcode_kain;
+                                                            }
+                                                            if (!$hasBarcodeLa && isset($proses->barcode_la)) {
+                                                                $hasBarcodeLa = (bool) $proses->barcode_la;
+                                                            }
+                                                            if (!$hasBarcodeAux && isset($proses->barcode_aux)) {
+                                                                $hasBarcodeAux = (bool) $proses->barcode_aux;
+                                                            }
                                                             // D: hijau jika ada minimal 1 barcode LA (cancel=false)
-                                                            $hasBarcodeLa =
-                                                                isset($proses->barcodeLas) &&
-                                                                is_iterable($proses->barcodeLas)
-                                                                    ? collect($proses->barcodeLas)
-                                                                            ->where('cancel', false)
-                                                                            ->count() > 0
-                                                                    : isset($proses->barcode_la) && $proses->barcode_la;
-                                                            // A: hijau jika ada minimal 1 barcode AUX (cancel=false)
-                                                            $hasBarcodeAux =
-                                                                isset($proses->barcodeAuxs) &&
-                                                                is_iterable($proses->barcodeAuxs)
-                                                                    ? collect($proses->barcodeAuxs)
-                                                                            ->where('cancel', false)
-                                                                            ->count() > 0
-                                                                    : isset($proses->barcode_aux) &&
-                                                                        $proses->barcode_aux;
                                                             $blockColors = [
                                                                 $hasBarcodeKain ? 'green' : 'red',
                                                                 $hasBarcodeLa ? 'green' : 'red',
@@ -807,20 +1034,28 @@
                                                         } else {
                                                             // Proses sedang berjalan (mulai ada, selesai belum)
                                                             // Cek barcode menggunakan relasi yang sama seperti DashboardController
-                                                            $hasBarcodeKain = $proses->barcodeKains
-                                                                ? $proses->barcodeKains
-                                                                        ->where('cancel', false)
-                                                                        ->count() > 0
-                                                                : false;
-                                                            $hasBarcodeLa = $proses->barcodeLas
-                                                                ? $proses->barcodeLas->where('cancel', false)->count() >
-                                                                    0
-                                                                : false;
-                                                            $hasBarcodeAux = $proses->barcodeAuxs
-                                                                ? $proses->barcodeAuxs
-                                                                        ->where('cancel', false)
-                                                                        ->count() > 0
-                                                                : false;
+                                                            $hasBarcodeKain = false;
+                                                            $hasBarcodeLa = false;
+                                                            $hasBarcodeAux = false;
+                                                            if (isset($proses->details) && is_iterable($proses->details)) {
+                                                                foreach ($proses->details as $d) {
+                                                                    if (isset($d->barcodeKains)) {
+                                                                        $hasBarcodeKain =
+                                                                            $hasBarcodeKain ||
+                                                                            $d->barcodeKains->where('cancel', false)->count() > 0;
+                                                                    }
+                                                                    if (isset($d->barcodeLas)) {
+                                                                        $hasBarcodeLa =
+                                                                            $hasBarcodeLa ||
+                                                                            $d->barcodeLas->where('cancel', false)->count() > 0;
+                                                                    }
+                                                                    if (isset($d->barcodeAuxs)) {
+                                                                        $hasBarcodeAux =
+                                                                            $hasBarcodeAux ||
+                                                                            $d->barcodeAuxs->where('cancel', false)->count() > 0;
+                                                                    }
+                                                                }
+                                                            }
                                                             if (
                                                                 $proses->jenis !== 'Maintenance' &&
                                                                 (!$hasBarcodeKain || !$hasBarcodeLa || !$hasBarcodeAux)
@@ -913,9 +1148,132 @@
                                                         {{-- Body --}}
                                                         <div class="card-body"
                                                             style="text-align: center; font-size: 12px; padding: 2px 10px; color: #fff;">
-                                                            <div class="card-id"
-                                                                style="font-weight: bold; color: #111; font-size: 22px; letter-spacing: 2px; text-shadow: 0 1px 4px #fff8;">
-                                                                {{ $proses->no_op ? $proses->no_op : 'MAINTENANCE' }}
+                                                            @php
+                                                                $detailList = $proses->jenis === 'Maintenance'
+                                                                    ? collect()
+                                                                    : ($proses->details ?? collect());
+                                                                $isMultipleOp = $detailList->count() > 1;
+                                                            @endphp
+                                                            <div class="op-list">
+                                                                @if ($proses->jenis === 'Maintenance' || $detailList->isEmpty())
+                                                                    {{-- Maintenance atau tidak ada detail --}}
+                                                                    <div class="op-row" data-detail-id="">
+                                                                        <div class="op-row-noop"
+                                                                            style="font-weight: bold; color: #111; font-size: 22px; letter-spacing: 2px; text-shadow: 0 1px 4px #fff8;">
+                                                                            MAINTENANCE
+                                                                        </div>
+                                                                    </div>
+                                                                @elseif ($isMultipleOp)
+                                                                    {{-- Multiple OP: OP pertama dengan header lengkap, OP kedua+ dengan garis pemisah --}}
+                                                                    @php
+                                                                        $firstDetail = $detailList->first();
+                                                                        $firstHasKain = isset($firstDetail->barcodeKains)
+                                                                            ? $firstDetail->barcodeKains->where('cancel', false)->count() > 0
+                                                                            : false;
+                                                                        $firstHasLa = isset($firstDetail->barcodeLas)
+                                                                            ? $firstDetail->barcodeLas->where('cancel', false)->count() > 0
+                                                                            : false;
+                                                                        $firstHasAux = isset($firstDetail->barcodeAuxs)
+                                                                            ? $firstDetail->barcodeAuxs->where('cancel', false)->count() > 0
+                                                                            : false;
+                                                                        $firstMap = [
+                                                                            'G' => $firstHasKain ? 'green' : 'red',
+                                                                            'D' => $firstHasLa ? 'green' : 'red',
+                                                                            'A' => $firstHasAux ? 'green' : 'red',
+                                                                        ];
+                                                                    @endphp
+                                                                    {{-- OP Pertama: Detail lengkap dengan No OP dan Info --}}
+                                                                    <div class="op-row" data-detail-id="{{ $firstDetail->id }}">
+                                                                        <div class="op-row-noop"
+                                                                            style="font-weight: bold; color: #111; font-size: 22px; letter-spacing: 2px; text-shadow: 0 1px 4px #fff8; margin-bottom: 4px;">
+                                                                            {{ $firstDetail->no_op ?? '-' }}
+                                                                        </div>
+                                                                        <div class="op-row-info"
+                                                                            style="font-size: 9px; margin: 2px 0; color: #fff; text-shadow: 0 1px 2px #0008;">
+                                                                            <div>
+                                                                                {{ $firstDetail->warna ?? 'Warna' }} -
+                                                                                {{ $firstDetail->kategori_warna ?? 'Kategori' }} -
+                                                                                {{ $firstDetail->kode_warna ?? 'Kode' }}
+                                                                            </div>
+                                                                            <div>{{ $firstDetail->konstruksi ?? 'Konstruksi' }}</div>
+                                                                        </div>
+                                                                    </div>
+                                                                    
+                                                                    {{-- Loop OP kedua dan seterusnya dengan garis pemisah --}}
+                                                                    @foreach ($detailList->skip(1) as $d)
+                                                                        @php
+                                                                            $subHasKain = isset($d->barcodeKains)
+                                                                                ? $d->barcodeKains->where('cancel', false)->count() > 0
+                                                                                : false;
+                                                                            $subHasLa = isset($d->barcodeLas)
+                                                                                ? $d->barcodeLas->where('cancel', false)->count() > 0
+                                                                                : false;
+                                                                            $subHasAux = isset($d->barcodeAuxs)
+                                                                                ? $d->barcodeAuxs->where('cancel', false)->count() > 0
+                                                                                : false;
+                                                                            $subMap = [
+                                                                                'G' => $subHasKain ? 'green' : 'red',
+                                                                                'D' => $subHasLa ? 'green' : 'red',
+                                                                                'A' => $subHasAux ? 'green' : 'red',
+                                                                            ];
+                                                                        @endphp
+                                                                        {{-- Garis pemisah --}}
+                                                                        <div style="border-top: 1px solid rgba(255,255,255,0.3); margin: 8px 0; padding-top: 8px;"></div>
+                                                                        {{-- GDA per OP (di luar detail OP, ukuran sama dengan header) --}}
+                                                                        <div style="display: flex; justify-content: center; gap: 6px; margin-bottom: 6px;">
+                                                                            @foreach ($blocks as $b)
+                                                                                @php
+                                                                                    $color = $subMap[$b] ?? 'red';
+                                                                                    $blockBg = $color === 'green' ? '#d4f8e8' : '#ffb3b3';
+                                                                                    $blockBorder = $color === 'green' ? '#43a047' : '#c62828';
+                                                                                @endphp
+                                                                                <span class="gda-block"
+                                                                                    data-block-type="{{ $b }}"
+                                                                                    style="display: inline-block; background: {{ $blockBg }}; color: #111; font-weight: bold; font-size: 22px; padding: 2px 10px; border-radius: 6px; border: 2.5px solid {{ $blockBorder }}; box-shadow: 0 1px 4px rgba(0,0,0,0.10); letter-spacing: 1px; text-shadow: 0 1px 2px #fff8;">
+                                                                                    {{ $b }}
+                                                                                </span>
+                                                                            @endforeach
+                                                                        </div>
+                                                                        {{-- Detail OP (No OP + Info) --}}
+                                                                        <div class="op-row" data-detail-id="{{ $d->id }}">
+                                                                            {{-- No OP --}}
+                                                                            <div class="op-row-noop"
+                                                                                style="font-weight: bold; color: #111; font-size: 22px; letter-spacing: 2px; text-shadow: 0 1px 4px #fff8; margin-bottom: 4px;">
+                                                                                {{ $d->no_op ?? '-' }}
+                                                                            </div>
+                                                                            {{-- Info warna/kategori/konstruksi --}}
+                                                                            <div class="op-row-info"
+                                                                                style="font-size: 9px; margin: 2px 0; color: #fff; text-shadow: 0 1px 2px #0008;">
+                                                                                <div>
+                                                                                    {{ $d->warna ?? 'Warna' }} -
+                                                                                    {{ $d->kategori_warna ?? 'Kategori' }} -
+                                                                                    {{ $d->kode_warna ?? 'Kode' }}
+                                                                                </div>
+                                                                                <div>{{ $d->konstruksi ?? 'Konstruksi' }}</div>
+                                                                            </div>
+                                                                        </div>
+                                                                    @endforeach
+                                                                @else
+                                                                    {{-- Single OP: Tampilan normal dengan semua komponen --}}
+                                                                    @php
+                                                                        $singleDetail = $detailList->first();
+                                                                    @endphp
+                                                                    <div class="op-row" data-detail-id="{{ $singleDetail->id }}">
+                                                                        <div class="op-row-noop"
+                                                                            style="font-weight: bold; color: #111; font-size: 22px; letter-spacing: 2px; text-shadow: 0 1px 4px #fff8;">
+                                                                            {{ $singleDetail->no_op ?? '-' }}
+                                                                        </div>
+                                                                        <div class="op-row-info"
+                                                                            style="font-size: 9px; margin: 2px 0; color: #fff; text-shadow: 0 1px 2px #0008;">
+                                                                            <div>
+                                                                                {{ $singleDetail->warna ?? 'Warna' }} -
+                                                                                {{ $singleDetail->kategori_warna ?? 'Kategori' }} -
+                                                                                {{ $singleDetail->kode_warna ?? 'Kode' }}
+                                                                            </div>
+                                                                            <div>{{ $singleDetail->konstruksi ?? 'Konstruksi' }}</div>
+                                                                        </div>
+                                                                    </div>
+                                                                @endif
                                                             </div>
                                                             <div class="card-time"
                                                                 style="display: flex; justify-content: space-between; font-size: 12px; margin: 2px 0; color: #fff; text-shadow: 0 1px 2px #0008;">
@@ -964,17 +1322,6 @@
                                                                     @endif
                                                                 </span>
                                                             </div>
-                                                            <div class="card-info"
-                                                                style="font-size: 9px; margin: 2px 0; color: #fff; text-shadow: 0 1px 2px #0008;">
-                                                                <div>{{ $proses->warna ? $proses->warna : 'Warna' }} -
-                                                                    {{ $proses->kategori_warna ? $proses->kategori_warna : 'Kategori' }}
-                                                                    -
-                                                                    {{ $proses->kode_warna ? $proses->kode_warna : 'Kode' }}
-                                                                </div>
-                                                                <div>
-                                                                    {{ $proses->konstruksi ? $proses->konstruksi : 'Konstruksi' }}
-                                                                </div>
-                                                            </div>
                                                             <div class="card-date"
                                                                 style="display: flex; justify-content: space-between; font-size: 10px; color: #fff; text-shadow: 0 1px 2px #0008;">
                                                                 <span>
@@ -1010,7 +1357,7 @@
         </section>
         <!-- Modal Tambah Proses -->
         <div class="modal fade" id="modalProses" tabindex="-1" aria-labelledby="modalProsesLabel" aria-hidden="true">
-            <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-dialog modal-xl modal-dialog-centered" style="max-width: 1200px;">
                 <div class="modal-content shadow-lg border-0 rounded-3">
                     <form id="formProses" action="{{ route('proses.store') }}" method="POST">
                         @csrf
@@ -1030,7 +1377,7 @@
                                 <div class="col-md-6">
                                     <div class="form-group">
                                         <label class="form-label fw-semibold">Jenis Proses</label>
-                                        <select name="jenis" class="form-control" required>
+                                        <select name="jenis" id="jenis" class="form-control" required>
                                             <option value="Produksi" selected>Produksi</option>
                                             <option value="Maintenance">Maintenance</option>
                                             <option value="Reproses">Reproses</option>
@@ -1038,24 +1385,13 @@
                                     </div>
                                 </div>
 
-                                <!-- No OP -->
+                                <!-- Jenis OP (Single/Multiple) -->
                                 <div class="col-md-6 hide-if-maintenance">
                                     <div class="form-group">
-                                        <label class="form-label fw-semibold">No. OP</label>
-                                        <select name="no_op" id="no_op" class="form-control select2"
-                                            style="width: 100%;" required>
-                                            <option value="" disabled>-- Pilih No. OP --</option>
-                                        </select>
-                                    </div>
-                                </div>
-
-                                <!-- No Partai -->
-                                <div class="col-md-6 hide-if-maintenance">
-                                    <div class="form-group">
-                                        <label class="form-label fw-semibold">No. Partai</label>
-                                        <select name="no_partai" id="no_partai" class="form-control select2"
-                                            style="width: 100%;" required>
-                                            <option value="" disabled>-- Pilih No. Partai --</option>
+                                        <label class="form-label fw-semibold">Jenis OP</label>
+                                        <select name="jenis_op" id="jenis_op" class="form-control" required>
+                                            <option value="Single" selected>Single</option>
+                                            <option value="Multiple">Multiple</option>
                                         </select>
                                     </div>
                                 </div>
@@ -1064,7 +1400,7 @@
                                 <div class="col-md-6">
                                     <div class="form-group">
                                         <label class="form-label fw-semibold">Mesin</label>
-                                        <select name="mesin_id" id="mesin_id" class="form-control" required>
+                                        <select name="mesin_id" id="mesin_id" class="form-control select2" style="width: 100%;" required>
                                             <option value="" disabled>-- Pilih Mesin --</option>
                                         </select>
                                     </div>
@@ -1086,94 +1422,141 @@
                                     </div>
                                 </div>
 
-                                <!-- Item OP (readonly) -->
-                                <div class="col-md-6 hide-if-maintenance">
-                                    <div class="form-group">
-                                        <label class="form-label fw-semibold">Item OP</label>
-                                        <input type="text" name="item_op" class="form-control auto-field" readonly>
+                                <!-- Container untuk DetailProses (Single/Multiple) -->
+                                <div class="col-12 hide-if-maintenance" id="detail-proses-container">
+                                    <!-- Single OP Form (Default) -->
+                                    <div class="detail-proses-item" data-index="0">
+                                        <div class="card border mb-3" style="background: #f8f9fa;">
+                                            <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                                                <h6 class="mb-0 fw-bold">Detail OP #1</h6>
+                                                <button type="button" class="btn btn-sm btn-danger remove-detail-btn ml-auto" style="display: none;">
+                                                    <i class="fas fa-times"></i> Hapus
+                                                </button>
+                                            </div>
+                                            <div class="card-body">
+                                                <div class="row">
+                                                    <!-- No OP -->
+                                                    <div class="col-md-6">
+                                                        <div class="form-group">
+                                                            <label class="form-label fw-semibold">No. OP</label>
+                                                            <select name="details[0][no_op]" class="form-control select2-detail no-op-select"
+                                                                style="width: 100%;" required>
+                                                                <option value="" disabled>-- Pilih No. OP --</option>
+                                                            </select>
+                                                        </div>
+                                                    </div>
+
+                                                    <!-- No Partai -->
+                                                    <div class="col-md-6">
+                                                        <div class="form-group">
+                                                            <label class="form-label fw-semibold">No. Partai</label>
+                                                            <select name="details[0][no_partai]" class="form-control select2-detail no-partai-select"
+                                                                style="width: 100%;" required>
+                                                                <option value="" disabled>-- Pilih No. Partai --</option>
+                                                            </select>
+                                                        </div>
+                                                    </div>
+
+                                                    <!-- Item OP (readonly) -->
+                                                    <div class="col-md-6">
+                                                        <div class="form-group">
+                                                            <label class="form-label fw-semibold">Item OP</label>
+                                                            <input type="text" name="details[0][item_op]" class="form-control auto-field-detail" readonly>
+                                                        </div>
+                                                    </div>
+
+                                                    <!-- Kode Material (readonly) -->
+                                                    <div class="col-md-6">
+                                                        <div class="form-group">
+                                                            <label class="form-label fw-semibold">Kode Material</label>
+                                                            <input type="text" name="details[0][kode_material]" class="form-control auto-field-detail" readonly>
+                                                        </div>
+                                                    </div>
+
+                                                    <!-- Konstruksi (readonly) -->
+                                                    <div class="col-md-6">
+                                                        <div class="form-group">
+                                                            <label class="form-label fw-semibold">Konstruksi</label>
+                                                            <input type="text" name="details[0][konstruksi]" class="form-control auto-field-detail" readonly>
+                                                        </div>
+                                                    </div>
+
+                                                    <!-- Gramasi (readonly) -->
+                                                    <div class="col-md-6">
+                                                        <div class="form-group">
+                                                            <label class="form-label fw-semibold">Gramasi</label>
+                                                            <input type="text" name="details[0][gramasi]" class="form-control auto-field-detail" readonly>
+                                                        </div>
+                                                    </div>
+
+                                                    <!-- Lebar (readonly) -->
+                                                    <div class="col-md-6">
+                                                        <div class="form-group">
+                                                            <label class="form-label fw-semibold">Lebar</label>
+                                                            <input type="text" name="details[0][lebar]" class="form-control auto-field-detail" readonly>
+                                                        </div>
+                                                    </div>
+
+                                                    <!-- Hand Feel (readonly) -->
+                                                    <div class="col-md-6">
+                                                        <div class="form-group">
+                                                            <label class="form-label fw-semibold">Hand Feel</label>
+                                                            <input type="text" name="details[0][hfeel]" class="form-control auto-field-detail" readonly>
+                                                        </div>
+                                                    </div>
+
+                                                    <!-- Warna (readonly) -->
+                                                    <div class="col-md-6">
+                                                        <div class="form-group">
+                                                            <label class="form-label fw-semibold">Warna</label>
+                                                            <input type="text" name="details[0][warna]" class="form-control auto-field-detail" readonly>
+                                                        </div>
+                                                    </div>
+
+                                                    <!-- Kode Warna (readonly) -->
+                                                    <div class="col-md-6">
+                                                        <div class="form-group">
+                                                            <label class="form-label fw-semibold">Kode Warna</label>
+                                                            <input type="text" name="details[0][kode_warna]" class="form-control auto-field-detail" readonly>
+                                                        </div>
+                                                    </div>
+
+                                                    <!-- Kategori Warna (readonly) -->
+                                                    <div class="col-md-6">
+                                                        <div class="form-group">
+                                                            <label class="form-label fw-semibold">Kategori Warna</label>
+                                                            <input type="text" name="details[0][kategori_warna]" class="form-control auto-field-detail" readonly>
+                                                        </div>
+                                                    </div>
+
+                                                    <!-- QTY (readonly, 2 digit koma) -->
+                                                    <div class="col-md-6">
+                                                        <div class="form-group">
+                                                            <label class="form-label fw-semibold">Quantity</label>
+                                                            <input type="text" name="details[0][qty]" class="form-control auto-field-detail" readonly>
+                                                        </div>
+                                                    </div>
+
+                                                    <!-- Roll (readonly) -->
+                                                    <div class="col-md-6">
+                                                        <div class="form-group">
+                                                            <label class="form-label fw-semibold">Roll</label>
+                                                            <input type="text" name="details[0][roll]" class="form-control auto-field-detail" readonly>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Tombol Tambah OP (untuk Multiple) -->
+                                    <div class="text-center mb-3" id="add-detail-btn-container" style="display: none;">
+                                        <button type="button" class="btn btn-success btn-sm" id="add-detail-btn">
+                                            <i class="fas fa-plus mr-1"></i> Tambah OP
+                                        </button>
                                     </div>
                                 </div>
 
-                                <!-- Kode Material (readonly) -->
-                                <div class="col-md-6 hide-if-maintenance">
-                                    <div class="form-group">
-                                        <label class="form-label fw-semibold">Kode Material</label>
-                                        <input type="text" name="kode_material" class="form-control auto-field"
-                                            readonly>
-                                    </div>
-                                </div>
-
-                                <!-- Konstruksi (readonly) -->
-                                <div class="col-md-6 hide-if-maintenance">
-                                    <div class="form-group">
-                                        <label class="form-label fw-semibold">Konstruksi</label>
-                                        <input type="text" name="konstruksi" class="form-control auto-field" readonly>
-                                    </div>
-                                </div>
-
-                                <!-- Gramasi (readonly) -->
-                                <div class="col-md-6 hide-if-maintenance">
-                                    <div class="form-group">
-                                        <label class="form-label fw-semibold">Gramasi</label>
-                                        <input type="text" name="gramasi" class="form-control auto-field" readonly>
-                                    </div>
-                                </div>
-
-                                <!-- Lebar (readonly) -->
-                                <div class="col-md-6 hide-if-maintenance">
-                                    <div class="form-group">
-                                        <label class="form-label fw-semibold">Lebar</label>
-                                        <input type="text" name="lebar" class="form-control auto-field" readonly>
-                                    </div>
-                                </div>
-
-                                <!-- Hand Feel (readonly) -->
-                                <div class="col-md-6 hide-if-maintenance">
-                                    <div class="form-group">
-                                        <label class="form-label fw-semibold">Hand Feel</label>
-                                        <input type="text" name="hfeel" class="form-control auto-field" readonly>
-                                    </div>
-                                </div>
-
-                                <!-- Warna (readonly) -->
-                                <div class="col-md-6 hide-if-maintenance">
-                                    <div class="form-group">
-                                        <label class="form-label fw-semibold">Warna</label>
-                                        <input type="text" name="warna" class="form-control auto-field" readonly>
-                                    </div>
-                                </div>
-
-                                <!-- Kode Warna (readonly) -->
-                                <div class="col-md-6 hide-if-maintenance">
-                                    <div class="form-group">
-                                        <label class="form-label fw-semibold">Kode Warna</label>
-                                        <input type="text" name="kode_warna" class="form-control auto-field" readonly>
-                                    </div>
-                                </div>
-
-                                <!-- Kategori Warna (readonly) -->
-                                <div class="col-md-6 hide-if-maintenance">
-                                    <div class="form-group">
-                                        <label class="form-label fw-semibold">Kategori Warna</label>
-                                        <input type="text" name="kategori_warna" class="form-control auto-field"
-                                            readonly>
-                                    </div>
-                                </div>
-
-                                <!-- QTY (readonly, 2 digit koma) -->
-                                <div class="col-md-6 hide-if-maintenance">
-                                    <div class="form-group">
-                                        <label class="form-label fw-semibold">Quantity</label>
-                                        <input type="text" name="qty" class="form-control auto-field" readonly>
-                                    </div>
-                                </div>
-
-                                <div class="col-md-6 hide-if-maintenance">
-                                    <div class="form-group">
-                                        <label class="form-label fw-semibold">Roll</label>
-                                        <input type="text" name="roll" class="form-control auto-field" readonly>
-                                    </div>
-                                </div>
 
                             </div>
                         </div>
@@ -2022,8 +2405,10 @@
                         restoreCardToOriginalPosition(dragging);
 
                         // Tampilkan modal konfirmasi swap position
+                        const proses1NoOp = getNoOpFromProses(proses);
+                        const proses2NoOp = getNoOpFromProses(targetProses);
                         const infoText =
-                            `Apakah Anda yakin ingin menukar posisi proses <strong>${proses.no_op || 'MAINTENANCE'}</strong> dengan proses <strong>${targetProses.no_op || 'MAINTENANCE'}</strong>?<br><br><small class="text-muted">Permintaan ini akan menunggu persetujuan FM.</small>`;
+                            `Apakah Anda yakin ingin menukar posisi proses <strong>${proses1NoOp}</strong> dengan proses <strong>${proses2NoOp}</strong>?<br><br><small class="text-muted">Permintaan ini akan menunggu persetujuan FM.</small>`;
                         $('#confirmSwapDragDropInfo').html(infoText);
                         $('#modalConfirmSwapDragDrop').modal('show');
                         return;
@@ -2083,8 +2468,9 @@
                     }, 10);
 
                     // Tampilkan modal konfirmasi
+                    const noOp = getNoOpFromProses(proses);
                     const infoText =
-                        `Apakah Anda yakin ingin memindahkan proses <strong>${proses.no_op || 'MAINTENANCE'}</strong> dari <strong>${sourceMesinName}</strong> ke <strong>${targetMesinName}</strong>?`;
+                        `Apakah Anda yakin ingin memindahkan proses <strong>${noOp}</strong> dari <strong>${sourceMesinName}</strong> ke <strong>${targetMesinName}</strong>?`;
                     $('#confirmMoveDragDropInfo').html(infoText);
                     $('#modalConfirmMoveDragDrop').modal('show');
                 });
@@ -2632,7 +3018,7 @@
 
         // Ambil data dropdown dari server dan inisialisasi select2 SETELAH data masuk
         $(document).ready(function() {
-            // Ambil data dropdown dari server untuk Mesin dan No Partai
+            // Ambil data dropdown dari server untuk Mesin
             fetch("{{ route('proses.create') }}")
                 .then(res => res.json())
                 .then(data => {
@@ -2651,26 +3037,19 @@
                         opt.textContent = m.jenis_mesin;
                         mesinSelect.appendChild(opt);
                     });
-                    // Isi dropdown no_partai
-                    const partaiSelect = document.getElementById('no_partai');
-                    partaiSelect.innerHTML = '<option value="">-- Pilih No. Partai --</option>';
-                    if (data.no_partais) {
-                        data.no_partais.forEach(partai => {
-                            const opt = document.createElement('option');
-                            opt.value = partai;
-                            opt.textContent = partai;
-                            partaiSelect.appendChild(opt);
-                        });
-                    }
-                    // Destroy & init select2 setelah data masuk (No Partai saja)
+                    
+                    // Inisialisasi Select2 untuk Mesin
                     if ($.fn.select2) {
-                        if ($('#no_partai').hasClass('select2-hidden-accessible')) {
-                            $('#no_partai').select2('destroy');
+                        const $mesinSelect = $('#mesin_id');
+                        if ($mesinSelect.hasClass('select2-hidden-accessible')) {
+                            $mesinSelect.select2('destroy');
                         }
-                        $('#no_partai').select2({
+                        $mesinSelect.select2({
                             dropdownParent: $('#modalProses'),
-                            placeholder: '-- Pilih No. Partai --',
-                            allowClear: true
+                            placeholder: '-- Pilih Mesin --',
+                            allowClear: false,
+                            dropdownCssClass: 'select2-dropdown-modal',
+                            width: '100%'
                         });
                     }
                 })
@@ -2686,135 +3065,23 @@
                             opt.textContent = m.jenis_mesin;
                             mesinSelect.appendChild(opt);
                         });
-                    }
-                });
-            // Inisialisasi select2 No. OP hanya sekali, logic seperti sebelumnya
-            if ($.fn.select2) {
-                $('#no_op').select2({
-                    dropdownParent: $('#modalProses'),
-                    placeholder: '-- Pilih No. OP --',
-                    minimumInputLength: 3,
-                    ajax: {
-                        url: '/api/proxy-op',
-                        type: 'POST',
-                        dataType: 'json',
-                        delay: 500,
-                        data: function(params) {
-                            return {
-                                no_op: params.term
-                            };
-                        },
-                        processResults: function(data) {
-                            if (Array.isArray(data.results)) {
-                                return {
-                                    results: data.results
-                                };
-                            } else {
-                                return {
-                                    results: []
-                                };
+                        
+                        // Inisialisasi Select2 untuk Mesin (fallback)
+                        if ($.fn.select2) {
+                            const $mesinSelect = $('#mesin_id');
+                            if ($mesinSelect.hasClass('select2-hidden-accessible')) {
+                                $mesinSelect.select2('destroy');
                             }
-                        },
-                        error: function(xhr, status, error) {
-                            return {
-                                results: []
-                            };
-                        }
-                    }
-                });
-            }
-            // Event setelah user memilih No OP
-            let globalOpData = [];
-            $('#no_op').on('select2:select', function(e) {
-                const selectedOp = e.params.data.id;
-                $('.auto-field').val('');
-                if ($('#no_partai').hasClass('select2-hidden-accessible')) {
-                    $('#no_partai').select2('destroy');
-                }
-                // Disable select No Partai saat proses AJAX
-                $('#no_partai').prop('disabled', true);
-                $('#no_partai').empty().append('<option value="">-- Pilih No. Partai --</option>');
-                globalOpData = [];
-                if (!selectedOp) return;
-                $.ajax({
-                    url: '/api/proxy-op',
-                    method: 'POST',
-                    headers: {
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                    },
-                    data: {
-                        no_op: selectedOp
-                    },
-                    success: function(res) {
-                        globalOpData = res.raw || [];
-                        const filtered = globalOpData.filter(x => (x.no_op || x.noOp || x
-                            .NO_OP) == selectedOp);
-                        const uniquePartai = [...new Set(filtered.map(x => x.no_partai || x
-                            .noPartai || x.NO_PARTAI))].filter(Boolean);
-                        if (uniquePartai.length === 0) {
-                            $('#no_partai').append(
-                                '<option value="">(Tidak ada partai ditemukan)</option>');
-                        } else {
-                            uniquePartai.forEach(partai => {
-                                $('#no_partai').append(
-                                    `<option value="${partai}">${partai}</option>`);
+                            $mesinSelect.select2({
+                                dropdownParent: $('#modalProses'),
+                                placeholder: '-- Pilih Mesin --',
+                                allowClear: false,
+                                dropdownCssClass: 'select2-dropdown-modal',
+                                width: '100%'
                             });
                         }
-                        // Re-init select2
-                        $('#no_partai').select2({
-                            dropdownParent: $('#modalProses'),
-                            placeholder: '-- Pilih No. Partai --',
-                            allowClear: false
-                        });
-                        $('#no_partai').val('').trigger('change');
-                        $('#no_partai').prop('disabled', false);
-                    },
-                    error: function(xhr) {
-                        $('#no_partai').append(
-                            '<option value="">(Gagal mengambil data partai)</option>');
-                        $('#no_partai').select2({
-                            dropdownParent: $('#modalProses'),
-                            placeholder: '-- Pilih No. Partai --',
-                            allowClear: false
-                        });
-                        $('#no_partai').val('').trigger('change');
-                        $('#no_partai').prop('disabled', false);
                     }
                 });
-            });
-            // Event setelah user memilih No Partai
-            $('#no_partai').on('change', function() {
-                const partai = $(this).val();
-                if (!partai) {
-                    $('.auto-field').val('');
-                    return;
-                }
-                const op = $('#no_op').val();
-                const row = globalOpData.find(x => (x.no_op || x.noOp || x.NO_OP) === op && (x.no_partai ||
-                    x.noPartai || x.NO_PARTAI) === partai);
-                if (row) {
-                    $('[name="item_op"]').val(row.item_op || '');
-                    $('[name="kode_material"]').val(row.kode_material || '');
-                    $('[name="konstruksi"]').val(row.konstruksi || '');
-                    $('[name="gramasi"]').val(row.gramasi || '');
-                    $('[name="lebar"]').val(row.lebar || '');
-                    $('[name="hfeel"]').val(row.hfeel || '');
-                    $('[name="warna"]').val(row.warna || '');
-                    $('[name="kode_warna"]').val(row.kode_warna || '');
-                    $('[name="kategori_warna"]').val(row.kat_warna || '');
-                    // Format qty 2 digit koma
-                    var qtyVal = row.qty || '';
-                    if (qtyVal !== '' && !isNaN(qtyVal)) {
-                        qtyVal = parseFloat(qtyVal).toFixed(2);
-                    }
-                    $('[name="qty"]').val(qtyVal);
-                    // Roll dari API
-                    var rollVal = row.roll || '';
-                    $('[name="roll"]').val(rollVal);
-                } else {
-                    $('.auto-field').val('');
-                }
-            });
         });
 
         // Inisialisasi tooltip Bootstrap (termasuk tooltip pada label Cycle Time)
@@ -2960,10 +3227,49 @@
             });
         }
 
+        // Helper function untuk mendapatkan DetailProses pertama dari proses
+        function getFirstDetailProses(proses) {
+            if (!proses) return null;
+            // Cek apakah proses memiliki details array
+            if (proses.details && Array.isArray(proses.details) && proses.details.length > 0) {
+                return proses.details[0];
+            }
+            // Fallback: cek apakah ada detail langsung (untuk backward compatibility)
+            return null;
+        }
+
+        // Helper function untuk mendapatkan no_op dari DetailProses
+        function getNoOpFromProses(proses) {
+            const firstDetail = getFirstDetailProses(proses);
+            if (firstDetail && firstDetail.no_op) {
+                let noOp = firstDetail.no_op;
+                // Jika ada multiple OP, tambahkan indikator
+                if (proses.details && proses.details.length > 1) {
+                    noOp += ' (+' + (proses.details.length - 1) + ')';
+                }
+                return noOp;
+            }
+            // Fallback ke proses.no_op untuk backward compatibility
+            return proses.no_op || 'MAINTENANCE';
+        }
+
+        function getDetailProsesById(proses, detailId) {
+            if (!proses || !detailId) return null;
+            if (proses.details && Array.isArray(proses.details)) {
+                return proses.details.find(d => String(d.id) === String(detailId)) || null;
+            }
+            return null;
+        }
+
         // Double click card proses untuk detail
-        $(document).on('dblclick', '.status-card', function() {
+        // Jika double click pada salah satu baris OP (multiple), modal akan menampilkan detail OP tersebut.
+        $(document).on('dblclick', '.status-card', function(e) {
             const proses = $(this).data('proses');
             if (!proses) return;
+            
+            const clickedDetailId = $(e.target).closest('.op-row').data('detail-id') || null;
+            const selectedDetail = getDetailProsesById(proses, clickedDetailId) || getFirstDetailProses(proses);
+            const selectedDetailId = selectedDetail && selectedDetail.id ? selectedDetail.id : null;
 
             // Cek apakah card berwarna kuning (menunggu approval)
             const bgColor = $(this).data('bg-color');
@@ -3018,9 +3324,23 @@
                     }
                 } catch {}
 
-                const entries = Object.entries(proses)
+                // Ambil DetailProses yang di-double click (fallback ke pertama)
+                const firstDetail = selectedDetail;
+                
+                // Gabungkan data dari Proses dan DetailProses
+                const prosesData = {...proses};
+                if (firstDetail) {
+                    // Override field yang ada di DetailProses dengan data dari DetailProses
+                    Object.keys(firstDetail).forEach(key => {
+                        if (maintenanceFields.includes(key) || ['no_op', 'no_partai', 'item_op', 'kode_material', 'konstruksi', 'gramasi', 'lebar', 'hfeel', 'warna', 'kode_warna', 'kategori_warna', 'qty', 'roll'].includes(key)) {
+                            prosesData[key] = firstDetail[key];
+                        }
+                    });
+                }
+                
+                const entries = Object.entries(prosesData)
                     .filter(([key]) => !hiddenFields.includes(key) && key !== 'barcode_kains' && key !==
-                        'barcode_las' && key !== 'barcode_auxs' && key !== 'mesin' && key !== 'approvals')
+                        'barcode_las' && key !== 'barcode_auxs' && key !== 'mesin' && key !== 'approvals' && key !== 'details')
                     .filter(([key]) => !(proses.jenis === 'Maintenance' && maintenanceFields.includes(key)))
                     .map(([key, val]) => {
                         if (key === 'hfeel') return ['HAND FEEL', val];
@@ -3060,6 +3380,8 @@
                 approvalHtml += '</div>';
                 $('#pending-approval-info').html(approvalHtml);
 
+                // Simpan detail_proses_id terpilih untuk scan/refresh barcode
+                $('#modalDetailProsesPending').data('detailProsesId', selectedDetailId);
                 $('#modalDetailProsesPending').modal('show');
                 return;
             }
@@ -3067,6 +3389,7 @@
             // Jika tidak ada pending approval, tampilkan modal normal
             // Simpan proses aktif ke modal detail untuk kebutuhan edit/delete
             $('#modalDetailProses').data('proses', proses);
+            $('#modalDetailProses').data('detailProsesId', selectedDetailId);
 
             const pendingInfo = getPendingApprovalInfo(proses);
 
@@ -3153,10 +3476,24 @@
                     if (opt) jenisMesin = opt.textContent;
                 }
             } catch {}
-            // Hapus BARCODE KAINS, APPROVALS dari detail proses
-            const entries = Object.entries(proses)
+            // Ambil DetailProses yang dipilih (fallback ke pertama)
+            const firstDetail = selectedDetail;
+            
+            // Gabungkan data dari Proses dan DetailProses
+            const prosesData = {...proses};
+            if (firstDetail) {
+                // Override field yang ada di DetailProses dengan data dari DetailProses
+                Object.keys(firstDetail).forEach(key => {
+                    if (maintenanceFields.includes(key) || ['no_op', 'no_partai', 'item_op', 'kode_material', 'konstruksi', 'gramasi', 'lebar', 'hfeel', 'warna', 'kode_warna', 'kategori_warna', 'qty', 'roll'].includes(key)) {
+                        prosesData[key] = firstDetail[key];
+                    }
+                });
+            }
+            
+            // Hapus BARCODE KAINS, APPROVALS, DETAILS dari detail proses
+            const entries = Object.entries(prosesData)
                 .filter(([key]) => !hiddenFields.includes(key) && key !== 'barcode_kains' && key !==
-                    'barcode_las' && key !== 'barcode_auxs' && key !== 'mesin' && key !== 'approvals')
+                    'barcode_las' && key !== 'barcode_auxs' && key !== 'mesin' && key !== 'approvals' && key !== 'details')
                 .filter(([key]) => !(proses.jenis === 'Maintenance' && maintenanceFields.includes(key)))
                 .map(([key, val]) => {
                     if (key === 'hfeel') return ['HAND FEEL', val];
@@ -3185,7 +3522,7 @@
                 if (showScanBtn) {
                     html +=
                         ' <button type="button" class="btn btn-sm btn-success scan-barcode-btn" data-barcode="barcode_kain" data-id="' +
-                        proses.id + '" style="float:right;"><i class="fas fa-barcode"></i> Scan</button>';
+                        proses.id + '" data-detail-id="' + (selectedDetailId || '') + '" style="float:right;"><i class="fas fa-barcode"></i> Scan</button>';
                 }
                 html += '</th></tr>';
                 html += '<tr><td colspan="4" id="barcode-kain-list">Loading...</td></tr>';
@@ -3193,7 +3530,7 @@
                 if (showScanBtn) {
                     html +=
                         ' <button type="button" class="btn btn-sm btn-success scan-barcode-btn" data-barcode="barcode_la" data-id="' +
-                        proses.id + '" style="float:right;"><i class="fas fa-barcode"></i> Scan</button>';
+                        proses.id + '" data-detail-id="' + (selectedDetailId || '') + '" style="float:right;"><i class="fas fa-barcode"></i> Scan</button>';
                 }
                 html += '</th></tr>';
                 html += '<tr><td colspan="4" id="barcode-la-list">Loading...</td></tr>';
@@ -3201,7 +3538,7 @@
                 if (showScanBtn) {
                     html +=
                         ' <button type="button" class="btn btn-sm btn-success scan-barcode-btn" data-barcode="barcode_aux" data-id="' +
-                        proses.id + '" style="float:right;"><i class="fas fa-barcode"></i> Scan</button>';
+                        proses.id + '" data-detail-id="' + (selectedDetailId || '') + '" style="float:right;"><i class="fas fa-barcode"></i> Scan</button>';
                 }
                 html += '</th></tr>';
                 html += '<tr><td colspan="4" id="barcode-aux-list">Loading...</td></tr>';
@@ -3209,13 +3546,18 @@
             $('#detail-proses-body').html(html);
             // Ambil barcode dari relasi dan render di modal detail proses hanya jika bukan Maintenance
             if (proses.jenis !== 'Maintenance') {
+                const barcodesUrl = '/proses/' + proses.id + '/barcodes' + (selectedDetailId ? ('?detail_proses_id=' + encodeURIComponent(selectedDetailId)) : '');
                 $.ajax({
-                    url: '/proses/' + proses.id + '/barcodes',
+                    url: barcodesUrl,
                     method: 'GET',
                     success: function(data) {
                         // Helper untuk update warna blok G, D, A di card utama setelah perubahan barcode
-                        function updateGDAIndicators(prosesId, hasKain, hasLa, hasAux) {
-                            const $cards = $(`.status-card[data-proses-id="${prosesId}"]`);
+                        function updateGDAIndicators(prosesId, detailId, hasKain, hasLa, hasAux) {
+                            let $targets = $(`.status-card[data-proses-id="${prosesId}"] .op-row[data-detail-id="${detailId}"]`);
+                            if (!$targets.length) {
+                                $targets = $(`.status-card[data-proses-id="${prosesId}"]`);
+                            }
+                            const $cards = $targets;
                             if (!$cards.length) return;
 
                             $cards.each(function() {
@@ -3278,7 +3620,7 @@
                         const hasKainActive = (data.barcode_kain || []).some(bk => !bk.cancel);
                         const hasLaActive = (data.barcode_la || []).some(bk => !bk.cancel);
                         const hasAuxActive = (data.barcode_aux || []).some(bk => !bk.cancel);
-                        updateGDAIndicators(proses.id, hasKainActive, hasLaActive, hasAuxActive);
+                        updateGDAIndicators(proses.id, selectedDetailId, hasKainActive, hasLaActive, hasAuxActive);
                     },
                     error: function() {
                         $('#barcode-kain-list').html(
@@ -3379,24 +3721,27 @@
             const detik = (val % 60).toString().padStart(2, '0');
             const hms = `${jam}:${menit}:${detik}`;
 
+            // Ambil DetailProses pertama untuk field yang ada di DetailProses
+            const firstDetail = getFirstDetailProses(proses);
+            
             // Isi data ke Form Edit sebelum modal dibuka
             $('#formEditProses').attr('action', updateUrl);
             $('#editProsesId').val(id);
             $('#editCycleTime').val(hms);
             $('#editJenis').val(proses.jenis || '');
-            $('#editNoOp').val(proses.no_op || '');
-            $('#editNoPartai').val(proses.no_partai || '');
-            $('#editItemOp').val(proses.item_op || '');
-            $('#editKodeMaterial').val(proses.kode_material || '');
-            $('#editKonstruksi').val(proses.konstruksi || '');
-            $('#editGramasi').val(proses.gramasi || '');
-            $('#editLebar').val(proses.lebar || '');
-            $('#editHfeel').val(proses.hfeel || '');
-            $('#editWarna').val(proses.warna || '');
-            $('#editKodeWarna').val(proses.kode_warna || '');
-            $('#editKategoriWarna').val(proses.kategori_warna || '');
-            $('#editQty').val(proses.qty || '');
-            $('#editRoll').val(proses.roll || '');
+            $('#editNoOp').val(firstDetail ? (firstDetail.no_op || '') : (proses.no_op || ''));
+            $('#editNoPartai').val(firstDetail ? (firstDetail.no_partai || '') : (proses.no_partai || ''));
+            $('#editItemOp').val(firstDetail ? (firstDetail.item_op || '') : (proses.item_op || ''));
+            $('#editKodeMaterial').val(firstDetail ? (firstDetail.kode_material || '') : (proses.kode_material || ''));
+            $('#editKonstruksi').val(firstDetail ? (firstDetail.konstruksi || '') : (proses.konstruksi || ''));
+            $('#editGramasi').val(firstDetail ? (firstDetail.gramasi || '') : (proses.gramasi || ''));
+            $('#editLebar').val(firstDetail ? (firstDetail.lebar || '') : (proses.lebar || ''));
+            $('#editHfeel').val(firstDetail ? (firstDetail.hfeel || '') : (proses.hfeel || ''));
+            $('#editWarna').val(firstDetail ? (firstDetail.warna || '') : (proses.warna || ''));
+            $('#editKodeWarna').val(firstDetail ? (firstDetail.kode_warna || '') : (proses.kode_warna || ''));
+            $('#editKategoriWarna').val(firstDetail ? (firstDetail.kategori_warna || '') : (proses.kategori_warna || ''));
+            $('#editQty').val(firstDetail ? (firstDetail.qty || '') : (proses.qty || ''));
+            $('#editRoll').val(firstDetail ? (firstDetail.roll || '') : (proses.roll || ''));
 
             // Tutup modal detail, lalu buka modal edit SETELAH detail tertutup sempurna
             $('#modalDetailProses').modal('hide').one('hidden.bs.modal', function() {
@@ -3496,9 +3841,13 @@
 
             $('#moveMesinId').val('').trigger('change');
 
+            // Ambil DetailProses pertama untuk mendapatkan no_op
+            const firstDetail = getFirstDetailProses(proses);
+            const noOp = firstDetail ? (firstDetail.no_op || '') : (proses.no_op || '');
+            
             let infoText = 'Pilih mesin tujuan untuk memindahkan proses ini.';
-            if (proses.no_op) {
-                infoText += `<br><br><strong>No OP:</strong> ${proses.no_op || '-'}`;
+            if (noOp) {
+                infoText += `<br><br><strong>No OP:</strong> ${noOp}`;
             }
             $('#moveProsesInfo').html(infoText);
 
@@ -3641,10 +3990,15 @@
             $('#formDeleteProses').attr('action', deleteUrl);
             $('#deleteProsesId').val(id);
 
+            // Ambil DetailProses pertama untuk mendapatkan no_op dan no_partai
+            const firstDetail = getFirstDetailProses(proses);
+            const noOp = firstDetail ? (firstDetail.no_op || '') : (proses.no_op || '');
+            const noPartai = firstDetail ? (firstDetail.no_partai || '') : (proses.no_partai || '');
+            
             let infoText = 'Apakah Anda yakin ingin mengajukan penghapusan proses ini?';
-            if (proses.no_op || proses.no_partai) {
-                infoText += `<br><br><strong>No OP:</strong> ${proses.no_op || '-'}<br>` +
-                    `<strong>No Partai:</strong> ${proses.no_partai || '-'}`;
+            if (noOp || noPartai) {
+                infoText += `<br><br><strong>No OP:</strong> ${noOp || '-'}<br>` +
+                    `<strong>No Partai:</strong> ${noPartai || '-'}`;
             }
             $('#deleteProsesInfo').html(infoText);
 
@@ -3665,6 +4019,7 @@
                         <form id="formScanBarcode" method="POST" action="">
                             @csrf
                             <input type="hidden" name="barcode" id="inputBarcodeValue">
+                            <input type="hidden" name="detail_proses_id" id="inputDetailProsesId">
                             <div class="modal-header bg-success text-white">
                                 <h5 class="modal-title fw-bold" id="modalScanBarcodeLabel">Scan Barcode</h5>
                                 <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
@@ -3688,6 +4043,7 @@
         $(document).on('click', '.scan-barcode-btn', function() {
             const barcodeType = $(this).data('barcode');
             const prosesId = $(this).data('id');
+            const detailId = $(this).data('detail-id') || $('#modalDetailProses').data('detailProsesId') || '';
             let actionUrl = '';
             if (barcodeType === 'barcode_kain') {
                 actionUrl = `/proses/${prosesId}/barcode/kain`;
@@ -3698,6 +4054,7 @@
             }
             $('#formScanBarcode').attr('action', actionUrl);
             $('#inputBarcodeValue').val('');
+            $('#inputDetailProsesId').val(detailId);
             $('#modalScanBarcode').modal('show');
         });
 
@@ -3943,6 +4300,99 @@
                 }
             }
 
+            // Fungsi global untuk update warna GDA per detail proses
+            // Bisa digunakan untuk update real-time dari API atau setelah scan barcode
+            function updateGDAIndicatorsGlobal(prosesId, detailId, hasKain, hasLa, hasAux) {
+                const $card = $(`.status-card[data-proses-id="${prosesId}"]`);
+                if (!$card.length) return;
+
+                const prosesData = $card.data('proses');
+                if (!prosesData || prosesData.jenis === 'Maintenance') {
+                    return; // Tidak ada G/D/A untuk Maintenance
+                }
+
+                // Fungsi helper untuk set warna blok GDA
+                function setBlockColor($container, blockType, ok) {
+                    const $blocks = $container.find(`.gda-block[data-block-type="${blockType}"]`);
+                    if (!$blocks.length) return;
+
+                    const blockBg = ok ? '#d4f8e8' : '#ffb3b3';
+                    const blockBorder = ok ? '#43a047' : '#c62828';
+                    $blocks.css({
+                        background: blockBg,
+                        borderColor: blockBorder
+                    });
+                }
+
+                // Jika detailId tidak ada atau kosong, update GDA di header card (untuk single OP atau OP pertama)
+                if (!detailId || detailId === '') {
+                    // Update GDA di header card
+                    setBlockColor($card, 'G', !!hasKain);
+                    setBlockColor($card, 'D', !!hasLa);
+                    setBlockColor($card, 'A', !!hasAux);
+                    return;
+                }
+
+                // Cari OP row yang sesuai dengan detailId
+                const $opRow = $card.find(`.op-row[data-detail-id="${detailId}"]`);
+                
+                // Untuk multiple OP:
+                // - OP pertama: GDA ada di header card
+                // - OP kedua+: GDA ada di luar .op-row (sebelum .op-row, biasanya di div dengan class khusus)
+                
+                // Cek apakah ini OP pertama
+                const $firstOpRow = $card.find('.op-row').first();
+                const isFirstOp = $firstOpRow.length && $firstOpRow.attr('data-detail-id') === String(detailId);
+
+                if (isFirstOp) {
+                    // OP pertama: update GDA di header card
+                    setBlockColor($card, 'G', !!hasKain);
+                    setBlockColor($card, 'D', !!hasLa);
+                    setBlockColor($card, 'A', !!hasAux);
+                } else if ($opRow.length) {
+                    // OP kedua+: cari GDA yang berada sebelum .op-row ini
+                    // Struktur HTML: <div>GDA blocks</div> <div class="op-row">...</div>
+                    let $gdaContainer = null;
+                    
+                    // Cek sibling sebelumnya yang memiliki GDA blocks
+                    const $prevSibling = $opRow.prev();
+                    if ($prevSibling.length && $prevSibling.find('.gda-block').length > 0) {
+                        $gdaContainer = $prevSibling;
+                    } else {
+                        // Cek parent dari op-row untuk mencari GDA di level yang sama
+                        const $opList = $opRow.closest('.op-list');
+                        if ($opList.length) {
+                            // Cari semua elemen sebelum op-row ini dalam op-list
+                            const $allBefore = $opList.children().slice(0, $opList.children().index($opRow));
+                            for (let i = $allBefore.length - 1; i >= 0; i--) {
+                                const $elem = $($allBefore[i]);
+                                if ($elem.find('.gda-block').length > 0) {
+                                    $gdaContainer = $elem;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    
+                    if ($gdaContainer && $gdaContainer.length) {
+                        // Update GDA di container yang ditemukan
+                        setBlockColor($gdaContainer, 'G', !!hasKain);
+                        setBlockColor($gdaContainer, 'D', !!hasLa);
+                        setBlockColor($gdaContainer, 'A', !!hasAux);
+                    } else {
+                        // Fallback: update di header card jika GDA khusus tidak ditemukan
+                        setBlockColor($card, 'G', !!hasKain);
+                        setBlockColor($card, 'D', !!hasLa);
+                        setBlockColor($card, 'A', !!hasAux);
+                    }
+                } else {
+                    // Jika OP row tidak ditemukan, update di header card sebagai fallback
+                    setBlockColor($card, 'G', !!hasKain);
+                    setBlockColor($card, 'D', !!hasLa);
+                    setBlockColor($card, 'A', !!hasAux);
+                }
+            }
+
             // Fungsi untuk update warna card berdasarkan status dari API
             function updateProsesStatuses() {
                 // Ambil parameter mesin dari URL jika ada (untuk filter)
@@ -4005,6 +4455,19 @@
                                 $card.css('background', gradient);
                                 $card.attr('data-bg-color', statusData.bg_color);
                             }
+
+                            // Update warna GDA per detail proses jika ada data gda_details
+                            if (statusData.gda_details && Array.isArray(statusData.gda_details)) {
+                                statusData.gda_details.forEach(function(gdaDetail) {
+                                    const detailId = gdaDetail.detail_id;
+                                    const hasKain = gdaDetail.has_kain || false;
+                                    const hasLa = gdaDetail.has_la || false;
+                                    const hasAux = gdaDetail.has_aux || false;
+
+                                    // Update GDA untuk detail ini menggunakan fungsi global
+                                    updateGDAIndicatorsGlobal(prosesId, detailId, hasKain, hasLa, hasAux);
+                                });
+                            }
                         });
 
                         // Reorder card di setiap mesin yang terpengaruh
@@ -4031,39 +4494,347 @@
             updateProsesStatuses(); // jalankan sekali di awal
         });
 
-        $(document).ready(function() {
-            $('[name="jenis"]').on('change', function() {
-                var isMaintenance = $(this).val() === 'Maintenance';
+        // Counter untuk detail item index
+        let detailItemIndex = 0;
+        let globalOpDataMap = {}; // Map untuk menyimpan data OP per detail item
 
-                // Modifikasi: Handle No OP dan No Partai (Disable jika Maintenance)
-                var $noOp = $('#no_op');
-                var $noPartai = $('#no_partai');
+        // Fungsi untuk inisialisasi select2 untuk detail item
+        function initDetailSelect2($container, index) {
+            const $noOpSelect = $container.find('.no-op-select');
+            const $noPartaiSelect = $container.find('.no-partai-select');
 
-                if (isMaintenance) {
-                    $noOp.val(null).trigger('change').prop('disabled', true).removeAttr('required');
-                    $noPartai.val(null).trigger('change').prop('disabled', true).removeAttr('required');
-                } else {
-                    $noOp.prop('disabled', false).attr('required', 'required');
-                    // No Partai di-enable logika-nya ada di event listener no_op select, tapi kita pastikan required-nya kembali
-                    $noPartai.attr('required', 'required');
+            // Destroy select2 jika sudah ada
+            if ($noOpSelect.hasClass('select2-hidden-accessible')) {
+                try {
+                    $noOpSelect.select2('destroy');
+                } catch(e) {
+                    // Jika destroy gagal, ignore (mungkin sudah di-destroy sebelumnya)
                 }
+            }
+            if ($noPartaiSelect.hasClass('select2-hidden-accessible')) {
+                try {
+                    $noPartaiSelect.select2('destroy');
+                } catch(e) {
+                    // Jika destroy gagal, ignore (mungkin sudah di-destroy sebelumnya)
+                }
+            }
 
-                // Sisa field auto-fill
-                var fields = [
-                    'item_op', 'kode_material', 'konstruksi', 'gramasi',
-                    'lebar', 'hfeel', 'warna', 'kode_warna', 'kategori_warna', 'qty'
-                ];
-                fields.forEach(function(name) {
-                    var $field = $('[name="' + name + '"]');
-                    if (isMaintenance) {
-                        $field.removeAttr('required');
-                    } else {
-                        $field.attr('required', 'required');
+            // Init select2 untuk No OP
+            $noOpSelect.select2({
+                dropdownParent: $('#modalProses'),
+                placeholder: '-- Pilih No. OP --',
+                minimumInputLength: 3,
+                dropdownCssClass: 'select2-dropdown-modal',
+                width: '100%',
+                ajax: {
+                    url: '/api/proxy-op',
+                    type: 'POST',
+                    dataType: 'json',
+                    delay: 500,
+                    data: function(params) {
+                        return {
+                            no_op: params.term
+                        };
+                    },
+                    processResults: function(data) {
+                        if (Array.isArray(data.results)) {
+                            return {
+                                results: data.results
+                            };
+                        } else {
+                            return {
+                                results: []
+                            };
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        return {
+                            results: []
+                        };
+                    }
+                }
+            });
+
+            // Init select2 untuk No Partai sejak awal (sebelum No OP dipilih)
+            $noPartaiSelect.select2({
+                dropdownParent: $('#modalProses'),
+                placeholder: '-- Pilih No. Partai --',
+                allowClear: true,
+                dropdownCssClass: 'select2-dropdown-modal',
+                width: '100%'
+            });
+
+            // Remove event handler sebelumnya jika ada, lalu tambahkan yang baru
+            $noOpSelect.off('select2:select');
+            // Event handler untuk No OP select
+            $noOpSelect.on('select2:select', function(e) {
+                const selectedOp = e.params.data.id;
+                const $item = $(this).closest('.detail-proses-item');
+                const itemIndex = $item.data('index');
+                
+                // Clear auto fields di item ini
+                $item.find('.auto-field-detail').val('');
+                
+                // Disable No Partai select
+                $noPartaiSelect.prop('disabled', true);
+                $noPartaiSelect.empty().append('<option value="">-- Pilih No. Partai --</option>');
+                
+                if (!selectedOp) return;
+                
+                $.ajax({
+                    url: '/api/proxy-op',
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                    },
+                    data: {
+                        no_op: selectedOp
+                    },
+                    success: function(res) {
+                        globalOpDataMap[itemIndex] = res.raw || [];
+                        const filtered = globalOpDataMap[itemIndex].filter(x => 
+                            (x.no_op || x.noOp || x.NO_OP) == selectedOp
+                        );
+                        const uniquePartai = [...new Set(filtered.map(x => 
+                            x.no_partai || x.noPartai || x.NO_PARTAI
+                        ))].filter(Boolean);
+                        
+                        if (uniquePartai.length === 0) {
+                            $noPartaiSelect.append(
+                                '<option value="">(Tidak ada partai ditemukan)</option>');
+                        } else {
+                            uniquePartai.forEach(partai => {
+                                $noPartaiSelect.append(
+                                    `<option value="${partai}">${partai}</option>`);
+                            });
+                        }
+                        
+                        // Destroy dan re-init select2 untuk update options
+                        if ($noPartaiSelect.hasClass('select2-hidden-accessible')) {
+                            $noPartaiSelect.select2('destroy');
+                        }
+                        $noPartaiSelect.select2({
+                            dropdownParent: $('#modalProses'),
+                            placeholder: '-- Pilih No. Partai --',
+                            allowClear: false,
+                            dropdownCssClass: 'select2-dropdown-modal',
+                            width: '100%'
+                        });
+                        $noPartaiSelect.val('').trigger('change');
+                        $noPartaiSelect.prop('disabled', false);
+                    },
+                    error: function(xhr) {
+                        $noPartaiSelect.append(
+                            '<option value="">(Gagal mengambil data partai)</option>');
+                        // Destroy dan re-init select2 untuk update options
+                        if ($noPartaiSelect.hasClass('select2-hidden-accessible')) {
+                            $noPartaiSelect.select2('destroy');
+                        }
+                        $noPartaiSelect.select2({
+                            dropdownParent: $('#modalProses'),
+                            placeholder: '-- Pilih No. Partai --',
+                            allowClear: false,
+                            dropdownCssClass: 'select2-dropdown-modal',
+                            width: '100%'
+                        });
+                        $noPartaiSelect.val('').trigger('change');
+                        $noPartaiSelect.prop('disabled', false);
                     }
                 });
-                // Mesin dan cycle_time tetap required
-                $('[name="mesin_id"]').attr('required', 'required');
-                $('[name="cycle_time"]').attr('required', 'required');
+            });
+
+            // Remove event handler sebelumnya jika ada, lalu tambahkan yang baru
+            $noPartaiSelect.off('change');
+            // Event handler untuk No Partai select
+            $noPartaiSelect.on('change', function() {
+                const partai = $(this).val();
+                const $item = $(this).closest('.detail-proses-item');
+                const itemIndex = $item.data('index');
+                
+                if (!partai) {
+                    $item.find('.auto-field-detail').val('');
+                    return;
+                }
+                
+                const op = $noOpSelect.val();
+                const opData = globalOpDataMap[itemIndex] || [];
+                const row = opData.find(x => 
+                    (x.no_op || x.noOp || x.NO_OP) === op && 
+                    (x.no_partai || x.noPartai || x.NO_PARTAI) === partai
+                );
+                
+                if (row) {
+                    $item.find('[name*="[item_op]"]').val(row.item_op || '');
+                    $item.find('[name*="[kode_material]"]').val(row.kode_material || '');
+                    $item.find('[name*="[konstruksi]"]').val(row.konstruksi || '');
+                    $item.find('[name*="[gramasi]"]').val(row.gramasi || '');
+                    $item.find('[name*="[lebar]"]').val(row.lebar || '');
+                    $item.find('[name*="[hfeel]"]').val(row.hfeel || '');
+                    $item.find('[name*="[warna]"]').val(row.warna || '');
+                    $item.find('[name*="[kode_warna]"]').val(row.kode_warna || '');
+                    $item.find('[name*="[kategori_warna]"]').val(row.kat_warna || '');
+                    
+                    // Format qty 2 digit koma
+                    var qtyVal = row.qty || '';
+                    if (qtyVal !== '' && !isNaN(qtyVal)) {
+                        qtyVal = parseFloat(qtyVal).toFixed(2);
+                    }
+                    $item.find('[name*="[qty]"]').val(qtyVal);
+                    
+                    // Roll dari API
+                    var rollVal = row.roll || '';
+                    $item.find('[name*="[roll]"]').val(rollVal);
+                } else {
+                    $item.find('.auto-field-detail').val('');
+                }
+            });
+        }
+
+        // Fungsi untuk menambah detail item baru
+        function addDetailItem() {
+            const $container = $('#detail-proses-container');
+            const $firstItem = $container.find('.detail-proses-item').first();
+            
+            // Gunakan jumlah item yang ada sebagai index baru (mengisi kekosongan)
+            const currentItemCount = $container.find('.detail-proses-item').length;
+            const newIndex = currentItemCount;
+            
+            // Update detailItemIndex global
+            detailItemIndex = newIndex;
+            
+            // Clone element tanpa event handler (karena akan di-init Select2 baru dengan event handler baru)
+            const $newItem = $firstItem.clone(false);
+            
+            // Update index dan name attributes
+            $newItem.attr('data-index', newIndex);
+            $newItem.find('.card-header h6').text('Detail OP #' + (newIndex + 1));
+            $newItem.find('.remove-detail-btn').show();
+            
+            // Update semua name attributes
+            $newItem.find('[name]').each(function() {
+                const $this = $(this);
+                const name = $this.attr('name');
+                if (name && name.includes('[0]')) {
+                    $this.attr('name', name.replace('[0]', '[' + newIndex + ']'));
+                }
+            });
+            
+            // Clear values
+            $newItem.find('input, select').val('');
+            $newItem.find('.auto-field-detail').val('');
+            
+            // Clean up Select2 HTML dari clone (karena clone membawa HTML Select2 tapi tidak state-nya)
+            $newItem.find('.no-op-select, .no-partai-select').each(function() {
+                const $select = $(this);
+                // Remove Select2 wrapper classes dan elements
+                $select.removeClass('select2-hidden-accessible');
+                $select.removeAttr('data-select2-id');
+                $select.removeAttr('tabindex');
+                $select.removeAttr('aria-hidden');
+                // Remove Select2 container yang mungkin ter-clone
+                $select.siblings('.select2-container').remove();
+            });
+            
+            // Insert sebelum tombol add
+            $newItem.insertBefore($('#add-detail-btn-container'));
+            
+            // Init select2 untuk item baru
+            initDetailSelect2($newItem, newIndex);
+        }
+
+        // Fungsi untuk menghapus detail item
+        function removeDetailItem($item) {
+            const itemIndex = $item.data('index');
+            
+            // Destroy select2 dengan check terlebih dahulu
+            $item.find('.no-op-select, .no-partai-select').each(function() {
+                const $select = $(this);
+                if ($select.hasClass('select2-hidden-accessible')) {
+                    try {
+                        $select.select2('destroy');
+                    } catch(e) {
+                        // Jika destroy gagal, ignore (mungkin sudah di-destroy sebelumnya)
+                    }
+                }
+            });
+            
+            // Hapus dari map
+            delete globalOpDataMap[itemIndex];
+            
+            // Hapus item
+            $item.remove();
+            
+            // Update nomor urut
+            updateDetailItemNumbers();
+        }
+
+        // Fungsi untuk update nomor urut detail items
+        function updateDetailItemNumbers() {
+            const $container = $('#detail-proses-container');
+            const $items = $container.find('.detail-proses-item');
+            
+            $items.each(function(index) {
+                const $item = $(this);
+                const newIndex = index;
+                
+                // Update data-index
+                $item.attr('data-index', newIndex);
+                
+                // Update teks nomor
+                $item.find('.card-header h6').text('Detail OP #' + (index + 1));
+                
+                // Update semua name attributes
+                $item.find('[name]').each(function() {
+                    const $this = $(this);
+                    const name = $this.attr('name');
+                    if (name && name.match(/\[(\d+)\]/)) {
+                        // Ganti index di name attribute dengan index baru
+                        $this.attr('name', name.replace(/\[\d+\]/, '[' + newIndex + ']'));
+                    }
+                });
+            });
+            
+            // Update detailItemIndex global: set ke index terakhir setelah renumbering
+            // Setelah renumbering, index terakhir = jumlah item - 1
+            detailItemIndex = $items.length > 0 ? $items.length - 1 : 0;
+        }
+
+        $(document).ready(function() {
+            // Inisialisasi select2 untuk detail item pertama
+            initDetailSelect2($('#detail-proses-container .detail-proses-item').first(), 0);
+
+            // Handler untuk Jenis OP (Single/Multiple)
+            $('#jenis_op').on('change', function() {
+                const jenisOp = $(this).val();
+                const $container = $('#detail-proses-container');
+                const $items = $container.find('.detail-proses-item');
+                const $addBtn = $('#add-detail-btn-container');
+                const $removeBtns = $container.find('.remove-detail-btn');
+                
+                if (jenisOp === 'Multiple') {
+                    // Tampilkan tombol tambah dan hapus
+                    $addBtn.show();
+                    $removeBtns.show();
+                } else {
+                    // Sembunyikan tombol tambah dan hapus
+                    $addBtn.hide();
+                    $removeBtns.hide();
+                    
+                    // Hapus semua item kecuali yang pertama
+                    $items.slice(1).each(function() {
+                        removeDetailItem($(this));
+                    });
+                    
+                    // Reset index
+                    detailItemIndex = 0;
+                    $items.first().attr('data-index', 0);
+                    updateDetailItemNumbers();
+                }
+            });
+
+            // Handler untuk Jenis Proses
+            $('[name="jenis"]').on('change', function() {
+                var isMaintenance = $(this).val() === 'Maintenance';
 
                 // Sembunyikan field tertentu jika Maintenance
                 if (isMaintenance) {
@@ -4072,8 +4843,81 @@
                     $('.hide-if-maintenance').show();
                 }
             });
+
+            // Handler untuk tombol tambah detail
+            $(document).on('click', '#add-detail-btn', function() {
+                addDetailItem();
+            });
+
+            // Handler untuk tombol hapus detail
+            $(document).on('click', '.remove-detail-btn', function() {
+                const $item = $(this).closest('.detail-proses-item');
+                const itemCount = $('#detail-proses-container .detail-proses-item').length;
+                
+                if (itemCount > 1) {
+                    removeDetailItem($item);
+                } else {
+                    alert('Minimal harus ada 1 detail OP');
+                }
+            });
+
+            // Inisialisasi Select2 saat modal dibuka
+            $('#modalProses').on('shown.bs.modal', function() {
+                // Pastikan Select2 untuk Mesin sudah terinisialisasi
+                const $mesinSelect = $('#mesin_id');
+                if (!$mesinSelect.hasClass('select2-hidden-accessible') && $.fn.select2) {
+                    $mesinSelect.select2({
+                        dropdownParent: $('#modalProses'),
+                        placeholder: '-- Pilih Mesin --',
+                        allowClear: false,
+                        dropdownCssClass: 'select2-dropdown-modal',
+                        width: '100%'
+                    });
+                }
+            });
+
+            // Reset form saat modal ditutup
+            $('#modalProses').on('hidden.bs.modal', function() {
+                // Reset form
+                $('#formProses')[0].reset();
+                
+                // Hapus semua detail item kecuali yang pertama
+                const $items = $('#detail-proses-container .detail-proses-item');
+                $items.slice(1).each(function() {
+                    const $item = $(this);
+                    const itemIndex = $item.data('index');
+                    delete globalOpDataMap[itemIndex];
+                    $item.find('.select2-detail').select2('destroy');
+                    $item.remove();
+                });
+                
+                // Reset index dan update nomor
+                detailItemIndex = 0;
+                $items.first().attr('data-index', 0);
+                updateDetailItemNumbers();
+                
+                // Clear global data
+                globalOpDataMap = {};
+                
+                // Destroy semua select2
+                $('#detail-proses-container .select2-detail').select2('destroy');
+                
+                // Destroy Select2 untuk Mesin
+                const $mesinSelect = $('#mesin_id');
+                if ($mesinSelect.hasClass('select2-hidden-accessible')) {
+                    $mesinSelect.select2('destroy');
+                }
+                
+                // Re-init select2 untuk item pertama
+                initDetailSelect2($('#detail-proses-container .detail-proses-item').first(), 0);
+                
+                // Reset jenis_op ke Single
+                $('#jenis_op').val('Single').trigger('change');
+            });
+
             // Trigger di awal
             $('[name="jenis"]').trigger('change');
+            $('#jenis_op').trigger('change');
         });
 
         // Helper function untuk notifikasi Swal Toast
@@ -4175,6 +5019,7 @@
 
         let cancelBarcodeData = null;
         let currentProsesForRefresh = null;
+        let currentDetailForRefresh = null;
 
         $(document).on('click', '#btnConfirmCancelBarcode', function() {
             if (!cancelBarcodeData) return;
@@ -4189,6 +5034,8 @@
 
             // Simpan proses ID untuk refresh
             currentProsesForRefresh = prosesId;
+            // Simpan detail_proses_id aktif (jika ada)
+            currentDetailForRefresh = $('#modalDetailProses').data('detailProsesId') || null;
 
             // Tampilkan loading dan disable button
             $('#btnConfirmCancelBarcode').prop('disabled', true).html(
@@ -4222,7 +5069,10 @@
                             if (activeProses.length) {
                                 // Reload barcode data via AJAX
                                 $.ajax({
-                                    url: '/proses/' + currentProsesForRefresh + '/barcodes',
+                                    url: '/proses/' + currentProsesForRefresh + '/barcodes' +
+                                        (currentDetailForRefresh ?
+                                            ('?detail_proses_id=' + encodeURIComponent(currentDetailForRefresh)) :
+                                            ''),
                                     method: 'GET',
                                     success: function(data) {
                                         function renderBarcodeGrid(barcodes, barcodeType,
@@ -4252,33 +5102,24 @@
                                             return html;
                                         }
                                         // Helper untuk update warna blok G, D, A di card utama setelah perubahan barcode
-                                        function updateGDAIndicators(prosesId, hasKain,
-                                            hasLa, hasAux) {
-                                            const $cards = $(
-                                                `.status-card[data-proses-id="${prosesId}"]`
-                                            );
-                                            if (!$cards.length) return;
+                                        function updateGDAIndicators(prosesId, detailId, hasKain, hasLa, hasAux) {
+                                            let $targets = $(`.status-card[data-proses-id="${prosesId}"] .op-row[data-detail-id="${detailId}"]`);
+                                            if (!$targets.length) {
+                                                $targets = $(`.status-card[data-proses-id="${prosesId}"]`);
+                                            }
+                                            if (!$targets.length) return;
 
-                                            $cards.each(function() {
+                                            $targets.each(function() {
                                                 const $card = $(this);
-                                                const prosesData = $card.data(
-                                                    'proses');
-                                                if (!prosesData || prosesData
-                                                    .jenis === 'Maintenance') {
-                                                    return; // Tidak ada G/D/A untuk Maintenance
-                                                }
 
-                                                function setBlockColor(blockType,
-                                                    ok) {
+                                                function setBlockColor(blockType, ok) {
                                                     const $block = $card.find(
                                                         `.gda-block[data-block-type="${blockType}"]`
                                                     );
                                                     if (!$block.length) return;
 
-                                                    const blockBg = ok ? '#d4f8e8' :
-                                                        '#ffb3b3';
-                                                    const blockBorder = ok ?
-                                                        '#43a047' : '#c62828';
+                                                    const blockBg = ok ? '#d4f8e8' : '#ffb3b3';
+                                                    const blockBorder = ok ? '#43a047' : '#c62828';
                                                     $block.css({
                                                         background: blockBg,
                                                         borderColor: blockBorder
@@ -4309,8 +5150,13 @@
                                             bk => !bk.cancel);
                                         const hasAuxActive = (data.barcode_aux || []).some(
                                             bk => !bk.cancel);
-                                        updateGDAIndicators(currentProsesForRefresh,
-                                            hasKainActive, hasLaActive, hasAuxActive);
+                                        updateGDAIndicators(
+                                            currentProsesForRefresh,
+                                            currentDetailForRefresh,
+                                            hasKainActive,
+                                            hasLaActive,
+                                            hasAuxActive
+                                        );
                                     },
                                     error: function() {
                                         showToastNotification('error',

@@ -4,57 +4,88 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Models\Activity;
 use Illuminate\Support\Facades\Auth;
 
-class Proses extends Model
+class DetailProses extends Model
 {
-    use HasFactory, SoftDeletes, LogsActivity;
+    use HasFactory, LogsActivity;
 
     protected $fillable = [
-        'jenis',
-        'jenis_op',
-        'cycle_time',
-        'cycle_time_actual',
-        'mulai',
-        'selesai',
-        'mesin_id',
-        'order',
+        'proses_id',
+        'no_op',
+        'item_op',
+        'kode_material',
+        'konstruksi',
+        'no_partai',
+        'gramasi',
+        'lebar',
+        'hfeel',
+        'warna',
+        'kode_warna',
+        'kategori_warna',
+        'qty',
+        'roll',
     ];
 
-    protected $casts = [
-        'mulai' => 'datetime',
-        'selesai' => 'datetime',
-        'cycle_time' => 'integer',
-        'cycle_time_actual' => 'integer',
-        'order' => 'integer',
-    ];
-
-    public function mesin()
-    {
-        return $this->belongsTo(Mesin::class);
-    }
-    public function details()
-    {
-        return $this->hasMany(DetailProses::class);
-    }
-    public function approvals()
-    {
-        return $this->hasMany(Approval::class, 'proses_id', 'id');
-    }
-    
     /**
-     * Konfigurasi logging untuk model Proses.
+     * Relasi ke model Proses
+     */
+    public function proses()
+    {
+        return $this->belongsTo(Proses::class);
+    }
+
+    /**
+     * Relasi ke BarcodeKain
+     */
+    public function barcodeKains()
+    {
+        return $this->hasMany(BarcodeKain::class, 'detail_proses_id', 'id');
+    }
+
+    /**
+     * Relasi ke BarcodeLa
+     */
+    public function barcodeLas()
+    {
+        return $this->hasMany(BarcodeLa::class, 'detail_proses_id', 'id');
+    }
+
+    /**
+     * Relasi ke BarcodeAux
+     */
+    public function barcodeAuxs()
+    {
+        return $this->hasMany(BarcodeAux::class, 'detail_proses_id', 'id');
+    }
+
+    /**
+     * Konfigurasi logging untuk model DetailProses.
      */
     public function getActivitylogOptions(): LogOptions
     {
-        $logFields = ['jenis', 'jenis_op', 'cycle_time', 'cycle_time_actual', 'mulai', 'selesai', 'mesin_id', 'order'];
+        $logFields = [
+            'proses_id',
+            'no_op',
+            'item_op',
+            'kode_material',
+            'konstruksi',
+            'no_partai',
+            'gramasi',
+            'lebar',
+            'hfeel',
+            'warna',
+            'kode_warna',
+            'kategori_warna',
+            'qty',
+            'roll',
+        ];
 
         return LogOptions::defaults()
-            ->useLogName('Manajemen Proses')
+            ->useLogName('Manajemen DetailProses')
             ->logOnly($logFields)
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs();
@@ -65,7 +96,7 @@ class Proses extends Model
      */
     public function tapActivity(Activity $activity, string $eventName): void
     {
-        if (! in_array($eventName, ['created', 'updated', 'deleted'])) {
+        if (! in_array($eventName, ['created', 'deleted'])) {
             return;
         }
 
@@ -91,19 +122,25 @@ class Proses extends Model
         ];
 
         $baseData = [
-            'jenis' => $this->jenis,
-            'jenis_op' => $this->jenis_op,
-            'cycle_time' => $this->cycle_time,
-            'cycle_time_actual' => $this->cycle_time_actual,
-            'mulai' => $this->mulai,
-            'selesai' => $this->selesai,
-            'mesin_id' => $this->mesin->jenis_mesin,
-            'order' => $this->order,
+            'proses_id' => $this->proses_id,
+            'no_op' => $this->no_op,
+            'item_op' => $this->item_op,
+            'kode_material' => $this->kode_material,
+            'konstruksi' => $this->konstruksi,
+            'no_partai' => $this->no_partai,
+            'gramasi' => $this->gramasi,
+            'lebar' => $this->lebar,
+            'hfeel' => $this->hfeel,
+            'warna' => $this->warna,
+            'kode_warna' => $this->kode_warna,
+            'kategori_warna' => $this->kategori_warna,
+            'qty' => $this->qty,
+            'roll' => $this->roll,
         ];
 
         switch ($eventName) {
             case 'created':
-                $activity->description = "Proses '{$this->jenis}' berhasil dibuat";
+                $activity->description = "DetailProses '{$this->no_op}' berhasil dibuat";
                 $activity->properties = $activity->properties->merge([
                     'event_type' => 'created',
                     'created_data' => array_merge($baseData, [
@@ -114,28 +151,8 @@ class Proses extends Model
                 ]);
                 break;
 
-            case 'updated':
-                $changes = $this->getChanges();
-
-                if (empty($changes)) {
-                    return;
-                }
-
-                $original = array_intersect_key($this->getOriginal(), $changes);
-
-                $activity->description = "Proses '{$this->jenis}' berhasil diperbarui";
-                $activity->properties = $activity->properties->merge([
-                    'event_type' => 'updated',
-                    'before_update' => $original,
-                    'after_update' => $changes,
-                    'updated_fields' => array_keys($changes),
-                    'causer_info' => $causerInfo,
-                    'timestamp_info' => $timestampInfo,
-                ]);
-                break;
-
             case 'deleted':
-                $activity->description = "Proses '{$this->jenis}' telah dihapus";
+                $activity->description = "DetailProses '{$this->no_op}' telah dihapus";
                 $activity->properties = $activity->properties->merge([
                     'event_type' => 'deleted',
                     'deleted_data' => array_merge($baseData, [

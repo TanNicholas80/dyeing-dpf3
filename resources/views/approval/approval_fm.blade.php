@@ -64,7 +64,27 @@
                                             @if($approval->action === 'create_aux_reprocess' && $approval->auxl)
                                             <strong>{{ $approval->auxl->barcode ?? 'AUXL' }}</strong>
                                             @else
-                                            <strong>{{ $approval->proses->no_op ?? 'MAINTENANCE' }}</strong>
+                                            @php
+                                            // Ambil no_op dari DetailProses jika ada, atau dari history_data, atau fallback ke MAINTENANCE
+                                            $noOpDisplay = 'MAINTENANCE';
+                                            if ($approval->proses) {
+                                                $firstDetail = $approval->proses->details->first();
+                                                if ($firstDetail) {
+                                                    $noOpDisplay = $firstDetail->no_op ?? 'MAINTENANCE';
+                                                    // Jika ada multiple OP, tambahkan indikator
+                                                    if ($approval->proses->details->count() > 1) {
+                                                        $noOpDisplay .= ' (+' . ($approval->proses->details->count() - 1) . ' OP)';
+                                                    }
+                                                } elseif ($approval->history_data && isset($approval->history_data['detail_proses_snapshot']) && !empty($approval->history_data['detail_proses_snapshot'])) {
+                                                    $firstDetailSnapshot = $approval->history_data['detail_proses_snapshot'][0];
+                                                    $noOpDisplay = $firstDetailSnapshot['no_op'] ?? 'MAINTENANCE';
+                                                    if (count($approval->history_data['detail_proses_snapshot']) > 1) {
+                                                        $noOpDisplay .= ' (+' . (count($approval->history_data['detail_proses_snapshot']) - 1) . ' OP)';
+                                                    }
+                                                }
+                                            }
+                                            @endphp
+                                            <strong>{{ $noOpDisplay }}</strong>
                                             @endif
                                         </td>
                                         <td>
@@ -158,7 +178,20 @@
                                                         @if($approval->action === 'create_aux_reprocess' && $approval->auxl)
                                                         {{ $approval->auxl->barcode ?? 'AUXL' }}
                                                         @else
-                                                        {{ $approval->proses->no_op ?? 'MAINTENANCE' }}
+                                                        @php
+                                                        // Ambil no_op dari DetailProses jika ada, atau dari history_data, atau fallback ke MAINTENANCE
+                                                        $noOpModal = 'MAINTENANCE';
+                                                        if ($approval->proses) {
+                                                            $firstDetail = $approval->proses->details->first();
+                                                            if ($firstDetail) {
+                                                                $noOpModal = $firstDetail->no_op ?? 'MAINTENANCE';
+                                                            } elseif ($approval->history_data && isset($approval->history_data['detail_proses_snapshot']) && !empty($approval->history_data['detail_proses_snapshot'])) {
+                                                                $firstDetailSnapshot = $approval->history_data['detail_proses_snapshot'][0];
+                                                                $noOpModal = $firstDetailSnapshot['no_op'] ?? 'MAINTENANCE';
+                                                            }
+                                                        }
+                                                        @endphp
+                                                        {{ $noOpModal }}
                                                         @endif
                                                     </h5>
                                                     <button type="button" class="close text-white" data-dismiss="modal">
@@ -241,6 +274,7 @@
                                                             </div>
                                                             @php
                                                             $prosesSnapshot = $history['proses_snapshot'] ?? [];
+                                                            $detailProsesSnapshots = $history['detail_proses_snapshot'] ?? [];
                                                             $oldMesin = isset($prosesSnapshot['mesin_id']) ? \App\Models\Mesin::find($prosesSnapshot['mesin_id']) : null;
                                                             @endphp
                                                             <div class="card border-danger mb-3">
@@ -248,14 +282,103 @@
                                                                     <h6 class="mb-0"><i class="fas fa-trash mr-2"></i>Detail Proses yang Akan Dihapus</h6>
                                                                 </div>
                                                                 <div class="card-body">
+                                                                    <!-- Informasi Proses Utama -->
+                                                                    <div class="row mb-3">
+                                                                        <div class="col-md-6 mb-3">
+                                                                            <strong class="text-muted d-block">Jenis</strong>
+                                                                            <span class="badge badge-secondary">{{ $prosesSnapshot['jenis'] ?? '-' }}</span>
+                                                                        </div>
+                                                                        @if(!empty($prosesSnapshot['cycle_time']))
+                                                                        <div class="col-md-6 mb-3">
+                                                                            <strong class="text-muted d-block">Cycle Time</strong>
+                                                                            <span class="badge badge-info">{{ detikKeWaktu($prosesSnapshot['cycle_time']) }}</span>
+                                                                        </div>
+                                                                        @endif
+                                                                        @if(!empty($prosesSnapshot['mesin_id']))
+                                                                        <div class="col-md-6 mb-3">
+                                                                            <strong class="text-muted d-block">Mesin</strong>
+                                                                            @if($oldMesin)
+                                                                            <span class="badge badge-info">{{ $oldMesin->jenis_mesin }}</span>
+                                                                            @else
+                                                                            <span class="text-muted">ID: {{ $prosesSnapshot['mesin_id'] }}</span>
+                                                                            @endif
+                                                                        </div>
+                                                                        @endif
+                                                                    </div>
+                                                                    
+                                                                    <!-- Detail Proses (OP) -->
+                                                                    @if(!empty($detailProsesSnapshots))
+                                                                    <hr class="my-3">
+                                                                    <h6 class="mb-3">
+                                                                        <i class="fas fa-list mr-2"></i>
+                                                                        <strong>Detail OP</strong>
+                                                                        <span class="badge badge-secondary ml-2">{{ count($detailProsesSnapshots) }} OP</span>
+                                                                    </h6>
+                                                                    @foreach($detailProsesSnapshots as $index => $detailSnapshot)
+                                                                    <div class="card border-left border-primary mb-3">
+                                                                        <div class="card-body">
+                                                                            <h6 class="mb-3">
+                                                                                <span class="badge badge-primary mr-2">OP #{{ $index + 1 }}</span>
+                                                                                <strong>{{ $detailSnapshot['no_op'] ?? '-' }}</strong>
+                                                                            </h6>
+                                                                            <div class="row">
+                                                                                @if(!empty($detailSnapshot['no_partai']))
+                                                                                <div class="col-md-6 mb-2">
+                                                                                    <strong class="text-muted d-block">No Partai</strong>
+                                                                                    <span>{{ $detailSnapshot['no_partai'] }}</span>
+                                                                                </div>
+                                                                                @endif
+                                                                                @if(!empty($detailSnapshot['item_op']))
+                                                                                <div class="col-md-6 mb-2">
+                                                                                    <strong class="text-muted d-block">Item OP</strong>
+                                                                                    <span>{{ $detailSnapshot['item_op'] }}</span>
+                                                                                </div>
+                                                                                @endif
+                                                                                @if(!empty($detailSnapshot['konstruksi']))
+                                                                                <div class="col-md-6 mb-2">
+                                                                                    <strong class="text-muted d-block">Konstruksi</strong>
+                                                                                    <span>{{ $detailSnapshot['konstruksi'] }}</span>
+                                                                                </div>
+                                                                                @endif
+                                                                                @if(!empty($detailSnapshot['kode_material']))
+                                                                                <div class="col-md-6 mb-2">
+                                                                                    <strong class="text-muted d-block">Kode Material</strong>
+                                                                                    <span class="small">{{ $detailSnapshot['kode_material'] }}</span>
+                                                                                </div>
+                                                                                @endif
+                                                                                @if(!empty($detailSnapshot['warna']) || !empty($detailSnapshot['kode_warna']))
+                                                                                <div class="col-md-6 mb-2">
+                                                                                    <strong class="text-muted d-block">Warna</strong>
+                                                                                    <span>
+                                                                                        {{ $detailSnapshot['warna'] ?? '-' }}
+                                                                                        @if(!empty($detailSnapshot['kode_warna']))
+                                                                                        <small class="text-muted">({{ $detailSnapshot['kode_warna'] }})</small>
+                                                                                        @endif
+                                                                                    </span>
+                                                                                </div>
+                                                                                @endif
+                                                                                @if(!empty($detailSnapshot['qty']) || !empty($detailSnapshot['roll']))
+                                                                                <div class="col-md-6 mb-2">
+                                                                                    <strong class="text-muted d-block">Qty / Roll</strong>
+                                                                                    <span>
+                                                                                        {{ !empty($detailSnapshot['qty']) ? number_format($detailSnapshot['qty'], 2) : '-' }}
+                                                                                        @if(!empty($detailSnapshot['roll']))
+                                                                                        / {{ $detailSnapshot['roll'] }} roll
+                                                                                        @endif
+                                                                                    </span>
+                                                                                </div>
+                                                                                @endif
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                    @endforeach
+                                                                    @else
+                                                                    <!-- Fallback ke proses_snapshot lama (untuk backward compatibility) -->
+                                                                    <hr class="my-3">
                                                                     <div class="row">
                                                                         <div class="col-md-6 mb-3">
                                                                             <strong class="text-muted d-block">No OP</strong>
                                                                             <h5 class="mb-0">{{ $prosesSnapshot['no_op'] ?? '-' }}</h5>
-                                                                        </div>
-                                                                        <div class="col-md-6 mb-3">
-                                                                            <strong class="text-muted d-block">Jenis</strong>
-                                                                            <span class="badge badge-secondary">{{ $prosesSnapshot['jenis'] ?? '-' }}</span>
                                                                         </div>
                                                                         @if(!empty($prosesSnapshot['no_partai']))
                                                                         <div class="col-md-6 mb-3">
@@ -303,23 +426,8 @@
                                                                             </span>
                                                                         </div>
                                                                         @endif
-                                                                        @if(!empty($prosesSnapshot['cycle_time']))
-                                                                        <div class="col-md-6 mb-3">
-                                                                            <strong class="text-muted d-block">Cycle Time</strong>
-                                                                            <span class="badge badge-info">{{ detikKeWaktu($prosesSnapshot['cycle_time']) }}</span>
-                                                                        </div>
-                                                                        @endif
-                                                                        @if(!empty($prosesSnapshot['mesin_id']))
-                                                                        <div class="col-md-6 mb-3">
-                                                                            <strong class="text-muted d-block">Mesin</strong>
-                                                                            @if($oldMesin)
-                                                                            <span class="badge badge-info">{{ $oldMesin->jenis_mesin }}</span>
-                                                                            @else
-                                                                            <span class="text-muted">ID: {{ $prosesSnapshot['mesin_id'] }}</span>
-                                                                            @endif
-                                                                        </div>
-                                                                        @endif
                                                                     </div>
+                                                                    @endif
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -389,6 +497,7 @@
                                                             </div>
                                                             @php
                                                             $prosesSnapshot = $history['proses_snapshot'] ?? [];
+                                                            $detailProsesSnapshots = $history['detail_proses_snapshot'] ?? [];
                                                             $oldMesin = isset($prosesSnapshot['mesin_id']) ? \App\Models\Mesin::find($prosesSnapshot['mesin_id']) : null;
                                                             @endphp
                                                             <div class="card border-warning mb-3">
@@ -396,14 +505,103 @@
                                                                     <h6 class="mb-0"><i class="fas fa-redo mr-2"></i>Detail Proses Reproses (Tahap 1: Approval FM)</h6>
                                                                 </div>
                                                                 <div class="card-body">
+                                                                    <!-- Informasi Proses Utama -->
+                                                                    <div class="row mb-3">
+                                                                        <div class="col-md-6 mb-3">
+                                                                            <strong class="text-muted d-block">Jenis</strong>
+                                                                            <span class="badge badge-warning">{{ $prosesSnapshot['jenis'] ?? 'Reproses' }}</span>
+                                                                        </div>
+                                                                        @if(!empty($prosesSnapshot['cycle_time']))
+                                                                        <div class="col-md-6 mb-3">
+                                                                            <strong class="text-muted d-block">Cycle Time</strong>
+                                                                            <span class="badge badge-info">{{ detikKeWaktu($prosesSnapshot['cycle_time']) }}</span>
+                                                                        </div>
+                                                                        @endif
+                                                                        @if(!empty($prosesSnapshot['mesin_id']))
+                                                                        <div class="col-md-6 mb-3">
+                                                                            <strong class="text-muted d-block">Mesin</strong>
+                                                                            @if($oldMesin)
+                                                                            <span class="badge badge-info">{{ $oldMesin->jenis_mesin }}</span>
+                                                                            @else
+                                                                            <span class="text-muted">ID: {{ $prosesSnapshot['mesin_id'] }}</span>
+                                                                            @endif
+                                                                        </div>
+                                                                        @endif
+                                                                    </div>
+                                                                    
+                                                                    <!-- Detail Proses (OP) -->
+                                                                    @if(!empty($detailProsesSnapshots))
+                                                                    <hr class="my-3">
+                                                                    <h6 class="mb-3">
+                                                                        <i class="fas fa-list mr-2"></i>
+                                                                        <strong>Detail OP</strong>
+                                                                        <span class="badge badge-secondary ml-2">{{ count($detailProsesSnapshots) }} OP</span>
+                                                                    </h6>
+                                                                    @foreach($detailProsesSnapshots as $index => $detailSnapshot)
+                                                                    <div class="card border-left border-warning mb-3">
+                                                                        <div class="card-body">
+                                                                            <h6 class="mb-3">
+                                                                                <span class="badge badge-warning mr-2">OP #{{ $index + 1 }}</span>
+                                                                                <strong>{{ $detailSnapshot['no_op'] ?? '-' }}</strong>
+                                                                            </h6>
+                                                                            <div class="row">
+                                                                                @if(!empty($detailSnapshot['no_partai']))
+                                                                                <div class="col-md-6 mb-2">
+                                                                                    <strong class="text-muted d-block">No Partai</strong>
+                                                                                    <span>{{ $detailSnapshot['no_partai'] }}</span>
+                                                                                </div>
+                                                                                @endif
+                                                                                @if(!empty($detailSnapshot['item_op']))
+                                                                                <div class="col-md-6 mb-2">
+                                                                                    <strong class="text-muted d-block">Item OP</strong>
+                                                                                    <span>{{ $detailSnapshot['item_op'] }}</span>
+                                                                                </div>
+                                                                                @endif
+                                                                                @if(!empty($detailSnapshot['konstruksi']))
+                                                                                <div class="col-md-6 mb-2">
+                                                                                    <strong class="text-muted d-block">Konstruksi</strong>
+                                                                                    <span>{{ $detailSnapshot['konstruksi'] }}</span>
+                                                                                </div>
+                                                                                @endif
+                                                                                @if(!empty($detailSnapshot['kode_material']))
+                                                                                <div class="col-md-6 mb-2">
+                                                                                    <strong class="text-muted d-block">Kode Material</strong>
+                                                                                    <span class="small">{{ $detailSnapshot['kode_material'] }}</span>
+                                                                                </div>
+                                                                                @endif
+                                                                                @if(!empty($detailSnapshot['warna']) || !empty($detailSnapshot['kode_warna']))
+                                                                                <div class="col-md-6 mb-2">
+                                                                                    <strong class="text-muted d-block">Warna</strong>
+                                                                                    <span>
+                                                                                        {{ $detailSnapshot['warna'] ?? '-' }}
+                                                                                        @if(!empty($detailSnapshot['kode_warna']))
+                                                                                        <small class="text-muted">({{ $detailSnapshot['kode_warna'] }})</small>
+                                                                                        @endif
+                                                                                    </span>
+                                                                                </div>
+                                                                                @endif
+                                                                                @if(!empty($detailSnapshot['qty']) || !empty($detailSnapshot['roll']))
+                                                                                <div class="col-md-6 mb-2">
+                                                                                    <strong class="text-muted d-block">Qty / Roll</strong>
+                                                                                    <span>
+                                                                                        {{ !empty($detailSnapshot['qty']) ? number_format($detailSnapshot['qty'], 2) : '-' }}
+                                                                                        @if(!empty($detailSnapshot['roll']))
+                                                                                        / {{ $detailSnapshot['roll'] }} roll
+                                                                                        @endif
+                                                                                    </span>
+                                                                                </div>
+                                                                                @endif
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                    @endforeach
+                                                                    @else
+                                                                    <!-- Fallback ke proses_snapshot lama (untuk backward compatibility) -->
+                                                                    <hr class="my-3">
                                                                     <div class="row">
                                                                         <div class="col-md-6 mb-3">
                                                                             <strong class="text-muted d-block">No OP</strong>
                                                                             <h5 class="mb-0">{{ $prosesSnapshot['no_op'] ?? '-' }}</h5>
-                                                                        </div>
-                                                                        <div class="col-md-6 mb-3">
-                                                                            <strong class="text-muted d-block">Jenis</strong>
-                                                                            <span class="badge badge-warning">{{ $prosesSnapshot['jenis'] ?? 'Reproses' }}</span>
                                                                         </div>
                                                                         @if(!empty($prosesSnapshot['no_partai']))
                                                                         <div class="col-md-6 mb-3">
@@ -451,23 +649,8 @@
                                                                             </span>
                                                                         </div>
                                                                         @endif
-                                                                        @if(!empty($prosesSnapshot['cycle_time']))
-                                                                        <div class="col-md-6 mb-3">
-                                                                            <strong class="text-muted d-block">Cycle Time</strong>
-                                                                            <span class="badge badge-info">{{ detikKeWaktu($prosesSnapshot['cycle_time']) }}</span>
-                                                                        </div>
-                                                                        @endif
-                                                                        @if(!empty($prosesSnapshot['mesin_id']))
-                                                                        <div class="col-md-6 mb-3">
-                                                                            <strong class="text-muted d-block">Mesin</strong>
-                                                                            @if($oldMesin)
-                                                                            <span class="badge badge-info">{{ $oldMesin->jenis_mesin }}</span>
-                                                                            @else
-                                                                            <span class="text-muted">ID: {{ $prosesSnapshot['mesin_id'] }}</span>
-                                                                            @endif
-                                                                        </div>
-                                                                        @endif
                                                                     </div>
+                                                                    @endif
                                                                 </div>
                                                             </div>
                                                             <div class="alert alert-info mb-0">
@@ -655,9 +838,19 @@
                                                                             <div class="p-3 bg-light rounded border-left border-warning border-3">
                                                                                 <small class="text-muted d-block mb-1">Proses yang Dipindahkan</small>
                                                                                 <h6 class="mb-1">
-                                                                                    <strong>{{ $proses1->no_op ?? 'MAINTENANCE' }}</strong>
-                                                                                    @if($proses1 && $proses1->jenis !== 'Maintenance' && $proses1->warna)
-                                                                                    <br><small class="text-muted">{{ $proses1->warna }}</small>
+                                                                                    @php
+                                                                                    $proses1NoOp = 'MAINTENANCE';
+                                                                                    $proses1Details = $proses1 ? $proses1->details : collect();
+                                                                                    if ($proses1Details->isNotEmpty()) {
+                                                                                        $proses1NoOp = $proses1Details->first()->no_op ?? 'MAINTENANCE';
+                                                                                        if ($proses1Details->count() > 1) {
+                                                                                            $proses1NoOp .= ' (+' . ($proses1Details->count() - 1) . ' OP)';
+                                                                                        }
+                                                                                    }
+                                                                                    @endphp
+                                                                                    <strong>{{ $proses1NoOp }}</strong>
+                                                                                    @if($proses1Details->isNotEmpty() && $proses1Details->first()->warna)
+                                                                                    <br><small class="text-muted">{{ $proses1Details->first()->warna }}</small>
                                                                                     @endif
                                                                                 </h6>
                                                                                 <div class="mt-2">
@@ -673,9 +866,19 @@
                                                                             <div class="p-3 bg-light rounded border-left border-info border-3">
                                                                                 <small class="text-muted d-block mb-1">Proses Tujuan</small>
                                                                                 <h6 class="mb-1">
-                                                                                    <strong>{{ $proses2->no_op ?? 'MAINTENANCE' }}</strong>
-                                                                                    @if($proses2 && $proses2->jenis !== 'Maintenance' && $proses2->warna)
-                                                                                    <br><small class="text-muted">{{ $proses2->warna }}</small>
+                                                                                    @php
+                                                                                    $proses2NoOp = 'MAINTENANCE';
+                                                                                    $proses2Details = $proses2 ? $proses2->details : collect();
+                                                                                    if ($proses2Details->isNotEmpty()) {
+                                                                                        $proses2NoOp = $proses2Details->first()->no_op ?? 'MAINTENANCE';
+                                                                                        if ($proses2Details->count() > 1) {
+                                                                                            $proses2NoOp .= ' (+' . ($proses2Details->count() - 1) . ' OP)';
+                                                                                        }
+                                                                                    }
+                                                                                    @endphp
+                                                                                    <strong>{{ $proses2NoOp }}</strong>
+                                                                                    @if($proses2Details->isNotEmpty() && $proses2Details->first()->warna)
+                                                                                    <br><small class="text-muted">{{ $proses2Details->first()->warna }}</small>
                                                                                     @endif
                                                                                 </h6>
                                                                                 <div class="mt-2">
@@ -709,10 +912,20 @@
                                                                             <small class="text-muted d-block mb-2"><i class="fas fa-arrow-left mr-1"></i>Sebelum:</small>
                                                                             <div class="p-2 bg-light rounded">
                                                                                 @foreach($affectedProses->sortBy('order') as $p)
+                                                                                @php
+                                                                                $pDetailsBefore = $p ? $p->details : collect();
+                                                                                $pNoOpBefore = 'MAINTENANCE';
+                                                                                if ($pDetailsBefore->isNotEmpty()) {
+                                                                                    $pNoOpBefore = $pDetailsBefore->first()->no_op ?? 'MAINTENANCE';
+                                                                                    if ($pDetailsBefore->count() > 1) {
+                                                                                        $pNoOpBefore .= ' (+' . ($pDetailsBefore->count() - 1) . ')';
+                                                                                    }
+                                                                                }
+                                                                                @endphp
                                                                                 <div class="mb-1">
                                                                                     <span class="badge badge-secondary">#{{ $p->order ?? '-' }}</span> 
                                                                                     <strong class="{{ $p->id == $proses1Id ? 'text-warning' : ($p->id == $proses2Id ? 'text-info' : '') }}">
-                                                                                        {{ $p->no_op ?? 'MAINTENANCE' }}
+                                                                                        {{ $pNoOpBefore }}
                                                                                     </strong>
                                                                                     @if($p->id == $proses1Id)
                                                                                     <small class="badge badge-warning">Akan dipindah</small>
@@ -743,11 +956,21 @@
                                                                                 $sortedAfter = $sortedAfter->sortBy('order');
                                                                                 @endphp
                                                                                 @foreach($sortedAfter as $item)
-                                                                                @php $p = $item->proses; @endphp
+                                                                                @php 
+                                                                                $p = $item->proses;
+                                                                                $pDetails = $p ? $p->details : collect();
+                                                                                $pNoOp = 'MAINTENANCE';
+                                                                                if ($pDetails->isNotEmpty()) {
+                                                                                    $pNoOp = $pDetails->first()->no_op ?? 'MAINTENANCE';
+                                                                                    if ($pDetails->count() > 1) {
+                                                                                        $pNoOp .= ' (+' . ($pDetails->count() - 1) . ')';
+                                                                                    }
+                                                                                }
+                                                                                @endphp
                                                                                 <div class="mb-1">
                                                                                     <span class="badge {{ $item->isMoved ? 'badge-success' : 'badge-secondary' }}">#{{ $item->order }}</span> 
                                                                                     <strong class="{{ $p->id == $proses1Id ? 'text-success' : ($p->id == $proses2Id ? 'text-info' : '') }}">
-                                                                                        {{ $p->no_op ?? 'MAINTENANCE' }}
+                                                                                        {{ $pNoOp }}
                                                                                     </strong>
                                                                                     @if($p->id == $proses1Id)
                                                                                     <small class="badge badge-success">Dipindah</small>
@@ -834,7 +1057,19 @@
                                                             @if($approval->action === 'create_aux_reprocess' && $approval->auxl)
                                                             {{ $approval->auxl->barcode ?? 'AUXL' }}
                                                             @else
-                                                            {{ $approval->proses->no_op ?? 'MAINTENANCE' }}
+                                                            @php
+                                                            $noOpModalNoteFM = 'MAINTENANCE';
+                                                            if ($approval->proses) {
+                                                                $firstDetail = $approval->proses->details->first();
+                                                                if ($firstDetail) {
+                                                                    $noOpModalNoteFM = $firstDetail->no_op ?? 'MAINTENANCE';
+                                                                } elseif ($approval->history_data && isset($approval->history_data['detail_proses_snapshot']) && !empty($approval->history_data['detail_proses_snapshot'])) {
+                                                                    $firstDetailSnapshot = $approval->history_data['detail_proses_snapshot'][0];
+                                                                    $noOpModalNoteFM = $firstDetailSnapshot['no_op'] ?? 'MAINTENANCE';
+                                                                }
+                                                            }
+                                                            @endphp
+                                                            {{ $noOpModalNoteFM }}
                                                             @endif
                                                         </span>
                                                     </div>
@@ -895,7 +1130,19 @@
                                                             @if($approval->action === 'create_aux_reprocess' && $approval->auxl)
                                                             {{ $approval->auxl->barcode ?? 'AUXL' }}
                                                             @else
-                                                            {{ $approval->proses->no_op ?? 'MAINTENANCE' }}
+                                                            @php
+                                                            $noOpModalNoteFM = 'MAINTENANCE';
+                                                            if ($approval->proses) {
+                                                                $firstDetail = $approval->proses->details->first();
+                                                                if ($firstDetail) {
+                                                                    $noOpModalNoteFM = $firstDetail->no_op ?? 'MAINTENANCE';
+                                                                } elseif ($approval->history_data && isset($approval->history_data['detail_proses_snapshot']) && !empty($approval->history_data['detail_proses_snapshot'])) {
+                                                                    $firstDetailSnapshot = $approval->history_data['detail_proses_snapshot'][0];
+                                                                    $noOpModalNoteFM = $firstDetailSnapshot['no_op'] ?? 'MAINTENANCE';
+                                                                }
+                                                            }
+                                                            @endphp
+                                                            {{ $noOpModalNoteFM }}
                                                             @endif
                                                         </p>
                                                         <p><strong>Action:</strong> {{ $actionLabel }}</p>
@@ -939,7 +1186,19 @@
                                                             @if($approval->action === 'create_aux_reprocess' && $approval->auxl)
                                                             {{ $approval->auxl->barcode ?? 'AUXL' }}
                                                             @else
-                                                            {{ $approval->proses->no_op ?? 'MAINTENANCE' }}
+                                                            @php
+                                                            $noOpModalNoteFM = 'MAINTENANCE';
+                                                            if ($approval->proses) {
+                                                                $firstDetail = $approval->proses->details->first();
+                                                                if ($firstDetail) {
+                                                                    $noOpModalNoteFM = $firstDetail->no_op ?? 'MAINTENANCE';
+                                                                } elseif ($approval->history_data && isset($approval->history_data['detail_proses_snapshot']) && !empty($approval->history_data['detail_proses_snapshot'])) {
+                                                                    $firstDetailSnapshot = $approval->history_data['detail_proses_snapshot'][0];
+                                                                    $noOpModalNoteFM = $firstDetailSnapshot['no_op'] ?? 'MAINTENANCE';
+                                                                }
+                                                            }
+                                                            @endphp
+                                                            {{ $noOpModalNoteFM }}
                                                             @endif
                                                         </p>
                                                         <p><strong>Action:</strong> {{ $actionLabel }}</p>
