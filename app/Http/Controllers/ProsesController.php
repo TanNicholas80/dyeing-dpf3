@@ -125,7 +125,7 @@ class ProsesController extends Controller
                 ->max('order') ?? 0;
 
             $validated['order'] = $maxOrder + 1;
-            
+
             // Buat Proses seperti biasa
             $proses = Proses::create($validated);
 
@@ -175,10 +175,10 @@ class ProsesController extends Controller
         try {
             $client = new \GuzzleHttp\Client();
             $response = $client->post(
-                'http://18.140.227.2:8000/sap/bc/zdyes/zterima_op?sap-client=310',
+                'http://18.139.142.16:8020/sap/bc/zdyes/zterima_op?sap-client=100',
                 [
                     'headers' => [
-                        'Authorization' => 'Basic RFRfRFZEOkFxdWluYWxkbzc=',
+                        'Authorization' => 'Basic RFRfV01TOldtczAxMTEyMDI1QA==',
                         'Content-Type' => 'text/plain',
                         'Accept' => 'application/json',
                     ],
@@ -211,22 +211,27 @@ class ProsesController extends Controller
     public function barcodeKain(Request $request, $id)
     {
         $request->validate([
-            'barcode' => 'required|string|max:255',
+            'barcode' => 'required|string|max:255|unique:barcode_kain,barcode',
         ]);
         try {
             $proses = Proses::findOrFail($id);
             $barcode = $request->barcode;
+            // Potong barcode agar maksimal 10 digit
+            $barcode = substr($barcode, 0, 10);
+            Log::info('BarcodeKain: Barcode received and trimmed', ['original' => $request->barcode, 'trimmed' => $barcode, 'proses_id' => $id]);
             $no_op = $proses->no_op;
             $no_partai = $proses->no_partai;
             $mesin_id = $proses->mesin_id;
-            $payload = $barcode . ';' . $no_op;
+            $item_op = $proses->item_op;
+            $payload = $barcode . '-' . $item_op . ';' . $no_op;
+            Log::info('BarcodeKain: Payload prepared', ['payload' => $payload]);
             $client = new \GuzzleHttp\Client();
             $body = json_encode($payload);
             $response = $client->post(
-                'http://18.140.227.2:8000/sap/bc/zdyes/zterima_data?sap-client=310',
+                'http://18.139.142.16:8020/sap/bc/zdyes/zterima_data?sap-client=100',
                 [
                     'headers' => [
-                        'Authorization' => 'Basic RFRfRFZEOkFxdWluYWxkbzc=',
+                        'Authorization' => 'Basic RFRfV01TOldtczAxMTEyMDI1QA==',
                         'Content-Type' => 'text/plain',
                         'Accept' => 'application/json',
                     ],
@@ -235,13 +240,16 @@ class ProsesController extends Controller
                 ]
             );
             $data = json_decode($response->getBody(), true);
+            Log::info('BarcodeKain: API Response', ['response' => $data]);
             if (!is_array($data) || !isset($data[0]['stats'])) {
                 $errorMsg = 'Gagal validasi barcode: response tidak valid';
+                Log::error('BarcodeKain: Invalid response', ['data' => $data]);
                 return back()->withInput()->with('error', $errorMsg);
             }
             if ($data[0]['stats'] !== 'success') {
                 $errorMsg = $data[0]['stats'] ?: 'Barcode tidak dapat digunakan';
-                return back()->withInput()->with('error', $errorMsg);
+                Log::error('BarcodeKain: API stats not success', ['stats' => $data[0]['stats']]);
+                return redirect()->route('dashboard')->with('error', $errorMsg);
             }
             // Sukses, simpan ke tabel barcode_kain
             \App\Models\BarcodeKain::create([
@@ -253,17 +261,19 @@ class ProsesController extends Controller
                 'mesin_id' => $mesin_id,
                 'cancel' => false,
             ]);
+            Log::info('BarcodeKain: Successfully saved to database', ['barcode' => $barcode, 'proses_id' => $proses->id]);
             return redirect()->route('dashboard')->with('success', 'Barcode kain berhasil disimpan!');
         } catch (\Exception $e) {
+            Log::error('BarcodeKain: Exception occurred', ['error' => $e->getMessage(), 'proses_id' => $id]);
             $errorMsg = 'Gagal menyimpan barcode kain: ' . $e->getMessage();
-            return back()->withInput()->with('error', $errorMsg);
+            return redirect()->route('dashboard')->with('error', $errorMsg);
         }
     }
     // Simpan barcode la
     public function barcodeLa(Request $request, $id)
     {
         $request->validate([
-            'barcode' => 'required|string|max:255',
+            'barcode' => 'required|string|max:255|unique:barcode_la,barcode',
         ]);
         $referer = $request->headers->get('referer');
         $page = 1;
@@ -279,6 +289,7 @@ class ProsesController extends Controller
         try {
             $proses = Proses::findOrFail($id);
             $barcode = $request->barcode;
+            Log::info('BarcodeLa: Barcode received', ['barcode' => $barcode, 'proses_id' => $id]);
             $no_op = $proses->no_op;
             $no_partai = $proses->no_partai;
             $mesin_id = $proses->mesin_id;
@@ -288,22 +299,31 @@ class ProsesController extends Controller
                 ->where('ID_NO', $barcode)
                 ->select('PRODUCT_CODE', 'ACTUAL_WT')
                 ->get();
+            Log::info('BarcodeLa: Ticket data from SQL Server', ['tickets' => $tickets->toArray()]);
             if ($tickets->isEmpty()) {
                 $errorMsg = 'Barcode tidak ditemukan di database TICKET_DETAIL';
-                return back()->withInput()->with('error', $errorMsg);
+                Log::error('BarcodeLa: No ticket data found', ['barcode' => $barcode]);
+                return redirect()->route('dashboard', ['page' => $page])->with('error', $errorMsg);
             }
             // Format body untuk API
             $details = $tickets->map(function ($row) {
-                return $row->PRODUCT_CODE . '/' . ($row->ACTUAL_WT ?? 0);
+                // Cari ProductName berdasarkan PRODUCT_CODE di tabel PRODUCT
+                $product = DB::connection('sqlsrv')
+                    ->table('PRODUCT')
+                    ->where('ProductCode', $row->PRODUCT_CODE)
+                    ->first();
+                $productName = $product ? $product->ProductName : $row->PRODUCT_CODE; // Fallback ke PRODUCT_CODE jika tidak ditemukan
+                return $productName . '/' . ($row->ACTUAL_WT ?? 0);
             })->implode('|');
             $body = '"' . $no_op . ';' . $details . '"';
+            Log::info('BarcodeLa: API body prepared', ['body' => $body]);
             // Kirim ke API
             $client = new \GuzzleHttp\Client();
             $response = $client->post(
-                'http://18.140.227.2:8000/sap/bc/zdyes/zterima_kimia?sap-client=310',
+                'http://18.139.142.16:8020/sap/bc/zdyes/zterima_kimia?sap-client=100',
                 [
                     'headers' => [
-                        'Authorization' => 'Basic RFRfRFZEOkFxdWluYWxkbzc=',
+                        'Authorization' => 'Basic RFRfV01TOldtczAxMTEyMDI1QA==',
                         'Content-Type' => 'text/plain',
                         'Accept' => 'application/json',
                     ],
@@ -312,19 +332,22 @@ class ProsesController extends Controller
                 ]
             );
             $rawResponse = $response->getBody()->getContents();
-            Log::info('API Response for barcode LA:', ['body' => $body, 'response' => $rawResponse]);
+            Log::info('BarcodeLa: API Response', ['response' => $rawResponse]);
             $data = json_decode($rawResponse, true);
             if (empty($data)) {
                 $errorMsg = 'Barcode atau detail kimia tidak dikenali oleh sistem SAP (API response kosong)';
+                Log::error('BarcodeLa: Empty API response');
                 return back()->withInput()->with('error', $errorMsg);
             }
             if (!is_array($data) || !isset($data[0]['stats'])) {
                 $errorMsg = 'Gagal validasi barcode: response tidak valid';
+                Log::error('BarcodeLa: Invalid API response', ['data' => $data]);
                 return back()->withInput()->with('error', $errorMsg);
             }
             if ($data[0]['stats'] !== 'success') {
                 $errorMsg = $data[0]['stats'] ?: 'Barcode tidak dapat digunakan';
-                return back()->withInput()->with('error', $errorMsg);
+                Log::error('BarcodeLa: API stats not success', ['stats' => $data[0]['stats']]);
+                return redirect()->route('dashboard', ['page' => $page])->with('error', $errorMsg);
             }
             // Sukses, simpan ke tabel barcode_la
             \App\Models\BarcodeLa::create([
@@ -336,18 +359,28 @@ class ProsesController extends Controller
                 'mesin_id' => $mesin_id,
                 'cancel' => false,
             ]);
+            Log::info('BarcodeLa: Successfully saved to database', ['barcode' => $barcode, 'proses_id' => $proses->id]);
             return redirect()->route('dashboard', ['page' => $page])
                 ->with('success', 'Barcode LA berhasil disimpan!');
         } catch (\Exception $e) {
-            $errorMsg = 'Gagal menyimpan barcode LA: ' . $e->getMessage();
-            return back()->withInput()->with('error', $errorMsg);
+            Log::error('BarcodeLa: Exception occurred', ['error' => $e->getMessage(), 'proses_id' => $id]);
+            // Jika timeout, jangan simpan karena tidak ada matdok dari SAP
+            if (str_contains($e->getMessage(), 'timed out') || str_contains($e->getMessage(), 'timeout')) {
+                $errorMsg = 'Timeout saat menghubungi SAP, barcode LA tidak disimpan. Coba lagi nanti.';
+                Log::info('BarcodeLa: Not saved due to timeout', ['barcode' => $barcode, 'proses_id' => $proses->id]);
+                return redirect()->route('dashboard', ['page' => $page])->with('error', $errorMsg);
+            } else {
+                $errorMsg = 'Gagal menyimpan barcode LA: ' . $e->getMessage();
+                return redirect()->route('dashboard', ['page' => $page])->with('error', $errorMsg);
+            }
         }
     }
+
     // Simpan barcode aux
     public function barcodeAux(Request $request, $id)
     {
         $request->validate([
-            'barcode' => 'required|string|max:255',
+            'barcode' => 'required|string|max:255|unique:barcode_aux,barcode',
         ]);
         $referer = $request->headers->get('referer');
         $page = 1;
@@ -366,12 +399,12 @@ class ProsesController extends Controller
             // Cari data auxl berdasarkan barcode (hanya untuk validasi & relasi detail)
             $auxl = \App\Models\Auxl::where('barcode', $barcode)->first();
             if (!$auxl) {
-                return back()->withInput()->with('error', 'Barcode tidak ditemukan di data auxiliary!');
+                return redirect()->route('dashboard', ['page' => $page])->with('error', 'Barcode tidak ditemukan di data auxiliary!');
             }
             // Ambil detail auxiliary
             $details = $auxl->details;
             if ($details->isEmpty()) {
-                return back()->withInput()->with('error', 'Data detail auxiliary tidak ditemukan!');
+                return redirect()->route('dashboard', ['page' => $page])->with('error', 'Data detail auxiliary tidak ditemukan!');
             }
             // Format: auxiliary/konsentrasi (konsentrasi dalam gram)
             $detailStr = $details->map(function ($d) {
@@ -383,10 +416,10 @@ class ProsesController extends Controller
             // Kirim ke API SAP
             $client = new \GuzzleHttp\Client();
             $response = $client->post(
-                'http://18.140.227.2:8000/sap/bc/zdyes/zterima_kimia?sap-client=310',
+                'http://18.139.142.16:8020/sap/bc/zdyes/zterima_kimia?sap-client=100',
                 [
                     'headers' => [
-                        'Authorization' => 'Basic RFRfRFZEOkFxdWluYWxkbzc=',
+                        'Authorization' => 'Basic RFRfV01TOldtczAxMTEyMDI1QA==',
                         'Content-Type' => 'text/plain',
                         'Accept' => 'application/json',
                     ],
@@ -405,7 +438,7 @@ class ProsesController extends Controller
             }
             if ($data[0]['stats'] !== 'success') {
                 $errorMsg = $data[0]['stats'] ?: 'Barcode tidak dapat digunakan';
-                return back()->withInput()->with('error', $errorMsg);
+                return redirect()->route('dashboard', ['page' => $page])->with('error', $errorMsg);
             }
             // Sukses, simpan ke tabel barcode_aux
             \App\Models\BarcodeAux::create([
@@ -420,8 +453,15 @@ class ProsesController extends Controller
             return redirect()->route('dashboard', ['page' => $page])
                 ->with('success', 'Barcode AUX berhasil disimpan & dikirim ke SAP!');
         } catch (\Exception $e) {
-            $errorMsg = 'Gagal menyimpan barcode AUX: ' . $e->getMessage();
-            return back()->withInput()->with('error', $errorMsg);
+            // Jika timeout, jangan simpan karena tidak ada matdok dari SAP
+            if (str_contains($e->getMessage(), 'timed out') || str_contains($e->getMessage(), 'timeout')) {
+                $errorMsg = 'Timeout saat menghubungi SAP, barcode AUX tidak disimpan. Coba lagi nanti.';
+                Log::info('BarcodeAux: Not saved due to timeout', ['barcode' => $barcode, 'proses_id' => $proses->id]);
+                return redirect()->route('dashboard', ['page' => $page])->with('error', $errorMsg);
+            } else {
+                $errorMsg = 'Gagal menyimpan barcode AUX: ' . $e->getMessage();
+                return redirect()->route('dashboard', ['page' => $page])->with('error', $errorMsg);
+            }
         }
     }
 
@@ -478,19 +518,19 @@ class ProsesController extends Controller
             $client = new \GuzzleHttp\Client();
             $body = '"' . $matdok . '"';
             Log::info('SAP Cancel Request', [
-                'url' => 'http://18.140.227.2:8000/sap/bc/zdyes/zterima_cancel?sap-client=310',
+                'url' => 'http://18.139.142.16:8020/sap/bc/zdyes/zterima_cancel?sap-client=100',
                 'headers' => [
-                    'Authorization' => 'Basic RFRfRFZEOkFxdWluYWxkbzc=',
+                    'Authorization' => 'Basic RFRfV01TOldtczAxMTEyMDI1QA==',
                     'Content-Type' => 'text/plain',
                     'Accept' => 'application/json',
                 ],
                 'body' => $body,
             ]);
             $response = $client->post(
-                'http://18.140.227.2:8000/sap/bc/zdyes/zterima_cancel?sap-client=310',
+                'http://18.139.142.16:8020/sap/bc/zdyes/zterima_cancel?sap-client=100',
                 [
                     'headers' => [
-                        'Authorization' => 'Basic RFRfRFZEOkFxdWluYWxkbzc=',
+                        'Authorization' => 'Basic RFRfV01TOldtczAxMTEyMDI1QA==',
                         'Content-Type' => 'text/plain',
                         'Accept' => 'application/json',
                     ],
@@ -891,7 +931,7 @@ class ProsesController extends Controller
         $affectedProsesIds = [$proses1->id, $proses2Id]; // Minimal kedua proses yang langsung terlibat
         $mesinId = $proses1->mesin_id;
         $affectedProses = collect([$proses1, $proses2]); // Inisialisasi dengan kedua proses yang terlibat
-        
+
         // Ambil semua proses pending di mesin yang sama untuk normalisasi order jika perlu
         $allPendingProses = Proses::where('mesin_id', $mesinId)
             ->whereNull('mulai')
@@ -899,7 +939,7 @@ class ProsesController extends Controller
             ->orderBy('order')
             ->orderBy('id')
             ->get();
-        
+
         // Jika order belum jelas, normalisasi dulu
         if ($order1 === 0 || $order2 === 0 || $allPendingProses->count() !== $allPendingProses->where('order', '>', 0)->count()) {
             $idx = 1;
@@ -907,18 +947,18 @@ class ProsesController extends Controller
                 $p->order = $idx++;
                 $p->save();
             }
-            
+
             $proses1->refresh();
             $proses2->refresh();
             $order1 = (int) ($proses1->order ?? 0);
             $order2 = (int) ($proses2->order ?? 0);
         }
-        
+
         // Tentukan rentang order yang akan terpengaruh
         if ($order1 !== $order2 && $order1 > 0 && $order2 > 0) {
             $minOrder = min($order1, $order2);
             $maxOrder = max($order1, $order2);
-            
+
             // Ambil semua proses yang berada di rentang tersebut (akan bergeser)
             // Termasuk proses yang berada di batas minOrder dan maxOrder
             $affectedProses = Proses::where('mesin_id', $mesinId)
@@ -927,10 +967,10 @@ class ProsesController extends Controller
                 ->where('order', '>=', $minOrder)
                 ->where('order', '<=', $maxOrder)
                 ->get();
-            
+
             $affectedProsesIds = $affectedProses->pluck('id')->toArray();
             $affectedProsesIds = array_unique($affectedProsesIds);
-            
+
             // Pastikan kedua proses yang langsung terlibat selalu ada di daftar
             if (!in_array($proses1->id, $affectedProsesIds)) {
                 $affectedProsesIds[] = $proses1->id;
@@ -970,7 +1010,7 @@ class ProsesController extends Controller
         if ($order1 !== $order2 && $order1 > 0 && $order2 > 0 && isset($affectedProses)) {
             $newOrder1 = $order2; // Proses1 akan pindah ke posisi order2
             $newOrder2 = $order1; // Proses2 akan pindah ke posisi order1
-            
+
             foreach ($affectedProses as $p) {
                 if ($p->id == $proses1->id) {
                     $affectedOrders[$p->id] = $newOrder1;
