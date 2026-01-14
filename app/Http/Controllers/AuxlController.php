@@ -155,4 +155,44 @@ class AuxlController extends Controller
             'requested_by'=> Auth::id(),
         ]);
     }
+
+    /**
+     * Proxy untuk Select2 auxiliary dari API eksternal.
+     * Route: POST /api/proxy-auxiliary
+     */
+    public function proxyAuxiliary(Request $request)
+    {
+        $q = $request->input('q', '');
+        if (strlen($q) < 3) {
+            return response()->json(['results' => []]);
+        }
+        try {
+            $client = new \GuzzleHttp\Client();
+            $response = $client->request('POST', 'http://18.139.142.16:8020/sap/bc/zdyes/zterima_zchm?sap-client=100', [
+                'headers' => [
+                    'Authorization' => 'Basic RFRfV01TOldtczAxMTEyMDI1QA==',
+                    'Content-Type' => 'text/plain',
+                    'Accept' => 'application/json',
+                ],
+                'body' => '"' . $q . '"',
+                'timeout' => 10,
+            ]);
+            $data = json_decode($response->getBody(), true);
+            $results = collect($data)
+                ->filter(function($item) use ($q) {
+                    return isset($item['matnr']);
+                })
+                ->map(function($item) {
+                    return [
+                        'id' => $item['matnr'],
+                        'text' => $item['matnr'],
+                    ];
+                })
+                ->values()
+                ->all();
+            return response()->json(['results' => $results]);
+        } catch (\Exception $e) {
+            return response()->json(['results' => []]);
+        }
+    }
 }
