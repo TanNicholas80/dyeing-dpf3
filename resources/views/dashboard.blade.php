@@ -4170,15 +4170,35 @@
                     if (!proses) return;
                     // Hanya update jika proses sedang berjalan (mulai ada, selesai null)
                     if (proses.mulai && !proses.selesai) {
-                        const mulai = new Date(proses.mulai.replace(/-/g, '/'));
+                        // Parse tanggal dengan lebih robust
+                        let mulai;
+                        if (typeof proses.mulai === 'string') {
+                            // Coba parse langsung (untuk format ISO seperti 2026-01-15T15:59:56.000000Z)
+                            mulai = new Date(proses.mulai);
+                            // Jika parsing gagal, coba dengan replace untuk format lama
+                            if (isNaN(mulai.getTime())) {
+                                mulai = new Date(proses.mulai.replace(/-/g, '/'));
+                            }
+                        } else {
+                            mulai = new Date(proses.mulai);
+                        }
+                        
+                        // Validasi: pastikan tanggal valid sebelum menghitung
+                        if (isNaN(mulai.getTime())) {
+                            console.warn('Invalid date format:', proses.mulai);
+                            return; // Skip jika tanggal tidak valid
+                        }
+                        
                         const now = new Date();
                         let diff = Math.floor((now - mulai) / 1000);
                         if (diff < 0) diff = 0;
+                        
                         // Format ke HH:MM:SS
                         const jam = Math.floor(diff / 3600).toString().padStart(2, '0');
                         const menit = Math.floor((diff % 3600) / 60).toString().padStart(2, '0');
                         const detik = (diff % 60).toString().padStart(2, '0');
                         const waktuStr = `${jam}:${menit}:${detik}`;
+                        
                         // Update elemen waktu berjalan di card-time (span pertama)
                         $(this).find('.card-time span').eq(0).text(waktuStr);
                     }
@@ -4932,14 +4952,17 @@
             $('#jenis_op').trigger('change');
 
             // Validasi tambahan saat submit form:
-            // Jika jenis_op = Multiple maka jumlah Detail OP harus >= 2
+            // 1. Jika jenis_op = Multiple maka jumlah Detail OP harus >= 2
+            // 2. Cek duplikasi No Partai di dalam satu proses (front-end)
             $('#formProses').on('submit', function(e) {
                 const jenisOp = $('#jenis_op').val();
+                const jenisProses = $('[name="jenis"]').val();
+
+                // Validasi Multiple OP
                 if (jenisOp === 'Multiple') {
                     const detailCount = $('#detail-proses-container .detail-proses-item').length;
                     if (detailCount < 2) {
                         e.preventDefault();
-                        // Gunakan SweetAlert untuk validasi Multiple OP
                         Swal.fire({
                             icon: 'warning',
                             title: 'Detail OP kurang',
@@ -4948,6 +4971,68 @@
                         });
                         return false;
                     }
+                }
+
+                // Validasi duplikasi No Partai dalam 1 proses (Produksi / Reproses)
+                if (jenisProses !== 'Maintenance') {
+                    const noPartaiList = [];
+                    const duplicatePartai = [];
+
+                    $('#detail-proses-container .detail-proses-item').each(function() {
+                        const noPartai = $(this).find('[name*=\"[no_partai]\"]').val();
+                        if (noPartai && noPartai.trim() !== '') {
+                            if (noPartaiList.includes(noPartai)) {
+                                if (!duplicatePartai.includes(noPartai)) {
+                                    duplicatePartai.push(noPartai);
+                                }
+                            } else {
+                                noPartaiList.push(noPartai);
+                            }
+                        }
+                    });
+
+                    if (duplicatePartai.length > 0) {
+                        e.preventDefault();
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'No Partai duplikat',
+                            html: 'No Partai tidak boleh duplikat dalam satu proses.<br><strong>Partai duplikat:</strong> ' + duplicatePartai.join(', '),
+                            confirmButtonText: 'OK'
+                        });
+                        return false;
+                    }
+                }
+            });
+
+            // Validasi realtime: cegah user memilih No Partai yang sama di dua Detail OP dalam 1 proses
+            $(document).on('change', '#detail-proses-container [name*=\"[no_partai]\"]', function() {
+                const $select = $(this);
+                const selectedPartai = $select.val();
+                const jenisProses = $('[name=\"jenis\"]').val();
+
+                if (!selectedPartai || jenisProses === 'Maintenance') {
+                    return;
+                }
+
+                let isDuplicate = false;
+                $('#detail-proses-container .detail-proses-item').each(function() {
+                    const $otherSelect = $(this).find('[name*=\"[no_partai]\"]');
+                    if ($otherSelect.length && $otherSelect[0] !== $select[0]) {
+                        if ($otherSelect.val() === selectedPartai) {
+                            isDuplicate = true;
+                            return false; // break
+                        }
+                    }
+                });
+
+                if (isDuplicate) {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'No Partai duplikat',
+                        text: `No Partai \"${selectedPartai}\" sudah dipakai di Detail OP lain dalam proses ini.`,
+                        confirmButtonText: 'OK'
+                    });
+                    $select.val('').trigger('change');
                 }
             });
         });

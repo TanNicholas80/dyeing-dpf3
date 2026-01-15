@@ -89,6 +89,73 @@ class ProsesController extends Controller
 
         $validated = $request->validate($rules);
 
+        /**
+         * VALIDASI KHUSUS NO PARTAI
+         * - Produksi: No Partai harus unik di seluruh proses (belum pernah dipakai).
+         * - Reproses: Boleh memakai No Partai yang sama, tapi SEMUA proses sebelumnya untuk partai tsb
+         *   sudah selesai (selesai != null). Jika masih ada proses berjalan / belum mulai, tolak.
+         * - Di dalam satu form (satu proses yang sedang dibuat), No Partai juga tidak boleh duplikat.
+         */
+        if (
+            ($validated['jenis'] ?? null) !== 'Maintenance' &&
+            isset($validated['details']) &&
+            is_array($validated['details'])
+        ) {
+            $jenisProses = $validated['jenis'];
+
+            // 1. Cek duplikasi No Partai di dalam form yang sama
+            $noPartaiList = array_column($validated['details'], 'no_partai');
+            $duplicatePartai = array_diff_assoc($noPartaiList, array_unique($noPartaiList));
+            if (!empty($duplicatePartai)) {
+                $duplicatePartai = array_unique($duplicatePartai);
+                return back()
+                    ->withInput()
+                    ->withErrors([
+                        'details' => 'No Partai tidak boleh duplikat dalam satu proses. Partai yang duplikat: ' . implode(', ', $duplicatePartai),
+                    ]);
+            }
+
+            // 2. Validasi terhadap data yang sudah ada di database
+            foreach ($validated['details'] as $index => $detail) {
+                $noPartai = $detail['no_partai'] ?? null;
+                if (!$noPartai) {
+                    continue;
+                }
+
+                // Ambil semua DetailProses yang punya no_partai ini beserta Proses-nya
+                $existingDetails = DetailProses::where('no_partai', $noPartai)
+                    ->with('proses')
+                    ->get();
+
+                if ($jenisProses === 'Reproses') {
+                    // Reproses: boleh pakai partai yang sama, tapi semua proses existing harus sudah selesai
+                    foreach ($existingDetails as $existingDetail) {
+                        $proses = $existingDetail->proses;
+                        if ($proses && $proses->selesai === null) {
+                            // Masih ada proses yang belum selesai (belum mulai / sedang jalan)
+                            return back()
+                                ->withInput()
+                                ->withErrors([
+                                    "details.$index.no_partai" =>
+                                    "No Partai '$noPartai' tidak dapat digunakan untuk Reproses karena masih ada proses yang berjalan / belum selesai untuk partai tersebut.",
+                                ]);
+                        }
+                    }
+                } else {
+                    // Produksi / selain Reproses: No Partai harus benar-benar unik (belum pernah dipakai)
+                    if ($existingDetails->isNotEmpty()) {
+                        return back()
+                            ->withInput()
+                            ->withErrors([
+                                "details.$index.no_partai" =>
+                                "No Partai '$noPartai' sudah pernah digunakan pada proses lain. " .
+                                    "Gunakan jenis proses 'Reproses' jika ingin memproses ulang partai ini (dengan syarat proses sebelumnya sudah selesai).",
+                            ]);
+                    }
+                }
+            }
+        }
+
         // Konversi cycle_time dari jam:menit:detik ke detik (integer)
         if (!empty($validated['cycle_time'])) {
             $parts = explode(':', $validated['cycle_time']);
@@ -165,7 +232,7 @@ class ProsesController extends Controller
                 $detailProsesSnapshots = $detailProsesList->map(function ($detail) {
                     return $detail->toArray();
                 })->toArray();
-                
+
                 Approval::create([
                     'proses_id'    => $proses->id,
                     'status'       => 'pending',
@@ -256,7 +323,7 @@ class ProsesController extends Controller
             // Potong barcode agar maksimal 10 digit
             $barcode = substr($barcode, 0, 10);
             Log::info('BarcodeKain: Barcode received and trimmed', ['original' => $request->barcode, 'trimmed' => $barcode, 'proses_id' => $id]);
-            
+
             // Cari DetailProses yang sesuai
             $detailProses = null;
             if ($request->has('detail_proses_id') && $request->detail_proses_id) {
@@ -270,7 +337,7 @@ class ProsesController extends Controller
                     return redirect()->route('dashboard')->with('error', 'Detail proses tidak ditemukan. Pastikan proses memiliki detail OP terlebih dahulu.');
                 }
             }
-            
+
             $no_op = $detailProses->no_op;
             $no_partai = $detailProses->no_partai;
             $mesin_id = $proses->mesin_id;
@@ -350,7 +417,7 @@ class ProsesController extends Controller
                 return redirect()->route('dashboard', ['page' => $page])
                     ->with('error', 'Barcode LA ini sudah pernah digunakan dan tidak dapat dipakai lagi.');
             }
-            
+
             // Cari DetailProses yang sesuai
             $detailProses = null;
             if ($request->has('detail_proses_id') && $request->detail_proses_id) {
@@ -364,7 +431,7 @@ class ProsesController extends Controller
                     return redirect()->route('dashboard', ['page' => $page])->with('error', 'Detail proses tidak ditemukan. Pastikan proses memiliki detail OP terlebih dahulu.');
                 }
             }
-            
+
             $no_op = $detailProses->no_op;
             $no_partai = $detailProses->no_partai;
             $mesin_id = $proses->mesin_id;
@@ -490,13 +557,13 @@ class ProsesController extends Controller
         try {
             $proses = Proses::findOrFail($id);
             $barcode = $request->barcode;
-            
+
             // Cek global: jika barcode sudah pernah dipakai di mana pun, tolak
             if (BarcodeAux::where('barcode', $barcode)->where('cancel', false)->exists()) {
                 return redirect()->route('dashboard', ['page' => $page])
                     ->with('error', 'Barcode AUX ini sudah pernah digunakan dan tidak dapat dipakai lagi.');
             }
-            
+
             // Cari DetailProses yang sesuai
             $detailProses = null;
             if ($request->has('detail_proses_id') && $request->detail_proses_id) {
@@ -510,7 +577,7 @@ class ProsesController extends Controller
                     return redirect()->route('dashboard', ['page' => $page])->with('error', 'Detail proses tidak ditemukan. Pastikan proses memiliki detail OP terlebih dahulu.');
                 }
             }
-            
+
             // Cari data auxl berdasarkan barcode (hanya untuk validasi & relasi detail)
             $auxl = \App\Models\Auxl::where('barcode', $barcode)->first();
             if (!$auxl) {
@@ -608,12 +675,12 @@ class ProsesController extends Controller
         } else {
             $detailProsesList = DetailProses::where('proses_id', $id)->get();
         }
-        
+
         // Kumpulkan semua barcode dari semua DetailProses
         $barcodeKain = collect();
         $barcodeLa = collect();
         $barcodeAux = collect();
-        
+
         foreach ($detailProsesList as $detailProses) {
             // Ambil barcode kain dari DetailProses ini
             $kains = $detailProses->barcodeKains()->get()->map(function ($b) {
@@ -621,14 +688,14 @@ class ProsesController extends Controller
                 return $b;
             });
             $barcodeKain = $barcodeKain->merge($kains);
-            
+
             // Ambil barcode la dari DetailProses ini
             $las = $detailProses->barcodeLas()->get()->map(function ($b) {
                 $b->matdok = $b->matdok ?? '';
                 return $b;
             });
             $barcodeLa = $barcodeLa->merge($las);
-            
+
             // Ambil barcode aux dari DetailProses ini
             $auxs = $detailProses->barcodeAuxs()->get()->map(function ($b) {
                 $b->matdok = $b->matdok ?? '';
@@ -636,7 +703,7 @@ class ProsesController extends Controller
             });
             $barcodeAux = $barcodeAux->merge($auxs);
         }
-        
+
         return response()->json([
             'barcode_kain' => $barcodeKain->values(),
             'barcode_la' => $barcodeLa->values(),
@@ -1248,7 +1315,7 @@ class ProsesController extends Controller
         $detailProsesSnapshots = $detailProsesList->map(function ($detail) {
             return $detail->toArray();
         })->toArray();
-        
+
         // Buat record approval untuk FM (delete proses), belum menghapus data
         Approval::create([
             'proses_id'    => $proses->id,
