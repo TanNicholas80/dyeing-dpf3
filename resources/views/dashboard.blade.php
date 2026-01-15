@@ -3868,7 +3868,13 @@
             const prosesId = $('#moveProsesId').val();
 
             if (!mesinId) {
-                alert('Silakan pilih mesin tujuan terlebih dahulu.');
+                // Gunakan SweetAlert untuk pesan error
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Mesin belum dipilih',
+                    text: 'Silakan pilih mesin tujuan terlebih dahulu.',
+                    confirmButtonText: 'OK'
+                });
                 return;
             }
 
@@ -4857,7 +4863,13 @@
                 if (itemCount > 1) {
                     removeDetailItem($item);
                 } else {
-                    alert('Minimal harus ada 1 detail OP');
+                    // Gunakan SweetAlert untuk validasi minimal 1 detail OP
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Tidak bisa dihapus',
+                        text: 'Minimal harus ada 1 Detail OP.',
+                        confirmButtonText: 'OK'
+                    });
                 }
             });
 
@@ -4918,6 +4930,26 @@
             // Trigger di awal
             $('[name="jenis"]').trigger('change');
             $('#jenis_op').trigger('change');
+
+            // Validasi tambahan saat submit form:
+            // Jika jenis_op = Multiple maka jumlah Detail OP harus >= 2
+            $('#formProses').on('submit', function(e) {
+                const jenisOp = $('#jenis_op').val();
+                if (jenisOp === 'Multiple') {
+                    const detailCount = $('#detail-proses-container .detail-proses-item').length;
+                    if (detailCount < 2) {
+                        e.preventDefault();
+                        // Gunakan SweetAlert untuk validasi Multiple OP
+                        Swal.fire({
+                            icon: 'warning',
+                            title: 'Detail OP kurang',
+                            text: 'Jenis OP dengan jenis Multiple, minimal harus ada 2 Detail OP.',
+                            confirmButtonText: 'OK'
+                        });
+                        return false;
+                    }
+                }
+            });
         });
 
         // Helper function untuk notifikasi Swal Toast
