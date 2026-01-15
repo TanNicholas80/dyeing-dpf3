@@ -278,10 +278,10 @@ class ProsesController extends Controller
         try {
             $client = new \GuzzleHttp\Client();
             $response = $client->post(
-                'http://18.139.142.16:8020/sap/bc/zdyes/zterima_op?sap-client=100',
+                'http://18.140.227.2:8000/sap/bc/zdyes/zterima_op?sap-client=310',
                 [
                     'headers' => [
-                        'Authorization' => 'Basic RFRfV01TOldtczAxMTEyMDI1QA==',
+                        'Authorization' => 'Basic RFRfRFZEOkFxdWluYWxkbzc=',
                         'Content-Type' => 'text/plain',
                         'Accept' => 'application/json',
                     ],
@@ -347,10 +347,10 @@ class ProsesController extends Controller
             $client = new \GuzzleHttp\Client();
             $body = json_encode($payload);
             $response = $client->post(
-                'http://18.139.142.16:8020/sap/bc/zdyes/zterima_data?sap-client=100',
+                'http://18.140.227.2:8000/sap/bc/zdyes/zterima_data?sap-client=310',
                 [
                     'headers' => [
-                        'Authorization' => 'Basic RFRfV01TOldtczAxMTEyMDI1QA==',
+                        'Authorization' => 'Basic RFRfRFZEOkFxdWluYWxkbzc=',
                         'Content-Type' => 'text/plain',
                         'Accept' => 'application/json',
                     ],
@@ -462,10 +462,10 @@ class ProsesController extends Controller
             // Kirim ke API
             $client = new \GuzzleHttp\Client();
             $response = $client->post(
-                'http://18.139.142.16:8020/sap/bc/zdyes/zterima_kimia?sap-client=100',
+                'http://18.140.227.2:8000/sap/bc/zdyes/zterima_kimia?sap-client=310',
                 [
                     'headers' => [
-                        'Authorization' => 'Basic RFRfV01TOldtczAxMTEyMDI1QA==',
+                        'Authorization' => 'Basic RFRfRFZEOkFxdWluYWxkbzc=',
                         'Content-Type' => 'text/plain',
                         'Accept' => 'application/json',
                     ],
@@ -598,10 +598,10 @@ class ProsesController extends Controller
             // Kirim ke API SAP
             $client = new \GuzzleHttp\Client();
             $response = $client->post(
-                'http://18.139.142.16:8020/sap/bc/zdyes/zterima_kimia?sap-client=100',
+                'http://18.140.227.2:8000/sap/bc/zdyes/zterima_kimia?sap-client=310',
                 [
                     'headers' => [
-                        'Authorization' => 'Basic RFRfV01TOldtczAxMTEyMDI1QA==',
+                        'Authorization' => 'Basic RFRfRFZEOkFxdWluYWxkbzc=',
                         'Content-Type' => 'text/plain',
                         'Accept' => 'application/json',
                     ],
@@ -739,19 +739,19 @@ class ProsesController extends Controller
             $client = new \GuzzleHttp\Client();
             $body = '"' . $matdok . '"';
             Log::info('SAP Cancel Request', [
-                'url' => 'http://18.139.142.16:8020/sap/bc/zdyes/zterima_cancel?sap-client=100',
+                'url' => 'http://18.140.227.2:8000/sap/bc/zdyes/zterima_cancel?sap-client=310',
                 'headers' => [
-                    'Authorization' => 'Basic RFRfV01TOldtczAxMTEyMDI1QA==',
+                    'Authorization' => 'Basic RFRfRFZEOkFxdWluYWxkbzc=',
                     'Content-Type' => 'text/plain',
                     'Accept' => 'application/json',
                 ],
                 'body' => $body,
             ]);
             $response = $client->post(
-                'http://18.139.142.16:8020/sap/bc/zdyes/zterima_cancel?sap-client=100',
+                'http://18.140.227.2:8000/sap/bc/zdyes/zterima_cancel?sap-client=310',
                 [
                     'headers' => [
-                        'Authorization' => 'Basic RFRfV01TOldtczAxMTEyMDI1QA==',
+                        'Authorization' => 'Basic RFRfRFZEOkFxdWluYWxkbzc=',
                         'Content-Type' => 'text/plain',
                         'Accept' => 'application/json',
                     ],
