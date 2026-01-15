@@ -4918,6 +4918,18 @@
             // Trigger di awal
             $('[name="jenis"]').trigger('change');
             $('#jenis_op').trigger('change');
+
+            // VALIDASI: Jenis OP Multiple wajib detail OP > 1
+            $(document).on('submit', '#formProses', function(e) {
+                var jenisOp = $('#jenis_op').val();
+                var detailCount = $('#detail-proses-container .detail-proses-item').length;
+                if (jenisOp === 'Multiple' && detailCount < 2) {
+                    e.preventDefault();
+                    showToastNotification('warning', 'Jika Jenis OP = Multiple, detail OP wajib lebih dari satu!');
+                    return false;
+                }
+                // ...existing code...
+            });
         });
 
         // Helper function untuk notifikasi Swal Toast

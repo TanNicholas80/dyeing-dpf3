@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
     <title id="dynamic-title">Dyeing Schedule - Duniatex</title>
     <link rel="icon" type="png" href="{{ asset('images/logo.png') }}">
 
@@ -37,6 +37,66 @@
         @media (max-width: 900px) {
             #datetime {
                 min-width: 170px;
+                font-size: 13px;
+            }
+        }
+
+        /* Responsive tweaks for mobile */
+        @media (max-width: 767.98px) {
+            .content-header .row.mb-2 {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .content-header .col-sm-6 {
+                width: 100%;
+                text-align: left !important;
+                margin-bottom: 10px;
+            }
+
+            .breadcrumb.float-sm-right {
+                float: none !important;
+                margin-top: 10px;
+                padding-left: 0;
+            }
+
+            .main-footer {
+                font-size: 13px;
+                padding: 10px 5px;
+            }
+
+            .navbar-brand img.brand-image {
+                max-width: 120px;
+                height: auto;
+            }
+
+            .sidebar {
+                font-size: 15px;
+            }
+
+            .select2-container .select2-selection--single {
+                height: 36px !important;
+            }
+
+            .select2-container--default .select2-selection--single .select2-selection__rendered {
+                line-height: 34px !important;
+            }
+
+            .select2-container--default .select2-selection--single .select2-selection__arrow {
+                height: 34px !important;
+            }
+        }
+
+        @media (max-width: 575.98px) {
+            .main-header .navbar {
+                padding: 0.25rem 0.5rem;
+            }
+
+            .main-footer {
+                font-size: 11px;
+            }
+
+            .sidebar {
                 font-size: 13px;
             }
         }
