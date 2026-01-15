@@ -58,6 +58,8 @@ class ProsesController extends Controller
         if ($request->jenis !== 'Maintenance') {
             $rules += [
                 'jenis_op' => 'required|in:Single,Multiple',
+                // Default: minimal 1 detail OP
+                // Akan dioverride menjadi min:2 jika jenis_op = Multiple
                 'details' => 'required|array|min:1',
                 'details.*.no_op' => 'required|string|max:12',
                 'details.*.no_partai' => 'required|string',
@@ -73,6 +75,11 @@ class ProsesController extends Controller
                 'details.*.qty' => 'required|numeric',
                 'details.*.roll' => 'required|integer',
             ];
+
+            // Jika jenis_op = Multiple, wajib minimal 2 OP
+            if ($request->input('jenis_op') === 'Multiple') {
+                $rules['details'] = 'required|array|min:2';
+            }
         } else {
             $rules += [
                 'jenis_op' => 'nullable|in:Single,Multiple',
