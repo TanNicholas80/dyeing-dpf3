@@ -47,6 +47,61 @@ class ProsesController extends Controller
             ->first();
     }
 
+    /**
+     * Validasi apakah semua DetailProses dalam proses sudah memenuhi jumlah barcode kain sesuai roll.
+     * 
+     * @param int $prosesId
+     * @return array|null Returns null if valid, or array with error message if invalid
+     */
+    private function validateBarcodeKainCompleteness($prosesId)
+    {
+        // Ambil semua DetailProses dalam proses ini
+        $detailList = DetailProses::where('proses_id', $prosesId)->get();
+        
+        if ($detailList->isEmpty()) {
+            return ['error' => 'Detail proses tidak ditemukan. Pastikan proses memiliki detail OP terlebih dahulu.'];
+        }
+
+        // Cek setiap DetailProses
+        $incompleteDetails = [];
+        foreach ($detailList as $detail) {
+            $roll = $detail->roll ?? 0;
+            
+            // Hitung jumlah barcode kain yang sudah di-scan (cancel = false) untuk DetailProses ini
+            $barcodeKainCount = BarcodeKain::where('detail_proses_id', $detail->id)
+                ->where('cancel', false)
+                ->count();
+            
+            // Jika jumlah barcode kain belum mencapai roll, tambahkan ke daftar
+            if ($barcodeKainCount < $roll) {
+                $incompleteDetails[] = [
+                    'no_partai' => $detail->no_partai ?? 'N/A',
+                    'scanned' => $barcodeKainCount,
+                    'required' => $roll,
+                    'missing' => $roll - $barcodeKainCount
+                ];
+            }
+        }
+
+        // Jika ada DetailProses yang belum lengkap, kembalikan error
+        if (!empty($incompleteDetails)) {
+            $errorMessages = [];
+            foreach ($incompleteDetails as $detail) {
+                $errorMessages[] = "No Partai '{$detail['no_partai']}': sudah scan {$detail['scanned']} dari {$detail['required']} roll (kurang {$detail['missing']})";
+            }
+            
+            return [
+                'error' => "Tidak dapat scan Barcode LA/AUX. " .
+                          "Masih ada partai yang belum memenuhi jumlah barcode kain sesuai roll:\n" .
+                          implode("\n", $errorMessages) .
+                          "\n\nHarap scan barcode kain terlebih dahulu hingga memenuhi jumlah roll untuk semua partai."
+            ];
+        }
+
+        // Semua DetailProses sudah memenuhi roll
+        return null;
+    }
+
     public function store(Request $request)
     {
         $rules = [
@@ -419,6 +474,13 @@ class ProsesController extends Controller
                     ->with('error', 'Barcode LA ini sudah pernah digunakan dan tidak dapat dipakai lagi.');
             }
 
+            // Validasi: cek apakah semua DetailProses sudah memenuhi jumlah barcode kain sesuai roll
+            $validationResult = $this->validateBarcodeKainCompleteness($id);
+            if ($validationResult !== null) {
+                return redirect()->route('dashboard', ['page' => $page])
+                    ->with('error', $validationResult['error']);
+            }
+
             // Cari DetailProses yang sesuai
             $detailProses = null;
             if ($request->has('detail_proses_id') && $request->detail_proses_id) {
@@ -565,6 +627,13 @@ class ProsesController extends Controller
                     ->with('error', 'Barcode AUX ini sudah pernah digunakan dan tidak dapat dipakai lagi.');
             }
 
+            // Validasi: cek apakah semua DetailProses sudah memenuhi jumlah barcode kain sesuai roll
+            $validationResult = $this->validateBarcodeKainCompleteness($id);
+            if ($validationResult !== null) {
+                return redirect()->route('dashboard', ['page' => $page])
+                    ->with('error', $validationResult['error']);
+            }
+
             // Cari DetailProses yang sesuai
             $detailProses = null;
             if ($request->has('detail_proses_id') && $request->detail_proses_id) {
@@ -681,6 +750,7 @@ class ProsesController extends Controller
         $barcodeKain = collect();
         $barcodeLa = collect();
         $barcodeAux = collect();
+        $barcodeKainProgress = [];
 
         foreach ($detailProsesList as $detailProses) {
             // Ambil barcode kain dari DetailProses ini
@@ -689,6 +759,20 @@ class ProsesController extends Controller
                 return $b;
             });
             $barcodeKain = $barcodeKain->merge($kains);
+
+            // Hitung progress barcode kain untuk DetailProses ini
+            $roll = $detailProses->roll ?? 0;
+            $barcodeKainCount = BarcodeKain::where('detail_proses_id', $detailProses->id)
+                ->where('cancel', false)
+                ->count();
+            
+            $barcodeKainProgress[] = [
+                'detail_proses_id' => $detailProses->id,
+                'no_partai' => $detailProses->no_partai ?? 'N/A',
+                'roll' => $roll,
+                'scanned' => $barcodeKainCount,
+                'is_complete' => $barcodeKainCount >= $roll
+            ];
 
             // Ambil barcode la dari DetailProses ini
             $las = $detailProses->barcodeLas()->get()->map(function ($b) {
@@ -705,10 +789,17 @@ class ProsesController extends Controller
             $barcodeAux = $barcodeAux->merge($auxs);
         }
 
+        // Cek apakah semua DetailProses sudah memenuhi roll
+        $allComplete = collect($barcodeKainProgress)->every(function ($progress) {
+            return $progress['is_complete'];
+        });
+
         return response()->json([
             'barcode_kain' => $barcodeKain->values(),
             'barcode_la' => $barcodeLa->values(),
             'barcode_aux' => $barcodeAux->values(),
+            'barcode_kain_progress' => $barcodeKainProgress,
+            'can_scan_la_aux' => $allComplete, // Flag untuk frontend: apakah bisa scan LA/AUX
         ]);
     }
 

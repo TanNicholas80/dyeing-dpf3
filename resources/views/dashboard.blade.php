@@ -3526,10 +3526,11 @@
                 }
                 html += '</th></tr>';
                 html += '<tr><td colspan="4" id="barcode-kain-list">Loading...</td></tr>';
+                html += '<tr><td colspan="4" id="barcode-kain-progress" style="padding:8px;background:#f9f9f9;font-size:12px;"></td></tr>';
                 html += '<tr><th colspan="4" style="background:#f8f8f8;">Barcode LA';
                 if (showScanBtn) {
                     html +=
-                        ' <button type="button" class="btn btn-sm btn-success scan-barcode-btn" data-barcode="barcode_la" data-id="' +
+                        ' <button type="button" id="btn-scan-la" class="btn btn-sm btn-success scan-barcode-btn" data-barcode="barcode_la" data-id="' +
                         proses.id + '" data-detail-id="' + (selectedDetailId || '') + '" style="float:right;"><i class="fas fa-barcode"></i> Scan</button>';
                 }
                 html += '</th></tr>';
@@ -3537,7 +3538,7 @@
                 html += '<tr><th colspan="4" style="background:#f8f8f8;">Barcode AUX';
                 if (showScanBtn) {
                     html +=
-                        ' <button type="button" class="btn btn-sm btn-success scan-barcode-btn" data-barcode="barcode_aux" data-id="' +
+                        ' <button type="button" id="btn-scan-aux" class="btn btn-sm btn-success scan-barcode-btn" data-barcode="barcode_aux" data-id="' +
                         proses.id + '" data-detail-id="' + (selectedDetailId || '') + '" style="float:right;"><i class="fas fa-barcode"></i> Scan</button>';
                 }
                 html += '</th></tr>';
@@ -3616,6 +3617,57 @@
                         $('#barcode-aux-list').html(renderBarcodeGrid(data.barcode_aux, 'aux', proses
                             .id));
 
+                        // Tampilkan progress barcode kain
+                        const progress = data.barcode_kain_progress || [];
+                        let progressHtml = '';
+                        if (progress.length > 0) {
+                            progressHtml = '<div style="padding:4px 0;"><strong>Progress Barcode Kain:</strong><br>';
+                            progress.forEach(function(p) {
+                                const statusIcon = p.is_complete ? 
+                                    '<span style="color:#43a047;">✓</span>' : 
+                                    '<span style="color:#c62828;">✗</span>';
+                                const statusText = p.is_complete ? 
+                                    '<span style="color:#43a047;">Lengkap</span>' : 
+                                    '<span style="color:#c62828;">Belum Lengkap</span>';
+                                progressHtml += `${statusIcon} <strong>No Partai ${p.no_partai}:</strong> ${p.scanned} dari ${p.roll} roll ${statusText}<br>`;
+                            });
+                            progressHtml += '</div>';
+                        }
+                        $('#barcode-kain-progress').html(progressHtml);
+
+                        // Enable/disable tombol scan LA dan AUX berdasarkan status progress
+                        const canScanLaAux = data.can_scan_la_aux !== false;
+                        const $btnScanLa = $('#btn-scan-la');
+                        const $btnScanAux = $('#btn-scan-aux');
+                        
+                        if (!canScanLaAux) {
+                            // Disable tombol scan LA dan AUX
+                            $btnScanLa.prop('disabled', true)
+                                .removeClass('btn-success')
+                                .addClass('btn-secondary')
+                                .css('cursor', 'not-allowed')
+                                .attr('title', 'Tidak dapat scan. Pastikan semua barcode kain sudah memenuhi jumlah roll terlebih dahulu.');
+                            
+                            $btnScanAux.prop('disabled', true)
+                                .removeClass('btn-success')
+                                .addClass('btn-secondary')
+                                .css('cursor', 'not-allowed')
+                                .attr('title', 'Tidak dapat scan. Pastikan semua barcode kain sudah memenuhi jumlah roll terlebih dahulu.');
+                        } else {
+                            // Enable tombol scan LA dan AUX
+                            $btnScanLa.prop('disabled', false)
+                                .removeClass('btn-secondary')
+                                .addClass('btn-success')
+                                .css('cursor', 'pointer')
+                                .removeAttr('title');
+                            
+                            $btnScanAux.prop('disabled', false)
+                                .removeClass('btn-secondary')
+                                .addClass('btn-success')
+                                .css('cursor', 'pointer')
+                                .removeAttr('title');
+                        }
+
                         // Hitung status barcode aktif per jenis untuk update G/D/A di card utama
                         const hasKainActive = (data.barcode_kain || []).some(bk => !bk.cancel);
                         const hasLaActive = (data.barcode_la || []).some(bk => !bk.cancel);
@@ -3625,10 +3677,23 @@
                     error: function() {
                         $('#barcode-kain-list').html(
                             '<span style="color:#888;">Belum ada barcode kain.</span>');
+                        $('#barcode-kain-progress').html('');
                         $('#barcode-la-list').html(
                             '<span style="color:#888;">Belum ada barcode LA.</span>');
                         $('#barcode-aux-list').html(
                             '<span style="color:#888;">Belum ada barcode AUX.</span>');
+                        
+                        // Disable tombol scan LA dan AUX jika error
+                        const $btnScanLa = $('#btn-scan-la');
+                        const $btnScanAux = $('#btn-scan-aux');
+                        $btnScanLa.prop('disabled', true)
+                            .removeClass('btn-success')
+                            .addClass('btn-secondary')
+                            .css('cursor', 'not-allowed');
+                        $btnScanAux.prop('disabled', true)
+                            .removeClass('btn-success')
+                            .addClass('btn-secondary')
+                            .css('cursor', 'not-allowed');
                     }
                 });
             }
@@ -4047,6 +4112,11 @@
 
         // Handler klik tombol scan barcode (hanya set data, scanner diinisialisasi saat modal tampil)
         $(document).on('click', '.scan-barcode-btn', function() {
+            // Cek apakah tombol disabled
+            if ($(this).prop('disabled')) {
+                return false; // Jangan lakukan apapun jika tombol disabled
+            }
+            
             const barcodeType = $(this).data('barcode');
             const prosesId = $(this).data('id');
             const detailId = $(this).data('detail-id') || $('#modalDetailProses').data('detailProsesId') || '';
