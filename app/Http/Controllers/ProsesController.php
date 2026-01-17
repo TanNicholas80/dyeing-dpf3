@@ -377,6 +377,7 @@ class ProsesController extends Controller
                 'no_partai' => $no_partai,
                 'barcode' => $barcode,
                 'matdok' => $data[0]['mblnr'] ?? null,
+                'qty_gi' => isset($data[0]['menge']) ? (float)$data[0]['menge'] : null,
                 'mesin_id' => $mesin_id,
                 'cancel' => false,
             ]);

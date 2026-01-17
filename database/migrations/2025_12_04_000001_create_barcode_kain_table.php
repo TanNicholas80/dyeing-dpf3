@@ -14,6 +14,7 @@ return new class extends Migration {
             $table->string('no_partai')->nullable();
             $table->string('barcode')->nullable();
             $table->string('matdok', 10)->nullable();
+            $table->double('qty_gi')->nullable();
             $table->foreignId('mesin_id')->constrained('mesins')->restrictOnDelete();
             $table->boolean('cancel')->default(false);
             $table->timestamps();

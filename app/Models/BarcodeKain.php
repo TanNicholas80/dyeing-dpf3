@@ -15,7 +15,7 @@ class BarcodeKain extends Model
     protected $table = 'barcode_kain';
 
     protected $fillable = [
-        'detail_proses_id', 'no_op', 'no_partai', 'barcode', 'matdok', 'mesin_id', 'cancel'
+        'detail_proses_id', 'no_op', 'no_partai', 'barcode', 'matdok', 'qty_gi', 'mesin_id', 'cancel'
     ];
 
     public function mesin()
