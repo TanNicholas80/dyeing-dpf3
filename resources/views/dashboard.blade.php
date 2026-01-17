@@ -3238,6 +3238,25 @@
             return null;
         }
 
+        // Fungsi untuk render barcode di detail proses
+        function renderBarcodeColumn($container, barcodeArr, type) {
+            if (!Array.isArray(barcodeArr) || barcodeArr.length === 0) {
+                $container.text('Tidak ada data barcode');
+                return;
+            }
+            // Render barcode sesuai tipe
+            let html = '';
+            barcodeArr.forEach(function(barcode) {
+                html += `<span class="badge badge-info mr-1">${barcode.kode_barcode || barcode.barcode || barcode}</span>`;
+            });
+            $container.html(html);
+        }
+
+        // Contoh pemakaian setelah AJAX selesai:
+        // renderBarcodeColumn($('#barcodeKainCol'), detail.barcode_kains, 'kain');
+        // renderBarcodeColumn($('#barcodeLaCol'), detail.barcode_las, 'la');
+        // renderBarcodeColumn($('#barcodeAuxCol'), detail.barcode_auxs, 'aux');
+
         // Helper function untuk mendapatkan no_op dari DetailProses
         function getNoOpFromProses(proses) {
             const firstDetail = getFirstDetailProses(proses);
