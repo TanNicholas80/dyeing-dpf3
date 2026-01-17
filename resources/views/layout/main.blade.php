@@ -584,21 +584,6 @@
                 title: "{{ session('info') }}"
             });
         @endif
-
-        @if ($errors->any())
-            const ToastValidation = Swal.mixin({
-                toast: true,
-                position: 'top-end',
-                icon: 'error',
-                showConfirmButton: false,
-                timer: 4000,
-                timerProgressBar: true,
-            });
-            let errorMsg = `{!! implode('<br>', $errors->all()) !!}`;
-            ToastValidation.fire({
-                html: errorMsg
-            });
-        @endif
     </script>
 
     @yield('scripts')
