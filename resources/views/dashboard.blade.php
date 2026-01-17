@@ -483,17 +483,21 @@
                                                                 if ($proses->jenis === 'Maintenance') {
                                                                     $blockColors = ['gray', 'gray', 'gray'];
                                                                 } else {
-                                                                    // Barcode sekarang terhubung via DetailProses (detail_proses_id)
-                                                                    $hasBarcodeKain = false;
+                                                                    // G: hijau hanya jika SEMUA detail OP sudah memenuhi barcode kain >= roll
+                                                                    $allKainComplete = true;
                                                                     $hasBarcodeLa = false;
                                                                     $hasBarcodeAux = false;
                                                                     if (isset($proses->details) && is_iterable($proses->details)) {
                                                                         foreach ($proses->details as $d) {
-                                                                            if (isset($d->barcodeKains)) {
-                                                                                $hasBarcodeKain =
-                                                                                    $hasBarcodeKain ||
-                                                                                    $d->barcodeKains->where('cancel', false)->count() > 0;
+                                                                            // Cek apakah detail ini sudah memenuhi barcode kain >= roll
+                                                                            $detailRoll = $d->roll ?? 0;
+                                                                            $detailKainCount = isset($d->barcodeKains)
+                                                                                ? $d->barcodeKains->where('cancel', false)->count()
+                                                                                : 0;
+                                                                            if ($detailRoll > 0 && $detailKainCount < $detailRoll) {
+                                                                                $allKainComplete = false;
                                                                             }
+                                                                            
                                                                             if (isset($d->barcodeLas)) {
                                                                                 $hasBarcodeLa =
                                                                                     $hasBarcodeLa ||
@@ -505,19 +509,19 @@
                                                                                     $d->barcodeAuxs->where('cancel', false)->count() > 0;
                                                                             }
                                                                         }
+                                                                    } else {
+                                                                        $allKainComplete = false;
                                                                     }
-                                                                    // Fallback backward compatibility jika masih ada kolom lama
-                                                                    if (!$hasBarcodeKain && isset($proses->barcode_kain)) {
-                                                                        $hasBarcodeKain = (bool) $proses->barcode_kain;
-                                                                    }
+                                                                    // Fallback backward compatibility untuk LA dan AUX
                                                                     if (!$hasBarcodeLa && isset($proses->barcode_la)) {
                                                                         $hasBarcodeLa = (bool) $proses->barcode_la;
                                                                     }
                                                                     if (!$hasBarcodeAux && isset($proses->barcode_aux)) {
                                                                         $hasBarcodeAux = (bool) $proses->barcode_aux;
                                                                     }
+                                                                    // G: hijau jika semua detail OP sudah memenuhi barcode kain >= roll
                                                                     $blockColors = [
-                                                                        $hasBarcodeKain ? 'green' : 'red',
+                                                                        $allKainComplete ? 'green' : 'red',
                                                                         $hasBarcodeLa ? 'green' : 'red',
                                                                         $hasBarcodeAux ? 'green' : 'red',
                                                                     ];
@@ -741,9 +745,12 @@
                                                                             {{-- Loop OP kedua dan seterusnya dengan garis pemisah --}}
                                                                             @foreach ($detailList->skip(1) as $d)
                                                                                 @php
-                                                                                    $subHasKain = isset($d->barcodeKains)
-                                                                                        ? $d->barcodeKains->where('cancel', false)->count() > 0
-                                                                                        : false;
+                                                                                    // Indikator G: hijau hanya jika jumlah barcode kain >= roll
+                                                                                    $subRoll = $d->roll ?? 0;
+                                                                                    $subBarcodeKainCount = isset($d->barcodeKains)
+                                                                                        ? $d->barcodeKains->where('cancel', false)->count()
+                                                                                        : 0;
+                                                                                    $subHasKain = ($subBarcodeKainCount >= $subRoll && $subRoll > 0);
                                                                                     $subHasLa = isset($d->barcodeLas)
                                                                                         ? $d->barcodeLas->where('cancel', false)->count() > 0
                                                                                         : false;
@@ -908,21 +915,25 @@
                                                                 : ($proses->jenis === 'Reproses'
                                                                     ? 'R'
                                                                     : 'M');
-                                                        // Status blok G, D, A (hijau jika barcode ada, merah jika tidak)
+                                                        // Status blok G, D, A (G: hijau jika barcode kain >= roll, D/A: hijau jika ada barcode)
                                                         if ($proses->jenis === 'Maintenance') {
                                                             $blockColors = ['gray', 'gray', 'gray'];
                                                         } else {
-                                                            // G: hijau jika ada minimal 1 barcode kain (cancel=false)
-                                                            $hasBarcodeKain = false;
+                                                            // G: hijau hanya jika SEMUA detail OP sudah memenuhi barcode kain >= roll
+                                                            $allKainComplete = true;
                                                             $hasBarcodeLa = false;
                                                             $hasBarcodeAux = false;
                                                             if (isset($proses->details) && is_iterable($proses->details)) {
                                                                 foreach ($proses->details as $d) {
-                                                                    if (isset($d->barcodeKains)) {
-                                                                        $hasBarcodeKain =
-                                                                            $hasBarcodeKain ||
-                                                                            $d->barcodeKains->where('cancel', false)->count() > 0;
+                                                                    // Cek apakah detail ini sudah memenuhi barcode kain >= roll
+                                                                    $detailRoll = $d->roll ?? 0;
+                                                                    $detailKainCount = isset($d->barcodeKains)
+                                                                        ? $d->barcodeKains->where('cancel', false)->count()
+                                                                        : 0;
+                                                                    if ($detailRoll > 0 && $detailKainCount < $detailRoll) {
+                                                                        $allKainComplete = false;
                                                                     }
+                                                                    
                                                                     if (isset($d->barcodeLas)) {
                                                                         $hasBarcodeLa =
                                                                             $hasBarcodeLa ||
@@ -934,19 +945,21 @@
                                                                             $d->barcodeAuxs->where('cancel', false)->count() > 0;
                                                                     }
                                                                 }
+                                                            } else {
+                                                                $allKainComplete = false;
                                                             }
-                                                            if (!$hasBarcodeKain && isset($proses->barcode_kain)) {
-                                                                $hasBarcodeKain = (bool) $proses->barcode_kain;
-                                                            }
+                                                            // Fallback untuk LA dan AUX
                                                             if (!$hasBarcodeLa && isset($proses->barcode_la)) {
                                                                 $hasBarcodeLa = (bool) $proses->barcode_la;
                                                             }
                                                             if (!$hasBarcodeAux && isset($proses->barcode_aux)) {
                                                                 $hasBarcodeAux = (bool) $proses->barcode_aux;
                                                             }
+                                                            // G: hijau jika semua detail OP sudah memenuhi barcode kain >= roll
                                                             // D: hijau jika ada minimal 1 barcode LA (cancel=false)
+                                                            // A: hijau jika ada minimal 1 barcode AUX (cancel=false)
                                                             $blockColors = [
-                                                                $hasBarcodeKain ? 'green' : 'red',
+                                                                $allKainComplete ? 'green' : 'red',
                                                                 $hasBarcodeLa ? 'green' : 'red',
                                                                 $hasBarcodeAux ? 'green' : 'red',
                                                             ];
@@ -1167,9 +1180,12 @@
                                                                     {{-- Multiple OP: OP pertama dengan header lengkap, OP kedua+ dengan garis pemisah --}}
                                                                     @php
                                                                         $firstDetail = $detailList->first();
-                                                                        $firstHasKain = isset($firstDetail->barcodeKains)
-                                                                            ? $firstDetail->barcodeKains->where('cancel', false)->count() > 0
-                                                                            : false;
+                                                                        // Indikator G: hijau hanya jika jumlah barcode kain >= roll
+                                                                        $firstRoll = $firstDetail->roll ?? 0;
+                                                                        $firstBarcodeKainCount = isset($firstDetail->barcodeKains)
+                                                                            ? $firstDetail->barcodeKains->where('cancel', false)->count()
+                                                                            : 0;
+                                                                        $firstHasKain = ($firstBarcodeKainCount >= $firstRoll && $firstRoll > 0);
                                                                         $firstHasLa = isset($firstDetail->barcodeLas)
                                                                             ? $firstDetail->barcodeLas->where('cancel', false)->count() > 0
                                                                             : false;
@@ -1202,9 +1218,12 @@
                                                                     {{-- Loop OP kedua dan seterusnya dengan garis pemisah --}}
                                                                     @foreach ($detailList->skip(1) as $d)
                                                                         @php
-                                                                            $subHasKain = isset($d->barcodeKains)
-                                                                                ? $d->barcodeKains->where('cancel', false)->count() > 0
-                                                                                : false;
+                                                                            // Indikator G: hijau hanya jika jumlah barcode kain >= roll
+                                                                            $subRoll = $d->roll ?? 0;
+                                                                            $subBarcodeKainCount = isset($d->barcodeKains)
+                                                                                ? $d->barcodeKains->where('cancel', false)->count()
+                                                                                : 0;
+                                                                            $subHasKain = ($subBarcodeKainCount >= $subRoll && $subRoll > 0);
                                                                             $subHasLa = isset($d->barcodeLas)
                                                                                 ? $d->barcodeLas->where('cancel', false)->count() > 0
                                                                                 : false;
@@ -3636,42 +3655,76 @@
                         $('#barcode-aux-list').html(renderBarcodeGrid(data.barcode_aux, 'aux', proses
                             .id));
 
-                        // Tampilkan progress barcode kain
-                        const progress = data.barcode_kain_progress || [];
+                        // Tampilkan progress barcode kain dari SEMUA detail proses
+                        // Gunakan all_barcode_kain_progress untuk menampilkan status lengkap semua detail
+                        const allProgress = data.all_barcode_kain_progress || data.barcode_kain_progress || [];
+                        const incompleteDetails = data.incomplete_details || [];
                         let progressHtml = '';
-                        if (progress.length > 0) {
-                            progressHtml = '<div style="padding:4px 0;"><strong>Progress Barcode Kain:</strong><br>';
-                            progress.forEach(function(p) {
+                        
+                        if (allProgress.length > 0) {
+                            const totalDetails = allProgress.length;
+                            const completeCount = allProgress.filter(p => p.is_complete).length;
+                            const allComplete = completeCount === totalDetails;
+                            
+                            // Header dengan status keseluruhan
+                            if (allComplete) {
+                                progressHtml = '<div style="padding:4px 0;background:#e8f5e9;border-radius:4px;margin-bottom:8px;">';
+                                progressHtml += '<strong style="color:#2e7d32;"><i class="fas fa-check-circle"></i> Semua Detail OP Sudah Lengkap!</strong>';
+                                progressHtml += '<br><span style="color:#43a047;font-size:12px;">Scan Barcode LA & AUX sudah diizinkan.</span>';
+                                progressHtml += '</div>';
+                            } else {
+                                progressHtml = '<div style="padding:4px 0;background:#ffebee;border-radius:4px;margin-bottom:8px;">';
+                                progressHtml += `<strong style="color:#c62828;"><i class="fas fa-exclamation-triangle"></i> ${completeCount} dari ${totalDetails} Detail OP Lengkap</strong>`;
+                                progressHtml += '<br><span style="color:#c62828;font-size:12px;">Semua Detail OP harus lengkap sebelum scan Barcode LA & AUX.</span>';
+                                progressHtml += '</div>';
+                            }
+                            
+                            // Tampilkan progress per detail
+                            progressHtml += '<div style="padding:4px 0;"><strong>Progress Barcode Kain per Detail OP:</strong><br>';
+                            allProgress.forEach(function(p) {
                                 const statusIcon = p.is_complete ? 
-                                    '<span style="color:#43a047;">✓</span>' : 
-                                    '<span style="color:#c62828;">✗</span>';
+                                    '<span style="color:#43a047;"><i class="fas fa-check"></i></span>' : 
+                                    '<span style="color:#c62828;"><i class="fas fa-times"></i></span>';
                                 const statusText = p.is_complete ? 
                                     '<span style="color:#43a047;">Lengkap</span>' : 
-                                    '<span style="color:#c62828;">Belum Lengkap</span>';
-                                progressHtml += `${statusIcon} <strong>No Partai ${p.no_partai}:</strong> ${p.scanned} dari ${p.roll} roll ${statusText}<br>`;
+                                    '<span style="color:#c62828;">Kurang ' + (p.roll - p.scanned) + ' roll</span>';
+                                const bgColor = p.is_complete ? '#e8f5e9' : '#ffebee';
+                                progressHtml += `<div style="background:${bgColor};padding:4px 8px;margin:2px 0;border-radius:4px;">`;
+                                progressHtml += `${statusIcon} <strong>OP ${p.no_op || 'N/A'}:</strong> ${p.scanned}/${p.roll} roll - ${statusText}`;
+                                progressHtml += '</div>';
                             });
                             progressHtml += '</div>';
                         }
                         $('#barcode-kain-progress').html(progressHtml);
 
-                        // Enable/disable tombol scan LA dan AUX berdasarkan status progress
+                        // Enable/disable tombol scan LA dan AUX berdasarkan status progress SEMUA detail
                         const canScanLaAux = data.can_scan_la_aux !== false;
                         const $btnScanLa = $('#btn-scan-la');
                         const $btnScanAux = $('#btn-scan-aux');
                         
                         if (!canScanLaAux) {
+                            // Buat pesan tooltip yang informatif dengan detail yang belum lengkap
+                            let tooltipMsg = 'Tidak dapat scan. ';
+                            if (incompleteDetails.length > 0) {
+                                tooltipMsg += 'Detail OP belum lengkap: ';
+                                const detailMsgs = incompleteDetails.map(d => `OP ${d.no_op} (kurang ${d.remaining} roll)`);
+                                tooltipMsg += detailMsgs.join(', ');
+                            } else {
+                                tooltipMsg += 'Pastikan semua barcode kain sudah memenuhi jumlah roll terlebih dahulu.';
+                            }
+                            
                             // Disable tombol scan LA dan AUX
                             $btnScanLa.prop('disabled', true)
                                 .removeClass('btn-success')
                                 .addClass('btn-secondary')
                                 .css('cursor', 'not-allowed')
-                                .attr('title', 'Tidak dapat scan. Pastikan semua barcode kain sudah memenuhi jumlah roll terlebih dahulu.');
+                                .attr('title', tooltipMsg);
                             
                             $btnScanAux.prop('disabled', true)
                                 .removeClass('btn-success')
                                 .addClass('btn-secondary')
                                 .css('cursor', 'not-allowed')
-                                .attr('title', 'Tidak dapat scan. Pastikan semua barcode kain sudah memenuhi jumlah roll terlebih dahulu.');
+                                .attr('title', tooltipMsg);
                         } else {
                             // Enable tombol scan LA dan AUX
                             $btnScanLa.prop('disabled', false)
@@ -3688,7 +3741,8 @@
                         }
 
                         // Hitung status barcode aktif per jenis untuk update G/D/A di card utama
-                        const hasKainActive = (data.barcode_kain || []).some(bk => !bk.cancel);
+                        // G: hijau hanya jika SEMUA detail OP sudah memenuhi barcode kain >= roll
+                        const hasKainActive = data.can_scan_la_aux === true;
                         const hasLaActive = (data.barcode_la || []).some(bk => !bk.cancel);
                         const hasAuxActive = (data.barcode_aux || []).some(bk => !bk.cancel);
                         updateGDAIndicators(proses.id, selectedDetailId, hasKainActive, hasLaActive, hasAuxActive);
@@ -4605,7 +4659,7 @@
             }
 
             // Polling setiap 1 detik untuk update status
-            setInterval(updateProsesStatuses, 1000);
+            setInterval(updateProsesStatuses, 2000);
             updateProsesStatuses(); // jalankan sekali di awal
         });
 
@@ -5349,9 +5403,88 @@
                                             .barcode_aux, 'aux',
                                             currentProsesForRefresh));
 
+                                        // Update progress barcode kain dari SEMUA detail proses
+                                        const allProgress = data.all_barcode_kain_progress || data.barcode_kain_progress || [];
+                                        const incompleteDetails = data.incomplete_details || [];
+                                        let progressHtml = '';
+                                        
+                                        if (allProgress.length > 0) {
+                                            const totalDetails = allProgress.length;
+                                            const completeCount = allProgress.filter(p => p.is_complete).length;
+                                            const allComplete = completeCount === totalDetails;
+                                            
+                                            if (allComplete) {
+                                                progressHtml = '<div style="padding:4px 0;background:#e8f5e9;border-radius:4px;margin-bottom:8px;">';
+                                                progressHtml += '<strong style="color:#2e7d32;"><i class="fas fa-check-circle"></i> Semua Detail OP Sudah Lengkap!</strong>';
+                                                progressHtml += '<br><span style="color:#43a047;font-size:12px;">Scan Barcode LA & AUX sudah diizinkan.</span>';
+                                                progressHtml += '</div>';
+                                            } else {
+                                                progressHtml = '<div style="padding:4px 0;background:#ffebee;border-radius:4px;margin-bottom:8px;">';
+                                                progressHtml += `<strong style="color:#c62828;"><i class="fas fa-exclamation-triangle"></i> ${completeCount} dari ${totalDetails} Detail OP Lengkap</strong>`;
+                                                progressHtml += '<br><span style="color:#c62828;font-size:12px;">Semua Detail OP harus lengkap sebelum scan Barcode LA & AUX.</span>';
+                                                progressHtml += '</div>';
+                                            }
+                                            
+                                            progressHtml += '<div style="padding:4px 0;"><strong>Progress Barcode Kain per Detail OP:</strong><br>';
+                                            allProgress.forEach(function(p) {
+                                                const statusIcon = p.is_complete ? 
+                                                    '<span style="color:#43a047;"><i class="fas fa-check"></i></span>' : 
+                                                    '<span style="color:#c62828;"><i class="fas fa-times"></i></span>';
+                                                const statusText = p.is_complete ? 
+                                                    '<span style="color:#43a047;">Lengkap</span>' : 
+                                                    '<span style="color:#c62828;">Kurang ' + (p.roll - p.scanned) + ' roll</span>';
+                                                const bgColor = p.is_complete ? '#e8f5e9' : '#ffebee';
+                                                progressHtml += `<div style="background:${bgColor};padding:4px 8px;margin:2px 0;border-radius:4px;">`;
+                                                progressHtml += `${statusIcon} <strong>OP ${p.no_op || 'N/A'}:</strong> ${p.scanned}/${p.roll} roll - ${statusText}`;
+                                                progressHtml += '</div>';
+                                            });
+                                            progressHtml += '</div>';
+                                        }
+                                        $('#barcode-kain-progress').html(progressHtml);
+
+                                        // Enable/disable tombol scan LA dan AUX berdasarkan status progress SEMUA detail
+                                        const canScanLaAux = data.can_scan_la_aux !== false;
+                                        const $btnScanLa = $('#btn-scan-la');
+                                        const $btnScanAux = $('#btn-scan-aux');
+                                        
+                                        if (!canScanLaAux) {
+                                            let tooltipMsg = 'Tidak dapat scan. ';
+                                            if (incompleteDetails.length > 0) {
+                                                tooltipMsg += 'Detail OP belum lengkap: ';
+                                                const detailMsgs = incompleteDetails.map(d => `OP ${d.no_op} (kurang ${d.remaining} roll)`);
+                                                tooltipMsg += detailMsgs.join(', ');
+                                            } else {
+                                                tooltipMsg += 'Pastikan semua barcode kain sudah memenuhi jumlah roll terlebih dahulu.';
+                                            }
+                                            
+                                            $btnScanLa.prop('disabled', true)
+                                                .removeClass('btn-success')
+                                                .addClass('btn-secondary')
+                                                .css('cursor', 'not-allowed')
+                                                .attr('title', tooltipMsg);
+                                            
+                                            $btnScanAux.prop('disabled', true)
+                                                .removeClass('btn-success')
+                                                .addClass('btn-secondary')
+                                                .css('cursor', 'not-allowed')
+                                                .attr('title', tooltipMsg);
+                                        } else {
+                                            $btnScanLa.prop('disabled', false)
+                                                .removeClass('btn-secondary')
+                                                .addClass('btn-success')
+                                                .css('cursor', 'pointer')
+                                                .removeAttr('title');
+                                            
+                                            $btnScanAux.prop('disabled', false)
+                                                .removeClass('btn-secondary')
+                                                .addClass('btn-success')
+                                                .css('cursor', 'pointer')
+                                                .removeAttr('title');
+                                        }
+
                                         // Hitung status barcode aktif per jenis untuk update G/D/A di card utama
-                                        const hasKainActive = (data.barcode_kain || [])
-                                            .some(bk => !bk.cancel);
+                                        // G: hijau hanya jika SEMUA detail OP sudah memenuhi barcode kain >= roll
+                                        const hasKainActive = data.can_scan_la_aux === true;
                                         const hasLaActive = (data.barcode_la || []).some(
                                             bk => !bk.cancel);
                                         const hasAuxActive = (data.barcode_aux || []).some(

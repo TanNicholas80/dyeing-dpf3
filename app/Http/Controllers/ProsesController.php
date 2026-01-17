@@ -737,7 +737,7 @@ class ProsesController extends Controller
 
         $detailProsesId = $request->query('detail_proses_id');
 
-        // Ambil DetailProses sesuai filter (jika ada) atau ambil semua
+        // Ambil DetailProses sesuai filter (jika ada) atau ambil semua untuk DISPLAY barcode
         if ($detailProsesId) {
             $detailProsesList = DetailProses::where('id', $detailProsesId)
                 ->where('proses_id', $id)
@@ -746,11 +746,15 @@ class ProsesController extends Controller
             $detailProsesList = DetailProses::where('proses_id', $id)->get();
         }
 
-        // Kumpulkan semua barcode dari semua DetailProses
+        // PENTING: Ambil SEMUA DetailProses untuk validasi can_scan_la_aux
+        // Agar scan LA/AUX hanya bisa dilakukan jika SEMUA detail memenuhi syarat barcode kain
+        $allDetailProsesList = DetailProses::where('proses_id', $id)->get();
+
+        // Kumpulkan semua barcode dari DetailProses yang dipilih (untuk display)
         $barcodeKain = collect();
         $barcodeLa = collect();
         $barcodeAux = collect();
-        $barcodeKainProgress = [];
+        $barcodeKainProgress = []; // Progress dari detail yang dipilih (untuk display)
 
         foreach ($detailProsesList as $detailProses) {
             // Ambil barcode kain dari DetailProses ini
@@ -769,6 +773,7 @@ class ProsesController extends Controller
             $barcodeKainProgress[] = [
                 'detail_proses_id' => $detailProses->id,
                 'no_partai' => $detailProses->no_partai ?? 'N/A',
+                'no_op' => $detailProses->no_op ?? 'N/A',
                 'roll' => $roll,
                 'scanned' => $barcodeKainCount,
                 'is_complete' => $barcodeKainCount >= $roll
@@ -789,8 +794,41 @@ class ProsesController extends Controller
             $barcodeAux = $barcodeAux->merge($auxs);
         }
 
-        // Cek apakah semua DetailProses sudah memenuhi roll
-        $allComplete = collect($barcodeKainProgress)->every(function ($progress) {
+        // Hitung progress untuk SEMUA DetailProses (untuk validasi can_scan_la_aux)
+        $allBarcodeKainProgress = [];
+        $incompleteDetails = []; // Detail yang belum lengkap
+        
+        foreach ($allDetailProsesList as $detailProses) {
+            $roll = $detailProses->roll ?? 0;
+            $barcodeKainCount = BarcodeKain::where('detail_proses_id', $detailProses->id)
+                ->where('cancel', false)
+                ->count();
+            
+            $isComplete = $barcodeKainCount >= $roll;
+            
+            $allBarcodeKainProgress[] = [
+                'detail_proses_id' => $detailProses->id,
+                'no_partai' => $detailProses->no_partai ?? 'N/A',
+                'no_op' => $detailProses->no_op ?? 'N/A',
+                'roll' => $roll,
+                'scanned' => $barcodeKainCount,
+                'is_complete' => $isComplete
+            ];
+            
+            // Kumpulkan detail yang belum lengkap untuk pesan error
+            if (!$isComplete) {
+                $incompleteDetails[] = [
+                    'no_op' => $detailProses->no_op ?? 'N/A',
+                    'no_partai' => $detailProses->no_partai ?? 'N/A',
+                    'roll' => $roll,
+                    'scanned' => $barcodeKainCount,
+                    'remaining' => $roll - $barcodeKainCount
+                ];
+            }
+        }
+
+        // Cek apakah SEMUA DetailProses sudah memenuhi roll
+        $allComplete = collect($allBarcodeKainProgress)->every(function ($progress) {
             return $progress['is_complete'];
         });
 
@@ -798,8 +836,10 @@ class ProsesController extends Controller
             'barcode_kain' => $barcodeKain->values(),
             'barcode_la' => $barcodeLa->values(),
             'barcode_aux' => $barcodeAux->values(),
-            'barcode_kain_progress' => $barcodeKainProgress,
-            'can_scan_la_aux' => $allComplete, // Flag untuk frontend: apakah bisa scan LA/AUX
+            'barcode_kain_progress' => $barcodeKainProgress, // Progress dari detail yang dipilih (untuk display)
+            'all_barcode_kain_progress' => $allBarcodeKainProgress, // Progress dari SEMUA detail (untuk validasi)
+            'incomplete_details' => $incompleteDetails, // Detail yang belum lengkap (untuk pesan error)
+            'can_scan_la_aux' => $allComplete, // Flag untuk frontend: apakah bisa scan LA/AUX (berdasarkan SEMUA detail)
         ]);
     }
 

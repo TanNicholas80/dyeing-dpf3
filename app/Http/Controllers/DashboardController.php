@@ -234,14 +234,19 @@ class DashboardController extends Controller
                 if ($proses->details) {
                     foreach ($proses->details as $detail) {
                         // Cek status barcode per detail
-                        $detailHasKain = false;
                         $detailHasLa = false;
                         $detailHasAux = false;
                         
+                        // Untuk indikator G (Kain): cek apakah jumlah barcode kain sudah sesuai dengan roll
+                        $roll = $detail->roll ?? 0;
+                        $barcodeKainCount = 0;
                         if ($detail->barcodeKains) {
-                            $detailHasKain = $detail->barcodeKains->where('cancel', false)->count() > 0;
-                            $hasBarcodeKain = $hasBarcodeKain || $detailHasKain;
+                            $barcodeKainCount = $detail->barcodeKains->where('cancel', false)->count();
                         }
+                        // Indikator G hijau hanya jika jumlah barcode kain >= jumlah roll
+                        $detailHasKain = ($barcodeKainCount >= $roll && $roll > 0);
+                        $hasBarcodeKain = $hasBarcodeKain || $detailHasKain;
+                        
                         if ($detail->barcodeLas) {
                             $detailHasLa = $detail->barcodeLas->where('cancel', false)->count() > 0;
                             $hasBarcodeLa = $hasBarcodeLa || $detailHasLa;
@@ -257,6 +262,8 @@ class DashboardController extends Controller
                             'has_kain' => $detailHasKain,
                             'has_la' => $detailHasLa,
                             'has_aux' => $detailHasAux,
+                            'roll' => $roll,
+                            'barcode_kain_count' => $barcodeKainCount,
                         ];
                     }
                 }
