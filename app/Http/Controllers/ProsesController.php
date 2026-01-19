@@ -338,6 +338,8 @@ class ProsesController extends Controller
                     'headers' => [
                         'Authorization' => 'Basic RFRfRFZEOkFxdWluYWxkbzc=',
                         'Content-Type' => 'text/plain',
+                        'Authorization' => 'Basic RFRfRFZEOkFxdWluYWxkbzc=',
+                        'Content-Type' => 'text/plain',
                         'Accept' => 'application/json',
                     ],
                     'body' => json_encode($no_op),
@@ -413,6 +415,8 @@ class ProsesController extends Controller
                 'http://18.140.227.2:8000/sap/bc/zdyes/zterima_data?sap-client=310',
                 [
                     'headers' => [
+                        'Authorization' => 'Basic RFRfRFZEOkFxdWluYWxkbzc=',
+                        'Content-Type' => 'text/plain',
                         'Accept' => 'application/json',
                     ],
                     'body' => $body,
@@ -588,6 +592,8 @@ class ProsesController extends Controller
                 'http://18.140.227.2:8000/sap/bc/zdyes/zterima_kimia?sap-client=310',
                 [
                     'headers' => [
+                        'Authorization' => 'Basic RFRfRFZEOkFxdWluYWxkbzc=',
+                        'Content-Type' => 'text/plain',
                         'Accept' => 'application/json',
                     ],
                     'body' => $body,
@@ -663,6 +669,13 @@ class ProsesController extends Controller
     // Simpan barcode aux
     public function barcodeAux(Request $request, $id)
     {
+        Log::info('BarcodeAux: Request received', [
+            'proses_id' => $id,
+            'barcode' => $request->barcode,
+            'detail_proses_id' => $request->detail_proses_id ?? null,
+            'user_id' => Auth::id(),
+            'input' => $request->all()
+        ]);
         $request->validate([
             'barcode' => 'required|string|max:255',
             'detail_proses_id' => 'nullable|exists:detail_proses,id',
@@ -681,9 +694,11 @@ class ProsesController extends Controller
         try {
             $proses = Proses::findOrFail($id);
             $barcode = $request->barcode;
+            Log::info('BarcodeAux: Proses found', ['proses_id' => $proses->id, 'barcode' => $barcode]);
 
             if (BarcodeAux::where('barcode', $barcode)->where('cancel', false)->exists()) {
                 $msg = 'Barcode AUX ini sudah pernah digunakan dan tidak dapat dipakai lagi.';
+                Log::error('BarcodeAux: Barcode already used', ['barcode' => $barcode]);
                 if ($request->ajax() || $request->wantsJson()) {
                     return response()->json(['status' => 'error', 'message' => $msg], 400);
                 }
@@ -694,6 +709,7 @@ class ProsesController extends Controller
             $validationResult = $this->validateBarcodeKainCompleteness($id);
             if ($validationResult !== null) {
                 $msg = $validationResult['error'];
+                Log::error('BarcodeAux: Barcode kain not complete', ['proses_id' => $id, 'error' => $msg]);
                 if ($request->ajax() || $request->wantsJson()) {
                     return response()->json(['status' => 'error', 'message' => $msg], 400);
                 }
@@ -706,8 +722,10 @@ class ProsesController extends Controller
                 $detailProses = DetailProses::where('id', $request->detail_proses_id)
                     ->where('proses_id', $id)
                     ->first();
+                Log::info('BarcodeAux: DetailProses by ID', ['detail_proses_id' => $request->detail_proses_id, 'found' => !!$detailProses]);
                 if (!$detailProses) {
                     $msg = 'Detail proses tidak ditemukan. Pastikan proses memiliki detail OP terlebih dahulu.';
+                    Log::error('BarcodeAux: DetailProses not found', ['detail_proses_id' => $request->detail_proses_id]);
                     if ($request->ajax() || $request->wantsJson()) {
                         return response()->json(['status' => 'error', 'message' => $msg], 400);
                     }
@@ -715,8 +733,10 @@ class ProsesController extends Controller
                 }
             } else {
                 $detailProses = DetailProses::where('proses_id', $id)->first();
+                Log::info('BarcodeAux: First DetailProses by proses_id', ['proses_id' => $id, 'found' => !!$detailProses]);
                 if (!$detailProses) {
                     $msg = 'Detail proses tidak ditemukan. Pastikan proses memiliki detail OP terlebih dahulu.';
+                    Log::error('BarcodeAux: No DetailProses found for proses', ['proses_id' => $id]);
                     if ($request->ajax() || $request->wantsJson()) {
                         return response()->json(['status' => 'error', 'message' => $msg], 400);
                     }
@@ -725,60 +745,39 @@ class ProsesController extends Controller
             }
 
             $auxl = \App\Models\Auxl::where('barcode', $barcode)->first();
+            Log::info('BarcodeAux: Auxl lookup', ['barcode' => $barcode, 'found' => !!$auxl]);
             if (!$auxl) {
                 $msg = 'Barcode tidak ditemukan di data auxiliary!';
+                Log::error('BarcodeAux: Barcode not found in auxl', ['barcode' => $barcode]);
                 if ($request->ajax() || $request->wantsJson()) {
                     return response()->json(['status' => 'error', 'message' => $msg], 400);
                 }
                 return redirect()->route('dashboard', ['page' => $page])->with('error', $msg);
             }
             $details = $auxl->details;
+            Log::info('BarcodeAux: Auxl details', ['count' => $details->count()]);
             if ($details->isEmpty()) {
                 $msg = 'Data detail auxiliary tidak ditemukan!';
+                Log::error('BarcodeAux: No details in auxl', ['barcode' => $barcode]);
                 if ($request->ajax() || $request->wantsJson()) {
                     return response()->json(['status' => 'error', 'message' => $msg], 400);
                 }
                 return redirect()->route('dashboard', ['page' => $page])->with('error', $msg);
             }
-            // Ambil semua detail proses untuk mendapatkan semua no_op
-            $detailList = DetailProses::where('proses_id', $proses->id)->get();
-            if ($detailList->isEmpty()) {
-                $msg = 'Detail proses tidak ditemukan.';
-                if ($request->ajax() || $request->wantsJson()) {
-                    return response()->json(['status' => 'error', 'message' => $msg], 400);
-                }
-                return redirect()->route('dashboard', ['page' => $page])->with('error', $msg);
-            }
-
-            // Gabungkan semua no_op dengan total qty_gi dari BarcodeKain dengan delimiter |
-            // Kelompokkan berdasarkan no_op dan jumlahkan total QTY GI untuk setiap no_op
-            $noOpGroups = $detailList->filter(function ($detail) {
-                return !empty($detail->no_op);
-            })->groupBy('no_op');
-
-            $allNoOps = $noOpGroups->map(function ($details, $noOp) {
-                // Jumlahkan total QTY GI dari semua DetailProses yang memiliki no_op yang sama
-                $totalQtyGi = 0;
-                foreach ($details as $detail) {
-                    $qtyGi = BarcodeKain::where('detail_proses_id', $detail->id)
-                        ->where('cancel', false)
-                        ->sum('qty_gi') ?? 0;
-                    $totalQtyGi += $qtyGi;
-                }
-                return $noOp . '/' . (int)$totalQtyGi;
-            })->values()->implode('|');
-
             $detailStr = $details->map(function ($d) {
                 $aux = $d->auxiliary;
                 $kons = (float)$d->konsentrasi * 1000;
                 return $aux . '/' . (int)$kons;
             })->implode('|');
-            $body = '"' . $allNoOps . ';' . $detailStr . '"';
+            $body = '"' . $detailProses->no_op . ';' . $detailStr . '"';
+            Log::info('BarcodeAux: API body prepared', ['body' => $body]);
             $client = new \GuzzleHttp\Client();
             $response = $client->post(
                 'http://18.140.227.2:8000/sap/bc/zdyes/zterima_kimia?sap-client=310',
                 [
                     'headers' => [
+                        'Authorization' => 'Basic RFRfRFZEOkFxdWluYWxkbzc=',
+                        'Content-Type' => 'text/plain',
                         'Accept' => 'application/json',
                     ],
                     'body' => $body,
@@ -786,10 +785,11 @@ class ProsesController extends Controller
                 ]
             );
             $rawResponse = $response->getBody()->getContents();
-            Log::info('API Response for barcode AUX:', ['body' => $body, 'response' => $rawResponse]);
+            Log::info('BarcodeAux: API Response', ['body' => $body, 'response' => $rawResponse]);
             $data = json_decode($rawResponse, true);
             if (empty($data)) {
                 $msg = 'Barcode atau detail auxiliary tidak dikenali oleh sistem SAP (API response kosong)';
+                Log::error('BarcodeAux: API response empty', ['body' => $body]);
                 if ($request->ajax() || $request->wantsJson()) {
                     return response()->json(['status' => 'error', 'message' => $msg], 400);
                 }
@@ -797,6 +797,7 @@ class ProsesController extends Controller
             }
             if (!is_array($data) || !isset($data[0]['stats'])) {
                 $msg = 'Gagal validasi barcode: response tidak valid';
+                Log::error('BarcodeAux: API response invalid', ['body' => $body, 'data' => $data]);
                 if ($request->ajax() || $request->wantsJson()) {
                     return response()->json(['status' => 'error', 'message' => $msg], 400);
                 }
@@ -804,12 +805,24 @@ class ProsesController extends Controller
             }
             if ($data[0]['stats'] !== 'success') {
                 $msg = $data[0]['stats'] ?: 'Barcode tidak dapat digunakan';
+                Log::error('BarcodeAux: API stats not success', ['body' => $body, 'stats' => $data[0]['stats']]);
                 if ($request->ajax() || $request->wantsJson()) {
                     return response()->json(['status' => 'error', 'message' => $msg], 400);
                 }
                 return redirect()->route('dashboard', ['page' => $page])->with('error', $msg);
             }
             $matdok = $data[0]['mblnr'] ?? null;
+
+            $detailList = DetailProses::where('proses_id', $proses->id)->get();
+            Log::info('BarcodeAux: All DetailProses for proses', ['proses_id' => $proses->id, 'count' => $detailList->count()]);
+            if ($detailList->isEmpty()) {
+                $msg = 'Detail proses tidak ditemukan.';
+                Log::error('BarcodeAux: No DetailProses found for proses', ['proses_id' => $proses->id]);
+                if ($request->ajax() || $request->wantsJson()) {
+                    return response()->json(['status' => 'error', 'message' => $msg], 400);
+                }
+                return redirect()->route('dashboard', ['page' => $page])->with('error', $msg);
+            }
 
             foreach ($detailList as $detail) {
                 BarcodeAux::create([
@@ -822,6 +835,11 @@ class ProsesController extends Controller
                     'cancel' => false,
                 ]);
             }
+            Log::info('BarcodeAux: Successfully saved to all details', [
+                'barcode' => $barcode,
+                'proses_id' => $proses->id,
+                'detail_count' => $detailList->count(),
+            ]);
 
             if ($request->ajax() || $request->wantsJson()) {
                 return response()->json(['status' => 'success', 'message' => 'Barcode AUX berhasil disimpan untuk semua OP pada proses ini!']);
@@ -834,6 +852,12 @@ class ProsesController extends Controller
             } else {
                 $errorMsg = 'Gagal menyimpan barcode AUX: ' . $e->getMessage();
             }
+            Log::error('BarcodeAux: Exception occurred', [
+                'error' => $e->getMessage(),
+                'barcode' => $request->barcode,
+                'proses_id' => $id,
+                'user_id' => Auth::id()
+            ]);
             if ($request->ajax() || $request->wantsJson()) {
                 return response()->json(['status' => 'error', 'message' => $errorMsg], 500);
             }
@@ -988,6 +1012,8 @@ class ProsesController extends Controller
                 'headers' => [
                     'Authorization' => 'Basic RFRfRFZEOkFxdWluYWxkbzc=',
                     'Content-Type' => 'text/plain',
+                    'Authorization' => 'Basic RFRfRFZEOkFxdWluYWxkbzc=',
+                    'Content-Type' => 'text/plain',
                     'Accept' => 'application/json',
                 ],
                 'body' => $body,
@@ -996,6 +1022,8 @@ class ProsesController extends Controller
                 'http://18.140.227.2:8000/sap/bc/zdyes/zterima_cancel?sap-client=310',
                 [
                     'headers' => [
+                        'Authorization' => 'Basic RFRfRFZEOkFxdWluYWxkbzc=',
+                        'Content-Type' => 'text/plain',
                         'Authorization' => 'Basic RFRfRFZEOkFxdWluYWxkbzc=',
                         'Content-Type' => 'text/plain',
                         'Accept' => 'application/json',
