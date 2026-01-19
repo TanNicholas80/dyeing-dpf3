@@ -338,8 +338,6 @@ class ProsesController extends Controller
                     'headers' => [
                         'Authorization' => 'Basic RFRfRFZEOkFxdWluYWxkbzc=',
                         'Content-Type' => 'text/plain',
-                        'Authorization' => 'Basic RFRfRFZEOkFxdWluYWxkbzc=',
-                        'Content-Type' => 'text/plain',
                         'Accept' => 'application/json',
                     ],
                     'body' => json_encode($no_op),
@@ -764,12 +762,42 @@ class ProsesController extends Controller
                 }
                 return redirect()->route('dashboard', ['page' => $page])->with('error', $msg);
             }
+
+            // Ambil semua detail proses untuk mendapatkan semua no_op
+            $detailList = DetailProses::where('proses_id', $proses->id)->get();
+            if ($detailList->isEmpty()) {
+                $msg = 'Detail proses tidak ditemukan.';
+                Log::error('BarcodeAux: No DetailProses found for proses', ['proses_id' => $proses->id]);
+                if ($request->ajax() || $request->wantsJson()) {
+                    return response()->json(['status' => 'error', 'message' => $msg], 400);
+                }
+                return redirect()->route('dashboard', ['page' => $page])->with('error', $msg);
+            }
+
+            // Gabungkan semua no_op dengan total qty_gi dari BarcodeKain dengan delimiter |
+            // Kelompokkan berdasarkan no_op dan jumlahkan total QTY GI untuk setiap no_op
+            $noOpGroups = $detailList->filter(function ($detail) {
+                return !empty($detail->no_op);
+            })->groupBy('no_op');
+
+            $allNoOps = $noOpGroups->map(function ($details, $noOp) {
+                // Jumlahkan total QTY GI dari semua DetailProses yang memiliki no_op yang sama
+                $totalQtyGi = 0;
+                foreach ($details as $detail) {
+                    $qtyGi = BarcodeKain::where('detail_proses_id', $detail->id)
+                        ->where('cancel', false)
+                        ->sum('qty_gi') ?? 0;
+                    $totalQtyGi += $qtyGi;
+                }
+                return $noOp . '/' . (int)$totalQtyGi;
+            })->values()->implode('|');
+
             $detailStr = $details->map(function ($d) {
                 $aux = $d->auxiliary;
                 $kons = (float)$d->konsentrasi * 1000;
                 return $aux . '/' . (int)$kons;
             })->implode('|');
-            $body = '"' . $detailProses->no_op . ';' . $detailStr . '"';
+            $body = '"' . $allNoOps . ';' . $detailStr . '"';
             Log::info('BarcodeAux: API body prepared', ['body' => $body]);
             $client = new \GuzzleHttp\Client();
             $response = $client->post(
@@ -813,16 +841,8 @@ class ProsesController extends Controller
             }
             $matdok = $data[0]['mblnr'] ?? null;
 
-            $detailList = DetailProses::where('proses_id', $proses->id)->get();
+            // $detailList sudah diambil sebelumnya untuk membuat body, gunakan yang sama
             Log::info('BarcodeAux: All DetailProses for proses', ['proses_id' => $proses->id, 'count' => $detailList->count()]);
-            if ($detailList->isEmpty()) {
-                $msg = 'Detail proses tidak ditemukan.';
-                Log::error('BarcodeAux: No DetailProses found for proses', ['proses_id' => $proses->id]);
-                if ($request->ajax() || $request->wantsJson()) {
-                    return response()->json(['status' => 'error', 'message' => $msg], 400);
-                }
-                return redirect()->route('dashboard', ['page' => $page])->with('error', $msg);
-            }
 
             foreach ($detailList as $detail) {
                 BarcodeAux::create([
@@ -1012,8 +1032,6 @@ class ProsesController extends Controller
                 'headers' => [
                     'Authorization' => 'Basic RFRfRFZEOkFxdWluYWxkbzc=',
                     'Content-Type' => 'text/plain',
-                    'Authorization' => 'Basic RFRfRFZEOkFxdWluYWxkbzc=',
-                    'Content-Type' => 'text/plain',
                     'Accept' => 'application/json',
                 ],
                 'body' => $body,
@@ -1022,8 +1040,6 @@ class ProsesController extends Controller
                 'http://18.140.227.2:8000/sap/bc/zdyes/zterima_cancel?sap-client=310',
                 [
                     'headers' => [
-                        'Authorization' => 'Basic RFRfRFZEOkFxdWluYWxkbzc=',
-                        'Content-Type' => 'text/plain',
                         'Authorization' => 'Basic RFRfRFZEOkFxdWluYWxkbzc=',
                         'Content-Type' => 'text/plain',
                         'Accept' => 'application/json',
