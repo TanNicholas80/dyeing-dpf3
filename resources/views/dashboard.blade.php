@@ -3301,11 +3301,21 @@
 
         // Double click card proses untuk detail
         // Jika double click pada salah satu baris OP (multiple), modal akan menampilkan detail OP tersebut.
+        // Hanya trigger jika klik berada di dalam .op-row (Box detail OP) saja
         $(document).on('dblclick', '.status-card', function(e) {
             const proses = $(this).data('proses');
             if (!proses) return;
             
-            const clickedDetailId = $(e.target).closest('.op-row').data('detail-id') || null;
+            // Cek apakah klik berada di dalam .op-row (Box detail OP)
+            const $clickedElement = $(e.target);
+            const $opRow = $clickedElement.closest('.op-row');
+            
+            // Hanya buka modal jika klik berada di dalam .op-row
+            if (!$opRow.length) {
+                return; // Klik di luar .op-row, jangan buka modal
+            }
+            
+            const clickedDetailId = $opRow.data('detail-id') || null;
             const selectedDetail = getDetailProsesById(proses, clickedDetailId) || getFirstDetailProses(proses);
             const selectedDetailId = selectedDetail && selectedDetail.id ? selectedDetail.id : null;
 
