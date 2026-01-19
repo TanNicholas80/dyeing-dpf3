@@ -544,22 +544,16 @@ class ProsesController extends Controller
             }
 
             // Gabungkan semua no_op dengan total qty_gi dari BarcodeKain dengan delimiter |
-            // Kelompokkan berdasarkan no_op dan jumlahkan total QTY GI untuk setiap no_op
-            $noOpGroups = $detailList->filter(function ($detail) {
+            // Ambil semua DetailProses (termasuk yang no_op-nya sama) tanpa di-unique
+            $allNoOps = $detailList->filter(function ($detail) {
                 return !empty($detail->no_op);
-            })->groupBy('no_op');
-
-            $allNoOps = $noOpGroups->map(function ($details, $noOp) {
-                // Jumlahkan total QTY GI dari semua DetailProses yang memiliki no_op yang sama
-                $totalQtyGi = 0;
-                foreach ($details as $detail) {
-                    $qtyGi = BarcodeKain::where('detail_proses_id', $detail->id)
-                        ->where('cancel', false)
-                        ->sum('qty_gi') ?? 0;
-                    $totalQtyGi += $qtyGi;
-                }
-                return $noOp . '/' . (int)$totalQtyGi;
-            })->values()->implode('|');
+            })->map(function ($detail) {
+                // Ambil total QTY GI dari BarcodeKain untuk DetailProses ini
+                $totalQtyGi = BarcodeKain::where('detail_proses_id', $detail->id)
+                    ->where('cancel', false)
+                    ->sum('qty_gi') ?? 0;
+                return $detail->no_op . '/' . (int)$totalQtyGi;
+            })->implode('|');
 
             $tickets = DB::connection('sqlsrv')
                 ->table('TICKET_DETAIL')
@@ -775,22 +769,16 @@ class ProsesController extends Controller
             }
 
             // Gabungkan semua no_op dengan total qty_gi dari BarcodeKain dengan delimiter |
-            // Kelompokkan berdasarkan no_op dan jumlahkan total QTY GI untuk setiap no_op
-            $noOpGroups = $detailList->filter(function ($detail) {
+            // Ambil semua DetailProses (termasuk yang no_op-nya sama) tanpa di-unique
+            $allNoOps = $detailList->filter(function ($detail) {
                 return !empty($detail->no_op);
-            })->groupBy('no_op');
-
-            $allNoOps = $noOpGroups->map(function ($details, $noOp) {
-                // Jumlahkan total QTY GI dari semua DetailProses yang memiliki no_op yang sama
-                $totalQtyGi = 0;
-                foreach ($details as $detail) {
-                    $qtyGi = BarcodeKain::where('detail_proses_id', $detail->id)
-                        ->where('cancel', false)
-                        ->sum('qty_gi') ?? 0;
-                    $totalQtyGi += $qtyGi;
-                }
-                return $noOp . '/' . (int)$totalQtyGi;
-            })->values()->implode('|');
+            })->map(function ($detail) {
+                // Ambil total QTY GI dari BarcodeKain untuk DetailProses ini
+                $totalQtyGi = BarcodeKain::where('detail_proses_id', $detail->id)
+                    ->where('cancel', false)
+                    ->sum('qty_gi') ?? 0;
+                return $detail->no_op . '/' . (int)$totalQtyGi;
+            })->implode('|');
 
             $detailStr = $details->map(function ($d) {
                 $aux = $d->auxiliary;
