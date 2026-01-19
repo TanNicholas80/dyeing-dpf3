@@ -625,8 +625,13 @@ class ProsesController extends Controller
 
             foreach ($detailList as $detail) {
                 BarcodeLa::create([
-                    'cancel'           => false,
-                    // ...isi field lain sesuai kebutuhan...
+                    'detail_proses_id' => $detail->id,
+                    'no_op' => $detail->no_op,
+                    'no_partai' => $detail->no_partai,
+                    'barcode' => $barcode,
+                    'matdok' => $matdok,
+                    'mesin_id' => $mesin_id,
+                    'cancel' => false,
                 ]);
             }
 
@@ -808,8 +813,13 @@ class ProsesController extends Controller
 
             foreach ($detailList as $detail) {
                 BarcodeAux::create([
-                    'cancel'           => false,
-                    // ...isi field lain sesuai kebutuhan...
+                    'detail_proses_id' => $detail->id,
+                    'no_op' => $detail->no_op,
+                    'no_partai' => $detail->no_partai,
+                    'barcode' => $barcode,
+                    'matdok' => $matdok,
+                    'mesin_id' => $proses->mesin_id,
+                    'cancel' => false,
                 ]);
             }
 
