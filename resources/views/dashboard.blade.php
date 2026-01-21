@@ -3665,33 +3665,18 @@
                         $('#barcode-aux-list').html(renderBarcodeGrid(data.barcode_aux, 'aux', proses
                             .id));
 
-                        // Tampilkan progress barcode kain dari SEMUA detail proses
-                        // Gunakan all_barcode_kain_progress untuk menampilkan status lengkap semua detail
-                        const allProgress = data.all_barcode_kain_progress || data.barcode_kain_progress || [];
+                        // Tampilkan progress barcode kain
+                        // Gunakan barcode_kain_progress untuk detail yang dipilih (untuk display)
+                        // dan all_barcode_kain_progress untuk validasi can_scan_la_aux (semua detail)
+                        const selectedProgress = data.barcode_kain_progress || [];
+                        const allProgress = data.all_barcode_kain_progress || [];
                         const incompleteDetails = data.incomplete_details || [];
                         let progressHtml = '';
                         
-                        if (allProgress.length > 0) {
-                            const totalDetails = allProgress.length;
-                            const completeCount = allProgress.filter(p => p.is_complete).length;
-                            const allComplete = completeCount === totalDetails;
-                            
-                            // Header dengan status keseluruhan
-                            if (allComplete) {
-                                progressHtml = '<div style="padding:4px 0;background:#e8f5e9;border-radius:4px;margin-bottom:8px;">';
-                                progressHtml += '<strong style="color:#2e7d32;"><i class="fas fa-check-circle"></i> Semua Detail OP Sudah Lengkap!</strong>';
-                                progressHtml += '<br><span style="color:#43a047;font-size:12px;">Scan Barcode LA & AUX sudah diizinkan.</span>';
-                                progressHtml += '</div>';
-                            } else {
-                                progressHtml = '<div style="padding:4px 0;background:#ffebee;border-radius:4px;margin-bottom:8px;">';
-                                progressHtml += `<strong style="color:#c62828;"><i class="fas fa-exclamation-triangle"></i> ${completeCount} dari ${totalDetails} Detail OP Lengkap</strong>`;
-                                progressHtml += '<br><span style="color:#c62828;font-size:12px;">Semua Detail OP harus lengkap sebelum scan Barcode LA & AUX.</span>';
-                                progressHtml += '</div>';
-                            }
-                            
-                            // Tampilkan progress per detail
-                            progressHtml += '<div style="padding:4px 0;"><strong>Progress Barcode Kain per Detail OP:</strong><br>';
-                            allProgress.forEach(function(p) {
+                        // Tampilkan progress untuk detail yang dipilih
+                        if (selectedProgress.length > 0) {
+                            progressHtml += '<div style="padding:4px 0;"><strong>Progress Barcode Kain (Detail yang Dipilih):</strong><br>';
+                            selectedProgress.forEach(function(p) {
                                 const statusIcon = p.is_complete ? 
                                     '<span style="color:#43a047;"><i class="fas fa-check"></i></span>' : 
                                     '<span style="color:#c62828;"><i class="fas fa-times"></i></span>';
@@ -3704,6 +3689,27 @@
                                 progressHtml += '</div>';
                             });
                             progressHtml += '</div>';
+                        }
+                        
+                        // Tampilkan status keseluruhan (untuk validasi scan LA/AUX)
+                        if (allProgress.length > 0) {
+                            const totalDetails = allProgress.length;
+                            const completeCount = allProgress.filter(p => p.is_complete).length;
+                            const allComplete = completeCount === totalDetails;
+                            
+                            if (allComplete) {
+                                progressHtml = '<div style="padding:4px 0;background:#e8f5e9;border-radius:4px;margin-bottom:8px;">' + progressHtml;
+                                progressHtml += '<div style="padding:4px 0;background:#e8f5e9;border-radius:4px;margin-top:8px;">';
+                                progressHtml += '<strong style="color:#2e7d32;"><i class="fas fa-check-circle"></i> Semua Detail OP Sudah Lengkap!</strong>';
+                                progressHtml += '<br><span style="color:#43a047;font-size:12px;">Scan Barcode LA & AUX sudah diizinkan.</span>';
+                                progressHtml += '</div>';
+                            } else {
+                                progressHtml = '<div style="padding:4px 0;background:#ffebee;border-radius:4px;margin-bottom:8px;">' + progressHtml;
+                                progressHtml += '<div style="padding:4px 0;background:#ffebee;border-radius:4px;margin-top:8px;">';
+                                progressHtml += `<strong style="color:#c62828;"><i class="fas fa-exclamation-triangle"></i> ${completeCount} dari ${totalDetails} Detail OP Lengkap</strong>`;
+                                progressHtml += '<br><span style="color:#c62828;font-size:12px;">Semua Detail OP harus lengkap sebelum scan Barcode LA & AUX.</span>';
+                                progressHtml += '</div>';
+                            }
                         }
                         $('#barcode-kain-progress').html(progressHtml);
 
@@ -4212,9 +4218,23 @@
                 actionUrl = `/proses/${prosesId}/barcode/aux`;
             }
             $('#formScanBarcode').attr('action', actionUrl);
+            // Simpan prosesId dan barcodeType untuk refresh setelah sukses
+            $('#formScanBarcode').data('proses-id', prosesId);
+            $('#formScanBarcode').data('barcode-type', barcodeType);
             $('#inputBarcodeValue').val('');
             $('#inputDetailProsesId').val(detailId);
             $('#modalScanBarcode').modal('show');
+        });
+
+        // Pastikan scroll modal detail tetap berfungsi saat modal scan dibuka
+        $('#modalScanBarcode').on('show.bs.modal', function() {
+            // Jika modal detail masih terbuka, pastikan body tetap memiliki class modal-open
+            if ($('#modalDetailProses').hasClass('show') || $('#modalDetailProses').is(':visible')) {
+                // Pastikan body memiliki class modal-open untuk scroll
+                if (!$('body').hasClass('modal-open')) {
+                    $('body').addClass('modal-open');
+                }
+            }
         });
 
         // Inisialisasi scanner hanya saat modal benar-benar tampil
@@ -4264,11 +4284,12 @@
                                 console.log("Tidak dapat memainkan suara beep:", e);
                             });
 
-                            // Setelah scan, isi input hidden dan submit form
+                            // Setelah scan, isi input hidden dan trigger submit handler
                             $('#inputBarcodeValue').val(decodedText);
-                            // Submit form POST ke endpoint barcode terkait
-                            $('#formScanBarcode').submit();
+                            // Stop scanner terlebih dahulu
                             window.html5QrcodeScanner.stop().catch(() => {});
+                            // Trigger submit event yang akan di-handle oleh AJAX handler
+                            $('#formScanBarcode').trigger('submit');
                         },
                         (errorMessage) => {}
                     ).catch(err => {
@@ -4279,6 +4300,324 @@
                 }
             }, 200);
         });
+        // Handler form submit dengan AJAX untuk memastikan notifikasi selalu muncul
+        $(document).on('submit', '#formScanBarcode', function(e) {
+            e.preventDefault(); // Prevent default form submission
+            
+            const form = $(this);
+            const actionUrl = form.attr('action');
+            const barcode = $('#inputBarcodeValue').val();
+            const detailProsesId = $('#inputDetailProsesId').val();
+            const prosesId = form.data('proses-id');
+            const barcodeType = form.data('barcode-type');
+            
+            // Validasi barcode tidak kosong
+            if (!barcode || barcode.trim() === '') {
+                showToastNotification('error', 'Barcode tidak boleh kosong!');
+                return false;
+            }
+            
+            // Tampilkan loading indicator
+            const $scannerContainer = $('#barcode-scanner-container');
+            const originalContent = $scannerContainer.html();
+            $scannerContainer.html(
+                '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;">' +
+                '<div class="spinner-border text-success" role="status" style="width:3rem;height:3rem;margin-bottom:15px;">' +
+                '<span class="sr-only">Loading...</span></div>' +
+                '<p style="color:#333;font-size:14px;margin:0;">Memproses barcode...</p>' +
+                '</div>'
+            );
+            
+            // Disable tombol tutup saat processing
+            $('#modalScanBarcode .btn-secondary').prop('disabled', true);
+            
+            // Kirim AJAX request
+            $.ajax({
+                url: actionUrl,
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json'
+                },
+                data: {
+                    barcode: barcode,
+                    detail_proses_id: detailProsesId,
+                    _token: $('meta[name="csrf-token"]').attr('content')
+                },
+                success: function(response) {
+                    // Tampilkan notifikasi success
+                    let successMessage = 'Barcode berhasil disimpan!';
+                    if (response && response.message) {
+                        successMessage = response.message;
+                    } else if (barcodeType === 'barcode_kain') {
+                        successMessage = 'Barcode kain berhasil disimpan!';
+                    } else if (barcodeType === 'barcode_la') {
+                        successMessage = 'Barcode LA berhasil disimpan untuk semua OP pada proses ini!';
+                    } else if (barcodeType === 'barcode_aux') {
+                        successMessage = 'Barcode AUX berhasil disimpan untuk semua OP pada proses ini!';
+                    }
+                    showToastNotification('success', successMessage);
+                    
+                    // Refresh barcode list jika modal detail proses masih terbuka
+                    if ($('#modalDetailProses').hasClass('show') || $('#modalDetailProses').is(':visible')) {
+                        // Ambil prosesId dari modal detail atau dari form
+                        const currentProsesId = $('#modalDetailProses').data('proses')?.id || prosesId;
+                        const selectedDetailId = $('#modalDetailProses').data('detailProsesId') || detailProsesId || '';
+                        
+                        if (currentProsesId) {
+                            // Reload barcode data via AJAX - gunakan detail_proses_id untuk filter barcode per DetailProses
+                            const barcodesUrl = `/proses/${currentProsesId}/barcodes${selectedDetailId ? '?detail_proses_id=' + encodeURIComponent(selectedDetailId) : ''}`;
+                            $.ajax({
+                                url: barcodesUrl,
+                                method: 'GET',
+                                success: function(data) {
+                                    // Helper untuk update warna blok G, D, A di card utama setelah perubahan barcode
+                                    function updateGDAIndicators(prosesId, detailId, hasKain, hasLa, hasAux) {
+                                        let $targets = $(`.status-card[data-proses-id="${prosesId}"] .op-row[data-detail-id="${detailId}"]`);
+                                        if (!$targets.length) {
+                                            $targets = $(`.status-card[data-proses-id="${prosesId}"]`);
+                                        }
+                                        const $cards = $targets;
+                                        if (!$cards.length) return;
+
+                                        $cards.each(function() {
+                                            const $card = $(this);
+                                            const prosesData = $card.data('proses');
+                                            if (!prosesData || prosesData.jenis === 'Maintenance') {
+                                                return;
+                                            }
+
+                                            function setBlockColor(blockType, ok) {
+                                                const $block = $card.find(
+                                                    `.gda-block[data-block-type="${blockType}"]`);
+                                                if (!$block.length) return;
+
+                                                const blockBg = ok ? '#d4f8e8' : '#ffb3b3';
+                                                const blockBorder = ok ? '#43a047' : '#c62828';
+                                                $block.css({
+                                                    background: blockBg,
+                                                    borderColor: blockBorder
+                                                });
+                                            }
+
+                                            setBlockColor('G', !!hasKain);
+                                            setBlockColor('D', !!hasLa);
+                                            setBlockColor('A', !!hasAux);
+                                        });
+                                    }
+
+                                    function renderBarcodeGrid(barcodes, barcodeType, prosesId) {
+                                        const activeBarcodes = (barcodes || []).filter(bk => !bk.cancel);
+                                        if (!activeBarcodes.length) {
+                                            return '<span style="color:#888;">Belum ada barcode.</span>';
+                                        }
+                                        const canCancel = window.canCancelBarcode !== false;
+                                        let html = '<div style="display:flex;flex-wrap:wrap;gap:6px;">';
+                                        activeBarcodes.forEach(function(bk, idx) {
+                                            const cancelButton = canCancel ?
+                                                `<span style='position:absolute;top:2px;right:6px;cursor:pointer;font-weight:bold;color:#b00;font-size:16px;z-index:2;' class='cancel-barcode-btn' data-type='${barcodeType}' data-proses='${prosesId}' data-id='${bk.id}' data-matdok='${bk.matdok}' title='Cancel barcode'>&times;</span>` :
+                                                '';
+                                            html += `<div style="position:relative;flex:1 0 30%;max-width:32%;background:#f3f3f3;border-radius:6px;padding:6px 4px;margin-bottom:6px;text-align:center;font-weight:bold;font-size:13px;color:#222;box-shadow:0 1px 2px #0001;">
+                                                ${cancelButton}
+                                                ${bk.barcode} ${(bk.matdok ? '<br><span style=\'font-size:11px;color:#888;\'>' + bk.matdok + '</span>' : '')}
+                                            </div>`;
+                                        });
+                                        html += '</div>';
+                                        return html;
+                                    }
+                                    
+                                    // Render ulang list barcode di modal
+                                    $('#barcode-kain-list').html(renderBarcodeGrid(data.barcode_kain, 'kain', currentProsesId));
+                                    $('#barcode-la-list').html(renderBarcodeGrid(data.barcode_la, 'la', currentProsesId));
+                                    $('#barcode-aux-list').html(renderBarcodeGrid(data.barcode_aux, 'aux', currentProsesId));
+
+                                    // Tampilkan progress barcode kain
+                                    // Gunakan barcode_kain_progress untuk detail yang dipilih (untuk display)
+                                    // dan all_barcode_kain_progress untuk validasi can_scan_la_aux (semua detail)
+                                    const selectedProgress = data.barcode_kain_progress || [];
+                                    const allProgress = data.all_barcode_kain_progress || [];
+                                    const incompleteDetails = data.incomplete_details || [];
+                                    let progressHtml = '';
+                                    
+                                    // Tampilkan progress untuk detail yang dipilih
+                                    if (selectedProgress.length > 0) {
+                                        progressHtml += '<div style="padding:4px 0;"><strong>Progress Barcode Kain (Detail yang Dipilih):</strong><br>';
+                                        selectedProgress.forEach(function(p) {
+                                            const statusIcon = p.is_complete ? 
+                                                '<span style="color:#43a047;"><i class="fas fa-check"></i></span>' : 
+                                                '<span style="color:#c62828;"><i class="fas fa-times"></i></span>';
+                                            const statusText = p.is_complete ? 
+                                                '<span style="color:#43a047;">Lengkap</span>' : 
+                                                '<span style="color:#c62828;">Kurang ' + (p.roll - p.scanned) + ' roll</span>';
+                                            const bgColor = p.is_complete ? '#e8f5e9' : '#ffebee';
+                                            progressHtml += `<div style="background:${bgColor};padding:4px 8px;margin:2px 0;border-radius:4px;">`;
+                                            progressHtml += `${statusIcon} <strong>OP ${p.no_op || 'N/A'}:</strong> ${p.scanned}/${p.roll} roll - ${statusText}`;
+                                            progressHtml += '</div>';
+                                        });
+                                        progressHtml += '</div>';
+                                    }
+                                    
+                                    // Tampilkan status keseluruhan (untuk validasi scan LA/AUX)
+                                    if (allProgress.length > 0) {
+                                        const totalDetails = allProgress.length;
+                                        const completeCount = allProgress.filter(p => p.is_complete).length;
+                                        const allComplete = completeCount === totalDetails;
+                                        
+                                        if (allComplete) {
+                                            progressHtml = '<div style="padding:4px 0;background:#e8f5e9;border-radius:4px;margin-bottom:8px;">' + progressHtml;
+                                            progressHtml += '<div style="padding:4px 0;background:#e8f5e9;border-radius:4px;margin-top:8px;">';
+                                            progressHtml += '<strong style="color:#2e7d32;"><i class="fas fa-check-circle"></i> Semua Detail OP Sudah Lengkap!</strong>';
+                                            progressHtml += '<br><span style="color:#43a047;font-size:12px;">Scan Barcode LA & AUX sudah diizinkan.</span>';
+                                            progressHtml += '</div>';
+                                        } else {
+                                            progressHtml = '<div style="padding:4px 0;background:#ffebee;border-radius:4px;margin-bottom:8px;">' + progressHtml;
+                                            progressHtml += '<div style="padding:4px 0;background:#ffebee;border-radius:4px;margin-top:8px;">';
+                                            progressHtml += `<strong style="color:#c62828;"><i class="fas fa-exclamation-triangle"></i> ${completeCount} dari ${totalDetails} Detail OP Lengkap</strong>`;
+                                            progressHtml += '<br><span style="color:#c62828;font-size:12px;">Semua Detail OP harus lengkap sebelum scan Barcode LA & AUX.</span>';
+                                            progressHtml += '</div>';
+                                        }
+                                    }
+                                    $('#barcode-kain-progress').html(progressHtml);
+
+                                    // Enable/disable tombol scan LA dan AUX (berdasarkan validasi semua detail)
+                                    const canScanLaAux = data.can_scan_la_aux !== false;
+                                    const $btnScanLa = $('#btn-scan-la');
+                                    const $btnScanAux = $('#btn-scan-aux');
+                                    
+                                    if (!canScanLaAux) {
+                                        let tooltipMsg = 'Tidak dapat scan. ';
+                                        if (incompleteDetails.length > 0) {
+                                            tooltipMsg += 'Detail OP belum lengkap: ';
+                                            const detailMsgs = incompleteDetails.map(d => `OP ${d.no_op} (kurang ${d.remaining} roll)`);
+                                            tooltipMsg += detailMsgs.join(', ');
+                                        } else {
+                                            tooltipMsg += 'Pastikan semua barcode kain sudah memenuhi jumlah roll terlebih dahulu.';
+                                        }
+                                        
+                                        $btnScanLa.prop('disabled', true)
+                                            .removeClass('btn-success')
+                                            .addClass('btn-secondary')
+                                            .css('cursor', 'not-allowed')
+                                            .attr('title', tooltipMsg);
+                                        
+                                        $btnScanAux.prop('disabled', true)
+                                            .removeClass('btn-success')
+                                            .addClass('btn-secondary')
+                                            .css('cursor', 'not-allowed')
+                                            .attr('title', tooltipMsg);
+                                    } else {
+                                        $btnScanLa.prop('disabled', false)
+                                            .removeClass('btn-secondary')
+                                            .addClass('btn-success')
+                                            .css('cursor', 'pointer')
+                                            .removeAttr('title');
+                                        
+                                        $btnScanAux.prop('disabled', false)
+                                            .removeClass('btn-secondary')
+                                            .addClass('btn-success')
+                                            .css('cursor', 'pointer')
+                                            .removeAttr('title');
+                                    }
+
+                                    // Update G/D/A indicators
+                                    const hasKainActive = data.can_scan_la_aux === true;
+                                    const hasLaActive = (data.barcode_la || []).some(bk => !bk.cancel);
+                                    const hasAuxActive = (data.barcode_aux || []).some(bk => !bk.cancel);
+                                    updateGDAIndicators(currentProsesId, selectedDetailId, hasKainActive, hasLaActive, hasAuxActive);
+                                },
+                                error: function() {
+                                    // Silent fail untuk refresh, tidak perlu notifikasi error
+                                }
+                            });
+                        }
+                    }
+                    
+                    // Tutup modal setelah sukses (delay sedikit agar user melihat notifikasi)
+                    // Pastikan scroll modal detail tetap berfungsi setelah modal scan ditutup
+                    setTimeout(function() {
+                        $('#modalScanBarcode').modal('hide');
+                        // Pastikan body tetap memiliki class modal-open jika modal detail masih terbuka
+                        if ($('#modalDetailProses').hasClass('show') || $('#modalDetailProses').is(':visible')) {
+                            // Restore modal-open class dan padding untuk scroll modal detail
+                            if (!$('body').hasClass('modal-open')) {
+                                $('body').addClass('modal-open');
+                            }
+                            // Pastikan overflow hidden hanya untuk modal yang sedang aktif
+                            const modalBackdrop = $('.modal-backdrop');
+                            if (modalBackdrop.length > 1) {
+                                // Jika ada multiple backdrop, hapus yang terakhir (dari modal scan)
+                                modalBackdrop.last().remove();
+                            }
+                        }
+                    }, 500);
+                },
+                error: function(xhr) {
+                    // Tampilkan notifikasi error
+                    let errorMsg = 'Gagal menyimpan barcode.';
+                    
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        errorMsg = xhr.responseJSON.message;
+                    } else if (xhr.responseJSON && xhr.responseJSON.errors) {
+                        errorMsg = Object.values(xhr.responseJSON.errors).flat().join(', ');
+                    } else if (xhr.status === 0) {
+                        errorMsg = 'Tidak dapat terhubung ke server. Periksa koneksi internet Anda.';
+                    } else if (xhr.status === 500) {
+                        errorMsg = 'Terjadi kesalahan pada server. Silakan coba lagi.';
+                    } else if (xhr.status === 404) {
+                        errorMsg = 'Endpoint tidak ditemukan.';
+                    } else if (xhr.status === 419) {
+                        errorMsg = 'Session expired. Silakan refresh halaman dan coba lagi.';
+                    }
+                    
+                    showToastNotification('error', errorMsg);
+                    
+                    // Restore scanner untuk scan ulang
+                    $scannerContainer.html(
+                        '<div id="reader" style="width:100%;max-width:400px;margin:auto;"></div>'
+                    );
+                    
+                    // Restart scanner
+                    if (window.html5QrcodeScanner) {
+                        try {
+                            window.html5QrcodeScanner.clear();
+                        } catch(e) {}
+                    }
+                    
+                    window.html5QrcodeScanner = new Html5Qrcode("reader");
+                    const beepSound = new Audio("{{ asset('sound/beep.mp3') }}");
+                    
+                    window.html5QrcodeScanner.start({
+                        facingMode: "environment"
+                    }, {
+                        fps: 10,
+                        qrbox: 250,
+                        formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE,
+                            Html5QrcodeSupportedFormats.CODE_128]
+                    },
+                    (decodedText, decodedResult) => {
+                        beepSound.play().catch(e => {
+                            console.log("Tidak dapat memainkan suara beep:", e);
+                        });
+                        $('#inputBarcodeValue').val(decodedText);
+                        window.html5QrcodeScanner.stop().catch(() => {});
+                        $('#formScanBarcode').trigger('submit');
+                    },
+                    (errorMessage) => {}
+                    ).catch(err => {
+                        $scannerContainer.html(
+                            '<span style="color:#fff;">Tidak dapat mengakses kamera: ' + err + '</span>'
+                        );
+                    });
+                },
+                complete: function() {
+                    // Enable tombol tutup kembali
+                    $('#modalScanBarcode .btn-secondary').prop('disabled', false);
+                }
+            });
+            
+            return false;
+        });
+
         // Stop scanner saat modal ditutup
         $('#modalScanBarcode').on('hidden.bs.modal', function() {
             if (window.html5QrcodeScanner) {
@@ -4297,6 +4636,31 @@
                 }
             } else {
                 $('#barcode-scanner-container').html('');
+            }
+            
+            // Reset form
+            $('#formScanBarcode').removeData('proses-id');
+            $('#formScanBarcode').removeData('barcode-type');
+            $('#inputBarcodeValue').val('');
+            
+            // Pastikan scroll modal detail tetap berfungsi setelah modal scan ditutup
+            // Jika modal detail masih terbuka, pastikan body tetap memiliki class modal-open
+            if ($('#modalDetailProses').hasClass('show') || $('#modalDetailProses').is(':visible')) {
+                // Restore modal-open class untuk memastikan scroll berfungsi
+                if (!$('body').hasClass('modal-open')) {
+                    $('body').addClass('modal-open');
+                }
+                // Pastikan hanya ada satu backdrop (dari modal detail)
+                const modalBackdrop = $('.modal-backdrop');
+                if (modalBackdrop.length > 1) {
+                    // Hapus backdrop tambahan yang mungkin tersisa dari modal scan
+                    modalBackdrop.last().remove();
+                }
+                // Pastikan padding-right di body diatur dengan benar untuk scroll
+                const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+                if (scrollbarWidth > 0) {
+                    $('body').css('padding-right', scrollbarWidth + 'px');
+                }
             }
         });
 
@@ -5248,6 +5612,17 @@
             $('#modalConfirmCancelBarcode').modal('show');
         });
 
+        // Pastikan scroll modal detail tetap berfungsi saat modal cancel barcode dibuka
+        $('#modalConfirmCancelBarcode').on('show.bs.modal', function() {
+            // Jika modal detail masih terbuka, pastikan body tetap memiliki class modal-open
+            if ($('#modalDetailProses').hasClass('show') || $('#modalDetailProses').is(':visible')) {
+                // Pastikan body memiliki class modal-open untuk scroll
+                if (!$('body').hasClass('modal-open')) {
+                    $('body').addClass('modal-open');
+                }
+            }
+        });
+
         // Modal konfirmasi cancel barcode
         if (!document.getElementById('modalConfirmCancelBarcode')) {
             $(document.body).append(`
@@ -5321,7 +5696,21 @@
                     matdok: matdok
                 },
                 success: function(r) {
+                    // Tutup modal dan pastikan scroll modal detail tetap berfungsi
                     $('#modalConfirmCancelBarcode').modal('hide');
+                    // Pastikan body tetap memiliki class modal-open jika modal detail masih terbuka
+                    if ($('#modalDetailProses').hasClass('show') || $('#modalDetailProses').is(':visible')) {
+                        // Restore modal-open class dan padding untuk scroll modal detail
+                        if (!$('body').hasClass('modal-open')) {
+                            $('body').addClass('modal-open');
+                        }
+                        // Pastikan overflow hidden hanya untuk modal yang sedang aktif
+                        const modalBackdrop = $('.modal-backdrop');
+                        if (modalBackdrop.length > 1) {
+                            // Jika ada multiple backdrop, hapus yang terakhir (dari modal cancel)
+                            modalBackdrop.last().remove();
+                        }
+                    }
 
                     if (r && r.status === 'success') {
                         // Show success message
@@ -5413,30 +5802,18 @@
                                             .barcode_aux, 'aux',
                                             currentProsesForRefresh));
 
-                                        // Update progress barcode kain dari SEMUA detail proses
-                                        const allProgress = data.all_barcode_kain_progress || data.barcode_kain_progress || [];
+                                        // Tampilkan progress barcode kain
+                                        // Gunakan barcode_kain_progress untuk detail yang dipilih (untuk display)
+                                        // dan all_barcode_kain_progress untuk validasi can_scan_la_aux (semua detail)
+                                        const selectedProgress = data.barcode_kain_progress || [];
+                                        const allProgress = data.all_barcode_kain_progress || [];
                                         const incompleteDetails = data.incomplete_details || [];
                                         let progressHtml = '';
                                         
-                                        if (allProgress.length > 0) {
-                                            const totalDetails = allProgress.length;
-                                            const completeCount = allProgress.filter(p => p.is_complete).length;
-                                            const allComplete = completeCount === totalDetails;
-                                            
-                                            if (allComplete) {
-                                                progressHtml = '<div style="padding:4px 0;background:#e8f5e9;border-radius:4px;margin-bottom:8px;">';
-                                                progressHtml += '<strong style="color:#2e7d32;"><i class="fas fa-check-circle"></i> Semua Detail OP Sudah Lengkap!</strong>';
-                                                progressHtml += '<br><span style="color:#43a047;font-size:12px;">Scan Barcode LA & AUX sudah diizinkan.</span>';
-                                                progressHtml += '</div>';
-                                            } else {
-                                                progressHtml = '<div style="padding:4px 0;background:#ffebee;border-radius:4px;margin-bottom:8px;">';
-                                                progressHtml += `<strong style="color:#c62828;"><i class="fas fa-exclamation-triangle"></i> ${completeCount} dari ${totalDetails} Detail OP Lengkap</strong>`;
-                                                progressHtml += '<br><span style="color:#c62828;font-size:12px;">Semua Detail OP harus lengkap sebelum scan Barcode LA & AUX.</span>';
-                                                progressHtml += '</div>';
-                                            }
-                                            
-                                            progressHtml += '<div style="padding:4px 0;"><strong>Progress Barcode Kain per Detail OP:</strong><br>';
-                                            allProgress.forEach(function(p) {
+                                        // Tampilkan progress untuk detail yang dipilih
+                                        if (selectedProgress.length > 0) {
+                                            progressHtml += '<div style="padding:4px 0;"><strong>Progress Barcode Kain (Detail yang Dipilih):</strong><br>';
+                                            selectedProgress.forEach(function(p) {
                                                 const statusIcon = p.is_complete ? 
                                                     '<span style="color:#43a047;"><i class="fas fa-check"></i></span>' : 
                                                     '<span style="color:#c62828;"><i class="fas fa-times"></i></span>';
@@ -5449,6 +5826,27 @@
                                                 progressHtml += '</div>';
                                             });
                                             progressHtml += '</div>';
+                                        }
+                                        
+                                        // Tampilkan status keseluruhan (untuk validasi scan LA/AUX)
+                                        if (allProgress.length > 0) {
+                                            const totalDetails = allProgress.length;
+                                            const completeCount = allProgress.filter(p => p.is_complete).length;
+                                            const allComplete = completeCount === totalDetails;
+                                            
+                                            if (allComplete) {
+                                                progressHtml = '<div style="padding:4px 0;background:#e8f5e9;border-radius:4px;margin-bottom:8px;">' + progressHtml;
+                                                progressHtml += '<div style="padding:4px 0;background:#e8f5e9;border-radius:4px;margin-top:8px;">';
+                                                progressHtml += '<strong style="color:#2e7d32;"><i class="fas fa-check-circle"></i> Semua Detail OP Sudah Lengkap!</strong>';
+                                                progressHtml += '<br><span style="color:#43a047;font-size:12px;">Scan Barcode LA & AUX sudah diizinkan.</span>';
+                                                progressHtml += '</div>';
+                                            } else {
+                                                progressHtml = '<div style="padding:4px 0;background:#ffebee;border-radius:4px;margin-bottom:8px;">' + progressHtml;
+                                                progressHtml += '<div style="padding:4px 0;background:#ffebee;border-radius:4px;margin-top:8px;">';
+                                                progressHtml += `<strong style="color:#c62828;"><i class="fas fa-exclamation-triangle"></i> ${completeCount} dari ${totalDetails} Detail OP Lengkap</strong>`;
+                                                progressHtml += '<br><span style="color:#c62828;font-size:12px;">Semua Detail OP harus lengkap sebelum scan Barcode LA & AUX.</span>';
+                                                progressHtml += '</div>';
+                                            }
                                         }
                                         $('#barcode-kain-progress').html(progressHtml);
 
@@ -5522,7 +5920,21 @@
                     }
                 },
                 error: function(xhr) {
+                    // Tutup modal dan pastikan scroll modal detail tetap berfungsi
                     $('#modalConfirmCancelBarcode').modal('hide');
+                    // Pastikan body tetap memiliki class modal-open jika modal detail masih terbuka
+                    if ($('#modalDetailProses').hasClass('show') || $('#modalDetailProses').is(':visible')) {
+                        // Restore modal-open class dan padding untuk scroll modal detail
+                        if (!$('body').hasClass('modal-open')) {
+                            $('body').addClass('modal-open');
+                        }
+                        // Pastikan overflow hidden hanya untuk modal yang sedang aktif
+                        const modalBackdrop = $('.modal-backdrop');
+                        if (modalBackdrop.length > 1) {
+                            // Jika ada multiple backdrop, hapus yang terakhir (dari modal cancel)
+                            modalBackdrop.last().remove();
+                        }
+                    }
                     let errorMsg = 'Gagal request ke server.';
                     if (xhr.responseJSON && xhr.responseJSON.message) {
                         errorMsg = xhr.responseJSON.message;
@@ -5553,6 +5965,26 @@
                 '<i class="fas fa-check mr-1"></i>Ya, Cancel');
             $('#btnCancelCancelBarcode').prop('disabled', false);
             $('#cancelBarcodeLoading').hide();
+            
+            // Pastikan scroll modal detail tetap berfungsi setelah modal cancel ditutup
+            // Jika modal detail masih terbuka, pastikan body tetap memiliki class modal-open
+            if ($('#modalDetailProses').hasClass('show') || $('#modalDetailProses').is(':visible')) {
+                // Restore modal-open class untuk memastikan scroll berfungsi
+                if (!$('body').hasClass('modal-open')) {
+                    $('body').addClass('modal-open');
+                }
+                // Pastikan hanya ada satu backdrop (dari modal detail)
+                const modalBackdrop = $('.modal-backdrop');
+                if (modalBackdrop.length > 1) {
+                    // Hapus backdrop tambahan yang mungkin tersisa dari modal cancel
+                    modalBackdrop.last().remove();
+                }
+                // Pastikan padding-right di body diatur dengan benar untuk scroll
+                const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+                if (scrollbarWidth > 0) {
+                    $('body').css('padding-right', scrollbarWidth + 'px');
+                }
+            }
         });
 
         $(document).ready(function() {
