@@ -385,11 +385,8 @@
     <script src="{{ asset('lte/plugins/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
     <!-- AdminLTE App -->
     <script src="{{ asset('lte/dist/js/adminlte.min.js') }}"></script>
-    <!-- AdminLTE for demo purposes -->
-    <script src="{{ asset('lte/dist/js/demo.js') }}"></script>
     <!-- Select2 -->
     <script src="{{ asset('lte/plugins/select2/js/select2.full.min.js') }}"></script>
-
     <!-- DataTables  & Plugins -->
     <script src="{{ asset('lte/plugins/datatables/jquery.dataTables.min.js') }}"></script>
     <script src="{{ asset('lte/plugins/datatables-bs4/js/dataTables.bootstrap4.min.js') }}"></script>
@@ -403,47 +400,28 @@
     <script src="{{ asset('lte/plugins/datatables-buttons/js/buttons.html5.min.js') }}"></script>
     <script src="{{ asset('lte/plugins/datatables-buttons/js/buttons.print.min.js') }}"></script>
     <script src="{{ asset('lte/plugins/datatables-buttons/js/buttons.colVis.min.js') }}"></script>
-
     <script src="{{ asset('lte/plugins/sweetalert2/sweetalert2.min.js') }}"></script>
 
     <script>
-        // Setup CSRF Token untuk AJAX (selalu ambil dari meta tag yang fresh)
+        // Setup CSRF Token untuk AJAX
         $.ajaxSetup({
             headers: {
                 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
             }
         });
 
-        // Update CSRF token setiap kali halaman di-load atau refresh
-        function updateCsrfToken() {
-            // Ambil token baru dari meta tag
-            const newToken = $('meta[name="csrf-token"]').attr('content');
-            if (newToken) {
-                // Update jQuery AJAX setup
+        // Update CSRF token setiap kali meta tag berubah (setelah logout/login)
+        $(document).ajaxComplete(function(event, xhr, settings) {
+            if (xhr.status === 419) {
                 $.ajaxSetup({
                     headers: {
-                        'X-CSRF-TOKEN': newToken
+                        'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
                     }
                 });
             }
-        }
-
-        // Update token saat document ready
-        $(document).ready(function() {
-            updateCsrfToken();
-            
-            // Initialize Select2 Elements
-            $('.select2').select2();
         });
 
-        // Update token setiap kali meta tag berubah (setelah logout/login)
-        $(document).ajaxComplete(function(event, xhr, settings) {
-            // Jika mendapat 419 error, refresh token dari meta tag
-            if (xhr.status === 419) {
-                updateCsrfToken();
-            }
-        });
-
+        // Update waktu real-time di navbar
         function updateDateTime() {
             const dateTimeElement = document.getElementById('datetime');
             if (dateTimeElement) {
@@ -456,63 +434,44 @@
                 const hours = now.getHours().toString().padStart(2, '0');
                 const minutes = now.getMinutes().toString().padStart(2, '0');
                 const seconds = now.getSeconds().toString().padStart(2, '0');
-
                 const dateTimeString = `${dayOfWeek}, ${dayOfMonth}-${month}-${year} | ${hours}:${minutes}:${seconds}`;
                 dateTimeElement.textContent = dateTimeString;
             }
         }
-
         updateDateTime();
-
         setInterval(updateDateTime, 1000);
 
+        // Inisialisasi Select2
         $(document).ready(function() {
-            function initializeDataTable(tableId) {
-                $(tableId).DataTable({
-                    "paging": true,
-                    "responsive": false,
-                    "lengthChange": true,
-                    "autoWidth": false,
-                    "scrollX": false,
-                    "searching": true,
-                    "ordering": true,
-                    "info": true,
-                }).buttons().container().appendTo($(tableId + '_wrapper .col-md-6:eq(0)'));
-            }
-            initializeDataTable('#user');
-            initializeDataTable('#mesin');
-            initializeDataTable('#approval_fm');
-            initializeDataTable('#approval_vp');
+            $('.select2').select2();
         });
 
+        // Inisialisasi DataTable (hanya jika ada table dengan id yang sesuai)
         $(document).ready(function() {
-            function initializeDataTable(tableId) {
-                $(tableId).DataTable({
-                    "paging": true,
-                    "responsive": false,
-                    "lengthChange": true,
-                    "autoWidth": false,
-                    "scrollX": true,
-                    "searching": true,
-                    "ordering": true,
-                    "info": true,
-                }).buttons().container().appendTo($(tableId + '_wrapper .col-md-6:eq(0)'));
-            }
-            initializeDataTable('#auxl');
-            initializeDataTable('#activity_log');
+            const tableIds = ['#user', '#mesin', '#approval_fm', '#approval_vp', '#auxl', '#activity_log'];
+            tableIds.forEach(function(tableId) {
+                if ($(tableId).length) {
+                    $(tableId).DataTable({
+                        paging: true,
+                        responsive: false,
+                        lengthChange: true,
+                        autoWidth: false,
+                        scrollX: true,
+                        searching: true,
+                        ordering: true,
+                        info: true,
+                    }).buttons().container().appendTo($(tableId + '_wrapper .col-md-6:eq(0)'));
+                }
+            });
         });
-
 
         // Fullscreen global button logic
         document.addEventListener('DOMContentLoaded', function() {
             const fsBtn = document.getElementById('global-fullscreen-btn');
             if (!fsBtn) return;
-
             fsBtn.addEventListener('click', function(e) {
                 e.preventDefault();
-
                 if (!document.fullscreenElement) {
-                    // Masuk fullscreen
                     if (document.documentElement.requestFullscreen) {
                         document.documentElement.requestFullscreen();
                     } else if (document.documentElement.webkitRequestFullscreen) {
@@ -521,7 +480,6 @@
                         document.documentElement.msRequestFullscreen();
                     }
                 } else {
-                    // Keluar fullscreen
                     if (document.exitFullscreen) {
                         document.exitFullscreen();
                     } else if (document.webkitExitFullscreen) {
@@ -531,8 +489,6 @@
                     }
                 }
             });
-
-            // Event listener untuk memberi tahu semua halaman saat fullscreen berubah
             document.addEventListener('fullscreenchange', function() {
                 const isFullscreen = !!document.fullscreenElement;
                 window.dispatchEvent(new CustomEvent('globalFullscreenToggle', {
@@ -544,43 +500,35 @@
 
     <script>
         @if (session('success'))
-            const ToastSuccess = Swal.mixin({
+            Swal.fire({
                 toast: true,
                 position: 'top-end',
                 icon: 'success',
                 showConfirmButton: false,
                 timer: 3000,
                 timerProgressBar: true,
-            });
-            ToastSuccess.fire({
                 title: "{{ session('success') }}"
             });
         @endif
-
         @if (session('error'))
-            const ToastError = Swal.mixin({
+            Swal.fire({
                 toast: true,
                 position: 'top-end',
                 icon: 'error',
                 showConfirmButton: false,
                 timer: 3000,
                 timerProgressBar: true,
-            });
-            ToastError.fire({
                 title: "{{ session('error') }}"
             });
         @endif
-
         @if (session('info'))
-            const ToastInfo = Swal.mixin({
+            Swal.fire({
                 toast: true,
                 position: 'top-end',
                 icon: 'info',
                 showConfirmButton: false,
                 timer: 3000,
                 timerProgressBar: true,
-            });
-            ToastInfo.fire({
                 title: "{{ session('info') }}"
             });
         @endif
