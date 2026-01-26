@@ -7,6 +7,8 @@ use Illuminate\Support\Facades\View;
 use Carbon\Carbon;
 use App\Models\Mesin;
 use App\Models\Approval;
+use App\Models\Proses;
+use App\Observers\ProsesObserver;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -46,5 +48,8 @@ class AppServiceProvider extends ServiceProvider
             $view->with('pendingApprovalFM', $pendingApprovalFM);
             $view->with('pendingApprovalVP', $pendingApprovalVP);
         });
+
+        // Register observer untuk Proses model
+        Proses::observe(ProsesObserver::class);
     }
 }

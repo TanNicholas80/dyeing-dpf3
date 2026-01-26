@@ -9,6 +9,10 @@ use App\Models\BarcodeKain;
 use App\Models\BarcodeLa;
 use App\Models\BarcodeAux;
 use App\Models\Approval;
+use App\Events\ProsesCreated;
+use App\Events\ProsesStatusUpdated;
+use App\Events\BarcodeStatusUpdated;
+use App\Services\ProsesStatusService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -307,6 +311,13 @@ class ProsesController extends Controller
             }
 
             // Produksi / Maintenance langsung tampil
+            // Broadcast event untuk update real-time
+            $proses->load(['approvals', 'details.barcodeKains', 'details.barcodeLas', 'details.barcodeAuxs']);
+            $statusService = new ProsesStatusService();
+            $affectedProsesIds = $statusService->getAffectedProsesIds();
+            $statusData = $statusService->generateProsesStatus($proses, $affectedProsesIds);
+            event(new ProsesCreated($proses->id, $statusData));
+
             return redirect()->route('dashboard', ['page' => $page])
                 ->with('success', 'Proses berhasil ditambahkan');
         } catch (\Exception $e) {
@@ -451,6 +462,15 @@ class ProsesController extends Controller
                 'cancel' => false,
             ]);
             Log::info('BarcodeKain: Successfully saved to database', ['barcode' => $barcode, 'proses_id' => $proses->id]);
+            
+            // Broadcast event untuk update real-time
+            $proses->refresh();
+            $proses->load(['approvals', 'details.barcodeKains', 'details.barcodeLas', 'details.barcodeAuxs']);
+            $statusService = new ProsesStatusService();
+            $affectedProsesIds = $statusService->getAffectedProsesIds();
+            $statusData = $statusService->generateProsesStatus($proses, $affectedProsesIds);
+            event(new BarcodeStatusUpdated($proses->id, $statusData));
+            
             if ($request->ajax() || $request->wantsJson()) {
                 return response()->json(['status' => 'success', 'message' => 'Barcode kain berhasil disimpan!']);
             }
@@ -638,6 +658,14 @@ class ProsesController extends Controller
                 'proses_id' => $proses->id,
                 'detail_count' => $detailList->count(),
             ]);
+
+            // Broadcast event untuk update real-time
+            $proses->refresh();
+            $proses->load(['approvals', 'details.barcodeKains', 'details.barcodeLas', 'details.barcodeAuxs']);
+            $statusService = new ProsesStatusService();
+            $affectedProsesIds = $statusService->getAffectedProsesIds();
+            $statusData = $statusService->generateProsesStatus($proses, $affectedProsesIds);
+            event(new BarcodeStatusUpdated($proses->id, $statusData));
 
             if ($request->ajax() || $request->wantsJson()) {
                 return response()->json(['status' => 'success', 'message' => 'Barcode LA berhasil disimpan untuk semua OP pada proses ini!']);
@@ -849,6 +877,14 @@ class ProsesController extends Controller
                 'detail_count' => $detailList->count(),
             ]);
 
+            // Broadcast event untuk update real-time
+            $proses->refresh();
+            $proses->load(['approvals', 'details.barcodeKains', 'details.barcodeLas', 'details.barcodeAuxs']);
+            $statusService = new ProsesStatusService();
+            $affectedProsesIds = $statusService->getAffectedProsesIds();
+            $statusData = $statusService->generateProsesStatus($proses, $affectedProsesIds);
+            event(new BarcodeStatusUpdated($proses->id, $statusData));
+
             if ($request->ajax() || $request->wantsJson()) {
                 return response()->json(['status' => 'success', 'message' => 'Barcode AUX berhasil disimpan untuk semua OP pada proses ini!']);
             }
@@ -1059,8 +1095,54 @@ class ProsesController extends Controller
                     }
                 }
                 if ($barcodeObj) {
+                    // Ambil prosesId sebelum update untuk memastikan relasi masih ada
+                    $prosesId = null;
+                    $detailProsesId = null;
+                    if ($type === 'kain') {
+                        $detailProsesId = $barcodeObj->detail_proses_id;
+                        $prosesId = $barcodeObj->detailProses->proses_id ?? null;
+                    } elseif ($type === 'la') {
+                        $detailProsesId = $barcodeObj->detail_proses_id;
+                        $prosesId = $barcodeObj->detailProses->proses_id ?? null;
+                    } elseif ($type === 'aux') {
+                        $detailProsesId = $barcodeObj->detail_proses_id;
+                        $prosesId = $barcodeObj->detailProses->proses_id ?? null;
+                    }
+                    
                     $barcodeObj->cancel = true;
                     $barcodeObj->save();
+                    
+                    // Refresh model untuk memastikan perubahan tersimpan
+                    $barcodeObj->refresh();
+                    
+                    // Broadcast event untuk update real-time
+                    if ($prosesId) {
+                        // Refresh proses dengan relasi yang fresh - gunakan fresh() untuk bypass cache
+                        $proses = Proses::with(['approvals', 'details.barcodeKains', 'details.barcodeLas', 'details.barcodeAuxs'])->find($prosesId);
+                        if ($proses) {
+                            // Refresh semua relasi untuk memastikan data terbaru (termasuk yang sudah di-cancel)
+                            $proses->load(['approvals', 'details.barcodeKains', 'details.barcodeLas', 'details.barcodeAuxs']);
+                            
+                            // Pastikan setiap detail juga di-refresh
+                            foreach ($proses->details as $detail) {
+                                $detail->load(['barcodeKains', 'barcodeLas', 'barcodeAuxs']);
+                            }
+                            
+                            $statusService = new ProsesStatusService();
+                            $affectedProsesIds = $statusService->getAffectedProsesIds();
+                            $statusData = $statusService->generateProsesStatus($proses, $affectedProsesIds);
+                            
+                            Log::info('Broadcasting BarcodeStatusUpdated after cancel', [
+                                'proses_id' => $prosesId,
+                                'detail_id' => $detailProsesId,
+                                'barcode_type' => $type,
+                                'status_data' => $statusData
+                            ]);
+                            
+                            event(new BarcodeStatusUpdated($prosesId, $statusData));
+                        }
+                    }
+                    
                     return response()->json([
                         'status' => 'success',
                         'message' => $alreadyCanceled

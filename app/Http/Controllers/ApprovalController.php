@@ -6,6 +6,10 @@ use App\Models\Approval;
 use App\Models\Auxl;
 use App\Models\Proses;
 use App\Models\DetailProses;
+use App\Events\ProsesStatusUpdated;
+use App\Events\ProsesDeleted;
+use App\Events\ProsesMoved;
+use App\Services\ProsesStatusService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -222,6 +226,14 @@ class ApprovalController extends Controller
                 if (isset($history['new_cycle_time'])) {
                     $proses->cycle_time = $history['new_cycle_time'];
                     $proses->save();
+                    
+                    // Broadcast event untuk update real-time
+                    $proses->refresh();
+                    $proses->load(['approvals', 'details.barcodeKains', 'details.barcodeLas', 'details.barcodeAuxs']);
+                    $statusService = new ProsesStatusService();
+                    $affectedProsesIds = $statusService->getAffectedProsesIds();
+                    $statusData = $statusService->generateProsesStatus($proses, $affectedProsesIds);
+                    event(new ProsesStatusUpdated($proses->id, $statusData));
                 } else {
                     throw new \Exception("Data 'new_cycle_time' tidak ditemukan dalam history_data.");
                 }
@@ -229,7 +241,12 @@ class ApprovalController extends Controller
 
             case 'delete_proses':
                 // Soft delete proses (menggunakan soft deletes, data tidak benar-benar dihapus)
+                $mesinId = $proses->mesin_id;
+                $prosesId = $proses->id;
                 $proses->delete();
+                
+                // Broadcast event untuk update real-time
+                event(new ProsesDeleted($prosesId, $mesinId));
                 break;
 
             case 'move_machine':
@@ -250,6 +267,14 @@ class ApprovalController extends Controller
                     $this->reorderPendingProcessesForMachine($oldMesinId);
                     $this->reorderPendingProcessesForMachine($newMesinId);
                 });
+                
+                // Broadcast event untuk update real-time
+                $proses->refresh();
+                $proses->load(['approvals', 'details.barcodeKains', 'details.barcodeLas', 'details.barcodeAuxs']);
+                $statusService = new ProsesStatusService();
+                $affectedProsesIds = $statusService->getAffectedProsesIds();
+                $statusData = $statusService->generateProsesStatus($proses, $affectedProsesIds);
+                event(new ProsesMoved($proses->id, $oldMesinId, $newMesinId, $statusData));
                 break;
 
             case 'create_reprocess':
@@ -373,6 +398,23 @@ class ApprovalController extends Controller
                         $proses1->order = $newOrder;
                         $proses1->save();
                     });
+                    
+                    // Broadcast event untuk update real-time - update semua proses yang terpengaruh
+                    $statusService = new ProsesStatusService();
+                    $affectedProsesIds = $statusService->getAffectedProsesIds();
+                    
+                    // Update proses1
+                    $proses1->refresh();
+                    $proses1->load(['approvals', 'details.barcodeKains', 'details.barcodeLas', 'details.barcodeAuxs']);
+                    $statusData1 = $statusService->generateProsesStatus($proses1, $affectedProsesIds);
+                    event(new ProsesStatusUpdated($proses1->id, $statusData1));
+                    
+                    // Update proses2 jika ada
+                    $proses2 = Proses::with(['approvals', 'details.barcodeKains', 'details.barcodeLas', 'details.barcodeAuxs'])->find($proses2Id);
+                    if ($proses2) {
+                        $statusData2 = $statusService->generateProsesStatus($proses2, $affectedProsesIds);
+                        event(new ProsesStatusUpdated($proses2->id, $statusData2));
+                    }
                 } else {
                     throw new \Exception("Data 'proses1_id' atau 'proses2_id' tidak ditemukan dalam history_data untuk swap_position.");
                 }

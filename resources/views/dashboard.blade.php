@@ -4847,7 +4847,10 @@
             // Bisa digunakan untuk update real-time dari API atau setelah scan barcode
             function updateGDAIndicatorsGlobal(prosesId, detailId, hasKain, hasLa, hasAux) {
                 const $card = $(`.status-card[data-proses-id="${prosesId}"]`);
-                if (!$card.length) return;
+                if (!$card.length) {
+                    console.warn('Card not found for prosesId:', prosesId);
+                    return;
+                }
 
                 const prosesData = $card.data('proses');
                 if (!prosesData || prosesData.jenis === 'Maintenance') {
@@ -4857,7 +4860,10 @@
                 // Fungsi helper untuk set warna blok GDA
                 function setBlockColor($container, blockType, ok) {
                     const $blocks = $container.find(`.gda-block[data-block-type="${blockType}"]`);
-                    if (!$blocks.length) return;
+                    if (!$blocks.length) {
+                        console.warn(`GDA block ${blockType} not found in container for prosesId: ${prosesId}, detailId: ${detailId}`);
+                        return;
+                    }
 
                     const blockBg = ok ? '#d4f8e8' : '#ffb3b3';
                     const blockBorder = ok ? '#43a047' : '#c62828';
@@ -4865,19 +4871,23 @@
                         background: blockBg,
                         borderColor: blockBorder
                     });
+                    console.log(`Updated ${blockType} to ${ok ? 'green' : 'red'} for prosesId: ${prosesId}, detailId: ${detailId || 'header'}`);
                 }
 
+                // Convert detailId ke string untuk memastikan match dengan HTML
+                const detailIdStr = detailId ? String(detailId) : null;
+
                 // Jika detailId tidak ada atau kosong, update GDA di header card (untuk single OP atau OP pertama)
-                if (!detailId || detailId === '') {
-                    // Update GDA di header card
+                if (!detailIdStr || detailIdStr === '' || detailIdStr === 'null' || detailIdStr === 'undefined') {
+                    console.log('Updating GDA in header card (no detailId)');
                     setBlockColor($card, 'G', !!hasKain);
                     setBlockColor($card, 'D', !!hasLa);
                     setBlockColor($card, 'A', !!hasAux);
                     return;
                 }
 
-                // Cari OP row yang sesuai dengan detailId
-                const $opRow = $card.find(`.op-row[data-detail-id="${detailId}"]`);
+                // Cari OP row yang sesuai dengan detailId (coba dengan string dan number untuk kompatibilitas)
+                const $opRow = $card.find(`.op-row[data-detail-id="${detailIdStr}"], .op-row[data-detail-id="${detailId}"]`);
                 
                 // Untuk multiple OP:
                 // - OP pertama: GDA ada di header card
@@ -4885,10 +4895,12 @@
                 
                 // Cek apakah ini OP pertama
                 const $firstOpRow = $card.find('.op-row').first();
-                const isFirstOp = $firstOpRow.length && $firstOpRow.attr('data-detail-id') === String(detailId);
+                const firstOpDetailId = $firstOpRow.length ? String($firstOpRow.attr('data-detail-id') || '') : '';
+                const isFirstOp = firstOpDetailId === detailIdStr || firstOpDetailId === String(detailId);
 
                 if (isFirstOp) {
                     // OP pertama: update GDA di header card
+                    console.log('Updating GDA in header card (first OP), detailId:', detailIdStr);
                     setBlockColor($card, 'G', !!hasKain);
                     setBlockColor($card, 'D', !!hasLa);
                     setBlockColor($card, 'A', !!hasAux);
@@ -4918,18 +4930,20 @@
                     }
                     
                     if ($gdaContainer && $gdaContainer.length) {
-                        // Update GDA di container yang ditemukan
+                        console.log('Updating GDA in container for OP:', detailIdStr);
                         setBlockColor($gdaContainer, 'G', !!hasKain);
                         setBlockColor($gdaContainer, 'D', !!hasLa);
                         setBlockColor($gdaContainer, 'A', !!hasAux);
                     } else {
                         // Fallback: update di header card jika GDA khusus tidak ditemukan
+                        console.log('GDA container not found, updating in header card as fallback');
                         setBlockColor($card, 'G', !!hasKain);
                         setBlockColor($card, 'D', !!hasLa);
                         setBlockColor($card, 'A', !!hasAux);
                     }
                 } else {
                     // Jika OP row tidak ditemukan, update di header card sebagai fallback
+                    console.log('OP row not found, updating in header card as fallback. detailId:', detailIdStr);
                     setBlockColor($card, 'G', !!hasKain);
                     setBlockColor($card, 'D', !!hasLa);
                     setBlockColor($card, 'A', !!hasAux);
@@ -5002,7 +5016,8 @@
                             // Update warna GDA per detail proses jika ada data gda_details
                             if (statusData.gda_details && Array.isArray(statusData.gda_details)) {
                                 statusData.gda_details.forEach(function(gdaDetail) {
-                                    const detailId = gdaDetail.detail_id;
+                                    // Convert detailId ke string untuk memastikan match dengan HTML
+                                    const detailId = gdaDetail.detail_id ? String(gdaDetail.detail_id) : null;
                                     const hasKain = gdaDetail.has_kain || false;
                                     const hasLa = gdaDetail.has_la || false;
                                     const hasAux = gdaDetail.has_aux || false;
@@ -5032,9 +5047,123 @@
                     });
             }
 
-            // Polling setiap 1 detik untuk update status
-            setInterval(updateProsesStatuses, 2000);
-            updateProsesStatuses(); // jalankan sekali di awal
+            // Inisialisasi WebSocket untuk real-time update
+            if (typeof Echo !== 'undefined') {
+                // Subscribe ke channel dashboard
+                Echo.channel('dashboard.proses-statuses')
+                    .listen('.proses.status.updated', (e) => {
+                        handleProsesStatusUpdate(e.proses_id, e.status);
+                    })
+                    .listen('.barcode.status.updated', (e) => {
+                        handleProsesStatusUpdate(e.proses_id, e.status);
+                    })
+                    .listen('.proses.created', (e) => {
+                        // Proses baru dibuat - reload halaman untuk menampilkan card baru
+                        // Atau bisa juga handle dengan menambahkan card secara dinamis
+                        window.location.reload();
+                    })
+                    .listen('.proses.deleted', (e) => {
+                        // Hapus card dari DOM
+                        const $card = $(`.status-card[data-proses-id="${e.proses_id}"]`);
+                        if ($card.length) {
+                            $card.fadeOut(300, function() {
+                                $(this).remove();
+                            });
+                        }
+                    })
+                    .listen('.proses.moved', (e) => {
+                        // Proses dipindah mesin - reload untuk update posisi
+                        window.location.reload();
+                    });
+            } else {
+                // Fallback ke polling jika WebSocket tidak tersedia
+                console.warn('Echo tidak tersedia, menggunakan polling sebagai fallback');
+                setInterval(updateProsesStatuses, 2000);
+                updateProsesStatuses(); // jalankan sekali di awal
+            }
+
+            // Fungsi untuk handle update status dari WebSocket (single proses)
+            function handleProsesStatusUpdate(prosesId, statusData) {
+                const $card = $(`.status-card[data-proses-id="${prosesId}"]`);
+                if (!$card.length) {
+                    // Card tidak ditemukan, mungkin perlu reload
+                    return;
+                }
+
+                const currentBgColor = $card.attr('data-bg-color');
+                const proses = $card.data('proses');
+
+                if (!proses) return;
+
+                // CEK: Jika proses baru selesai, pindahkan ke history
+                const wasNotFinished = !proses.selesai || proses.selesai === null;
+                const isNowFinished = statusData.selesai && statusData.selesai !== null;
+
+                if (wasNotFinished && isNowFinished && !$card.hasClass('history-card')) {
+                    // Proses baru selesai, pindahkan ke history container
+                    moveToHistory($card, statusData);
+                    return; // Skip update warna karena sudah dipindahkan
+                }
+
+                // Update data proses untuk mulai, selesai, dan order
+                const oldOrder = parseInt(proses.order || 0);
+                proses.mulai = statusData.mulai;
+                proses.selesai = statusData.selesai;
+                proses.order = statusData.order || 0;
+                $card.data('proses', proses);
+
+                // Update warna jika berbeda
+                if (currentBgColor !== statusData.bg_color) {
+                    const gradient = getGradient(statusData.bg_color);
+                    $card.css('background', gradient);
+                    $card.attr('data-bg-color', statusData.bg_color);
+                }
+
+                // Update warna GDA per detail proses jika ada data gda_details
+                if (statusData.gda_details && Array.isArray(statusData.gda_details)) {
+                    console.log('Updating GDA details from WebSocket:', {
+                        prosesId: prosesId,
+                        gdaDetails: statusData.gda_details
+                    });
+                    
+                    statusData.gda_details.forEach(function(gdaDetail) {
+                        // Convert detailId ke string untuk memastikan match dengan HTML
+                        const detailId = gdaDetail.detail_id ? String(gdaDetail.detail_id) : null;
+                        const hasKain = gdaDetail.has_kain || false;
+                        const hasLa = gdaDetail.has_la || false;
+                        const hasAux = gdaDetail.has_aux || false;
+
+                        console.log('Processing GDA detail:', {
+                            detailId: detailId,
+                            hasKain: hasKain,
+                            hasLa: hasLa,
+                            hasAux: hasAux,
+                            roll: gdaDetail.roll,
+                            barcode_kain_count: gdaDetail.barcode_kain_count
+                        });
+
+                        // Update GDA untuk detail ini menggunakan fungsi global
+                        updateGDAIndicatorsGlobal(prosesId, detailId, hasKain, hasLa, hasAux);
+                    });
+                } else {
+                    console.warn('No gda_details in statusData:', statusData);
+                }
+
+                // Reorder jika order berubah dan proses masih pending
+                if (!proses.selesai && !proses.mulai && statusData.order !== undefined) {
+                    const newOrder = parseInt(statusData.order || 0);
+                    if (oldOrder !== newOrder) {
+                        const mesinId = proses.mesin_id;
+                        const container = document.querySelector(`[data-mesin-id="${mesinId}"]`);
+                        if (container) {
+                            reorderCardsByOrder(container);
+                        }
+                    }
+                }
+            }
+
+            // Jalankan sekali di awal untuk load status awal (fallback jika WebSocket belum connect)
+            updateProsesStatuses();
         });
 
         // Counter untuk detail item index
