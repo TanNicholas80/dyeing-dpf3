@@ -5599,16 +5599,24 @@
 
             // Validasi tambahan saat submit form:
             // 1. Jika jenis_op = Multiple maka jumlah Detail OP harus >= 2
-            // 2. Cek duplikasi No Partai di dalam satu proses (front-end)
-            $('#formProses').on('submit', function(e) {
+            // 2. Cek duplikasi (no_op, no_partai) dalam 1 proses
+            // 3. Cek (no_op, no_partai) sudah terpakai di proses lain via API
+            $('#formProses').on('submit', async function(e) {
+                if (window._formProsesSkipValidation) {
+                    window._formProsesSkipValidation = false;
+                    return;
+                }
+                e.preventDefault();
+
                 const jenisOp = $('#jenis_op').val();
                 const jenisProses = $('[name="jenis"]').val();
+                const $form = $(this);
+                const $btn = $form.find('button[type="submit"]');
 
                 // Validasi Multiple OP
                 if (jenisOp === 'Multiple') {
                     const detailCount = $('#detail-proses-container .detail-proses-item').length;
                     if (detailCount < 2) {
-                        e.preventDefault();
                         Swal.fire({
                             icon: 'warning',
                             title: 'Detail OP kurang',
@@ -5619,38 +5627,96 @@
                     }
                 }
 
-                // Validasi duplikasi No Partai dalam 1 proses (Produksi / Reproses)
+                // Validasi duplikasi (no_op, no_partai) dalam 1 proses. No Partai sama boleh jika No OP beda.
                 if (jenisProses !== 'Maintenance') {
-                    const noPartaiList = [];
-                    const duplicatePartai = [];
+                    const pairs = {};
+                    const duplicatePairs = [];
 
                     $('#detail-proses-container .detail-proses-item').each(function() {
+                        const noOp = $(this).find('[name*=\"[no_op]\"]').val();
                         const noPartai = $(this).find('[name*=\"[no_partai]\"]').val();
-                        if (noPartai && noPartai.trim() !== '') {
-                            if (noPartaiList.includes(noPartai)) {
-                                if (!duplicatePartai.includes(noPartai)) {
-                                    duplicatePartai.push(noPartai);
-                                }
+                        if (noOp && noOp.trim() !== '' && noPartai && noPartai.trim() !== '') {
+                            const key = noOp.trim() + '|' + noPartai.trim();
+                            if (pairs[key]) {
+                                if (duplicatePairs.indexOf(key) === -1) duplicatePairs.push(key);
                             } else {
-                                noPartaiList.push(noPartai);
+                                pairs[key] = true;
                             }
                         }
                     });
 
-                    if (duplicatePartai.length > 0) {
-                        e.preventDefault();
+                    if (duplicatePairs.length > 0) {
+                        const labels = duplicatePairs.map(k => k.replace('|', ' / '));
                         Swal.fire({
                             icon: 'error',
-                            title: 'No Partai duplikat',
-                            html: 'No Partai tidak boleh duplikat dalam satu proses.<br><strong>Partai duplikat:</strong> ' + duplicatePartai.join(', '),
+                            title: 'Kombinasi No OP + No Partai duplikat',
+                            html: 'Kombinasi No OP + No Partai tidak boleh duplikat dalam satu proses.<br><strong>Duplikat:</strong> ' + labels.join(', '),
                             confirmButtonText: 'OK'
                         });
                         return false;
                     }
                 }
+
+                // Cek (no_op, no_partai) sudah terpakai di proses lain
+                if (jenisProses !== 'Maintenance') {
+                    const pairList = [];
+                    const seen = {};
+                    $('#detail-proses-container .detail-proses-item').each(function() {
+                        const noOp = $(this).find('[name*=\"[no_op]\"]').val();
+                        const noPartai = $(this).find('[name*=\"[no_partai]\"]').val();
+                        if (noOp && noOp.trim() !== '' && noPartai && noPartai.trim() !== '') {
+                            const key = noOp.trim() + '|' + noPartai.trim();
+                            if (!seen[key]) {
+                                seen[key] = true;
+                                pairList.push({ noOp: noOp.trim(), noPartai: noPartai.trim() });
+                            }
+                        }
+                    });
+
+                    if (pairList.length > 0) {
+                        $btn.prop('disabled', true);
+                        try {
+                            const promises = pairList.map(function(p) {
+                                return $.ajax({
+                                    url: '/api/check-partai-used',
+                                    method: 'POST',
+                                    headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                                    data: { no_op: p.noOp, no_partai: p.noPartai, jenis: jenisProses },
+                                    dataType: 'json'
+                                });
+                            });
+                            const results = await Promise.all(promises);
+                            for (let i = 0; i < results.length; i++) {
+                                if (!results[i].ok) {
+                                    Swal.fire({
+                                        icon: 'warning',
+                                        title: 'No Partai sudah dipakai',
+                                        text: results[i].message || 'No Partai untuk No OP tersebut sudah dipakai di proses lain.',
+                                        confirmButtonText: 'OK'
+                                    });
+                                    $btn.prop('disabled', false);
+                                    return false;
+                                }
+                            }
+                        } catch (err) {
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Validasi gagal',
+                                text: 'Gagal mengecek ketersediaan No Partai. Silakan coba lagi.',
+                                confirmButtonText: 'OK'
+                            });
+                            $btn.prop('disabled', false);
+                            return false;
+                        }
+                        $btn.prop('disabled', false);
+                    }
+                }
+
+                window._formProsesSkipValidation = true;
+                $form[0].submit();
             });
 
-            // Validasi realtime: cegah user memilih No Partai yang sama di dua Detail OP dalam 1 proses
+            // Validasi realtime: cegah duplikat (no_op, no_partai). No Partai sama diperbolehkan jika No OP beda.
             $(document).on('change', '#detail-proses-container [name*=\"[no_partai]\"]', function() {
                 const $select = $(this);
                 const selectedPartai = $select.val();
@@ -5660,22 +5726,30 @@
                     return;
                 }
 
+                const $item = $select.closest('.detail-proses-item');
+                const currentNoOp = $item.find('[name*=\"[no_op]\"]').val();
+                if (!currentNoOp || !currentNoOp.trim()) {
+                    return;
+                }
+
                 let isDuplicate = false;
                 $('#detail-proses-container .detail-proses-item').each(function() {
-                    const $otherSelect = $(this).find('[name*=\"[no_partai]\"]');
-                    if ($otherSelect.length && $otherSelect[0] !== $select[0]) {
-                        if ($otherSelect.val() === selectedPartai) {
-                            isDuplicate = true;
-                            return false; // break
-                        }
+                    const $other = $(this);
+                    const $otherPartai = $other.find('[name*=\"[no_partai]\"]');
+                    if (!$otherPartai.length || $otherPartai[0] === $select[0]) return;
+                    const otherNoOp = $other.find('[name*=\"[no_op]\"]').val();
+                    const otherPartai = $otherPartai.val();
+                    if (otherNoOp && otherPartai && otherNoOp === currentNoOp && otherPartai === selectedPartai) {
+                        isDuplicate = true;
+                        return false;
                     }
                 });
 
                 if (isDuplicate) {
                     Swal.fire({
                         icon: 'warning',
-                        title: 'No Partai duplikat',
-                        text: `No Partai \"${selectedPartai}\" sudah dipakai di Detail OP lain dalam proses ini.`,
+                        title: 'Kombinasi No OP + No Partai duplikat',
+                        text: 'Kombinasi No OP \"' + currentNoOp + '\" + No Partai \"' + selectedPartai + '\" sudah dipakai di Detail OP lain dalam proses ini.',
                         confirmButtonText: 'OK'
                     });
                     $select.val('').trigger('change');

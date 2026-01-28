@@ -126,3 +126,5 @@ Route::middleware(['auth'])->group(function () {
 Route::post('/api/proxy-op', [App\Http\Controllers\ProsesController::class, 'proxyOpSearch']);
 // Tambahkan route API proxy auxiliary untuk select2
 Route::post('/api/proxy-auxiliary', [\App\Http\Controllers\AuxlController::class, 'proxyAuxiliary']);
+// Cek (no_op, no_partai) sudah terpakai di proses lain (validasi tambah proses)
+Route::post('/api/check-partai-used', [App\Http\Controllers\ProsesController::class, 'checkPartaiUsed']);

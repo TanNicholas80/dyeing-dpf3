@@ -149,11 +149,14 @@ class ProsesController extends Controller
         $validated = $request->validate($rules);
 
         /**
-         * VALIDASI KHUSUS NO PARTAI
-         * - Produksi: No Partai harus unik di seluruh proses (belum pernah dipakai).
-         * - Reproses: Boleh memakai No Partai yang sama, tapi SEMUA proses sebelumnya untuk partai tsb
-         *   sudah selesai (selesai != null). Jika masih ada proses berjalan / belum mulai, tolak.
-         * - Di dalam satu form (satu proses yang sedang dibuat), No Partai juga tidak boleh duplikat.
+         * VALIDASI KHUSUS (NO OP, NO PARTAI)
+         * - Unik per kombinasi (no_op, no_partai): No Partai sama boleh dipakai jika No OP berbeda
+         *   (dalam 1 proses OP Multiple maupun proses lain).
+         * - Produksi: (no_op, no_partai) harus belum pernah dipakai.
+         * - Reproses: Boleh pakai (no_op, no_partai) yang sama jika semua proses sebelumnya
+         *   untuk pasangan tsb sudah selesai.
+         * - Di dalam satu form: (no_op, no_partai) tidak boleh duplikat; No Partai sama dengan
+         *   No OP berbeda diperbolehkan.
          */
         if (
             ($validated['jenis'] ?? null) !== 'Maintenance' &&
@@ -162,53 +165,68 @@ class ProsesController extends Controller
         ) {
             $jenisProses = $validated['jenis'];
 
-            // 1. Cek duplikasi No Partai di dalam form yang sama
-            $noPartaiList = array_column($validated['details'], 'no_partai');
-            $duplicatePartai = array_diff_assoc($noPartaiList, array_unique($noPartaiList));
-            if (!empty($duplicatePartai)) {
-                $duplicatePartai = array_unique($duplicatePartai);
+            // 1. Cek duplikasi (no_op, no_partai) di dalam form yang sama
+            $pairs = [];
+            $duplicatePairs = [];
+            foreach ($validated['details'] as $d) {
+                $noOp = $d['no_op'] ?? '';
+                $noPartai = $d['no_partai'] ?? '';
+                if ($noOp === '' || $noPartai === '') {
+                    continue;
+                }
+                $key = $noOp . '|' . $noPartai;
+                if (isset($pairs[$key])) {
+                    if (!in_array($key, $duplicatePairs)) {
+                        $duplicatePairs[] = $key;
+                    }
+                } else {
+                    $pairs[$key] = true;
+                }
+            }
+            if (!empty($duplicatePairs)) {
+                $labels = array_map(function ($k) {
+                    return str_replace('|', ' / ', $k);
+                }, $duplicatePairs);
                 return back()
                     ->withInput()
                     ->withErrors([
-                        'details' => 'No Partai tidak boleh duplikat dalam satu proses. Partai yang duplikat: ' . implode(', ', $duplicatePartai),
+                        'details' => 'Kombinasi No OP + No Partai tidak boleh duplikat dalam satu proses. Duplikat: ' . implode(', ', $labels),
                     ]);
             }
 
-            // 2. Validasi terhadap data yang sudah ada di database
+            // 2. Validasi terhadap data yang sudah ada di database (per pasangan no_op + no_partai)
             foreach ($validated['details'] as $index => $detail) {
+                $noOp = $detail['no_op'] ?? null;
                 $noPartai = $detail['no_partai'] ?? null;
-                if (!$noPartai) {
+                if (!$noOp || !$noPartai) {
                     continue;
                 }
 
-                // Ambil semua DetailProses yang punya no_partai ini beserta Proses-nya
-                $existingDetails = DetailProses::where('no_partai', $noPartai)
+                $existingDetails = DetailProses::where('no_op', $noOp)
+                    ->where('no_partai', $noPartai)
                     ->with('proses')
                     ->get();
 
                 if ($jenisProses === 'Reproses') {
-                    // Reproses: boleh pakai partai yang sama, tapi semua proses existing harus sudah selesai
                     foreach ($existingDetails as $existingDetail) {
                         $proses = $existingDetail->proses;
                         if ($proses && $proses->selesai === null) {
-                            // Masih ada proses yang belum selesai (belum mulai / sedang jalan)
                             return back()
                                 ->withInput()
                                 ->withErrors([
                                     "details.$index.no_partai" =>
-                                    "No Partai '$noPartai' tidak dapat digunakan untuk Reproses karena masih ada proses yang berjalan / belum selesai untuk partai tersebut.",
+                                    "Kombinasi No OP '$noOp' + No Partai '$noPartai' tidak dapat digunakan untuk Reproses karena masih ada proses yang berjalan / belum selesai.",
                                 ]);
                         }
                     }
                 } else {
-                    // Produksi / selain Reproses: No Partai harus benar-benar unik (belum pernah dipakai)
                     if ($existingDetails->isNotEmpty()) {
                         return back()
                             ->withInput()
                             ->withErrors([
                                 "details.$index.no_partai" =>
-                                "No Partai '$noPartai' sudah pernah digunakan pada proses lain. " .
-                                    "Gunakan jenis proses 'Reproses' jika ingin memproses ulang partai ini (dengan syarat proses sebelumnya sudah selesai).",
+                                "Kombinasi No OP '$noOp' + No Partai '$noPartai' sudah pernah digunakan. " .
+                                    "Gunakan 'Reproses' jika ingin memproses ulang (dengan syarat proses sebelumnya sudah selesai).",
                             ]);
                     }
                 }
@@ -374,6 +392,54 @@ class ProsesController extends Controller
         } catch (\Exception $e) {
             return response()->json(['results' => []]);
         }
+    }
+
+    /**
+     * API: Cek apakah (no_op, no_partai) sudah terpakai di proses lain.
+     * Dipakai untuk validasi frontend sebelum submit tambah proses.
+     *
+     * @return \Illuminate\Http\JsonResponse { ok: bool, message?: string }
+     */
+    public function checkPartaiUsed(Request $request)
+    {
+        $noOp = $request->input('no_op');
+        $noPartai = $request->input('no_partai');
+        $jenis = $request->input('jenis', 'Produksi');
+
+        if (!$noOp || !$noPartai) {
+            return response()->json(['ok' => true]);
+        }
+
+        if ($jenis === 'Maintenance') {
+            return response()->json(['ok' => true]);
+        }
+
+        $existing = DetailProses::where('no_op', $noOp)
+            ->where('no_partai', $noPartai)
+            ->with('proses')
+            ->get();
+
+        if ($existing->isEmpty()) {
+            return response()->json(['ok' => true]);
+        }
+
+        if ($jenis === 'Reproses') {
+            foreach ($existing as $d) {
+                $p = $d->proses;
+                if ($p && $p->selesai === null) {
+                    return response()->json([
+                        'ok' => false,
+                        'message' => "No Partai \"{$noPartai}\" untuk No OP \"{$noOp}\" tidak dapat digunakan karena masih ada proses yang berjalan / belum selesai untuk kombinasi tersebut.",
+                    ]);
+                }
+            }
+            return response()->json(['ok' => true]);
+        }
+
+        return response()->json([
+            'ok' => false,
+            'message' => "No Partai \"{$noPartai}\" untuk No OP \"{$noOp}\" sudah dipakai di proses lain.",
+        ]);
     }
 
     // Simpan barcode kain
