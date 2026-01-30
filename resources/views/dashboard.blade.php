@@ -3213,12 +3213,7 @@
 
         // Fungsi untuk mendapatkan semua pending approval dengan detail
         function getAllPendingApprovals(proses) {
-            if (!proses || !proses.approvals || !Array.isArray(proses.approvals)) {
-                return [];
-            }
-            const pendingApprovals = proses.approvals.filter(function(approval) {
-                return approval.status === 'pending';
-            });
+            if (!proses) return [];
 
             const actionLabels = {
                 'edit_cycle_time': 'Edit Cycle Time',
@@ -3233,6 +3228,31 @@
                 'VP': 'Vice President (VP)'
             };
 
+            // PRIORITAS: Gunakan pending_approvals dari update real-time jika tersedia
+            if (proses.pending_approvals && Array.isArray(proses.pending_approvals)) {
+                return proses.pending_approvals.map(function(approval) {
+                    var typeVal = (approval && typeof approval.type === 'string') ? approval.type : (approval && approval.type != null ? String(approval.type) : null);
+                    var actionVal = (approval && typeof approval.action === 'string') ? approval.action : (approval && approval.action != null ? String(approval.action) : null);
+                    return {
+                        id: approval.id || null,
+                        type: typeVal,
+                        typeLabel: (typeVal && typeLabels[typeVal]) ? typeLabels[typeVal] : (typeVal || '-'),
+                        action: actionVal,
+                        actionLabel: (actionVal && actionLabels[actionVal]) ? actionLabels[actionVal] : (actionVal || '-'),
+                        requested_by: approval.requested_by,
+                        created_at: approval.created_at
+                    };
+                });
+            }
+
+            // FALLBACK: Gunakan data approvals awal (stale) jika belum ada update real-time
+            if (!proses.approvals || !Array.isArray(proses.approvals)) {
+                return [];
+            }
+            const pendingApprovals = proses.approvals.filter(function(approval) {
+                return approval.status === 'pending';
+            });
+
             return pendingApprovals.map(function(approval) {
                 return {
                     id: approval.id,
@@ -3244,6 +3264,41 @@
                     created_at: approval.created_at
                 };
             });
+        }
+
+        // Map pending_approvals dari API/WebSocket (array of {type, action}) ke format tampilan
+        function mapPendingApprovalsFromStatus(pendingApprovals) {
+            if (!Array.isArray(pendingApprovals) || pendingApprovals.length === 0) return [];
+            const actionLabels = { 'edit_cycle_time': 'Edit Cycle Time', 'delete_proses': 'Hapus Proses', 'move_machine': 'Pindah Mesin', 'swap_position': 'Tukar Posisi', 'create_reprocess': 'Buat Reproses' };
+            const typeLabels = { 'FM': 'Factory Manager (FM)', 'VP': 'Vice President (VP)' };
+            function toStr(v) { return (v != null && typeof v === 'string') ? v : ''; }
+            return pendingApprovals.map(function(a) {
+                if (!a || (a.type == null && a.action == null)) return null;
+                var typeStr = toStr(a.type);
+                var actionStr = toStr(a.action);
+                return { typeLabel: typeLabels[typeStr] || typeStr || '-', actionLabel: actionLabels[actionStr] || actionStr || '-' };
+            }).filter(Boolean);
+        }
+
+        // Bangun HTML kotak "Status Approval Pending" (FM/VP) untuk modal pending
+        function buildPendingApprovalInfoHtml(approvalsList) {
+            if (!Array.isArray(approvalsList) || approvalsList.length === 0) return '';
+            function toLabel(v) {
+                if (v == null) return '-';
+                if (typeof v === 'string') return v;
+                if (typeof v === 'object') return '-';
+                return String(v);
+            }
+            let html = '<div class="alert alert-warning mb-3">';
+            html += '<h6 class="font-weight-bold mb-2"><i class="fas fa-clock mr-2"></i>Status Approval Pending</h6>';
+            html += '<p class="mb-2">Proses ini sedang menunggu persetujuan dari:</p><ul class="mb-0 pl-3">';
+            approvalsList.forEach(function(a) {
+                var typeText = toLabel(a.typeLabel || a.type);
+                var actionText = toLabel(a.actionLabel || a.action);
+                html += '<li><strong>' + typeText + '</strong> - ' + actionText + '</li>';
+            });
+            html += '</ul></div>';
+            return html;
         }
 
         // Helper function untuk mendapatkan DetailProses pertama dari proses
@@ -3388,7 +3443,7 @@
                 
                 const entries = Object.entries(prosesData)
                     .filter(([key]) => !hiddenFields.includes(key) && key !== 'barcode_kains' && key !==
-                        'barcode_las' && key !== 'barcode_auxs' && key !== 'mesin' && key !== 'approvals' && key !== 'details')
+                        'barcode_las' && key !== 'barcode_auxs' && key !== 'mesin' && key !== 'approvals' && key !== 'details' && key !== 'pending_approvals')
                     .filter(([key]) => !(proses.jenis === 'Maintenance' && maintenanceFields.includes(key)))
                     .map(([key, val]) => {
                         if (key === 'hfeel') return ['HAND FEEL', val];
@@ -3401,12 +3456,17 @@
                 entries.unshift(['JENIS MESIN', jenisMesin]);
 
                 let detailHtml = '';
+                function formatCellValue(val) {
+                    if (val === null || val === undefined) return '-';
+                    if (typeof val === 'object') return '-';
+                    return val;
+                }
                 for (let i = 0; i < entries.length; i += 2) {
                     detailHtml += '<tr>';
-                    detailHtml += `<th style="width:180px;">${entries[i][0]}</th><td>${entries[i][1] ?? '-'}</td>`;
+                    detailHtml += `<th style="width:180px;">${entries[i][0]}</th><td>${formatCellValue(entries[i][1])}</td>`;
                     if (entries[i + 1]) {
                         detailHtml +=
-                            `<th style="width:180px;">${entries[i+1][0]}</th><td>${entries[i+1][1] ?? '-'}</td>`;
+                            `<th style="width:180px;">${entries[i+1][0]}</th><td>${formatCellValue(entries[i+1][1])}</td>`;
                     } else {
                         detailHtml += '<th></th><td></td>';
                     }
@@ -3414,29 +3474,21 @@
                 }
                 $('#detail-proses-pending-body').html(detailHtml);
 
-                // Format informasi pending approval
-                let approvalHtml = '<div class="alert alert-warning mb-3">';
-                approvalHtml +=
-                    '<h6 class="font-weight-bold mb-2"><i class="fas fa-clock mr-2"></i>Status Approval Pending</h6>';
-                approvalHtml += '<p class="mb-2">Proses ini sedang menunggu persetujuan dari:</p>';
-                approvalHtml += '<ul class="mb-0 pl-3">';
-                pendingApprovals.forEach(function(approval) {
-                    approvalHtml +=
-                        `<li><strong>${approval.typeLabel}</strong> - ${approval.actionLabel}</li>`;
-                });
-                approvalHtml += '</ul>';
-                approvalHtml += '</div>';
-                $('#pending-approval-info').html(approvalHtml);
+                // Format informasi pending approval (FM/VP) — dipakai juga saat refresh lintas browser
+                $('#pending-approval-info').html(buildPendingApprovalInfoHtml(pendingApprovals));
 
-                // Simpan detail_proses_id terpilih untuk scan/refresh barcode
+                // Simpan prosesId dan proses untuk refresh saat approval disetujui di browser lain
+                $('#modalDetailProsesPending').data('prosesId', proses.id);
+                $('#modalDetailProsesPending').data('proses', proses);
                 $('#modalDetailProsesPending').data('detailProsesId', selectedDetailId);
                 $('#modalDetailProsesPending').modal('show');
                 return;
             }
 
             // Jika tidak ada pending approval, tampilkan modal normal
-            // Simpan proses aktif ke modal detail untuk kebutuhan edit/delete
+            // Simpan proses aktif ke modal detail untuk kebutuhan edit/delete dan refresh saat approval disetujui
             $('#modalDetailProses').data('proses', proses);
+            $('#modalDetailProses').data('prosesId', proses.id);
             $('#modalDetailProses').data('detailProsesId', selectedDetailId);
 
             const pendingInfo = getPendingApprovalInfo(proses);
@@ -3541,7 +3593,7 @@
             // Hapus BARCODE KAINS, APPROVALS, DETAILS dari detail proses
             const entries = Object.entries(prosesData)
                 .filter(([key]) => !hiddenFields.includes(key) && key !== 'barcode_kains' && key !==
-                    'barcode_las' && key !== 'barcode_auxs' && key !== 'mesin' && key !== 'approvals' && key !== 'details')
+                    'barcode_las' && key !== 'barcode_auxs' && key !== 'mesin' && key !== 'approvals' && key !== 'details' && key !== 'pending_approvals')
                 .filter(([key]) => !(proses.jenis === 'Maintenance' && maintenanceFields.includes(key)))
                 .map(([key, val]) => {
                     if (key === 'hfeel') return ['HAND FEEL', val];
@@ -3552,12 +3604,17 @@
                     return [key.replace(/_/g, ' ').toUpperCase(), val];
                 });
             entries.unshift(['JENIS MESIN', jenisMesin]);
+            function formatCellValueNormal(val) {
+                if (val === null || val === undefined) return '-';
+                if (typeof val === 'object') return '-';
+                return val;
+            }
             let html = '';
             for (let i = 0; i < entries.length; i += 2) {
                 html += '<tr>';
-                html += `<th style="width:180px;">${entries[i][0]}</th><td>${entries[i][1] ?? '-'}</td>`;
+                html += `<th style="width:180px;">${entries[i][0]}</th><td>${formatCellValueNormal(entries[i][1])}</td>`;
                 if (entries[i + 1]) {
-                    html += `<th style="width:180px;">${entries[i+1][0]}</th><td>${entries[i+1][1] ?? '-'}</td>`;
+                    html += `<th style="width:180px;">${entries[i+1][0]}</th><td>${formatCellValueNormal(entries[i+1][1])}</td>`;
                 } else {
                     html += '<th></th><td></td>';
                 }
@@ -4727,6 +4784,332 @@
 
         // Real-time update warna card berdasarkan status mulai/selesai
         $(document).ready(function() {
+            // Format detik ke HH:MM:SS (sama seperti detikKeWaktu di PHP)
+            function formatDetikToHMS(detik) {
+                if (detik === null || detik === undefined || isNaN(detik)) return '-';
+                const val = parseInt(detik, 10);
+                const jam = Math.floor(val / 3600).toString().padStart(2, '0');
+                const menit = Math.floor((val % 3600) / 60).toString().padStart(2, '0');
+                const d = (val % 60).toString().padStart(2, '0');
+                return jam + ':' + menit + ':' + d;
+            }
+
+            // Bangun HTML body tabel detail proses (entries saja, untuk modal pending) dari objek proses
+            function buildDetailProsesPendingBodyHtml(proses, selectedDetailId) {
+                const hiddenFields = ['id', 'created_at', 'updated_at', 'deleted_at', 'mesin_id'];
+                const maintenanceFields = ['no_op', 'item_op', 'kode_material', 'konstruksi', 'no_partai', 'gramasi', 'lebar', 'hfeel', 'warna', 'kode_warna', 'kategori_warna', 'qty', 'roll'];
+                const firstDetail = getDetailProsesById(proses, selectedDetailId) || getFirstDetailProses(proses);
+                const prosesData = {...proses};
+                if (firstDetail) {
+                    Object.keys(firstDetail).forEach(function(key) {
+                        if (maintenanceFields.indexOf(key) !== -1 || ['no_op', 'no_partai', 'item_op', 'kode_material', 'konstruksi', 'gramasi', 'lebar', 'hfeel', 'warna', 'kode_warna', 'kategori_warna', 'qty', 'roll'].indexOf(key) !== -1) {
+                            prosesData[key] = firstDetail[key];
+                        }
+                    });
+                }
+                let jenisMesin = '-';
+                try {
+                    const mesinSelect = document.getElementById('mesin_id');
+                    if (mesinSelect && proses.mesin_id) {
+                        const opt = mesinSelect.querySelector('option[value="' + proses.mesin_id + '"]');
+                        if (opt) jenisMesin = opt.textContent;
+                    }
+                } catch (e) {}
+                const entries = Object.entries(prosesData)
+                    .filter(function(pair) { return hiddenFields.indexOf(pair[0]) === -1 && pair[0] !== 'barcode_kains' && pair[0] !== 'barcode_las' && pair[0] !== 'barcode_auxs' && pair[0] !== 'mesin' && pair[0] !== 'approvals' && pair[0] !== 'details' && pair[0] !== 'pending_approvals'; })
+                    .filter(function(pair) { return !(proses.jenis === 'Maintenance' && maintenanceFields.indexOf(pair[0]) !== -1); })
+                    .map(function(pair) {
+                        const key = pair[0], val = pair[1];
+                        if (key === 'hfeel') return ['HAND FEEL', val];
+                        if (key === 'matdok') return ['MATERIAL DOKUMEN', val];
+                        if (key === 'cycle_time' || key === 'cycle_time_actual') return [key.replace(/_/g, ' ').toUpperCase(), formatDetikToHMS(val)];
+                        return [key.replace(/_/g, ' ').toUpperCase(), val];
+                    });
+                entries.unshift(['JENIS MESIN', jenisMesin]);
+                let html = '';
+                for (let i = 0; i < entries.length; i += 2) {
+                    html += '<tr><th style="width:180px;">' + entries[i][0] + '</th><td>' + (entries[i][1] != null ? entries[i][1] : '-') + '</td>';
+                    if (entries[i + 1]) {
+                        html += '<th style="width:180px;">' + entries[i + 1][0] + '</th><td>' + (entries[i + 1][1] != null ? entries[i + 1][1] : '-') + '</td>';
+                    } else {
+                        html += '<th></th><td></td>';
+                    }
+                    html += '</tr>';
+                }
+                return html;
+            }
+
+            // Bangun HTML body tabel detail proses LENGKAP (entries + section Barcode Kain, LA, AUX) untuk modal normal
+            function buildDetailProsesBodyHtml(proses, selectedDetailId) {
+                const hiddenFields = ['id', 'created_at', 'updated_at', 'deleted_at', 'mesin_id'];
+                const maintenanceFields = ['no_op', 'item_op', 'kode_material', 'konstruksi', 'no_partai', 'gramasi', 'lebar', 'hfeel', 'warna', 'kode_warna', 'kategori_warna', 'qty', 'roll'];
+                const firstDetail = getDetailProsesById(proses, selectedDetailId) || getFirstDetailProses(proses);
+                const prosesData = {...proses};
+                if (firstDetail) {
+                    Object.keys(firstDetail).forEach(function(key) {
+                        if (maintenanceFields.indexOf(key) !== -1 || ['no_op', 'no_partai', 'item_op', 'kode_material', 'konstruksi', 'gramasi', 'lebar', 'hfeel', 'warna', 'kode_warna', 'kategori_warna', 'qty', 'roll'].indexOf(key) !== -1) {
+                            prosesData[key] = firstDetail[key];
+                        }
+                    });
+                }
+                let jenisMesin = '-';
+                try {
+                    const mesinSelect = document.getElementById('mesin_id');
+                    if (mesinSelect && proses.mesin_id) {
+                        const opt = mesinSelect.querySelector('option[value="' + proses.mesin_id + '"]');
+                        if (opt) jenisMesin = opt.textContent;
+                    }
+                } catch (e) {}
+                const entries = Object.entries(prosesData)
+                    .filter(function(pair) { return hiddenFields.indexOf(pair[0]) === -1 && pair[0] !== 'barcode_kains' && pair[0] !== 'barcode_las' && pair[0] !== 'barcode_auxs' && pair[0] !== 'mesin' && pair[0] !== 'approvals' && pair[0] !== 'details' && pair[0] !== 'pending_approvals'; })
+                    .filter(function(pair) { return !(proses.jenis === 'Maintenance' && maintenanceFields.indexOf(pair[0]) !== -1); })
+                    .map(function(pair) {
+                        const key = pair[0], val = pair[1];
+                        if (key === 'hfeel') return ['HAND FEEL', val];
+                        if (key === 'matdok') return ['MATERIAL DOKUMEN', val];
+                        if (key === 'cycle_time' || key === 'cycle_time_actual') return [key.replace(/_/g, ' ').toUpperCase(), formatDetikToHMS(val)];
+                        return [key.replace(/_/g, ' ').toUpperCase(), val];
+                    });
+                entries.unshift(['JENIS MESIN', jenisMesin]);
+                let html = '';
+                for (let i = 0; i < entries.length; i += 2) {
+                    html += '<tr><th style="width:180px;">' + entries[i][0] + '</th><td>' + (entries[i][1] != null ? entries[i][1] : '-') + '</td>';
+                    if (entries[i + 1]) {
+                        html += '<th style="width:180px;">' + entries[i + 1][0] + '</th><td>' + (entries[i + 1][1] != null ? entries[i + 1][1] : '-') + '</td>';
+                    } else {
+                        html += '<th></th><td></td>';
+                    }
+                    html += '</tr>';
+                }
+                if (proses.jenis !== 'Maintenance') {
+                    const showScanBtn = window.canScanBarcode !== false;
+                    const detailIdAttr = selectedDetailId ? (selectedDetailId + '') : '';
+                    html += '<tr><th colspan="4" style="background:#f8f8f8;">Barcode Kain';
+                    if (showScanBtn) {
+                        html += ' <button type="button" class="btn btn-sm btn-success scan-barcode-btn" data-barcode="barcode_kain" data-id="' + proses.id + '" data-detail-id="' + detailIdAttr + '" style="float:right;"><i class="fas fa-barcode"></i> Scan</button>';
+                    }
+                    html += '</th></tr><tr><td colspan="4" id="barcode-kain-list">Loading...</td></tr><tr><td colspan="4" id="barcode-kain-progress" style="padding:8px;background:#f9f9f9;font-size:12px;"></td></tr>';
+                    html += '<tr><th colspan="4" style="background:#f8f8f8;">Barcode LA';
+                    if (showScanBtn) {
+                        html += ' <button type="button" id="btn-scan-la" class="btn btn-sm btn-success scan-barcode-btn" data-barcode="barcode_la" data-id="' + proses.id + '" data-detail-id="' + detailIdAttr + '" style="float:right;"><i class="fas fa-barcode"></i> Scan</button>';
+                    }
+                    html += '</th></tr><tr><td colspan="4" id="barcode-la-list">Loading...</td></tr>';
+                    html += '<tr><th colspan="4" style="background:#f8f8f8;">Barcode AUX';
+                    if (showScanBtn) {
+                        html += ' <button type="button" id="btn-scan-aux" class="btn btn-sm btn-success scan-barcode-btn" data-barcode="barcode_aux" data-id="' + proses.id + '" data-detail-id="' + detailIdAttr + '" style="float:right;"><i class="fas fa-barcode"></i> Scan</button>';
+                    }
+                    html += '</th></tr><tr><td colspan="4" id="barcode-aux-list">Loading...</td></tr>';
+                }
+                return html;
+            }
+
+            // Muat data barcode ke modal detail proses (setelah body di-set) agar section Barcode Kain, LA, AUX terisi
+            function loadBarcodesIntoDetailModal(prosesId, selectedDetailId) {
+                const barcodesUrl = '/proses/' + prosesId + '/barcodes' + (selectedDetailId ? ('?detail_proses_id=' + encodeURIComponent(selectedDetailId)) : '');
+                $.ajax({
+                    url: barcodesUrl,
+                    method: 'GET',
+                    success: function(data) {
+                        function updateGDAIndicatorsLocal(pid, detailId, hasKain, hasLa, hasAux) {
+                            let $targets = $(`.status-card[data-proses-id="${pid}"] .op-row[data-detail-id="${detailId}"]`);
+                            if (!$targets.length) $targets = $(`.status-card[data-proses-id="${pid}"]`);
+                            $targets.each(function() {
+                                const $card = $(this);
+                                const pData = $card.data('proses');
+                                if (!pData || pData.jenis === 'Maintenance') return;
+                                function setBlockColor(blockType, ok) {
+                                    const $block = $card.find('.gda-block[data-block-type="' + blockType + '"]');
+                                    if (!$block.length) return;
+                                    $block.css({ background: ok ? '#d4f8e8' : '#ffb3b3', borderColor: ok ? '#43a047' : '#c62828' });
+                                }
+                                setBlockColor('G', !!hasKain);
+                                setBlockColor('D', !!hasLa);
+                                setBlockColor('A', !!hasAux);
+                            });
+                        }
+                        function renderBarcodeGrid(barcodes, barcodeType, pid) {
+                            const activeBarcodes = (barcodes || []).filter(function(bk) { return !bk.cancel; });
+                            if (!activeBarcodes.length) return '<span style="color:#888;">Belum ada barcode.</span>';
+                            const canCancel = window.canCancelBarcode !== false;
+                            let h = '<div style="display:flex;flex-wrap:wrap;gap:6px;">';
+                            activeBarcodes.forEach(function(bk) {
+                                const cancelBtn = canCancel ? '<span style="position:absolute;top:2px;right:6px;cursor:pointer;font-weight:bold;color:#b00;font-size:16px;z-index:2;" class="cancel-barcode-btn" data-type="' + barcodeType + '" data-proses="' + pid + '" data-id="' + bk.id + '" data-matdok="' + (bk.matdok || '') + '" title="Cancel barcode">&times;</span>' : '';
+                                h += '<div style="position:relative;flex:1 0 30%;max-width:32%;background:#f3f3f3;border-radius:6px;padding:6px 4px;margin-bottom:6px;text-align:center;font-weight:bold;font-size:13px;color:#222;box-shadow:0 1px 2px #0001;">' + cancelBtn + bk.barcode + (bk.matdok ? '<br><span style="font-size:11px;color:#888;">' + bk.matdok + '</span>' : '') + '</div>';
+                            });
+                            h += '</div>';
+                            return h;
+                        }
+                        $('#barcode-kain-list').html(renderBarcodeGrid(data.barcode_kain, 'kain', prosesId));
+                        $('#barcode-la-list').html(renderBarcodeGrid(data.barcode_la, 'la', prosesId));
+                        $('#barcode-aux-list').html(renderBarcodeGrid(data.barcode_aux, 'aux', prosesId));
+                        const selectedProgress = data.barcode_kain_progress || [];
+                        const allProgress = data.all_barcode_kain_progress || [];
+                        const incompleteDetails = data.incomplete_details || [];
+                        let progressHtml = '';
+                        if (selectedProgress.length > 0) {
+                            progressHtml += '<div style="padding:4px 0;"><strong>Progress Barcode Kain (Detail yang Dipilih):</strong><br>';
+                            selectedProgress.forEach(function(p) {
+                                const statusIcon = p.is_complete ? '<span style="color:#43a047;"><i class="fas fa-check"></i></span>' : '<span style="color:#c62828;"><i class="fas fa-times"></i></span>';
+                                const statusText = p.is_complete ? '<span style="color:#43a047;">Lengkap</span>' : '<span style="color:#c62828;">Kurang ' + (p.roll - p.scanned) + ' roll</span>';
+                                const bgColor = p.is_complete ? '#e8f5e9' : '#ffebee';
+                                progressHtml += '<div style="background:' + bgColor + ';padding:4px 8px;margin:2px 0;border-radius:4px;">' + statusIcon + ' <strong>OP ' + (p.no_op || 'N/A') + ':</strong> ' + p.scanned + '/' + p.roll + ' roll - ' + statusText + '</div>';
+                            });
+                            progressHtml += '</div>';
+                        }
+                        if (allProgress.length > 0) {
+                            const completeCount = allProgress.filter(function(p) { return p.is_complete; }).length;
+                            const totalDetails = allProgress.length;
+                            const allComplete = completeCount === totalDetails;
+                            if (allComplete) {
+                                progressHtml = '<div style="padding:4px 0;background:#e8f5e9;border-radius:4px;margin-bottom:8px;">' + progressHtml + '<div style="padding:4px 0;background:#e8f5e9;border-radius:4px;margin-top:8px;"><strong style="color:#2e7d32;"><i class="fas fa-check-circle"></i> Semua Detail OP Sudah Lengkap!</strong><br><span style="color:#43a047;font-size:12px;">Scan Barcode LA & AUX sudah diizinkan.</span></div>';
+                            } else {
+                                progressHtml = '<div style="padding:4px 0;background:#ffebee;border-radius:4px;margin-bottom:8px;">' + progressHtml + '<div style="padding:4px 0;background:#ffebee;border-radius:4px;margin-top:8px;"><strong style="color:#c62828;"><i class="fas fa-exclamation-triangle"></i> ' + completeCount + ' dari ' + totalDetails + ' Detail OP Lengkap</strong><br><span style="color:#c62828;font-size:12px;">Semua Detail OP harus lengkap sebelum scan Barcode LA & AUX.</span></div>';
+                            }
+                        }
+                        $('#barcode-kain-progress').html(progressHtml);
+                        const canScanLaAux = data.can_scan_la_aux !== false;
+                        const $btnScanLa = $('#btn-scan-la');
+                        const $btnScanAux = $('#btn-scan-aux');
+                        if (!canScanLaAux) {
+                            let tooltipMsg = 'Tidak dapat scan. ';
+                            if (incompleteDetails.length > 0) {
+                                tooltipMsg += 'Detail OP belum lengkap: ';
+                                tooltipMsg += incompleteDetails.map(function(d) { return 'OP ' + d.no_op + ' (kurang ' + d.remaining + ' roll)'; }).join(', ');
+                            } else {
+                                tooltipMsg += 'Pastikan semua barcode kain sudah memenuhi jumlah roll terlebih dahulu.';
+                            }
+                            $btnScanLa.prop('disabled', true).removeClass('btn-success').addClass('btn-secondary').css('cursor', 'not-allowed').attr('title', tooltipMsg);
+                            $btnScanAux.prop('disabled', true).removeClass('btn-success').addClass('btn-secondary').css('cursor', 'not-allowed').attr('title', tooltipMsg);
+                        } else {
+                            $btnScanLa.prop('disabled', false).removeClass('btn-secondary').addClass('btn-success').css('cursor', 'pointer').removeAttr('title');
+                            $btnScanAux.prop('disabled', false).removeClass('btn-secondary').addClass('btn-success').css('cursor', 'pointer').removeAttr('title');
+                        }
+                        const hasKainActive = data.can_scan_la_aux === true;
+                        const hasLaActive = (data.barcode_la || []).some(function(bk) { return !bk.cancel; });
+                        const hasAuxActive = (data.barcode_aux || []).some(function(bk) { return !bk.cancel; });
+                        updateGDAIndicatorsLocal(prosesId, selectedDetailId, hasKainActive, hasLaActive, hasAuxActive);
+                    },
+                    error: function() {
+                        $('#barcode-kain-list').html('<span style="color:#888;">Belum ada barcode kain.</span>');
+                        $('#barcode-kain-progress').html('');
+                        $('#barcode-la-list').html('<span style="color:#888;">Belum ada barcode LA.</span>');
+                        $('#barcode-aux-list').html('<span style="color:#888;">Belum ada barcode AUX.</span>');
+                        $('#btn-scan-la').prop('disabled', true).removeClass('btn-success').addClass('btn-secondary').css('cursor', 'not-allowed');
+                        $('#btn-scan-aux').prop('disabled', true).removeClass('btn-success').addClass('btn-secondary').css('cursor', 'not-allowed');
+                    }
+                });
+            }
+
+            // Refresh modal detail proses jika sedang terbuka untuk proses ini (setelah approval FM/VP disetujui)
+            function refreshDetailModalIfOpen(prosesId, statusData, prosesFromCard) {
+                if (!prosesId || !prosesFromCard) return;
+                const selectedDetailId = $('#modalDetailProsesPending').data('detailProsesId') || $('#modalDetailProses').data('detailProsesId') || null;
+                const noLongerPending = statusData && statusData.bg_color !== '#ffeb3b';
+
+                // Modal Pending terbuka untuk proses ini
+                if ($('#modalDetailProsesPending').hasClass('show') && $('#modalDetailProsesPending').data('prosesId') == prosesId) {
+                    $('#modalDetailProsesPending').data('proses', prosesFromCard);
+                    if (noLongerPending) {
+                        // Approval sudah disetujui/ditolak: langsung tutup modal pending (JANGAN update body dulu agar tidak sekilas tampil "Menunggu Approval"), lalu buka modal normal
+                        $('#modalDetailProsesPending').modal('hide');
+                        $('#modalDetailProsesPending').one('hidden.bs.modal', function() {
+                            $('#modalDetailProses').data('proses', prosesFromCard).data('prosesId', prosesFromCard.id).data('detailProsesId', selectedDetailId);
+                            $('#detail-proses-body').html(buildDetailProsesBodyHtml(prosesFromCard, selectedDetailId));
+                            if (prosesFromCard.jenis !== 'Maintenance') {
+                                loadBarcodesIntoDetailModal(prosesFromCard.id, selectedDetailId);
+                            }
+                            $('.btn-edit-proses').prop('disabled', false).removeClass('disabled').css('cursor', 'pointer');
+                            $('.btn-move-proses').prop('disabled', false).removeClass('disabled').css('cursor', 'pointer');
+                            $('.btn-delete-proses').prop('disabled', false).removeClass('disabled').css('cursor', 'pointer');
+                            $('#modalDetailProses').modal('show');
+                        });
+                    } else {
+                        // Masih pending: update tabel dan kotak "Menunggu persetujuan dari FM/VP" agar sinkron 2-step approval lintas browser
+                        $('#detail-proses-pending-body').html(buildDetailProsesPendingBodyHtml(prosesFromCard, selectedDetailId));
+                        let list = [];
+                        if (statusData && statusData.pending_approvals && statusData.pending_approvals.length) {
+                            list = mapPendingApprovalsFromStatus(statusData.pending_approvals);
+                        } else {
+                            list = getAllPendingApprovals(prosesFromCard);
+                        }
+                        $('#pending-approval-info').html(buildPendingApprovalInfoHtml(list));
+                    }
+                }
+
+                // Modal normal terbuka untuk proses ini
+                if ($('#modalDetailProses').hasClass('show') && $('#modalDetailProses').data('prosesId') == prosesId) {
+                    $('#modalDetailProses').data('proses', prosesFromCard);
+                    const $body = $('#detail-proses-body');
+                    $body.find('th').each(function() {
+                        const thText = $(this).text().trim();
+                        const $td = $(this).next('td');
+                        if (thText === 'CYCLE TIME' && $td.length) $td.text(formatDetikToHMS(prosesFromCard.cycle_time));
+                        if (thText === 'ORDER' && $td.length) $td.text(prosesFromCard.order != null ? prosesFromCard.order : '-');
+                        if (thText === 'JENIS MESIN' && $td.length) {
+                            let jenisMesin = '-';
+                            try {
+                                const mesinSelect = document.getElementById('mesin_id');
+                                if (mesinSelect && prosesFromCard.mesin_id) {
+                                    const opt = mesinSelect.querySelector('option[value="' + prosesFromCard.mesin_id + '"]');
+                                    if (opt) jenisMesin = opt.textContent;
+                                }
+                            } catch (e) {}
+                            $td.text(jenisMesin);
+                        }
+                    });
+                }
+            }
+
+            // Fungsi untuk fetch status proses dari API dan refresh modal yang sedang terbuka
+            function fetchAndRefreshModal(prosesId) {
+                const urlParams = new URLSearchParams(window.location.search);
+                const mesinParams = urlParams.get('mesin');
+                let apiUrl = '/dashboard/proses-statuses';
+                if (mesinParams) {
+                    apiUrl += '?mesin=' + encodeURIComponent(mesinParams);
+                }
+                
+                fetch(apiUrl)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data[prosesId]) {
+                            const statusData = data[prosesId];
+                            const $card = $(`.status-card[data-proses-id="${prosesId}"]`);
+                            let proses = $card.length ? $card.data('proses') : null;
+                            
+                            // Update data proses dari card jika ada
+                            if (proses) {
+                                proses.mulai = statusData.mulai;
+                                proses.selesai = statusData.selesai;
+                                proses.order = statusData.order || 0;
+                                if (statusData.cycle_time !== undefined) {
+                                    proses.cycle_time = statusData.cycle_time;
+                                }
+                                
+                                // PENTING: Update pending_approvals agar modal sinkron
+                                if (statusData.pending_approvals) {
+                                    proses.pending_approvals = statusData.pending_approvals;
+                                }
+
+                                $card.data('proses', proses);
+                                
+                                // Update warna card
+                                const gradient = getGradient(statusData.bg_color);
+                                $card.css('background', gradient);
+                                $card.attr('data-bg-color', statusData.bg_color);
+                            }
+                            
+                            // Refresh modal jika terbuka untuk proses ini
+                            if (proses) {
+                                refreshDetailModalIfOpen(prosesId, statusData, proses);
+                            }
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error fetching proses status:', error);
+                    });
+            }
+
             // Fungsi untuk mendapatkan gradient berdasarkan warna background
             // Konsisten dengan function getGradient di PHP (blade template)
             // Mapping warna sama persis dengan DashboardController::prosesStatuses()
@@ -4963,6 +5346,20 @@
                 fetch(apiUrl)
                     .then(response => response.json())
                     .then(data => {
+                        // Deteksi proses baru (mis. create reproses) yang belum ada di DOM.
+                        // Jika ada, reload agar kartu baru tampil di browser lain (sinkron lintas browser).
+                        const apiIds = Object.keys(data).map(String);
+                        const ourIds = [];
+                        $('.status-card').each(function() {
+                            const id = $(this).attr('data-proses-id');
+                            if (id) ourIds.push(String(id));
+                        });
+                        const missing = apiIds.filter(function(id) { return ourIds.indexOf(id) === -1; });
+                        if (missing.length > 0) {
+                            window.location.reload();
+                            return;
+                        }
+
                         // Group card by mesin untuk reorder
                         const cardsByMesin = {};
 
@@ -4987,12 +5384,35 @@
                                 return; // Skip update warna karena sudah dipindahkan
                             }
 
-                            // Update data proses untuk mulai, selesai, dan order
+                            // Update data proses untuk mulai, selesai, order, dan cycle_time
                             const oldOrder = parseInt(proses.order || 0);
                             proses.mulai = statusData.mulai;
                             proses.selesai = statusData.selesai;
                             proses.order = statusData.order || 0;
+                            if (statusData.cycle_time !== undefined && statusData.cycle_time !== null) {
+                                proses.cycle_time = statusData.cycle_time;
+                            }
+                            if (statusData.cycle_time_actual !== undefined && statusData.cycle_time_actual !== null) {
+                                proses.cycle_time_actual = statusData.cycle_time_actual;
+                            }
+                            
+                            // PENTING: Update pending_approvals agar modal sinkron
+                            if (statusData.pending_approvals) {
+                                proses.pending_approvals = statusData.pending_approvals;
+                            }
+                            
                             $card.data('proses', proses);
+
+                            // Update tampilan cycle_time di card (setelah edit cycle time di-approve FM)
+                            if (statusData.cycle_time !== undefined) {
+                                const cycleTimeStr = formatDetikToHMS(statusData.cycle_time);
+                                $card.find('.card-time').each(function() {
+                                    $(this).find('span').eq(2).text(cycleTimeStr);
+                                });
+                            }
+
+                            // Refresh modal detail jika terbuka untuk proses ini (seragamkan tampilan setelah approval FM/VP)
+                            refreshDetailModalIfOpen(prosesId, statusData, proses);
 
                             // Track card untuk reorder jika order berubah
                             if (!proses.selesai && !proses.mulai && statusData.order !== undefined) {
@@ -5057,6 +5477,24 @@
                     .listen('.barcode.status.updated', (e) => {
                         handleProsesStatusUpdate(e.proses_id, e.status);
                     })
+                    .listen('.approval.pending.created', (e) => {
+                        // Approval pending baru: create reproses, pindah mesin, edit cycle time, delete, tukar posisi.
+                        // updateProsesStatuses akan deteksi proses baru (create reproses) → reload;
+                        // atau update blok kuning untuk proses yang sudah ada.
+                        updateProsesStatuses();
+                        
+                        // Refresh modal jika ada proses yang terpengaruh sedang dibuka modalnya
+                        if (e.proses_ids && Array.isArray(e.proses_ids)) {
+                            e.proses_ids.forEach(function(pid) {
+                                const openPendingId = $('#modalDetailProsesPending').data('prosesId');
+                                const openNormalId = $('#modalDetailProses').data('prosesId');
+                                if (openPendingId == pid || openNormalId == pid) {
+                                    // Fetch status terbaru untuk proses ini dan refresh modal
+                                    fetchAndRefreshModal(pid);
+                                }
+                            });
+                        }
+                    })
                     .listen('.proses.created', (e) => {
                         // Proses baru dibuat - reload halaman untuk menampilkan card baru
                         // Atau bisa juga handle dengan menambahkan card secara dinamis
@@ -5070,17 +5508,29 @@
                                 $(this).remove();
                             });
                         }
+                        
+                        // Tutup modal jika sedang terbuka untuk proses yang dihapus
+                        const openPendingId = $('#modalDetailProsesPending').data('prosesId');
+                        const openNormalId = $('#modalDetailProses').data('prosesId');
+                        if (openPendingId == e.proses_id && $('#modalDetailProsesPending').hasClass('show')) {
+                            $('#modalDetailProsesPending').modal('hide');
+                        }
+                        if (openNormalId == e.proses_id && $('#modalDetailProses').hasClass('show')) {
+                            $('#modalDetailProses').modal('hide');
+                        }
                     })
                     .listen('.proses.moved', (e) => {
                         // Proses dipindah mesin - reload untuk update posisi
                         window.location.reload();
                     });
+                // Polling backup (5 detik) agar tampilan seragam antar browser jika WebSocket miss event
+                setInterval(updateProsesStatuses, 5000);
             } else {
                 // Fallback ke polling jika WebSocket tidak tersedia
                 console.warn('Echo tidak tersedia, menggunakan polling sebagai fallback');
                 setInterval(updateProsesStatuses, 2000);
-                updateProsesStatuses(); // jalankan sekali di awal
             }
+            updateProsesStatuses(); // jalankan sekali di awal
 
             // Fungsi untuk handle update status dari WebSocket (single proses)
             function handleProsesStatusUpdate(prosesId, statusData) {
@@ -5105,12 +5555,35 @@
                     return; // Skip update warna karena sudah dipindahkan
                 }
 
-                // Update data proses untuk mulai, selesai, dan order
+                // Update data proses untuk mulai, selesai, order, dan cycle_time
                 const oldOrder = parseInt(proses.order || 0);
                 proses.mulai = statusData.mulai;
                 proses.selesai = statusData.selesai;
                 proses.order = statusData.order || 0;
+                if (statusData.cycle_time !== undefined && statusData.cycle_time !== null) {
+                    proses.cycle_time = statusData.cycle_time;
+                }
+                if (statusData.cycle_time_actual !== undefined && statusData.cycle_time_actual !== null) {
+                    proses.cycle_time_actual = statusData.cycle_time_actual;
+                }
+                
+                // PENTING: Update pending_approvals agar modal sinkron (mis. FM -> VP)
+                if (statusData.pending_approvals) {
+                    proses.pending_approvals = statusData.pending_approvals;
+                }
+                
                 $card.data('proses', proses);
+
+                // Update tampilan cycle_time di card (setelah edit cycle time di-approve FM)
+                if (statusData.cycle_time !== undefined) {
+                    const cycleTimeStr = formatDetikToHMS(statusData.cycle_time);
+                    $card.find('.card-time').each(function() {
+                        $(this).find('span').eq(2).text(cycleTimeStr);
+                    });
+                }
+
+                // Refresh modal detail jika terbuka untuk proses ini (seragamkan tampilan setelah approval FM/VP)
+                refreshDetailModalIfOpen(prosesId, statusData, proses);
 
                 // Update warna jika berbeda
                 if (currentBgColor !== statusData.bg_color) {

@@ -9,6 +9,7 @@ use App\Models\DetailProses;
 use App\Events\ProsesStatusUpdated;
 use App\Events\ProsesDeleted;
 use App\Events\ProsesMoved;
+use App\Events\ApprovalPendingCreated;
 use App\Services\ProsesStatusService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -314,7 +315,27 @@ class ApprovalController extends Controller
                             'requested_by' => $approval->requested_by, // Tetap dari user yang request awal
                             'approved_by'  => null, // Akan diisi saat VP approve/reject
                         ]);
+
+                        // Broadcast agar semua browser langsung update blok kuning (menunggu approval VP)
+                        event(new ApprovalPendingCreated([$proses->id]));
+                        
+                        // Broadcast ProsesStatusUpdated agar modal detail di browser lain juga diperbarui
+                        $proses->refresh();
+                        $proses->load(['approvals', 'details.barcodeKains', 'details.barcodeLas', 'details.barcodeAuxs']);
+                        $statusService = new ProsesStatusService();
+                        $affectedProsesIds = $statusService->getAffectedProsesIds();
+                        $statusData = $statusService->generateProsesStatus($proses, $affectedProsesIds);
+                        event(new ProsesStatusUpdated($proses->id, $statusData));
                     }
+                } elseif ($approval->type === 'VP') {
+                    // VP approve create_reprocess: proses reproses sudah aktif (tidak ada action khusus)
+                    // Broadcast ProsesStatusUpdated agar semua browser update tampilan (warna berubah dari kuning)
+                    $proses->refresh();
+                    $proses->load(['approvals', 'details.barcodeKains', 'details.barcodeLas', 'details.barcodeAuxs']);
+                    $statusService = new ProsesStatusService();
+                    $affectedProsesIds = $statusService->getAffectedProsesIds();
+                    $statusData = $statusService->generateProsesStatus($proses, $affectedProsesIds);
+                    event(new ProsesStatusUpdated($proses->id, $statusData));
                 } 
                 break;
 
@@ -447,11 +468,15 @@ class ApprovalController extends Controller
                 break;
 
             case 'create_reprocess':
-                // Jika create_reprocess di-reject oleh FM, hapus proses yang baru dibuat
-                // Jika di-reject oleh VP, juga hapus proses
+                // Jika create_reprocess di-reject oleh FM atau VP, hapus proses yang baru dibuat
                 $proses = $approval->proses;
                 if ($proses) {
+                    $mesinId = $proses->mesin_id;
+                    $prosesId = $proses->id;
                     $proses->delete();
+                    
+                    // Broadcast ProsesDeleted agar semua browser menghapus card dari tampilan
+                    event(new ProsesDeleted($prosesId, $mesinId));
                 }
                 break;
 

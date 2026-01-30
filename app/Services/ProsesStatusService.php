@@ -118,6 +118,15 @@ class ProsesStatusService
             }
         }
 
+        $pendingApprovals = [];
+        if ($proses->approvals) {
+            foreach ($proses->approvals as $appr) {
+                if ($appr->status === 'pending') {
+                    $pendingApprovals[] = ['type' => $appr->type, 'action' => $appr->action];
+                }
+            }
+        }
+
         return [
             'mulai' => $proses->mulai ? $proses->mulai->format('Y-m-d H:i:s') : null,
             'selesai' => $proses->selesai ? $proses->selesai->format('Y-m-d H:i:s') : null,
@@ -125,6 +134,9 @@ class ProsesStatusService
             'jenis' => $proses->jenis,
             'order' => (int)($proses->order ?? 0),
             'gda_details' => $gdaDetails, // Status GDA per detail proses untuk update real-time
+            'cycle_time' => $proses->cycle_time !== null ? (int) $proses->cycle_time : null, // detik, untuk update real-time setelah edit cycle time di-approve
+            'cycle_time_actual' => $proses->cycle_time_actual !== null ? (int) $proses->cycle_time_actual : null,
+            'pending_approvals' => $pendingApprovals, // FM/VP step untuk sinkronisasi modal 2-step approval lintas browser
         ];
     }
 

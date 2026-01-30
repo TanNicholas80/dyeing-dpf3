@@ -12,6 +12,7 @@ use App\Models\Approval;
 use App\Events\ProsesCreated;
 use App\Events\ProsesStatusUpdated;
 use App\Events\BarcodeStatusUpdated;
+use App\Events\ApprovalPendingCreated;
 use App\Services\ProsesStatusService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -129,7 +130,7 @@ class ProsesController extends Controller
                 'details.*.lebar' => 'required|string',
                 'details.*.hfeel' => 'required|string',
                 'details.*.warna' => 'required|string',
-                'details.*.kode_warna' => 'required|string',
+                'details.*.kode_warna' => 'nullable|string',
                 'details.*.kategori_warna' => 'required|string',
                 'details.*.qty' => 'required|numeric',
                 'details.*.roll' => 'required|integer',
@@ -323,6 +324,9 @@ class ProsesController extends Controller
                     'requested_by' => Auth::id(),
                     'approved_by'  => null, // Akan diisi saat FM approve/reject
                 ]);
+
+                // Broadcast agar semua browser langsung menampilkan blok kuning (menunggu approval FM)
+                event(new ApprovalPendingCreated([$proses->id]));
 
                 return redirect()->route('dashboard', ['page' => $page])
                     ->with('success', 'Proses Reproses berhasil ditambahkan. Proses akan tampil dengan warna kuning dan menunggu persetujuan FM terlebih dahulu, kemudian VP.');
@@ -1313,6 +1317,9 @@ class ProsesController extends Controller
             'approved_by'  => null, // Akan diisi saat FM approve/reject
         ]);
 
+        // Broadcast agar semua browser langsung menampilkan blok kuning (menunggu approval)
+        event(new ApprovalPendingCreated([$proses->id]));
+
         return redirect()->route('dashboard', ['page' => $page])
             ->with('success', 'Permintaan perubahan cycle time telah dikirim dan menunggu persetujuan FM.');
     }
@@ -1405,6 +1412,9 @@ class ProsesController extends Controller
             'requested_by' => Auth::id(),
             'approved_by'  => null, // Akan diisi saat FM approve/reject
         ]);
+
+        // Broadcast agar semua browser langsung menampilkan blok kuning (menunggu approval)
+        event(new ApprovalPendingCreated([$proses->id]));
 
         $successMessage = 'Permintaan pemindahan mesin telah dikirim dan menunggu persetujuan FM.';
 
@@ -1651,6 +1661,9 @@ class ProsesController extends Controller
             'approved_by'  => null, // Akan diisi saat FM approve/reject
         ]);
 
+        // Broadcast agar semua browser langsung menampilkan blok kuning untuk proses yang terpengaruh
+        event(new ApprovalPendingCreated($affectedProsesIds));
+
         // Hitung order baru untuk semua proses yang terpengaruh (untuk preview di frontend)
         $affectedOrders = [];
         if ($order1 !== $order2 && $order1 > 0 && $order2 > 0 && isset($affectedProses)) {
@@ -1755,6 +1768,9 @@ class ProsesController extends Controller
             'requested_by' => Auth::id(),
             'approved_by'  => null, // Akan diisi saat FM approve/reject
         ]);
+
+        // Broadcast agar semua browser langsung menampilkan blok kuning (menunggu approval)
+        event(new ApprovalPendingCreated([$proses->id]));
 
         return redirect()->route('dashboard', ['page' => $page])
             ->with('success', 'Permintaan penghapusan proses telah dikirim dan menunggu persetujuan FM.');

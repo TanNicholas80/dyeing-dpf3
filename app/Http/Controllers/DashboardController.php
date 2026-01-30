@@ -300,6 +300,15 @@ class DashboardController extends Controller
                     }
                 }
 
+                $pendingApprovals = [];
+                if ($proses->approvals) {
+                    foreach ($proses->approvals as $appr) {
+                        if ($appr->status === 'pending') {
+                            $pendingApprovals[] = ['type' => $appr->type, 'action' => $appr->action];
+                        }
+                    }
+                }
+
                 $result[$proses->id] = [
                     'mulai' => $proses->mulai,
                     'selesai' => $proses->selesai,
@@ -307,6 +316,9 @@ class DashboardController extends Controller
                     'jenis' => $proses->jenis,
                     'order' => (int)($proses->order ?? 0),
                     'gda_details' => $gdaDetails, // Status GDA per detail proses untuk update real-time
+                    'cycle_time' => $proses->cycle_time !== null ? (int) $proses->cycle_time : null, // detik, untuk update real-time setelah edit cycle time di-approve
+                    'cycle_time_actual' => $proses->cycle_time_actual !== null ? (int) $proses->cycle_time_actual : null,
+                    'pending_approvals' => $pendingApprovals, // FM/VP step untuk sinkronisasi modal 2-step approval lintas browser
                 ];
             }
 
