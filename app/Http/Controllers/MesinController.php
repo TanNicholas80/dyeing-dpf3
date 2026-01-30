@@ -3,6 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Mesin;
+use App\Events\MesinCreated;
+use App\Events\MesinUpdated;
+use App\Events\MesinDeleted;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
@@ -26,7 +29,14 @@ class MesinController extends Controller
             'status' => 'required|boolean',
         ]);
 
-        Mesin::create($request->only('jenis_mesin', 'status'));
+        $mesin = Mesin::create($request->only('jenis_mesin', 'status'));
+
+        // Broadcast event untuk update real-time di dashboard
+        event(new MesinCreated([
+            'id' => $mesin->id,
+            'jenis_mesin' => $mesin->jenis_mesin,
+            'status' => (bool) $mesin->status,
+        ]));
 
         return redirect()->route('mesin.index')->with('success', 'Mesin berhasil ditambahkan.');
     }
@@ -44,13 +54,27 @@ class MesinController extends Controller
         ]);
 
         $mesin->update($request->only('jenis_mesin', 'status'));
+        
+        // Refresh untuk memastikan data terbaru
+        $mesin->refresh();
+
+        // Broadcast event untuk update real-time di dashboard
+        event(new MesinUpdated([
+            'id' => $mesin->id,
+            'jenis_mesin' => $mesin->jenis_mesin,
+            'status' => (bool) $mesin->status,
+        ]));
 
         return redirect()->route('mesin.index')->with('success', 'Mesin berhasil diperbarui.');
     }
 
     public function destroy(Mesin $mesin)
     {
+        $mesinId = $mesin->id;
         $mesin->delete();
+
+        // Broadcast event untuk update real-time di dashboard
+        event(new MesinDeleted($mesinId));
 
         return redirect()->route('mesin.index')->with('success', 'Mesin berhasil dihapus.');
     }

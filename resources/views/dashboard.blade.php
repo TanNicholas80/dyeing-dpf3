@@ -3161,25 +3161,37 @@
     <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <script>
         // Fungsi helper untuk mengecek apakah ada pending approval FM
+        // PRIORITAS: pending_approvals dari event ProsesStatusUpdated (real-time lintas browser)
         function hasPendingApprovalFM(proses) {
-            if (!proses || !proses.approvals || !Array.isArray(proses.approvals)) {
-                return false;
+            if (!proses) return false;
+            const fmActions = ['edit_cycle_time', 'delete_proses', 'move_machine', 'swap_position'];
+            if (proses.pending_approvals && Array.isArray(proses.pending_approvals)) {
+                return proses.pending_approvals.some(function(a) {
+                    const typeVal = (a && a.type != null) ? String(a.type) : '';
+                    const actionVal = (a && a.action != null) ? String(a.action) : '';
+                    return typeVal === 'FM' && fmActions.indexOf(actionVal) !== -1;
+                });
             }
+            if (!proses.approvals || !Array.isArray(proses.approvals)) return false;
             return proses.approvals.some(function(approval) {
                 return approval.status === 'pending' &&
-                    approval.type === 'FM' && ['edit_cycle_time', 'delete_proses', 'move_machine', 'swap_position']
-                    .includes(approval.action);
+                    approval.type === 'FM' && fmActions.includes(approval.action);
             });
         }
 
         // Fungsi helper untuk mengecek apakah ada pending approval FM atau VP untuk Reproses (2 tahap approval)
+        // PRIORITAS: pending_approvals dari event ProsesStatusUpdated (real-time lintas browser)
         function hasPendingReprocessApproval(proses) {
-            if (!proses || !proses.approvals || !Array.isArray(proses.approvals)) {
-                return false;
+            if (!proses) return false;
+            if (proses.jenis !== 'Reproses') return false;
+            if (proses.pending_approvals && Array.isArray(proses.pending_approvals)) {
+                return proses.pending_approvals.some(function(a) {
+                    const typeVal = (a && a.type != null) ? String(a.type) : '';
+                    const actionVal = (a && a.action != null) ? String(a.action) : '';
+                    return actionVal === 'create_reprocess' && (typeVal === 'FM' || typeVal === 'VP');
+                });
             }
-            if (proses.jenis !== 'Reproses') {
-                return false;
-            }
+            if (!proses.approvals || !Array.isArray(proses.approvals)) return false;
             return proses.approvals.some(function(approval) {
                 return approval.status === 'pending' &&
                     approval.action === 'create_reprocess' &&
@@ -3188,23 +3200,34 @@
         }
 
         // Fungsi untuk mendapatkan informasi pending approval
+        // PRIORITAS: pending_approvals dari event ProsesStatusUpdated (real-time lintas browser)
         function getPendingApprovalInfo(proses) {
-            if (!proses || !proses.approvals || !Array.isArray(proses.approvals)) {
-                return null;
-            }
-            const pendingApproval = proses.approvals.find(function(approval) {
-                return approval.status === 'pending' &&
-                    approval.type === 'FM' && ['edit_cycle_time', 'delete_proses', 'move_machine', 'swap_position']
-                    .includes(approval.action);
-            });
-            if (!pendingApproval) return null;
-
+            if (!proses) return null;
+            const fmActions = ['edit_cycle_time', 'delete_proses', 'move_machine', 'swap_position'];
             const actionLabels = {
                 'edit_cycle_time': 'perubahan cycle time',
                 'delete_proses': 'penghapusan proses',
                 'move_machine': 'pemindahan mesin',
                 'swap_position': 'tukar posisi'
             };
+            if (proses.pending_approvals && Array.isArray(proses.pending_approvals)) {
+                const fmPending = proses.pending_approvals.find(function(a) {
+                    const typeVal = (a && a.type != null) ? String(a.type) : '';
+                    const actionVal = (a && a.action != null) ? String(a.action) : '';
+                    return typeVal === 'FM' && fmActions.indexOf(actionVal) !== -1;
+                });
+                if (fmPending) {
+                    const actionVal = (fmPending.action != null) ? String(fmPending.action) : '';
+                    return { action: actionVal, label: actionLabels[actionVal] || 'perubahan' };
+                }
+                return null;
+            }
+            if (!proses.approvals || !Array.isArray(proses.approvals)) return null;
+            const pendingApproval = proses.approvals.find(function(approval) {
+                return approval.status === 'pending' &&
+                    approval.type === 'FM' && fmActions.includes(approval.action);
+            });
+            if (!pendingApproval) return null;
             return {
                 action: pendingApproval.action,
                 label: actionLabels[pendingApproval.action] || 'perubahan'
@@ -3374,17 +3397,18 @@
             const selectedDetail = getDetailProsesById(proses, clickedDetailId) || getFirstDetailProses(proses);
             const selectedDetailId = selectedDetail && selectedDetail.id ? selectedDetail.id : null;
 
-            // Cek apakah card berwarna kuning (menunggu approval)
+            // Cek apakah card berwarna kuning (menunggu approval) — di-update oleh ProsesStatusUpdated
             const bgColor = $(this).data('bg-color');
             const isYellowCard = bgColor === '#ffeb3b' || bgColor === 'rgb(255, 235, 59)' || $(this).css(
                 'background-color') === 'rgb(255, 235, 59)';
 
-            // Cek apakah ada pending approval (FM untuk edit/delete/move atau FM/VP untuk reproses)
+            // Keputusan modal mengikuti status real-time (ProsesStatusUpdated): pending_approvals + bg_color
+            // hasPending* memprioritaskan proses.pending_approvals agar lintas browser konsisten
             const hasPending = hasPendingApprovalFM(proses);
             const hasPendingReprocess = hasPendingReprocessApproval(proses);
             const hasAnyPending = hasPending || hasPendingReprocess || isYellowCard;
 
-            // Jika ada pending approval atau card berwarna kuning, tampilkan modal khusus pending approval
+            // Jika masih pending → modal pending approval; jika sudah approved/rejected → modal normal
             if (hasAnyPending) {
                 let pendingApprovals = getAllPendingApprovals(proses);
 
@@ -5060,56 +5084,6 @@
                 }
             }
 
-            // Fungsi untuk fetch status proses dari API dan refresh modal yang sedang terbuka
-            function fetchAndRefreshModal(prosesId) {
-                const urlParams = new URLSearchParams(window.location.search);
-                const mesinParams = urlParams.get('mesin');
-                let apiUrl = '/dashboard/proses-statuses';
-                if (mesinParams) {
-                    apiUrl += '?mesin=' + encodeURIComponent(mesinParams);
-                }
-                
-                fetch(apiUrl)
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data[prosesId]) {
-                            const statusData = data[prosesId];
-                            const $card = $(`.status-card[data-proses-id="${prosesId}"]`);
-                            let proses = $card.length ? $card.data('proses') : null;
-                            
-                            // Update data proses dari card jika ada
-                            if (proses) {
-                                proses.mulai = statusData.mulai;
-                                proses.selesai = statusData.selesai;
-                                proses.order = statusData.order || 0;
-                                if (statusData.cycle_time !== undefined) {
-                                    proses.cycle_time = statusData.cycle_time;
-                                }
-                                
-                                // PENTING: Update pending_approvals agar modal sinkron
-                                if (statusData.pending_approvals) {
-                                    proses.pending_approvals = statusData.pending_approvals;
-                                }
-
-                                $card.data('proses', proses);
-                                
-                                // Update warna card
-                                const gradient = getGradient(statusData.bg_color);
-                                $card.css('background', gradient);
-                                $card.attr('data-bg-color', statusData.bg_color);
-                            }
-                            
-                            // Refresh modal jika terbuka untuk proses ini
-                            if (proses) {
-                                refreshDetailModalIfOpen(prosesId, statusData, proses);
-                            }
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error fetching proses status:', error);
-                    });
-            }
-
             // Fungsi untuk mendapatkan gradient berdasarkan warna background
             // Konsisten dengan function getGradient di PHP (blade template)
             // Mapping warna sama persis dengan DashboardController::prosesStatuses()
@@ -5333,140 +5307,6 @@
                 }
             }
 
-            // Fungsi untuk update warna card berdasarkan status dari API
-            function updateProsesStatuses() {
-                // Ambil parameter mesin dari URL jika ada (untuk filter)
-                const urlParams = new URLSearchParams(window.location.search);
-                const mesinParams = urlParams.get('mesin');
-                let apiUrl = '/dashboard/proses-statuses';
-                if (mesinParams) {
-                    apiUrl += '?mesin=' + encodeURIComponent(mesinParams);
-                }
-
-                fetch(apiUrl)
-                    .then(response => response.json())
-                    .then(data => {
-                        // Deteksi proses baru (mis. create reproses) yang belum ada di DOM.
-                        // Jika ada, reload agar kartu baru tampil di browser lain (sinkron lintas browser).
-                        const apiIds = Object.keys(data).map(String);
-                        const ourIds = [];
-                        $('.status-card').each(function() {
-                            const id = $(this).attr('data-proses-id');
-                            if (id) ourIds.push(String(id));
-                        });
-                        const missing = apiIds.filter(function(id) { return ourIds.indexOf(id) === -1; });
-                        if (missing.length > 0) {
-                            window.location.reload();
-                            return;
-                        }
-
-                        // Group card by mesin untuk reorder
-                        const cardsByMesin = {};
-
-                        $('.status-card').each(function() {
-                            const $card = $(this);
-                            const prosesId = $card.attr('data-proses-id');
-                            if (!prosesId || !data[prosesId]) return;
-
-                            const statusData = data[prosesId];
-                            const currentBgColor = $card.attr('data-bg-color');
-                            const proses = $card.data('proses');
-
-                            if (!proses) return;
-
-                            // CEK: Jika proses baru selesai, pindahkan ke history
-                            const wasNotFinished = !proses.selesai || proses.selesai === null;
-                            const isNowFinished = statusData.selesai && statusData.selesai !== null;
-
-                            if (wasNotFinished && isNowFinished && !$card.hasClass('history-card')) {
-                                // Proses baru selesai, pindahkan ke history container
-                                moveToHistory($card, statusData);
-                                return; // Skip update warna karena sudah dipindahkan
-                            }
-
-                            // Update data proses untuk mulai, selesai, order, dan cycle_time
-                            const oldOrder = parseInt(proses.order || 0);
-                            proses.mulai = statusData.mulai;
-                            proses.selesai = statusData.selesai;
-                            proses.order = statusData.order || 0;
-                            if (statusData.cycle_time !== undefined && statusData.cycle_time !== null) {
-                                proses.cycle_time = statusData.cycle_time;
-                            }
-                            if (statusData.cycle_time_actual !== undefined && statusData.cycle_time_actual !== null) {
-                                proses.cycle_time_actual = statusData.cycle_time_actual;
-                            }
-                            
-                            // PENTING: Update pending_approvals agar modal sinkron
-                            if (statusData.pending_approvals) {
-                                proses.pending_approvals = statusData.pending_approvals;
-                            }
-                            
-                            $card.data('proses', proses);
-
-                            // Update tampilan cycle_time di card (setelah edit cycle time di-approve FM)
-                            if (statusData.cycle_time !== undefined) {
-                                const cycleTimeStr = formatDetikToHMS(statusData.cycle_time);
-                                $card.find('.card-time').each(function() {
-                                    $(this).find('span').eq(2).text(cycleTimeStr);
-                                });
-                            }
-
-                            // Refresh modal detail jika terbuka untuk proses ini (seragamkan tampilan setelah approval FM/VP)
-                            refreshDetailModalIfOpen(prosesId, statusData, proses);
-
-                            // Track card untuk reorder jika order berubah
-                            if (!proses.selesai && !proses.mulai && statusData.order !== undefined) {
-                                const newOrder = parseInt(statusData.order || 0);
-                                if (oldOrder !== newOrder) {
-                                    const mesinId = proses.mesin_id;
-                                    if (!cardsByMesin[mesinId]) {
-                                        cardsByMesin[mesinId] = [];
-                                    }
-                                    cardsByMesin[mesinId].push($card);
-                                }
-                            }
-
-                            // Update warna jika berbeda
-                            if (currentBgColor !== statusData.bg_color) {
-                                const gradient = getGradient(statusData.bg_color);
-                                $card.css('background', gradient);
-                                $card.attr('data-bg-color', statusData.bg_color);
-                            }
-
-                            // Update warna GDA per detail proses jika ada data gda_details
-                            if (statusData.gda_details && Array.isArray(statusData.gda_details)) {
-                                statusData.gda_details.forEach(function(gdaDetail) {
-                                    // Convert detailId ke string untuk memastikan match dengan HTML
-                                    const detailId = gdaDetail.detail_id ? String(gdaDetail.detail_id) : null;
-                                    const hasKain = gdaDetail.has_kain || false;
-                                    const hasLa = gdaDetail.has_la || false;
-                                    const hasAux = gdaDetail.has_aux || false;
-
-                                    // Update GDA untuk detail ini menggunakan fungsi global
-                                    updateGDAIndicatorsGlobal(prosesId, detailId, hasKain, hasLa, hasAux);
-                                });
-                            }
-                        });
-
-                        // Reorder card di setiap mesin yang terpengaruh
-                        Object.keys(cardsByMesin).forEach(function(mesinId) {
-                            const container = document.querySelector(`[data-mesin-id="${mesinId}"]`);
-                            if (container) {
-                                reorderCardsByOrder(container);
-                            }
-                        });
-
-                        // Reorder semua mesin untuk memastikan urutan sesuai dengan order terbaru
-                        // (untuk menangani kasus order berubah dari API)
-                        $('.card-dropzone').each(function() {
-                            reorderCardsByOrder(this);
-                        });
-                    })
-                    .catch(error => {
-                        // Silent fail, jangan tampilkan error di console
-                    });
-            }
-
             // Inisialisasi WebSocket untuk real-time update
             if (typeof Echo !== 'undefined') {
                 // Subscribe ke channel dashboard
@@ -5479,21 +5319,32 @@
                     })
                     .listen('.approval.pending.created', (e) => {
                         // Approval pending baru: create reproses, pindah mesin, edit cycle time, delete, tukar posisi.
-                        // updateProsesStatuses akan deteksi proses baru (create reproses) → reload;
-                        // atau update blok kuning untuk proses yang sudah ada.
-                        updateProsesStatuses();
-                        
-                        // Refresh modal jika ada proses yang terpengaruh sedang dibuka modalnya
+                        // Update card menjadi kuning secara real-time untuk semua proses yang terpengaruh.
+                        // ProsesStatusUpdated akan di-fire oleh backend untuk update lengkap (pending_approvals, cycle_time, dll).
                         if (e.proses_ids && Array.isArray(e.proses_ids)) {
-                            e.proses_ids.forEach(function(pid) {
-                                const openPendingId = $('#modalDetailProsesPending').data('prosesId');
-                                const openNormalId = $('#modalDetailProses').data('prosesId');
-                                if (openPendingId == pid || openNormalId == pid) {
-                                    // Fetch status terbaru untuk proses ini dan refresh modal
-                                    fetchAndRefreshModal(pid);
+                            e.proses_ids.forEach(function(prosesId) {
+                                const $card = $(`.status-card[data-proses-id="${prosesId}"]`);
+                                if ($card.length) {
+                                    const proses = $card.data('proses');
+                                    if (proses) {
+                                        // Update warna card menjadi kuning (menunggu approval) - real-time visual update
+                                        const yellowGradient = getGradient('#ffeb3b');
+                                        $card.css('background', yellowGradient);
+                                        $card.attr('data-bg-color', '#ffeb3b');
+                                        
+                                        // Inisialisasi pending_approvals jika belum ada (akan diisi lengkap oleh ProsesStatusUpdated)
+                                        if (!proses.pending_approvals) {
+                                            proses.pending_approvals = [];
+                                        }
+                                        $card.data('proses', proses);
+                                        
+                                        // Catatan: Modal akan di-refresh oleh ProsesStatusUpdated dengan data lengkap
+                                        // (pending_approvals, bg_color, cycle_time, dll) via handleProsesStatusUpdate → refreshDetailModalIfOpen
+                                    }
                                 }
                             });
                         }
+                        // Proses baru (create reproses) ditangani oleh .proses.created → reload.
                     })
                     .listen('.proses.created', (e) => {
                         // Proses baru dibuat - reload halaman untuk menampilkan card baru
@@ -5522,15 +5373,289 @@
                     .listen('.proses.moved', (e) => {
                         // Proses dipindah mesin - reload untuk update posisi
                         window.location.reload();
+                    })
+                    .listen('.mesin.created', (e) => {
+                        // Mesin baru ditambahkan - update dropdown mesin secara real-time
+                        console.log('MesinCreated event received:', e);
+                        if (e.mesin && e.mesin.id) {
+                            updateMesinDropdown(e.mesin);
+                        }
+                    })
+                    .listen('.mesin.updated', (e) => {
+                        // Mesin di-update - update dropdown mesin secara real-time
+                        console.log('MesinUpdated event received:', e);
+                        if (e.mesin && e.mesin.id) {
+                            updateMesinDropdown(e.mesin);
+                        }
+                    })
+                    .listen('.mesin.deleted', (e) => {
+                        // Mesin dihapus - hapus dari dropdown mesin secara real-time
+                        console.log('MesinDeleted event received:', e);
+                        if (e.mesin_id) {
+                            removeMesinFromDropdown(e.mesin_id);
+                        }
                     });
-                // Polling backup (5 detik) agar tampilan seragam antar browser jika WebSocket miss event
-                setInterval(updateProsesStatuses, 5000);
             } else {
-                // Fallback ke polling jika WebSocket tidak tersedia
-                console.warn('Echo tidak tersedia, menggunakan polling sebagai fallback');
-                setInterval(updateProsesStatuses, 2000);
+                console.warn('Echo tidak tersedia; update card/modal hanya dari render awal halaman.');
             }
-            updateProsesStatuses(); // jalankan sekali di awal
+
+            // Fungsi untuk update dropdown mesin saat mesin ditambahkan/di-update
+            function updateMesinDropdown(mesinData) {
+                if (!mesinData || !mesinData.id) {
+                    console.warn('updateMesinDropdown: Invalid mesinData', mesinData);
+                    return;
+                }
+                
+                console.log('updateMesinDropdown called with:', mesinData);
+                
+                const $filterMesin = $('#filter-mesin');
+                const $mesinIdSelect = $('#mesin_id');
+                const $moveMesinIdSelect = $('#moveMesinId');
+                
+                const mesinId = mesinData.id;
+                const mesinName = mesinData.jenis_mesin || '';
+                
+                // Helper function untuk refresh Select2 dengan benar
+                function refreshSelect2($select) {
+                    if (!$select.length || !$.fn.select2) return;
+                    
+                    try {
+                        // Simpan nilai yang dipilih
+                        const currentValue = $select.val();
+                        const selectId = $select.attr('id');
+                        const placeholder = $select.data('placeholder') || $select.attr('data-placeholder') || '-- Pilih --';
+                        const isMultiple = $select.prop('multiple');
+                        
+                        // Destroy Select2 jika sudah diinisialisasi
+                        if ($select.hasClass('select2-hidden-accessible')) {
+                            $select.select2('destroy');
+                        }
+                        
+                        // Konfigurasi Select2 berdasarkan ID dropdown
+                        let select2Config = {
+                            placeholder: placeholder,
+                            allowClear: true,
+                            width: '100%'
+                        };
+                        
+                        // Konfigurasi khusus untuk mesin_id (di modal tambah proses)
+                        if (selectId === 'mesin_id') {
+                            select2Config = {
+                                dropdownParent: $('#modalProses'),
+                                placeholder: '-- Pilih Mesin --',
+                                allowClear: false,
+                                dropdownCssClass: 'select2-dropdown-modal',
+                                width: '100%'
+                            };
+                        }
+                        // Konfigurasi untuk filter-mesin (multiple select)
+                        else if (selectId === 'filter-mesin') {
+                            select2Config = {
+                                placeholder: 'Semua Mesin',
+                                allowClear: true,
+                                width: '100%'
+                            };
+                        }
+                        
+                        // Re-init Select2
+                        $select.select2(select2Config);
+                        
+                        // Restore nilai yang dipilih
+                        if (currentValue) {
+                            $select.val(currentValue).trigger('change');
+                        }
+                    } catch (e) {
+                        console.warn('Error refreshing Select2:', e);
+                        // Fallback: trigger change saja
+                        $select.trigger('change');
+                    }
+                }
+                
+                // Update filter mesin dropdown (di header dashboard)
+                if ($filterMesin.length) {
+                    const existingOption = $filterMesin.find(`option[value="${mesinId}"]`);
+                    if (existingOption.length) {
+                        // Update text jika sudah ada
+                        existingOption.text(mesinName);
+                    } else {
+                        // Tambahkan option baru (urutkan berdasarkan id)
+                        let inserted = false;
+                        $filterMesin.find('option').each(function() {
+                            const optId = parseInt($(this).val());
+                            if (!isNaN(optId) && optId > mesinId) {
+                                $(this).before(`<option value="${mesinId}">${mesinName}</option>`);
+                                inserted = true;
+                                return false; // break loop
+                            }
+                        });
+                        if (!inserted) {
+                            // Jika belum di-insert, tambahkan di akhir
+                            $filterMesin.append(`<option value="${mesinId}">${mesinName}</option>`);
+                        }
+                    }
+                    // Refresh Select2
+                    refreshSelect2($filterMesin);
+                }
+                
+                // Update mesin_id dropdown (di modal tambah proses)
+                if ($mesinIdSelect.length) {
+                    const existingOption = $mesinIdSelect.find(`option[value="${mesinId}"]`);
+                    if (existingOption.length) {
+                        existingOption.text(mesinName);
+                    } else {
+                        let inserted = false;
+                        $mesinIdSelect.find('option').each(function() {
+                            const optId = parseInt($(this).val());
+                            if (!isNaN(optId) && optId > mesinId) {
+                                $(this).before(`<option value="${mesinId}">${mesinName}</option>`);
+                                inserted = true;
+                                return false;
+                            }
+                        });
+                        if (!inserted) {
+                            $mesinIdSelect.append(`<option value="${mesinId}">${mesinName}</option>`);
+                        }
+                    }
+                    // Refresh Select2
+                    refreshSelect2($mesinIdSelect);
+                }
+                
+                // Update moveMesinId dropdown (di modal pindah mesin)
+                if ($moveMesinIdSelect.length) {
+                    const existingOption = $moveMesinIdSelect.find(`option[value="${mesinId}"]`);
+                    if (existingOption.length) {
+                        existingOption.text(mesinName);
+                    } else {
+                        let inserted = false;
+                        $moveMesinIdSelect.find('option').each(function() {
+                            const optId = parseInt($(this).val());
+                            if (!isNaN(optId) && optId > mesinId) {
+                                $(this).before(`<option value="${mesinId}">${mesinName}</option>`);
+                                inserted = true;
+                                return false;
+                            }
+                        });
+                        if (!inserted) {
+                            $moveMesinIdSelect.append(`<option value="${mesinId}">${mesinName}</option>`);
+                        }
+                    }
+                    // Refresh Select2 jika sudah diinisialisasi
+                    refreshSelect2($moveMesinIdSelect);
+                }
+                
+                console.log('updateMesinDropdown completed for mesin:', mesinId, mesinName);
+            }
+
+            // Fungsi untuk menghapus mesin dari dropdown saat mesin dihapus
+            function removeMesinFromDropdown(mesinId) {
+                if (!mesinId) {
+                    console.warn('removeMesinFromDropdown: Invalid mesinId', mesinId);
+                    return;
+                }
+                
+                console.log('removeMesinFromDropdown called for mesinId:', mesinId);
+                
+                const $filterMesin = $('#filter-mesin');
+                const $mesinIdSelect = $('#mesin_id');
+                const $moveMesinIdSelect = $('#moveMesinId');
+                
+                // Helper function untuk refresh Select2 setelah remove
+                function refreshSelect2AfterRemove($select) {
+                    if (!$select.length || !$.fn.select2) return;
+                    
+                    try {
+                        // Hapus selection jika mesin yang dihapus sedang dipilih
+                        const selectedValues = $select.val();
+                        let newValue = selectedValues;
+                        
+                        if (selectedValues) {
+                            if (Array.isArray(selectedValues)) {
+                                newValue = selectedValues.filter(v => String(v) !== String(mesinId));
+                            } else if (String(selectedValues) === String(mesinId)) {
+                                newValue = null;
+                            }
+                        }
+                        
+                        const selectId = $select.attr('id');
+                        
+                        // Destroy Select2 jika sudah diinisialisasi
+                        if ($select.hasClass('select2-hidden-accessible')) {
+                            $select.select2('destroy');
+                        }
+                        
+                        // Set nilai baru sebelum re-init
+                        if (newValue !== selectedValues) {
+                            $select.val(newValue);
+                        }
+                        
+                        // Konfigurasi Select2 berdasarkan ID dropdown
+                        let select2Config = {
+                            placeholder: $select.data('placeholder') || $select.attr('data-placeholder') || '-- Pilih --',
+                            allowClear: true,
+                            width: '100%'
+                        };
+                        
+                        // Konfigurasi khusus untuk mesin_id
+                        if (selectId === 'mesin_id') {
+                            select2Config = {
+                                dropdownParent: $('#modalProses'),
+                                placeholder: '-- Pilih Mesin --',
+                                allowClear: false,
+                                dropdownCssClass: 'select2-dropdown-modal',
+                                width: '100%'
+                            };
+                        }
+                        // Konfigurasi untuk filter-mesin
+                        else if (selectId === 'filter-mesin') {
+                            select2Config = {
+                                placeholder: 'Semua Mesin',
+                                allowClear: true,
+                                width: '100%'
+                            };
+                        }
+                        
+                        // Re-init Select2
+                        $select.select2(select2Config);
+                        
+                        // Trigger change jika nilai berubah
+                        if (newValue !== selectedValues) {
+                            $select.trigger('change');
+                        }
+                    } catch (e) {
+                        console.warn('Error refreshing Select2 after remove:', e);
+                        $select.trigger('change');
+                    }
+                }
+                
+                // Hapus dari filter mesin dropdown
+                if ($filterMesin.length) {
+                    const optionToRemove = $filterMesin.find(`option[value="${mesinId}"]`);
+                    if (optionToRemove.length) {
+                        optionToRemove.remove();
+                        refreshSelect2AfterRemove($filterMesin);
+                    }
+                }
+                
+                // Hapus dari mesin_id dropdown
+                if ($mesinIdSelect.length) {
+                    const optionToRemove = $mesinIdSelect.find(`option[value="${mesinId}"]`);
+                    if (optionToRemove.length) {
+                        optionToRemove.remove();
+                        refreshSelect2AfterRemove($mesinIdSelect);
+                    }
+                }
+                
+                // Hapus dari moveMesinId dropdown
+                if ($moveMesinIdSelect.length) {
+                    const optionToRemove = $moveMesinIdSelect.find(`option[value="${mesinId}"]`);
+                    if (optionToRemove.length) {
+                        optionToRemove.remove();
+                        refreshSelect2AfterRemove($moveMesinIdSelect);
+                    }
+                }
+                
+                console.log('removeMesinFromDropdown completed for mesinId:', mesinId);
+            }
 
             // Fungsi untuk handle update status dari WebSocket (single proses)
             function handleProsesStatusUpdate(prosesId, statusData) {
@@ -5634,9 +5759,6 @@
                     }
                 }
             }
-
-            // Jalankan sekali di awal untuk load status awal (fallback jika WebSocket belum connect)
-            updateProsesStatuses();
         });
 
         // Counter untuk detail item index
