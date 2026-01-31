@@ -130,7 +130,7 @@ class ProsesController extends Controller
                 'details.*.lebar' => 'required|string',
                 'details.*.hfeel' => 'required|string',
                 'details.*.warna' => 'required|string',
-                'details.*.kode_warna' => 'nullable|string',
+                'details.*.kode_warna' => 'required|string',
                 'details.*.kategori_warna' => 'required|string',
                 'details.*.qty' => 'required|numeric',
                 'details.*.roll' => 'required|integer',
@@ -374,7 +374,6 @@ class ProsesController extends Controller
                         'Accept' => 'application/json',
                     ],
                     'body' => json_encode($no_op),
-                    'timeout' => 10,
                 ]
             );
             $data = json_decode($response->getBody(), true);
@@ -499,7 +498,6 @@ class ProsesController extends Controller
                         'Accept' => 'application/json',
                     ],
                     'body' => $body,
-                    'timeout' => 10,
                 ]
             );
             $data = json_decode($response->getBody(), true);
@@ -679,7 +677,6 @@ class ProsesController extends Controller
                         'Accept' => 'application/json',
                     ],
                     'body' => $body,
-                    'timeout' => 10,
                 ]
             );
             $rawResponse = $response->getBody()->getContents();
@@ -895,7 +892,6 @@ class ProsesController extends Controller
                         'Accept' => 'application/json',
                     ],
                     'body' => $body,
-                    'timeout' => 10,
                 ]
             );
             $rawResponse = $response->getBody()->getContents();

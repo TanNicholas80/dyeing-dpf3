@@ -5316,6 +5316,21 @@
                     })
                     .listen('.barcode.status.updated', (e) => {
                         handleProsesStatusUpdate(e.proses_id, e.status);
+                        
+                        // Refresh barcode di modal detail proses jika modal sedang terbuka untuk proses ini
+                        // Ini memungkinkan update real-time lintas browser saat barcode di-scan
+                        const prosesId = e.proses_id;
+                        
+                        // Jika modal normal terbuka untuk proses ini, refresh barcode
+                        if ($('#modalDetailProses').hasClass('show') && $('#modalDetailProses').data('prosesId') == prosesId) {
+                            const proses = $('#modalDetailProses').data('proses');
+                            const selectedDetailId = $('#modalDetailProses').data('detailProsesId') || null;
+                            
+                            if (proses && proses.jenis !== 'Maintenance') {
+                                // Refresh barcode secara real-time untuk semua browser yang membuka modal ini
+                                loadBarcodesIntoDetailModal(prosesId, selectedDetailId);
+                            }
+                        }
                     })
                     .listen('.approval.pending.created', (e) => {
                         // Approval pending baru: create reproses, pindah mesin, edit cycle time, delete, tukar posisi.
