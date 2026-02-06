@@ -4252,6 +4252,7 @@
         });
 
         // Modal scan barcode (HTML, append ke body jika belum ada)
+        // 2 mode: Scan (kamera) dan Input Manual (ketik barcode)
         if (!document.getElementById('modalScanBarcode')) {
             $(document.body).append(`
             <div class="modal fade" id="modalScanBarcode" tabindex="-1" aria-labelledby="modalScanBarcodeLabel" aria-hidden="true">
@@ -4262,13 +4263,37 @@
                             <input type="hidden" name="barcode" id="inputBarcodeValue">
                             <input type="hidden" name="detail_proses_id" id="inputDetailProsesId">
                             <div class="modal-header bg-success text-white">
-                                <h5 class="modal-title fw-bold" id="modalScanBarcodeLabel">Scan Barcode</h5>
+                                <h5 class="modal-title fw-bold" id="modalScanBarcodeLabel">Input Barcode</h5>
                                 <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
                                     <span aria-hidden="true">&times;</span>
                                 </button>
                             </div>
                             <div class="modal-body py-3 px-4 text-center">
-                                <div id="barcode-scanner-container" style="width:100%;min-height:320px;display:flex;align-items:center;justify-content:center;"></div>
+                                <ul class="nav nav-pills nav-fill mb-3" id="barcodeModeTabs" role="tablist">
+                                    <li class="nav-item" role="presentation">
+                                        <a class="nav-link active" id="mode-scan-tab" data-toggle="pill" href="#mode-scan-pane" role="tab" aria-controls="mode-scan-pane" aria-selected="true"><i class="fas fa-barcode"></i> Scan Barcode</a>
+                                    </li>
+                                    <li class="nav-item" role="presentation">
+                                        <a class="nav-link" id="mode-manual-tab" data-toggle="pill" href="#mode-manual-pane" role="tab" aria-controls="mode-manual-pane" aria-selected="false"><i class="fas fa-keyboard"></i> Input Manual</a>
+                                    </li>
+                                </ul>
+                                <div class="tab-content position-relative" id="barcodeModeContent" style="min-height:320px;">
+                                    <div id="barcode-submit-loading" style="display:none;position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(255,255,255,0.9);align-items:center;justify-content:center;z-index:10;flex-direction:column;">
+                                        <div class="spinner-border text-success mb-2" style="width:3rem;height:3rem;"></div>
+                                        <p class="text-dark mb-0">Memproses barcode...</p>
+                                    </div>
+                                    <div class="tab-pane fade show active" id="mode-scan-pane" role="tabpanel">
+                                        <div id="barcode-scanner-container" style="width:100%;min-height:320px;display:flex;align-items:center;justify-content:center;"></div>
+                                    </div>
+                                    <div class="tab-pane fade" id="mode-manual-pane" role="tabpanel">
+                                        <div id="barcode-manual-container" class="py-3">
+                                            <label for="inputBarcodeManual" class="d-block text-left mb-2 font-weight-bold">Ketik kode barcode:</label>
+                                            <input type="text" class="form-control form-control-lg text-center" id="inputBarcodeManual" placeholder="Masukkan barcode" maxlength="255" autocomplete="off">
+                                            <small class="text-muted d-block mt-2">Tekan Enter atau klik Simpan setelah mengisi barcode.</small>
+                                            <button type="button" class="btn btn-success mt-3" id="btnSubmitManualBarcode"><i class="fas fa-check"></i> Simpan Barcode</button>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                             <div class="modal-footer d-flex justify-content-end px-4">
                                 <button type="button" class="btn btn-secondary" data-dismiss="modal">Tutup</button>
@@ -4318,21 +4343,104 @@
             }
         });
 
-        // Inisialisasi scanner hanya saat modal benar-benar tampil
+        // Fungsi stop scanner (untuk ganti ke mode manual)
+        function stopBarcodeScanner() {
+            if (window.html5QrcodeScanner) {
+                try {
+                    window.html5QrcodeScanner.stop().then(() => {
+                        try { window.html5QrcodeScanner.clear(); } catch(e) {}
+                        window.html5QrcodeScanner = null;
+                        $('#barcode-scanner-container').html('');
+                    }).catch(() => {
+                        window.html5QrcodeScanner = null;
+                        $('#barcode-scanner-container').html('');
+                    });
+                } catch (e) {
+                    window.html5QrcodeScanner = null;
+                    $('#barcode-scanner-container').html('');
+                }
+            } else {
+                $('#barcode-scanner-container').html('');
+            }
+        }
+
+        // Fungsi start scanner (hanya dipanggil saat mode Scan aktif)
+        function startBarcodeScannerInModal() {
+            if (!$('#mode-scan-pane').hasClass('active')) return;
+            $('#barcode-scanner-container').html(
+                '<div id="reader" style="width:100%;max-width:400px;margin:auto;"></div>');
+            window.html5QrcodeScanner = new Html5Qrcode("reader");
+            const beepSound = new Audio("{{ asset('sound/beep.mp3') }}");
+            window.html5QrcodeScanner.start({
+                facingMode: "environment"
+            }, {
+                fps: 10,
+                qrbox: 250,
+                formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE, Html5QrcodeSupportedFormats.CODE_128]
+            },
+            (decodedText, decodedResult) => {
+                beepSound.play().catch(e => { console.log("Tidak dapat memainkan suara beep:", e); });
+                $('#inputBarcodeValue').val(decodedText);
+                window.html5QrcodeScanner.stop().catch(() => {});
+                $('#formScanBarcode').trigger('submit');
+            },
+            (errorMessage) => {}).catch(err => {
+                $('#barcode-scanner-container').html(
+                    '<span style="color:#666;">Tidak dapat mengakses kamera: ' + err + '</span>');
+            });
+        }
+
+        // Ganti tab: Scan <-> Input Manual
+        $('a[data-toggle="pill"]', '#modalScanBarcode').on('shown.bs.tab', function(e) {
+            const targetId = $(e.target).attr('href');
+            if (targetId === '#mode-manual-pane') {
+                stopBarcodeScanner();
+                setTimeout(function() { $('#inputBarcodeManual').focus(); }, 100);
+            } else if (targetId === '#mode-scan-pane') {
+                $('#inputBarcodeManual').val('');
+                setTimeout(startBarcodeScannerInModal, 200);
+            }
+        });
+
+        // Submit barcode dari input manual
+        $('#modalScanBarcode').on('click', '#btnSubmitManualBarcode', function() {
+            const manualVal = $('#inputBarcodeManual').val();
+            if (!manualVal || manualVal.trim() === '') {
+                showToastNotification('error', 'Barcode tidak boleh kosong!');
+                $('#inputBarcodeManual').focus();
+                return;
+            }
+            $('#inputBarcodeValue').val(manualVal.trim());
+            $('#formScanBarcode').trigger('submit');
+        });
+        $(document).on('keypress', '#inputBarcodeManual', function(e) {
+            if (e.which === 13) {
+                e.preventDefault();
+                $('#btnSubmitManualBarcode').click();
+            }
+        });
+
+        // Inisialisasi saat modal tampil: mode Scan = start scanner; mode Manual = focus input
         $('#modalScanBarcode').on('shown.bs.modal', function() {
+            $('#inputBarcodeManual').val('');
+            $('#inputBarcodeValue').val('');
+            const isManualActive = $('#mode-manual-pane').hasClass('active');
+            if (isManualActive) {
+                $('#inputBarcodeManual').focus();
+                return;
+            }
             setTimeout(function() {
-                // Destroy instance lama jika ada
                 if (window.html5QrcodeScanner) {
                     try {
                         window.html5QrcodeScanner.stop().then(() => {
-                            window.html5QrcodeScanner.clear();
+                            try { window.html5QrcodeScanner.clear(); } catch(ee) {}
                             window.html5QrcodeScanner = null;
                             $('#barcode-scanner-container').html('');
-                            startScanner();
+                            startBarcodeScannerInModal();
                         }).catch(() => {
                             window.html5QrcodeScanner = null;
                             $('#barcode-scanner-container').html('');
-                            startScanner();
+                            startBarcodeScannerInModal();
                         });
                         return;
                     } catch (e) {
@@ -4340,47 +4448,10 @@
                         $('#barcode-scanner-container').html('');
                     }
                 }
-                startScanner();
-
-                function startScanner() {
-                    $('#barcode-scanner-container').html(
-                        '<div id="reader" style="width:100%;max-width:400px;margin:auto;"></div>');
-                    window.html5QrcodeScanner = new Html5Qrcode("reader");
-
-                    // Buat Audio object untuk beep sound
-                    const beepSound = new Audio("{{ asset('sound/beep.mp3') }}");
-
-                    window.html5QrcodeScanner.start({
-                            facingMode: "environment"
-                        }, {
-                            fps: 10,
-                            qrbox: 250,
-                            formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE,
-                                Html5QrcodeSupportedFormats.CODE_128
-                            ]
-                        },
-                        (decodedText, decodedResult) => {
-                            // Mainkan suara beep ketika barcode berhasil di-scan
-                            beepSound.play().catch(e => {
-                                console.log("Tidak dapat memainkan suara beep:", e);
-                            });
-
-                            // Setelah scan, isi input hidden dan trigger submit handler
-                            $('#inputBarcodeValue').val(decodedText);
-                            // Stop scanner terlebih dahulu
-                            window.html5QrcodeScanner.stop().catch(() => {});
-                            // Trigger submit event yang akan di-handle oleh AJAX handler
-                            $('#formScanBarcode').trigger('submit');
-                        },
-                        (errorMessage) => {}
-                    ).catch(err => {
-                        $('#barcode-scanner-container').html(
-                            '<span style="color:#fff;">Tidak dapat mengakses kamera: ' + err +
-                            '</span>');
-                    });
-                }
+                startBarcodeScannerInModal();
             }, 200);
         });
+        
         // Handler form submit dengan AJAX untuk memastikan notifikasi selalu muncul
         $(document).on('submit', '#formScanBarcode', function(e) {
             e.preventDefault(); // Prevent default form submission
@@ -4398,7 +4469,8 @@
                 return false;
             }
             
-            // Tampilkan loading indicator
+            // Tampilkan loading overlay (terlihat di mode Scan maupun Input Manual)
+            $('#barcode-submit-loading').css('display', 'flex');
             const $scannerContainer = $('#barcode-scanner-container');
             const originalContent = $scannerContainer.html();
             $scannerContainer.html(
@@ -4409,8 +4481,9 @@
                 '</div>'
             );
             
-            // Disable tombol tutup saat processing
+            // Disable tombol tutup dan tombol manual saat processing
             $('#modalScanBarcode .btn-secondary').prop('disabled', true);
+            $('#btnSubmitManualBarcode').prop('disabled', true);
             
             // Kirim AJAX request
             $.ajax({
@@ -4652,47 +4725,47 @@
                     
                     showToastNotification('error', errorMsg);
                     
-                    // Restore scanner untuk scan ulang
-                    $scannerContainer.html(
-                        '<div id="reader" style="width:100%;max-width:400px;margin:auto;"></div>'
-                    );
+                    // Sembunyikan loading overlay
+                    $('#barcode-submit-loading').hide();
+                    $('#btnSubmitManualBarcode').prop('disabled', false);
                     
-                    // Restart scanner
-                    if (window.html5QrcodeScanner) {
-                        try {
-                            window.html5QrcodeScanner.clear();
-                        } catch(e) {}
-                    }
-                    
-                    window.html5QrcodeScanner = new Html5Qrcode("reader");
-                    const beepSound = new Audio("{{ asset('sound/beep.mp3') }}");
-                    
-                    window.html5QrcodeScanner.start({
-                        facingMode: "environment"
-                    }, {
-                        fps: 10,
-                        qrbox: 250,
-                        formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE,
-                            Html5QrcodeSupportedFormats.CODE_128]
-                    },
-                    (decodedText, decodedResult) => {
-                        beepSound.play().catch(e => {
-                            console.log("Tidak dapat memainkan suara beep:", e);
-                        });
-                        $('#inputBarcodeValue').val(decodedText);
-                        window.html5QrcodeScanner.stop().catch(() => {});
-                        $('#formScanBarcode').trigger('submit');
-                    },
-                    (errorMessage) => {}
-                    ).catch(err => {
+                    // Restore scanner hanya jika mode Scan aktif
+                    if ($('#mode-scan-pane').hasClass('active')) {
                         $scannerContainer.html(
-                            '<span style="color:#fff;">Tidak dapat mengakses kamera: ' + err + '</span>'
+                            '<div id="reader" style="width:100%;max-width:400px;margin:auto;"></div>'
                         );
-                    });
+                        if (window.html5QrcodeScanner) {
+                            try { window.html5QrcodeScanner.clear(); } catch(e) {}
+                        }
+                        window.html5QrcodeScanner = new Html5Qrcode("reader");
+                        const beepSound = new Audio("{{ asset('sound/beep.mp3') }}");
+                        window.html5QrcodeScanner.start({
+                            facingMode: "environment"
+                        }, {
+                            fps: 10,
+                            qrbox: 250,
+                            formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE, Html5QrcodeSupportedFormats.CODE_128]
+                        },
+                        (decodedText, decodedResult) => {
+                            beepSound.play().catch(e => { console.log("Tidak dapat memainkan suara beep:", e); });
+                            $('#inputBarcodeValue').val(decodedText);
+                            window.html5QrcodeScanner.stop().catch(() => {});
+                            $('#formScanBarcode').trigger('submit');
+                        },
+                        (errorMessage) => {}).catch(err => {
+                            $scannerContainer.html(
+                                '<span style="color:#666;">Tidak dapat mengakses kamera: ' + err + '</span>'
+                            );
+                        });
+                    } else {
+                        $scannerContainer.html('');
+                        $('#inputBarcodeManual').focus();
+                    }
                 },
                 complete: function() {
-                    // Enable tombol tutup kembali
+                    $('#barcode-submit-loading').hide();
                     $('#modalScanBarcode .btn-secondary').prop('disabled', false);
+                    $('#btnSubmitManualBarcode').prop('disabled', false);
                 }
             });
             
@@ -4719,10 +4792,13 @@
                 $('#barcode-scanner-container').html('');
             }
             
-            // Reset form
+            // Reset form dan loading state
             $('#formScanBarcode').removeData('proses-id');
             $('#formScanBarcode').removeData('barcode-type');
             $('#inputBarcodeValue').val('');
+            $('#inputBarcodeManual').val('');
+            $('#barcode-submit-loading').hide();
+            $('#btnSubmitManualBarcode').prop('disabled', false);
             
             // Pastikan scroll modal detail tetap berfungsi setelah modal scan ditutup
             // Jika modal detail masih terbuka, pastikan body tetap memiliki class modal-open

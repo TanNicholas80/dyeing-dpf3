@@ -3,6 +3,7 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Cache;
+use App\Http\Controllers\ApiCheckStatusBarcodeController;
 
 // Endpoint untuk menerima data berat dari timbangan (POST) dan juga bisa GET data terakhir
 Route::match(['get', 'post'], '/weight', function(Request $request) {
@@ -22,4 +23,19 @@ Route::match(['get', 'post'], '/weight', function(Request $request) {
         'device' => $data['device'] ?? null,
         'time' => $data['time'] ?? null,
     ]);
+});
+
+/**
+ * IoT Arduino/ESP endpoints
+ * Base path: /api/iot/...
+ *
+ * Header (opsional tapi direkomendasikan):
+ * - X-DEVICE-TOKEN: <IOT_DEVICE_TOKEN>
+ */
+Route::prefix('iot')->group(function () {
+    // Arduino kirim status PLC ON/OFF
+    Route::post('/mesin/{mesin}/state', [ApiCheckStatusBarcodeController::class, 'updateMesinState']);
+
+    // Arduino polling status alarm (ON/OFF) berdasarkan kelengkapan barcode
+    Route::get('/mesin/{mesin}/alarm', [ApiCheckStatusBarcodeController::class, 'getAlarmStatus']);
 });
