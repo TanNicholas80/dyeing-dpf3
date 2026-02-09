@@ -6193,12 +6193,30 @@
             // Handler untuk Jenis Proses
             $('[name="jenis"]').on('change', function() {
                 var isMaintenance = $(this).val() === 'Maintenance';
+                var $maintenanceBlocks = $('.hide-if-maintenance');
 
-                // Sembunyikan field tertentu jika Maintenance
+                // Jika Maintenance: sembunyikan blok & matikan required supaya
+                // field tersembunyi (mis. no_op, no_partai, jenis_op) tidak
+                // ikut divalidasi browser dan menyebabkan error "not focusable".
                 if (isMaintenance) {
-                    $('.hide-if-maintenance').hide();
+                    $maintenanceBlocks.find('input, select, textarea').each(function () {
+                        // Simpan status required awal di data attribute
+                        if ($(this).prop('required')) {
+                            $(this).data('was-required', true);
+                        }
+                        $(this).prop('required', false);
+                    });
+
+                    $maintenanceBlocks.hide();
                 } else {
-                    $('.hide-if-maintenance').show();
+                    // Jika bukan Maintenance: tampilkan kembali dan restore required
+                    $maintenanceBlocks.show();
+
+                    $maintenanceBlocks.find('input, select, textarea').each(function () {
+                        if ($(this).data('was-required')) {
+                            $(this).prop('required', true);
+                        }
+                    });
                 }
             });
 
