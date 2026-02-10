@@ -10,6 +10,7 @@ use App\Models\DetailProses;
 use App\Models\BarcodeKain;
 use App\Models\BarcodeLa;
 use App\Models\BarcodeAux;
+USE App\Events\MesinUpdated;
 
 class ApiCheckStatusBarcodeController extends Controller
 {
@@ -61,6 +62,8 @@ class ApiCheckStatusBarcodeController extends Controller
         // Update status mesin di database (1 = Hidup/ON, 0 = Mati/OFF)
         $mesin->status = $isOn;
         $mesin->save();
+
+        event(new \App\Events\MesinUpdated($mesin));
 
         return response()->json([
             'status' => 'success',

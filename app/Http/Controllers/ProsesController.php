@@ -9,6 +9,7 @@ use App\Models\BarcodeKain;
 use App\Models\BarcodeLa;
 use App\Models\BarcodeAux;
 use App\Models\Approval;
+use App\Models\Auxl;
 use App\Events\ProsesCreated;
 use App\Events\ProsesStatusUpdated;
 use App\Events\BarcodeStatusUpdated;
@@ -631,6 +632,7 @@ class ProsesController extends Controller
                 return redirect()->route('dashboard', ['page' => $page])->with('error', $msg);
             }
 
+
             // Gabungkan semua no_op dengan total qty_gi dari BarcodeKain dengan delimiter |
             // Ambil semua DetailProses (termasuk yang no_op-nya sama) tanpa di-unique
             $allNoOps = $detailList->filter(function ($detail) {
@@ -662,7 +664,7 @@ class ProsesController extends Controller
                     ->table('PRODUCT')
                     ->where('ProductCode', $row->PRODUCT_CODE)
                     ->first();
-                $productName = $product ? $product->ProductName : $row->PRODUCT_CODE;
+                $productName = $product ? $product->ProductCode : $row->PRODUCT_CODE;
                 return $productName . '/' . ($row->ACTUAL_WT ?? 0);
             })->implode('|');
             $body = '"' . $allNoOps . ';' . $details . '"';
@@ -706,6 +708,36 @@ class ProsesController extends Controller
                 }
                 return redirect()->route('dashboard', ['page' => $page])->with('error', $msg);
             }
+
+
+            // Validasi Jenis Bahan untuk OP
+            $jenis = Auxl::where('barcode', $barcode)
+            ->value('jenis');
+
+            foreach ($detailList as $detail) {
+
+                Log::info('DEBUG validateOpByJenis', [
+                    'barcode' => $barcode,
+                    'jenis' => $jenis,
+                    'no_op'=> $detail->no_op
+                ]);
+                $opValidation = $this->validateOpByJenis($jenis, $detail->no_op);
+
+                if ($opValidation) {
+                    if ($request->ajax() || $request->wantsJson()) {
+                        return response()->json(['status' => 'error', 'message' => $opValidation], 400);
+                    }
+                    return redirect()->route('dashboard', ['page' => $page])->with('error', $opValidation);
+                }
+
+                Log::info('BarcodeLa: Successfully saved to all details', [
+                    'barcode' => $barcode,
+                    'proses_id' => $proses->id,
+                    'detail_count' => $detailList->count(),
+                ]);
+            }
+
+
             $matdok = $data[0]['mblnr'] ?? null;
 
             foreach ($detailList as $detail) {
@@ -719,12 +751,6 @@ class ProsesController extends Controller
                     'cancel' => false,
                 ]);
             }
-
-            Log::info('BarcodeLa: Successfully saved to all details', [
-                'barcode' => $barcode,
-                'proses_id' => $proses->id,
-                'detail_count' => $detailList->count(),
-            ]);
 
             // Broadcast event untuk update real-time
             $proses->refresh();
@@ -921,6 +947,33 @@ class ProsesController extends Controller
                 }
                 return redirect()->route('dashboard', ['page' => $page])->with('error', $msg);
             }
+
+            // Validasi Jenis Bahan untuk OP
+            $jenis = Auxl::where('barcode', $barcode)
+            ->value('jenis');
+            foreach ($detailList as $detail) {
+                Log::info('DEBUG validateOpByJenis', [
+                    'barcode' => $barcode,
+                    'jenis' => $jenis,
+                    'no_op'=> $detail->no_op
+                ]);
+
+                $opValidation = $this->validateOpByJenis($jenis, $detail->no_op);
+
+                if ($opValidation) {
+                    if ($request->ajax() || $request->wantsJson()) {
+                        return response()->json(['status' => 'error', 'message' => $opValidation], 400);
+                    }
+                    return redirect()->route('dashboard', ['page' => $page])->with('error', $opValidation);
+                }
+
+                Log::info('BarcodeLa: Successfully saved to all details', [
+                    'barcode' => $barcode,
+                    'proses_id' => $proses->id,
+                    'detail_count' => $detailList->count(),
+                ]);
+            }
+
             $matdok = $data[0]['mblnr'] ?? null;
 
             // $detailList sudah diambil sebelumnya untuk membuat body, gunakan yang sama
@@ -974,9 +1027,34 @@ class ProsesController extends Controller
             return redirect()->route('dashboard', ['page' => $page])->with('error', $errorMsg);
         }
     }
-
-
+    
     // Endpoint untuk ambil barcode berdasarkan proses_id
+
+    // Validasi Jenis Bahan untuk OP
+    private function validateOpByJenis($jenis, $noOp)
+    {
+
+                Log::info('DEBUG validateOpByJenis', [
+                    'jenis' => $jenis,
+                    'no_op'=> $noOp
+                ]);
+
+        if ($jenis === 'reproses') {
+            if (!str_starts_with($noOp, '010')) {
+                return 'OP ini tidak dapat menggunakan jenis bahan reproses';
+            }
+        }
+
+        if ($jenis === 'perbaikan') {
+            if (!str_starts_with($noOp, '066')) {
+                return 'OP ini tidak dapat menggunakan jenis bahan perbaikan';
+            }
+        }
+
+        return null;
+    }
+
+
     // Optional: filter per detail dengan query param ?detail_proses_id=123
     public function barcodes(Request $request, $id)
     {

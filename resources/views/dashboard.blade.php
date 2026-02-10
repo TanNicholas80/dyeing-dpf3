@@ -6926,4 +6926,16 @@
             }
         });
     </script>
+
+    <script>
+    document.addEventListener("DOMContentLoaded", function () {
+
+        Echo.channel('dashboard.proses-statuses')
+            .listen('.mesin.updated', () => {
+                location.reload();
+            });
+
+    });
+    </script>
+
 @endsection
