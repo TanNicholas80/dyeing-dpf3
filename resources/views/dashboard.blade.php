@@ -306,7 +306,7 @@
                     <div class="col-sm-4 d-flex justify-content-end">
                         <div id="dashboard-controls" style="display: flex; justify-content: flex-end; gap: 10px;">
                             @if ($canAddProses ?? true)
-                                <button id="add-card-btn" class="btn btn-success" style="font-weight:bold;"
+                                <button type="button" id="add-card-btn" class="btn btn-success" style="font-weight:bold;"
                                     data-toggle="modal" data-target="#modalProses">
                                     + Tambah Proses
                                 </button>
@@ -519,14 +519,14 @@
                                                                     if (!$hasBarcodeAux && isset($proses->barcode_aux)) {
                                                                         $hasBarcodeAux = (bool) $proses->barcode_aux;
                                                                     }
-                                                                    // G: hijau jika semua detail OP sudah memenuhi barcode kain >= roll
+                                                                    // Blok pertama (G greige / F finish): hijau jika semua detail OP memenuhi barcode kain >= roll
                                                                     $blockColors = [
                                                                         $allKainComplete ? 'green' : 'red',
                                                                         $hasBarcodeLa ? 'green' : 'red',
                                                                         $hasBarcodeAux ? 'green' : 'red',
                                                                     ];
                                                                 }
-                                                                $blocks = ['G', 'D', 'A'];
+                                                                $blocks = (($proses->mode ?? 'greige') === 'finish') ? ['F', 'D', 'A'] : ['G', 'D', 'A'];
                                                                 if ($proses->mulai && !$proses->selesai) {
                                                                     $light = 'green';
                                                                 } else {
@@ -758,14 +758,14 @@
                                                                                         ? $d->barcodeAuxs->where('cancel', false)->count() > 0
                                                                                         : false;
                                                                                     $subMap = [
-                                                                                        'G' => $subHasKain ? 'green' : 'red',
-                                                                                        'D' => $subHasLa ? 'green' : 'red',
-                                                                                        'A' => $subHasAux ? 'green' : 'red',
+                                                                                        $blocks[0] => $subHasKain ? 'green' : 'red',
+                                                                                        $blocks[1] => $subHasLa ? 'green' : 'red',
+                                                                                        $blocks[2] => $subHasAux ? 'green' : 'red',
                                                                                     ];
                                                                                 @endphp
                                                                                 {{-- Garis pemisah --}}
                                                                                 <div style="border-top: 1px solid rgba(255,255,255,0.3); margin: 8px 0; padding-top: 8px;"></div>
-                                                                                {{-- GDA per OP (di luar detail OP, ukuran sama dengan header) --}}
+                                                                                {{-- GDA/FDA per OP (di luar detail OP, ukuran sama dengan header) --}}
                                                                                 <div style="display: flex; justify-content: center; gap: 6px; margin-bottom: 6px;">
                                                                                     @foreach ($blocks as $b)
                                                                                         @php
@@ -964,7 +964,7 @@
                                                                 $hasBarcodeAux ? 'green' : 'red',
                                                             ];
                                                         }
-                                                        $blocks = ['G', 'D', 'A'];
+                                                        $blocks = (($proses->mode ?? 'greige') === 'finish') ? ['F', 'D', 'A'] : ['G', 'D', 'A'];
                                                         // Lampu indikator: hijau jika mulai ada dan selesai null, merah jika mulai dan selesai ada, atau mulai null
                                                         if ($proses->mulai && !$proses->selesai) {
                                                             $light = 'green';
@@ -1193,9 +1193,9 @@
                                                                             ? $firstDetail->barcodeAuxs->where('cancel', false)->count() > 0
                                                                             : false;
                                                                         $firstMap = [
-                                                                            'G' => $firstHasKain ? 'green' : 'red',
-                                                                            'D' => $firstHasLa ? 'green' : 'red',
-                                                                            'A' => $firstHasAux ? 'green' : 'red',
+                                                                            $blocks[0] => $firstHasKain ? 'green' : 'red',
+                                                                            $blocks[1] => $firstHasLa ? 'green' : 'red',
+                                                                            $blocks[2] => $firstHasAux ? 'green' : 'red',
                                                                         ];
                                                                     @endphp
                                                                     {{-- OP Pertama: Detail lengkap dengan No OP dan Info --}}
@@ -1231,14 +1231,14 @@
                                                                                 ? $d->barcodeAuxs->where('cancel', false)->count() > 0
                                                                                 : false;
                                                                             $subMap = [
-                                                                                'G' => $subHasKain ? 'green' : 'red',
-                                                                                'D' => $subHasLa ? 'green' : 'red',
-                                                                                'A' => $subHasAux ? 'green' : 'red',
+                                                                                $blocks[0] => $subHasKain ? 'green' : 'red',
+                                                                                $blocks[1] => $subHasLa ? 'green' : 'red',
+                                                                                $blocks[2] => $subHasAux ? 'green' : 'red',
                                                                             ];
                                                                         @endphp
                                                                         {{-- Garis pemisah --}}
                                                                         <div style="border-top: 1px solid rgba(255,255,255,0.3); margin: 8px 0; padding-top: 8px;"></div>
-                                                                        {{-- GDA per OP (di luar detail OP, ukuran sama dengan header) --}}
+                                                                        {{-- GDA/FDA per OP (di luar detail OP, ukuran sama dengan header) --}}
                                                                         <div style="display: flex; justify-content: center; gap: 6px; margin-bottom: 6px;">
                                                                             @foreach ($blocks as $b)
                                                                                 @php
@@ -1380,6 +1380,7 @@
                 <div class="modal-content shadow-lg border-0 rounded-3">
                     <form id="formProses" action="{{ route('proses.store') }}" method="POST">
                         @csrf
+                        <input type="hidden" name="mode" id="proses_mode" value="greige">
                         <!-- Header -->
                         <div class="modal-header bg-primary text-white">
                             <h5 class="modal-title fw-bold" id="modalProsesLabel">Tambah Proses</h5>
@@ -1390,17 +1391,39 @@
 
                         <!-- Body -->
                         <div class="modal-body py-3 px-4">
+                            <!-- Pilihan Mode (di dalam modal) -->
+                            <div class="row mb-3">
+                                <div class="col-12">
+                                    <label class="form-label fw-semibold">Mode</label>
+                                    <div class="d-flex gap-4 flex-wrap">
+                                        <label class="d-flex align-items-center mr-3" style="cursor:pointer;">
+                                            <input type="radio" name="proses_mode_radio" id="proses_mode_greige" value="greige" class="mr-2" checked>
+                                            <span>Greige</span>
+                                            <small class="text-muted ml-1">(Block GDA)</small>
+                                        </label>
+                                        <label class="d-flex align-items-center" style="cursor:pointer;">
+                                            <input type="radio" name="proses_mode_radio" id="proses_mode_finish" value="finish" class="mr-2">
+                                            <span>Finish</span>
+                                            <small class="text-muted ml-1">(Block FDA)</small>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                            <hr class="my-3">
                             <div class="row">
 
-                                <!-- Jenis Proses -->
+                                <!-- Jenis Proses (Greige: Produksi/Maintenance/Reproses, Finish: hanya Maintenance & Reproses) -->
                                 <div class="col-md-6">
                                     <div class="form-group">
                                         <label class="form-label fw-semibold">Jenis Proses</label>
                                         <select name="jenis" id="jenis" class="form-control" required>
-                                            <option value="Produksi" selected>Produksi</option>
+                                            <option value="Produksi" selected id="jenis-option-produksi">Produksi</option>
                                             <option value="Maintenance">Maintenance</option>
-                                            <option value="Reproses">Reproses</option>
+                                            <option value="Reproses" id="jenis-option-reproses">Reproses</option>
                                         </select>
+                                        <small id="reprocess-hint-greige" class="form-text text-info mt-1" style="display:none;">
+                                            <i class="fas fa-info-circle"></i> Reproses hanya untuk No OP &amp; No Partai yang pernah dipakai pada jenis proses Produksi.
+                                        </small>
                                     </div>
                                 </div>
 
@@ -3694,8 +3717,9 @@
                                 const $card = $(this);
                                 const prosesData = $card.data('proses');
                                 if (!prosesData || prosesData.jenis === 'Maintenance') {
-                                    return; // Tidak ada G/D/A untuk Maintenance
+                                    return; // Tidak ada G/D/A atau F/D/A untuk Maintenance
                                 }
+                                const firstBlock = (prosesData.mode === 'finish') ? 'F' : 'G';
 
                                 // Update warna blok berdasarkan status barcode
                                 function setBlockColor(blockType, ok) {
@@ -3711,7 +3735,7 @@
                                     });
                                 }
 
-                                setBlockColor('G', !!hasKain);
+                                setBlockColor(firstBlock, !!hasKain);
                                 setBlockColor('D', !!hasLa);
                                 setBlockColor('A', !!hasAux);
                             });
@@ -3773,7 +3797,11 @@
                         }
                         
                         // Tampilkan status keseluruhan (untuk validasi scan LA/AUX)
-                        if (allProgress.length > 0) {
+                        const barcodeKainOptional = data.barcode_kain_optional === true;
+                        if (barcodeKainOptional) {
+                            const hintHtml = '<div style="padding:6px 8px;background:#e3f2fd;border-radius:4px;margin-bottom:8px;font-size:12px;color:#1565c0;"><i class="fas fa-info-circle"></i> <strong>Proses ini hanya wajib Barcode LA &amp; AUX (D &amp; A).</strong> Barcode Kain (G/F) tidak wajib.</div>';
+                            progressHtml = hintHtml + progressHtml;
+                        } else if (allProgress.length > 0) {
                             const totalDetails = allProgress.length;
                             const completeCount = allProgress.filter(p => p.is_complete).length;
                             const allComplete = completeCount === totalDetails;
@@ -4540,6 +4568,7 @@
                                             if (!prosesData || prosesData.jenis === 'Maintenance') {
                                                 return;
                                             }
+                                            const firstBlock = (prosesData.mode === 'finish') ? 'F' : 'G';
 
                                             function setBlockColor(blockType, ok) {
                                                 const $block = $card.find(
@@ -4554,7 +4583,7 @@
                                                 });
                                             }
 
-                                            setBlockColor('G', !!hasKain);
+                                            setBlockColor(firstBlock, !!hasKain);
                                             setBlockColor('D', !!hasLa);
                                             setBlockColor('A', !!hasAux);
                                         });
@@ -4612,7 +4641,11 @@
                                     }
                                     
                                     // Tampilkan status keseluruhan (untuk validasi scan LA/AUX)
-                                    if (allProgress.length > 0) {
+                                    const barcodeKainOptionalScan = data.barcode_kain_optional === true;
+                                    if (barcodeKainOptionalScan) {
+                                        const hintHtmlScan = '<div style="padding:6px 8px;background:#e3f2fd;border-radius:4px;margin-bottom:8px;font-size:12px;color:#1565c0;"><i class="fas fa-info-circle"></i> <strong>Proses ini hanya wajib Barcode LA &amp; AUX (D &amp; A).</strong> Barcode Kain (G/F) tidak wajib.</div>';
+                                        progressHtml = hintHtmlScan + progressHtml;
+                                    } else if (allProgress.length > 0) {
                                         const totalDetails = allProgress.length;
                                         const completeCount = allProgress.filter(p => p.is_complete).length;
                                         const allComplete = completeCount === totalDetails;
@@ -5017,12 +5050,13 @@
                                 const $card = $(this);
                                 const pData = $card.data('proses');
                                 if (!pData || pData.jenis === 'Maintenance') return;
+                                const firstBlock = (pData.mode === 'finish') ? 'F' : 'G';
                                 function setBlockColor(blockType, ok) {
                                     const $block = $card.find('.gda-block[data-block-type="' + blockType + '"]');
                                     if (!$block.length) return;
                                     $block.css({ background: ok ? '#d4f8e8' : '#ffb3b3', borderColor: ok ? '#43a047' : '#c62828' });
                                 }
-                                setBlockColor('G', !!hasKain);
+                                setBlockColor(firstBlock, !!hasKain);
                                 setBlockColor('D', !!hasLa);
                                 setBlockColor('A', !!hasAux);
                             });
@@ -5056,7 +5090,11 @@
                             });
                             progressHtml += '</div>';
                         }
-                        if (allProgress.length > 0) {
+                        const barcodeKainOptionalLocal = data.barcode_kain_optional === true;
+                        if (barcodeKainOptionalLocal) {
+                            const hintHtmlLocal = '<div style="padding:6px 8px;background:#e3f2fd;border-radius:4px;margin-bottom:8px;font-size:12px;color:#1565c0;"><i class="fas fa-info-circle"></i> <strong>Proses ini hanya wajib Barcode LA &amp; AUX (D &amp; A).</strong> Barcode Kain (G/F) tidak wajib.</div>';
+                            progressHtml = hintHtmlLocal + progressHtml;
+                        } else if (allProgress.length > 0) {
                             const completeCount = allProgress.filter(function(p) { return p.is_complete; }).length;
                             const totalDetails = allProgress.length;
                             const allComplete = completeCount === totalDetails;
@@ -5287,14 +5325,15 @@
 
                 const prosesData = $card.data('proses');
                 if (!prosesData || prosesData.jenis === 'Maintenance') {
-                    return; // Tidak ada G/D/A untuk Maintenance
+                    return; // Tidak ada G/D/A atau F/D/A untuk Maintenance
                 }
+                const firstBlock = (prosesData.mode === 'finish') ? 'F' : 'G';
 
-                // Fungsi helper untuk set warna blok GDA
+                // Fungsi helper untuk set warna blok GDA/FDA
                 function setBlockColor($container, blockType, ok) {
                     const $blocks = $container.find(`.gda-block[data-block-type="${blockType}"]`);
                     if (!$blocks.length) {
-                        console.warn(`GDA block ${blockType} not found in container for prosesId: ${prosesId}, detailId: ${detailId}`);
+                        console.warn(`Block ${blockType} not found in container for prosesId: ${prosesId}, detailId: ${detailId}`);
                         return;
                     }
 
@@ -5310,10 +5349,10 @@
                 // Convert detailId ke string untuk memastikan match dengan HTML
                 const detailIdStr = detailId ? String(detailId) : null;
 
-                // Jika detailId tidak ada atau kosong, update GDA di header card (untuk single OP atau OP pertama)
+                // Jika detailId tidak ada atau kosong, update GDA/FDA di header card (untuk single OP atau OP pertama)
                 if (!detailIdStr || detailIdStr === '' || detailIdStr === 'null' || detailIdStr === 'undefined') {
-                    console.log('Updating GDA in header card (no detailId)');
-                    setBlockColor($card, 'G', !!hasKain);
+                    console.log('Updating blocks in header card (no detailId)');
+                    setBlockColor($card, firstBlock, !!hasKain);
                     setBlockColor($card, 'D', !!hasLa);
                     setBlockColor($card, 'A', !!hasAux);
                     return;
@@ -5332,13 +5371,13 @@
                 const isFirstOp = firstOpDetailId === detailIdStr || firstOpDetailId === String(detailId);
 
                 if (isFirstOp) {
-                    // OP pertama: update GDA di header card
-                    console.log('Updating GDA in header card (first OP), detailId:', detailIdStr);
-                    setBlockColor($card, 'G', !!hasKain);
+                    // OP pertama: update blok di header card
+                    console.log('Updating blocks in header card (first OP), detailId:', detailIdStr);
+                    setBlockColor($card, firstBlock, !!hasKain);
                     setBlockColor($card, 'D', !!hasLa);
                     setBlockColor($card, 'A', !!hasAux);
                 } else if ($opRow.length) {
-                    // OP kedua+: cari GDA yang berada sebelum .op-row ini
+                    // OP kedua+: cari blok GDA/FDA yang berada sebelum .op-row ini
                     // Struktur HTML: <div>GDA blocks</div> <div class="op-row">...</div>
                     let $gdaContainer = null;
                     
@@ -5363,21 +5402,21 @@
                     }
                     
                     if ($gdaContainer && $gdaContainer.length) {
-                        console.log('Updating GDA in container for OP:', detailIdStr);
-                        setBlockColor($gdaContainer, 'G', !!hasKain);
+                        console.log('Updating blocks in container for OP:', detailIdStr);
+                        setBlockColor($gdaContainer, firstBlock, !!hasKain);
                         setBlockColor($gdaContainer, 'D', !!hasLa);
                         setBlockColor($gdaContainer, 'A', !!hasAux);
                     } else {
-                        // Fallback: update di header card jika GDA khusus tidak ditemukan
-                        console.log('GDA container not found, updating in header card as fallback');
-                        setBlockColor($card, 'G', !!hasKain);
+                        // Fallback: update di header card jika container tidak ditemukan
+                        console.log('Block container not found, updating in header card as fallback');
+                        setBlockColor($card, firstBlock, !!hasKain);
                         setBlockColor($card, 'D', !!hasLa);
                         setBlockColor($card, 'A', !!hasAux);
                     }
                 } else {
                     // Jika OP row tidak ditemukan, update di header card sebagai fallback
                     console.log('OP row not found, updating in header card as fallback. detailId:', detailIdStr);
-                    setBlockColor($card, 'G', !!hasKain);
+                    setBlockColor($card, firstBlock, !!hasKain);
                     setBlockColor($card, 'D', !!hasLa);
                     setBlockColor($card, 'A', !!hasAux);
                 }
@@ -6190,6 +6229,18 @@
                 }
             });
 
+            // Tampilkan hint Reproses (mode Greige): No OP & No Partai harus pernah dipakai di Produksi
+            function toggleReprocessHint() {
+                var mode = $('input[name="proses_mode_radio"]:checked').val() || 'greige';
+                var isReproses = $('#jenis').val() === 'Reproses';
+                var $hint = $('#reprocess-hint-greige');
+                if (mode === 'greige' && isReproses) {
+                    $hint.show();
+                } else {
+                    $hint.hide();
+                }
+            }
+
             // Handler untuk Jenis Proses
             $('[name="jenis"]').on('change', function() {
                 var isMaintenance = $(this).val() === 'Maintenance';
@@ -6218,6 +6269,7 @@
                         }
                     });
                 }
+                toggleReprocessHint();
             });
 
             // Handler untuk tombol tambah detail
@@ -6241,6 +6293,37 @@
                         confirmButtonText: 'OK'
                     });
                 }
+            });
+
+            // Fungsi: terapkan mode (Greige/Finish) ke hidden input, judul, dan opsi Jenis Proses
+            function applyProsesMode(mode) {
+                mode = mode || $('input[name="proses_mode_radio"]:checked').val() || 'greige';
+                $('#proses_mode').val(mode);
+                $('#modalProsesLabel').text(mode === 'finish' ? 'Tambah Proses (Finish)' : 'Tambah Proses (Greige)');
+                var $produksi = $('#jenis-option-produksi');
+                var $reproses = $('#jenis-option-reproses');
+                if (mode === 'finish') {
+                    $produksi.prop('disabled', true).hide();
+                    $reproses.prop('disabled', false).show();
+                    if ($('#jenis').val() === 'Produksi') { $('#jenis').val('Maintenance'); }
+                } else {
+                    $produksi.prop('disabled', false).show();
+                    $reproses.prop('disabled', false).show();
+                }
+                toggleReprocessHint();
+            }
+
+            // Saat modal dibuka: set default mode Greige dan terapkan (kecuali form di-reopen dengan error, jenis bisa Reproses)
+            $('#modalProses').on('show.bs.modal', function() {
+                $('#proses_mode_greige').prop('checked', true);
+                applyProsesMode('greige');
+                toggleReprocessHint();
+            });
+
+            // Saat user ganti mode di dalam modal (radio)
+            $(document).on('change', 'input[name="proses_mode_radio"]', function() {
+                var mode = $(this).val();
+                applyProsesMode(mode);
             });
 
             // Inisialisasi Select2 saat modal dibuka
@@ -6677,6 +6760,8 @@
 
                                             $targets.each(function() {
                                                 const $card = $(this);
+                                                const prosesData = $card.data('proses');
+                                                const firstBlock = (prosesData && prosesData.mode === 'finish') ? 'F' : 'G';
 
                                                 function setBlockColor(blockType, ok) {
                                                     const $block = $card.find(
@@ -6692,7 +6777,7 @@
                                                     });
                                                 }
 
-                                                setBlockColor('G', !!hasKain);
+                                                setBlockColor(firstBlock, !!hasKain);
                                                 setBlockColor('D', !!hasLa);
                                                 setBlockColor('A', !!hasAux);
                                             });
@@ -6736,7 +6821,11 @@
                                         }
                                         
                                         // Tampilkan status keseluruhan (untuk validasi scan LA/AUX)
-                                        if (allProgress.length > 0) {
+                                        const barcodeKainOptionalRefresh = data.barcode_kain_optional === true;
+                                        if (barcodeKainOptionalRefresh) {
+                                            const hintHtmlRefresh = '<div style="padding:6px 8px;background:#e3f2fd;border-radius:4px;margin-bottom:8px;font-size:12px;color:#1565c0;"><i class="fas fa-info-circle"></i> <strong>Proses ini hanya wajib Barcode LA &amp; AUX (D &amp; A).</strong> Barcode Kain (G/F) tidak wajib.</div>';
+                                            progressHtml = hintHtmlRefresh + progressHtml;
+                                        } else if (allProgress.length > 0) {
                                             const totalDetails = allProgress.length;
                                             const completeCount = allProgress.filter(p => p.is_complete).length;
                                             const allComplete = completeCount === totalDetails;
@@ -6925,17 +7014,6 @@
                 btn.html(`<i class="fas fa-chevron-up"></i> Sembunyikan History`);
             }
         });
-    </script>
-
-    <script>
-    document.addEventListener("DOMContentLoaded", function () {
-
-        Echo.channel('dashboard.proses-statuses')
-            .listen('.mesin.updated', () => {
-                location.reload();
-            });
-
-    });
     </script>
 
 @endsection

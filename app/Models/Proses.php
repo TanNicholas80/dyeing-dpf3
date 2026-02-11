@@ -16,6 +16,7 @@ class Proses extends Model
 
     protected $fillable = [
         'jenis',
+        'mode',
         'jenis_op',
         'cycle_time',
         'cycle_time_actual',

@@ -10,7 +10,7 @@ use App\Models\DetailProses;
 use App\Models\BarcodeKain;
 use App\Models\BarcodeLa;
 use App\Models\BarcodeAux;
-USE App\Events\MesinUpdated;
+use App\Events\MesinUpdated;
 
 class ApiCheckStatusBarcodeController extends Controller
 {
@@ -109,19 +109,55 @@ class ApiCheckStatusBarcodeController extends Controller
         $alarmOn = false;
 
         if ($isOn && $proses && ($proses->jenis ?? null) !== 'Maintenance') {
-            $details = DetailProses::where('proses_id', $proses->id)->get(['id', 'no_op', 'roll']);
+            $details = DetailProses::where('proses_id', $proses->id)->get(['id', 'no_op', 'no_partai', 'roll']);
             $detailIds = $details->pluck('id')->all();
 
+            $mode = $proses->mode ?? 'greige';
+            $jenis = $proses->jenis ?? null;
+
+            // Apakah barcode kain (G/F) wajib untuk alarm? Jika tidak wajib = hanya D & A yang dianggap.
+            $requireKain = true;
+            if ($jenis === 'Reproses' && $mode === 'greige') {
+                $requireKain = false; // Greige Reproses: hanya D & A
+            } elseif ($jenis === 'Reproses' && $mode === 'finish') {
+                // Finish Reproses: wajib kain hanya jika reproses pertama kali (belum pernah ada reproses finish selesai untuk no_op+no_partai)
+                $allDetailSecondOrMore = true;
+                foreach ($details as $d) {
+                    $noOp = $d->no_op ?? '';
+                    $noPartai = $d->no_partai ?? '';
+                    if ($noOp === '' || $noPartai === '') {
+                        $allDetailSecondOrMore = false;
+                        break;
+                    }
+                    $countFinishReprosesSelesai = Proses::where('jenis', 'Reproses')
+                        ->where('mode', 'finish')
+                        ->whereNotNull('selesai')
+                        ->where('id', '!=', $proses->id)
+                        ->whereHas('details', function ($q) use ($noOp, $noPartai) {
+                            $q->where('no_op', $noOp)->where('no_partai', $noPartai);
+                        })
+                        ->count();
+                    if ($countFinishReprosesSelesai < 1) {
+                        $allDetailSecondOrMore = false;
+                        break;
+                    }
+                }
+                $requireKain = !$allDetailSecondOrMore; // pertama kali = wajib FDA; ke-2+ = hanya D & A
+            }
+            // Produksi (Greige/Finish): selalu wajib G/F (requireKain tetap true)
+
             $kainIncomplete = false;
-            foreach ($details as $d) {
-                $roll = (int) ($d->roll ?? 0);
-                $scanned = BarcodeKain::where('detail_proses_id', $d->id)
-                    ->where('cancel', false)
-                    ->count();
-                $isComplete = ($roll > 0) ? ($scanned >= $roll) : true;
-                if (!$isComplete) {
-                    $kainIncomplete = true;
-                    break;
+            if ($requireKain) {
+                foreach ($details as $d) {
+                    $roll = (int) ($d->roll ?? 0);
+                    $scanned = BarcodeKain::where('detail_proses_id', $d->id)
+                        ->where('cancel', false)
+                        ->count();
+                    $isComplete = ($roll > 0) ? ($scanned >= $roll) : true;
+                    if (!$isComplete) {
+                        $kainIncomplete = true;
+                        break;
+                    }
                 }
             }
 
