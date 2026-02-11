@@ -112,13 +112,76 @@ class ProsesController extends Controller
     }
 
     /**
+     * Cek apakah proses ini boleh scan LA/AUX tanpa wajib barcode kain lengkap.
+     * - Greige Reproses: D & A saja wajib, G tidak wajib → true.
+     * - Finish Reproses (ke-2 dan seterusnya): D & A saja wajib, F tidak wajib → true.
+     *
+     * @param Proses $proses
+     * @return bool
+     */
+    private function isBarcodeKainOptionalForLaAux(Proses $proses): bool
+    {
+        if ($proses->jenis !== 'Reproses') {
+            return false;
+        }
+        $mode = $proses->mode ?? 'greige';
+
+        // Greige Reproses: hanya D & A wajib, G tidak wajib
+        if ($mode === 'greige') {
+            return true;
+        }
+
+        // Finish Reproses: hanya setelah reproses pertama, F tidak wajib (hanya D & A)
+        if ($mode === 'finish') {
+            $detailList = DetailProses::where('proses_id', $proses->id)->get();
+            if ($detailList->isEmpty()) {
+                return false;
+            }
+            foreach ($detailList as $detail) {
+                $noOp = $detail->no_op ?? '';
+                $noPartai = $detail->no_partai ?? '';
+                if ($noOp === '' || $noPartai === '') {
+                    return false;
+                }
+                // Ada berapa proses Reproses (finish) yang sudah selesai dengan (no_op, no_partai) ini selain proses saat ini?
+                $countFinishReprosesSelesai = Proses::where('jenis', 'Reproses')
+                    ->where('mode', 'finish')
+                    ->whereNotNull('selesai')
+                    ->where('id', '!=', $proses->id)
+                    ->whereHas('details', function ($q) use ($noOp, $noPartai) {
+                        $q->where('no_op', $noOp)->where('no_partai', $noPartai);
+                    })
+                    ->count();
+                // Jika belum ada satupun Reproses finish selesai untuk pasangan ini, proses ini = reproses pertama → F wajib
+                if ($countFinishReprosesSelesai < 1) {
+                    return false;
+                }
+            }
+            return true; // Semua detail sudah pernah reproses finish minimal 1x → F tidak wajib
+        }
+
+        return false;
+    }
+
+    /**
      * Validasi apakah semua DetailProses dalam proses sudah memenuhi jumlah barcode kain sesuai roll.
-     * 
+     * Untuk Greige Reproses: barcode kain (G) tidak wajib, hanya D & A → skip validasi.
+     * Untuk Finish Reproses ke-2+: barcode kain (F) tidak wajib → skip validasi.
+     *
      * @param int $prosesId
      * @return array|null Returns null if valid, or array with error message if invalid
      */
     private function validateBarcodeKainCompleteness($prosesId)
     {
+        $proses = Proses::find($prosesId);
+        if (!$proses) {
+            return ['error' => 'Proses tidak ditemukan.'];
+        }
+
+        if ($this->isBarcodeKainOptionalForLaAux($proses)) {
+            return null; // Boleh scan LA/AUX tanpa wajib barcode kain lengkap
+        }
+
         // Ambil semua DetailProses dalam proses ini
         $detailList = DetailProses::where('proses_id', $prosesId)->get();
 
@@ -168,11 +231,18 @@ class ProsesController extends Controller
 
     public function store(Request $request)
     {
+        $mode = $request->input('mode', 'greige');
         $rules = [
+            'mode' => 'nullable|in:greige,finish',
             'jenis' => 'required|in:Produksi,Maintenance,Reproses',
             'mesin_id' => 'required|exists:mesins,id',
             'cycle_time' => 'required',
         ];
+
+        // Finish mode: hanya Maintenance dan Reproses
+        if ($mode === 'finish') {
+            $rules['jenis'] = 'required|in:Maintenance,Reproses';
+        }
 
         if ($request->jenis !== 'Maintenance') {
             $rules += [
@@ -210,6 +280,7 @@ class ProsesController extends Controller
 
         /**
          * VALIDASI KHUSUS (NO OP, NO PARTAI)
+         * - Format No OP menurut mode: Greige = kode awal 066, Finish = kode awal 010.
          * - Unik per kombinasi (no_op, no_partai): No Partai sama boleh dipakai jika No OP berbeda
          *   (dalam 1 proses OP Multiple maupun proses lain).
          * - Produksi: (no_op, no_partai) harus belum pernah dipakai.
@@ -224,6 +295,35 @@ class ProsesController extends Controller
             is_array($validated['details'])
         ) {
             $jenisProses = $validated['jenis'];
+            $mode = $validated['mode'] ?? $request->input('mode', 'greige');
+
+            // 0. Validasi format No OP menurut mode (Greige = 066, Finish = 010)
+            $prefixGreige = '066';
+            $prefixFinish = '010';
+            foreach ($validated['details'] as $index => $detail) {
+                $noOp = isset($detail['no_op']) ? trim((string) $detail['no_op']) : '';
+                if ($noOp === '') {
+                    continue;
+                }
+                if ($mode === 'finish') {
+                    if (!str_starts_with($noOp, $prefixFinish)) {
+                        return back()
+                            ->withInput()
+                            ->withErrors([
+                                "details.$index.no_op" => "No OP untuk mode Finish harus memiliki kode awal {$prefixFinish}. Contoh: {$prefixFinish}xxxxx. No OP yang dimasukkan: \"{$noOp}\".",
+                            ]);
+                    }
+                } else {
+                    // greige
+                    if (!str_starts_with($noOp, $prefixGreige)) {
+                        return back()
+                            ->withInput()
+                            ->withErrors([
+                                "details.$index.no_op" => "No OP untuk mode Greige harus memiliki kode awal {$prefixGreige}. Contoh: {$prefixGreige}xxxxx. No OP yang dimasukkan: \"{$noOp}\".",
+                            ]);
+                    }
+                }
+            }
 
             // 1. Cek duplikasi (no_op, no_partai) di dalam form yang sama
             $pairs = [];
@@ -276,6 +376,21 @@ class ProsesController extends Controller
                                 ->withErrors([
                                     "details.$index.no_partai" =>
                                     "Kombinasi No OP '$noOp' + No Partai '$noPartai' tidak dapat digunakan untuk Reproses karena masih ada proses yang berjalan / belum selesai.",
+                                ]);
+                        }
+                    }
+                    // Mode Greige - Reproses: No OP & No Partai harus pernah dipakai pada jenis proses Produksi
+                    if ($mode === 'greige') {
+                        $pernahProduksi = $existingDetails->contains(function ($d) {
+                            return $d->proses && $d->proses->jenis === 'Produksi';
+                        });
+                        if (!$pernahProduksi) {
+                            return back()
+                                ->withInput()
+                                ->withErrors([
+                                    "details.$index.no_partai" =>
+                                    "Kombinasi No OP \"{$noOp}\" + No Partai \"{$noPartai}\" belum pernah dipakai pada jenis proses Produksi. " .
+                                    "Reproses hanya dapat dibuat untuk Detail OP yang pernah dipakai di Produksi.",
                                 ]);
                         }
                     }
@@ -332,6 +447,7 @@ class ProsesController extends Controller
             // Buat Proses (hanya field yang ada di model Proses)
             $prosesData = [
                 'jenis' => $validated['jenis'],
+                'mode' => $validated['mode'] ?? 'greige',
                 'jenis_op' => $validated['jenis_op'] ?? null,
                 'cycle_time' => $validated['cycle_time'],
                 'mesin_id' => $validated['mesin_id'],
@@ -1130,7 +1246,7 @@ class ProsesController extends Controller
     // Optional: filter per detail dengan query param ?detail_proses_id=123
     public function barcodes(Request $request, $id)
     {
-        Proses::findOrFail($id); // validasi proses ada
+        $proses = Proses::findOrFail($id); // validasi proses ada
 
         $detailProsesId = $request->query('detail_proses_id');
 
@@ -1224,10 +1340,13 @@ class ProsesController extends Controller
             }
         }
 
-        // Cek apakah SEMUA DetailProses sudah memenuhi roll
-        $allComplete = collect($allBarcodeKainProgress)->every(function ($progress) {
-            return $progress['is_complete'];
-        });
+        // Cek apakah SEMUA DetailProses sudah memenuhi roll (atau barcode kain tidak wajib: Greige Reproses / Finish Reproses ke-2+)
+        $barcodeKainOptional = $this->isBarcodeKainOptionalForLaAux($proses);
+        $allComplete = $barcodeKainOptional
+            ? true
+            : collect($allBarcodeKainProgress)->every(function ($progress) {
+                return $progress['is_complete'];
+            });
 
         return response()->json([
             'barcode_kain' => $barcodeKain->values(),
@@ -1236,7 +1355,8 @@ class ProsesController extends Controller
             'barcode_kain_progress' => $barcodeKainProgress, // Progress dari detail yang dipilih (untuk display)
             'all_barcode_kain_progress' => $allBarcodeKainProgress, // Progress dari SEMUA detail (untuk validasi)
             'incomplete_details' => $incompleteDetails, // Detail yang belum lengkap (untuk pesan error)
-            'can_scan_la_aux' => $allComplete, // Flag untuk frontend: apakah bisa scan LA/AUX (berdasarkan SEMUA detail)
+            'can_scan_la_aux' => $allComplete, // Flag untuk frontend: apakah bisa scan LA/AUX
+            'barcode_kain_optional' => $barcodeKainOptional, // true = hanya D & A wajib (untuk tampilan hint)
         ]);
     }
 
