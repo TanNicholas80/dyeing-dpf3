@@ -53,6 +53,64 @@ class ProsesController extends Controller
     }
 
     /**
+     * Jika mesin dalam status ON (1) dan tidak ada proses yang sedang berjalan,
+     * mulai proses berikutnya sesuai antrian (order). Mirip logic trigger mesin_after_update_status.
+     *
+     * @param int $mesinId
+     * @return Proses|null Proses yang baru dimulai, atau null jika tidak ada yang dimulai
+     */
+    private function startNextProsesIfMesinOn(int $mesinId): ?Proses
+    {
+        $mesin = Mesin::find($mesinId);
+        if (!$mesin || (int) $mesin->status !== 1) {
+            return null;
+        }
+
+        // Sudah ada proses yang sedang berjalan (mulai ada, selesai belum) → jangan mulai yang lain
+        $adaProsesAktif = Proses::where('mesin_id', $mesinId)
+            ->whereNotNull('mulai')
+            ->whereNull('selesai')
+            ->exists();
+        if ($adaProsesAktif) {
+            return null;
+        }
+
+        // Cari proses selanjutnya: belum mulai, belum selesai, order > 0, urut order lalu id
+        $prosesSelanjutnya = Proses::where('mesin_id', $mesinId)
+            ->whereNull('mulai')
+            ->whereNull('selesai')
+            ->where('order', '>', 0)
+            ->orderBy('order')
+            ->orderBy('id')
+            ->first();
+
+        if (!$prosesSelanjutnya) {
+            return null;
+        }
+
+        $prosesSelanjutnya->update([
+            'mulai' => now(),
+            'order' => 0,
+        ]);
+
+        // Renumber proses pending yang tersisa (1, 2, 3, ...)
+        $pending = Proses::where('mesin_id', $mesinId)
+            ->whereNull('mulai')
+            ->whereNull('selesai')
+            ->where('id', '!=', $prosesSelanjutnya->id)
+            ->orderBy('order')
+            ->orderBy('id')
+            ->get();
+
+        $order = 1;
+        foreach ($pending as $p) {
+            $p->update(['order' => $order++]);
+        }
+
+        return $prosesSelanjutnya->fresh();
+    }
+
+    /**
      * Validasi apakah semua DetailProses dalam proses sudah memenuhi jumlah barcode kain sesuai roll.
      * 
      * @param int $prosesId
@@ -330,6 +388,20 @@ class ProsesController extends Controller
 
                 return redirect()->route('dashboard', ['page' => $page])
                     ->with('success', 'Proses Reproses berhasil ditambahkan. Proses akan tampil dengan warna kuning dan menunggu persetujuan FM terlebih dahulu, kemudian VP.');
+            }
+
+            // Logic sama dengan trigger: jika mesin ON dan tidak ada proses berjalan, mulai proses berikutnya (urut order)
+            $started = $this->startNextProsesIfMesinOn((int) $validated['mesin_id']);
+            if ($started && $started->id !== $proses->id) {
+                // Proses yang dimulai bukan proses baru kita → broadcast agar card proses itu update (mulai berjalan)
+                $started->load(['approvals', 'details.barcodeKains', 'details.barcodeLas', 'details.barcodeAuxs']);
+                $statusService = new ProsesStatusService();
+                $affectedProsesIds = $statusService->getAffectedProsesIds();
+                $statusData = $statusService->generateProsesStatus($started, $affectedProsesIds);
+                event(new ProsesStatusUpdated($started->id, $statusData));
+            }
+            if ($started && $started->id === $proses->id) {
+                $proses = $proses->fresh(); // Proses baru kita yang dimulai → pakai data terbaru (mulai terisi)
             }
 
             // Produksi / Maintenance langsung tampil
