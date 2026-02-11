@@ -73,7 +73,15 @@
                                 @foreach($auxl->details as $i => $detail)
                                     <div class="row detail-row mb-2">
                                         <div class="col-md-6 col-12 mb-2 mb-md-0">
-                                            <input type="text" name="details[{{ $i }}][auxiliary]" class="form-control" value="{{ $detail->auxiliary }}" required>
+                                            <select name="details[{{ $i }}][auxiliary]" 
+                                                    class="form-control select2-auxiliary" 
+                                                    data-selected="{{ $detail->auxiliary }}" 
+                                                    required>
+                                                <option value="{{ $detail->auxiliary }}" selected>
+                                                    {{ $detail->auxiliary }}
+                                                </option>
+                                            </select>
+
                                         </div>
                                         <div class="col-md-6 col-12">
                                             <div class="input-group">
@@ -96,7 +104,7 @@
             </div>
         </section>
     </div>
-    <script>
+    <!-- <script>
         let detailIndex = {{ count($auxl->details) }};
         document.getElementById('btn-add-detail').onclick = function() {
             const list = document.getElementById('details-list');
@@ -125,5 +133,73 @@
             }
         });
         document.title = "Edit Auxiliary";
-    </script>
+    </script> -->
+@endsection
+
+@section('scripts')
+<script>
+    $(document).ready(function () {
+
+        function initAuxiliarySelect2(selector) {
+            $(selector).select2({
+                placeholder: '-- Pilih Auxiliary --',
+                minimumInputLength: 3,
+                ajax: {
+                    url: '/api/proxy-auxiliary',
+                    type: 'POST',
+                    dataType: 'json',
+                    delay: 500,
+                    data: function(params) {
+                        return { q: params.term };
+                    },
+                    processResults: function(data) {
+                        return { results: data.results || [] };
+                    }
+                }
+            });
+        }
+
+        // init existing
+        $('.select2-auxiliary').each(function () {
+            initAuxiliarySelect2(this);
+        });
+
+        let detailIndex = {{ count($auxl->details) }};
+
+        $('#btn-add-detail').on('click', function () {
+
+            const row = $(`
+                <div class="row detail-row mb-2">
+                    <div class="col-md-6 col-12 mb-2 mb-md-0">
+                        <select name="details[${detailIndex}][auxiliary]" 
+                                class="form-control select2-auxiliary" required></select>
+                    </div>
+                    <div class="col-md-6 col-12">
+                        <div class="input-group">
+                            <input type="number" step="0.01" 
+                                name="details[${detailIndex}][konsentrasi]" 
+                                class="form-control" required>
+                            <div class="input-group-append">
+                                <button type="button" class="btn btn-danger btn-remove-detail">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `);
+
+            $('#details-list').append(row);
+            initAuxiliarySelect2(row.find('.select2-auxiliary'));
+
+            detailIndex++;
+        });
+
+        $(document).on('click', '.btn-remove-detail', function () {
+            $(this).closest('.detail-row').remove();
+        });
+
+        document.title = "Edit Auxiliary";
+    });
+</script>
 @endsection

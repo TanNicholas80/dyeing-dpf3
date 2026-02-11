@@ -450,7 +450,7 @@ class ProsesController extends Controller
     public function barcodeKain(Request $request, $id)
     {
         $request->validate([
-            'barcode' => 'required|string|max:255|unique:barcode_kain,barcode',
+            // 'barcode' => 'required|string|max:255|unique:barcode_kain,barcode',
             'detail_proses_id' => 'nullable|exists:detail_proses,id',
         ]);
         try {
@@ -458,6 +458,14 @@ class ProsesController extends Controller
             $barcode = $request->barcode;
             $barcode = substr($barcode, 0, 10);
             Log::info('BarcodeKain: Barcode received and trimmed', ['original' => $request->barcode, 'trimmed' => $barcode, 'proses_id' => $id]);
+
+            $opberjalan = Proses::select('mulai', 'selesai')
+            ->where('id', $id)
+            ->first();
+
+            if (!empty($opberjalan->mulai) && empty($opberjalan->selesai)) {
+                return response()->json(['status' => 'error', 'message' => 'Tambah kain tidak dapat dilakukan saat mesin berjalan'], 400);
+            }
 
             $detailProses = null;
             if ($request->has('detail_proses_id') && $request->detail_proses_id) {
@@ -711,31 +719,31 @@ class ProsesController extends Controller
 
 
             // Validasi Jenis Bahan untuk OP
-            $jenis = Auxl::where('barcode', $barcode)
-            ->value('jenis');
+            // $jenis = Auxl::where('barcode', $barcode)
+            // ->value('jenis');
 
-            foreach ($detailList as $detail) {
+            // foreach ($detailList as $detail) {
 
-                Log::info('DEBUG validateOpByJenis', [
-                    'barcode' => $barcode,
-                    'jenis' => $jenis,
-                    'no_op'=> $detail->no_op
-                ]);
-                $opValidation = $this->validateOpByJenis($jenis, $detail->no_op);
+            //     Log::info('DEBUG validateOpByJenis', [
+            //         'barcode' => $barcode,
+            //         'jenis' => $jenis,
+            //         'no_op'=> $detail->no_op
+            //     ]);
+            //     $opValidation = $this->validateOpByJenis($jenis, $detail->no_op);
 
-                if ($opValidation) {
-                    if ($request->ajax() || $request->wantsJson()) {
-                        return response()->json(['status' => 'error', 'message' => $opValidation], 400);
-                    }
-                    return redirect()->route('dashboard', ['page' => $page])->with('error', $opValidation);
-                }
+            //     if ($opValidation) {
+            //         if ($request->ajax() || $request->wantsJson()) {
+            //             return response()->json(['status' => 'error', 'message' => $opValidation], 400);
+            //         }
+            //         return redirect()->route('dashboard', ['page' => $page])->with('error', $opValidation);
+            //     }
 
-                Log::info('BarcodeLa: Successfully saved to all details', [
-                    'barcode' => $barcode,
-                    'proses_id' => $proses->id,
-                    'detail_count' => $detailList->count(),
-                ]);
-            }
+            //     Log::info('BarcodeLa: Successfully saved to all details', [
+            //         'barcode' => $barcode,
+            //         'proses_id' => $proses->id,
+            //         'detail_count' => $detailList->count(),
+            //     ]);
+            // }
 
 
             $matdok = $data[0]['mblnr'] ?? null;
@@ -1172,18 +1180,20 @@ class ProsesController extends Controller
     public function cancelBarcode(Request $request, $proses, $type, $barcode)
     {
         $matdok = $request->input('matdok');
+
+        if ($type === 'kain') {
+        $barcodeObj = \App\Models\BarcodeKain::find($barcode);
+        } elseif ($type === 'la') {
+            $barcodeObj = \App\Models\BarcodeLa::find($barcode);
+        } elseif ($type === 'aux') {
+            $barcodeObj = \App\Models\BarcodeAux::find($barcode);
+        } else {
+            Log::error('Cancel barcode gagal: tipe barcode tidak valid', compact('type', 'barcode'));
+            return response()->json(['status' => 'error', 'message' => 'Tipe barcode tidak valid'], 400);
+        }
+
         // Jika matdok kosong/null, ambil dari database barcode
         if (!$matdok) {
-            if ($type === 'kain') {
-                $barcodeObj = \App\Models\BarcodeKain::find($barcode);
-            } elseif ($type === 'la') {
-                $barcodeObj = \App\Models\BarcodeLa::find($barcode);
-            } elseif ($type === 'aux') {
-                $barcodeObj = \App\Models\BarcodeAux::find($barcode);
-            } else {
-                Log::error('Cancel barcode gagal: tipe barcode tidak valid', compact('type', 'barcode'));
-                return response()->json(['status' => 'error', 'message' => 'Tipe barcode tidak valid'], 400);
-            }
             if ($barcodeObj && $barcodeObj->matdok) {
                 $matdok = $barcodeObj->matdok;
             }
@@ -1192,6 +1202,24 @@ class ProsesController extends Controller
             Log::error('Cancel barcode gagal: matdok tidak tersedia', compact('type', 'barcode'));
             return response()->json(['status' => 'error', 'message' => 'Material document tidak tersedia'], 400);
         }
+
+        if ($type === 'kain') {
+            $barcodeObj = \App\Models\BarcodeKain::find($barcode);  
+            $prosesId = DetailProses::select('proses_id')
+            ->where('id', $barcodeObj->detail_proses_id)
+            ->first();
+            $opberjalan = Proses::select('mulai', 'selesai')
+            ->where('id', $prosesId->proses_id)
+            ->first();
+
+            if (!empty($opberjalan->mulai) && empty($opberjalan->selesai)) {
+                return response()->json(['status' => 'error', 'message' => 'Cancel barcode tidak dapat dilakukan saat mesin berjalan'], 400);
+            }
+        }
+        if (!empty($opberjalan->mulai) && !empty($opberjalan->selesai)) {
+            return response()->json(['status' => 'error', 'message' => 'Cancel barcode tidak dapat dilakukan saat proses telah selesai'], 400);
+        }
+    
         try {
             $client = new \GuzzleHttp\Client();
             $body = '"' . $matdok . '"';
