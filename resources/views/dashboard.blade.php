@@ -3556,6 +3556,7 @@
                 $btnEdit.prop('disabled', true).addClass('disabled').css('cursor', 'not-allowed');
                 $btnMove.prop('disabled', true).addClass('disabled').css('cursor', 'not-allowed');
                 $btnDelete.prop('disabled', true).addClass('disabled').css('cursor', 'not-allowed');
+            
 
                 // Tentukan pesan tooltip berdasarkan kondisi
                 let tooltipText = '';
@@ -3673,7 +3674,7 @@
                 html += '<tr><th colspan="4" style="background:#f8f8f8;">Barcode Kain';
                 if (showScanBtn) {
                     html +=
-                        ' <button type="button" class="btn btn-sm btn-success scan-barcode-btn" data-barcode="barcode_kain" data-id="' +
+                        ' <button type="button" id = btn-scan-kain class="btn btn-sm btn-success scan-barcode-btn" data-barcode="barcode_kain" data-id="' +
                         proses.id + '" data-detail-id="' + (selectedDetailId || '') + '" style="float:right;"><i class="fas fa-barcode"></i> Scan</button>';
                 }
                 html += '</th></tr>';
@@ -3749,10 +3750,13 @@
                             }
                             // Cek apakah user bisa cancel barcode
                             const canCancel = window.canCancelBarcode !== false;
+                            const canCancelByProses = window.canCancelByProses === true;
+
+                            const allowCancel = canCancel && canCancelByProses;
                             let html = '<div style="display:flex;flex-wrap:wrap;gap:6px;">';
                             activeBarcodes.forEach(function(bk, idx) {
                                 // Hanya tampilkan button cancel jika user memiliki akses
-                                const cancelButton = canCancel ?
+                                const cancelButton = allowCancel ?
                                     `<span style='position:absolute;top:2px;right:6px;cursor:pointer;font-weight:bold;color:#b00;font-size:16px;z-index:2;' class='cancel-barcode-btn' data-type='${barcodeType}' data-proses='${prosesId}' data-id='${bk.id}' data-matdok='${bk.matdok}' title='Cancel barcode'>&times;</span>` :
                                     '';
                                 html += `<div style="position:relative;flex:1 0 30%;max-width:32%;background:#f3f3f3;border-radius:6px;padding:6px 4px;margin-bottom:6px;text-align:center;font-weight:bold;font-size:13px;color:#222;box-shadow:0 1px 2px #0001;">
@@ -3763,12 +3767,19 @@
                             html += '</div>';
                             return html;
                         }
+
+                        fetch(`/process-can-cancel/${proses.id}`)
+                        .then(res => res.json())
+                        .then(json => {
+
+                            window.canCancelByProses = json.canCancelByProses;
                         // Render ulang list barcode di modal
                         $('#barcode-kain-list').html(renderBarcodeGrid(data.barcode_kain, 'kain', proses
                             .id));
                         $('#barcode-la-list').html(renderBarcodeGrid(data.barcode_la, 'la', proses.id));
                         $('#barcode-aux-list').html(renderBarcodeGrid(data.barcode_aux, 'aux', proses
                             .id));
+                        });
 
                         // Tampilkan progress barcode kain
                         // Gunakan barcode_kain_progress untuk detail yang dipilih (untuk display)
@@ -3822,10 +3833,18 @@
                         }
                         $('#barcode-kain-progress').html(progressHtml);
 
+                        // Cek apakah proses sudah dimulai
+                        const isStarted = proses.mulai !== null && proses.mulai !== undefined && proses.mulai !== '';
+
+                        // Cek apakah proses sudah selesai
+                        const isEnded = proses.mulai !== null && proses.mulai !== undefined && proses.mulai !== ''
+                        && proses.selesai !== null && proses.selesai !== undefined && proses.selesai !== '';
+
                         // Enable/disable tombol scan LA dan AUX berdasarkan status progress SEMUA detail
                         const canScanLaAux = data.can_scan_la_aux !== false;
+                        const $btnScanKain = $('#btn-scan-kain');
                         const $btnScanLa = $('#btn-scan-la');
-                        const $btnScanAux = $('#btn-scan-aux');
+                        const $btnScanAux = $('#btn-scan-aux'); 
                         
                         if (!canScanLaAux) {
                             // Buat pesan tooltip yang informatif dengan detail yang belum lengkap
@@ -3846,6 +3865,38 @@
                                 .attr('title', tooltipMsg);
                             
                             $btnScanAux.prop('disabled', true)
+                                .removeClass('btn-success')
+                                .addClass('btn-secondary')
+                                .css('cursor', 'not-allowed')
+                                .attr('title', tooltipMsg);
+                        } else if (isEnded) {
+                            // Buat pesan tooltip
+                            let tooltipMsg = 'Tidak dapat scan karena proses sudah selesai';
+
+                            // Disable tombol scan Kain LA dan AUX
+                            $btnScanKain.prop('disabled', true)
+                                .removeClass('btn-success')
+                                .addClass('btn-secondary')
+                                .css('cursor', 'not-allowed')
+                                .attr('title', tooltipMsg);
+
+                            $btnScanLa.prop('disabled', true)
+                                .removeClass('btn-success')
+                                .addClass('btn-secondary')
+                                .css('cursor', 'not-allowed')
+                                .attr('title', tooltipMsg);
+                            
+                            $btnScanAux.prop('disabled', true)
+                                .removeClass('btn-success')
+                                .addClass('btn-secondary')
+                                .css('cursor', 'not-allowed')
+                                .attr('title', tooltipMsg);
+                        } else if (isStarted) {
+                            // Buat pesan tooltip
+                            let tooltipMsg = 'Tidak dapat scan karena proses sudah dimulai';
+
+                            // Disable tombol scan Kain LA dan AUX
+                            $btnScanKain.prop('disabled', true)
                                 .removeClass('btn-success')
                                 .addClass('btn-secondary')
                                 .css('cursor', 'not-allowed')
@@ -4595,9 +4646,12 @@
                                             return '<span style="color:#888;">Belum ada barcode.</span>';
                                         }
                                         const canCancel = window.canCancelBarcode !== false;
+                                        const canCancelByProses = window.canCancelByProses === true;
+
+                                        const allowCancel = canCancel && canCancelByProses;
                                         let html = '<div style="display:flex;flex-wrap:wrap;gap:6px;">';
                                         activeBarcodes.forEach(function(bk, idx) {
-                                            const cancelButton = canCancel ?
+                                            const cancelButton = allowCancel ?
                                                 `<span style='position:absolute;top:2px;right:6px;cursor:pointer;font-weight:bold;color:#b00;font-size:16px;z-index:2;' class='cancel-barcode-btn' data-type='${barcodeType}' data-proses='${prosesId}' data-id='${bk.id}' data-matdok='${bk.matdok}' title='Cancel barcode'>&times;</span>` :
                                                 '';
                                             html += `<div style="position:relative;flex:1 0 30%;max-width:32%;background:#f3f3f3;border-radius:6px;padding:6px 4px;margin-bottom:6px;text-align:center;font-weight:bold;font-size:13px;color:#222;box-shadow:0 1px 2px #0001;">
@@ -4609,10 +4663,16 @@
                                         return html;
                                     }
                                     
-                                    // Render ulang list barcode di modal
-                                    $('#barcode-kain-list').html(renderBarcodeGrid(data.barcode_kain, 'kain', currentProsesId));
-                                    $('#barcode-la-list').html(renderBarcodeGrid(data.barcode_la, 'la', currentProsesId));
-                                    $('#barcode-aux-list').html(renderBarcodeGrid(data.barcode_aux, 'aux', currentProsesId));
+                                    fetch(`/process-can-cancel/${currentProsesId}`)
+                                    .then(res => res.json())
+                                    .then(json => {
+
+                                        window.canCancelByProses = json.canCancelByProses;
+                                        // Render ulang list barcode di modal
+                                        $('#barcode-kain-list').html(renderBarcodeGrid(data.barcode_kain, 'kain', currentProsesId));
+                                        $('#barcode-la-list').html(renderBarcodeGrid(data.barcode_la, 'la', currentProsesId));
+                                        $('#barcode-aux-list').html(renderBarcodeGrid(data.barcode_aux, 'aux', currentProsesId));
+                                    });
 
                                     // Tampilkan progress barcode kain
                                     // Gunakan barcode_kain_progress untuk detail yang dipilih (untuk display)
@@ -5019,7 +5079,7 @@
                     const detailIdAttr = selectedDetailId ? (selectedDetailId + '') : '';
                     html += '<tr><th colspan="4" style="background:#f8f8f8;">Barcode Kain';
                     if (showScanBtn) {
-                        html += ' <button type="button" class="btn btn-sm btn-success scan-barcode-btn" data-barcode="barcode_kain" data-id="' + proses.id + '" data-detail-id="' + detailIdAttr + '" style="float:right;"><i class="fas fa-barcode"></i> Scan</button>';
+                        html += ' <button type="button" id="btn-scan-kain" class="btn btn-sm btn-success scan-barcode-btn" data-barcode="barcode_kain" data-id="' + proses.id + '" data-detail-id="' + detailIdAttr + '" style="float:right;"><i class="fas fa-barcode"></i> Scan</button>';
                     }
                     html += '</th></tr><tr><td colspan="4" id="barcode-kain-list">Loading...</td></tr><tr><td colspan="4" id="barcode-kain-progress" style="padding:8px;background:#f9f9f9;font-size:12px;"></td></tr>';
                     html += '<tr><th colspan="4" style="background:#f8f8f8;">Barcode LA';
@@ -5065,17 +5125,30 @@
                             const activeBarcodes = (barcodes || []).filter(function(bk) { return !bk.cancel; });
                             if (!activeBarcodes.length) return '<span style="color:#888;">Belum ada barcode.</span>';
                             const canCancel = window.canCancelBarcode !== false;
+                            const canCancelByProses = window.canCancelByProses === true;
+
+                            const allowCancel = canCancel && canCancelByProses;
+
                             let h = '<div style="display:flex;flex-wrap:wrap;gap:6px;">';
                             activeBarcodes.forEach(function(bk) {
-                                const cancelBtn = canCancel ? '<span style="position:absolute;top:2px;right:6px;cursor:pointer;font-weight:bold;color:#b00;font-size:16px;z-index:2;" class="cancel-barcode-btn" data-type="' + barcodeType + '" data-proses="' + pid + '" data-id="' + bk.id + '" data-matdok="' + (bk.matdok || '') + '" title="Cancel barcode">&times;</span>' : '';
+                                const cancelBtn = allowCancel ? '<span style="position:absolute;top:2px;right:6px;cursor:pointer;font-weight:bold;color:#b00;font-size:16px;z-index:2;" class="cancel-barcode-btn" data-type="' + barcodeType + '" data-proses="' + pid + '" data-id="' + bk.id + '" data-matdok="' + (bk.matdok || '') + '" title="Cancel barcode">&times;</span>' : '';
                                 h += '<div style="position:relative;flex:1 0 30%;max-width:32%;background:#f3f3f3;border-radius:6px;padding:6px 4px;margin-bottom:6px;text-align:center;font-weight:bold;font-size:13px;color:#222;box-shadow:0 1px 2px #0001;">' + cancelBtn + bk.barcode + (bk.matdok ? '<br><span style="font-size:11px;color:#888;">' + bk.matdok + '</span>' : '') + '</div>';
                             });
                             h += '</div>';
                             return h;
                         }
-                        $('#barcode-kain-list').html(renderBarcodeGrid(data.barcode_kain, 'kain', prosesId));
-                        $('#barcode-la-list').html(renderBarcodeGrid(data.barcode_la, 'la', prosesId));
-                        $('#barcode-aux-list').html(renderBarcodeGrid(data.barcode_aux, 'aux', prosesId));
+                        fetch(`/process-can-cancel/${prosesId}`)
+                        .then(res => res.json())
+                        .then(json => {
+
+                            window.canCancelByProses = json.canCancelByProses;
+                            $('#barcode-kain-list').html(renderBarcodeGrid(data.barcode_kain, 'kain', prosesId));
+                            $('#barcode-la-list').html(renderBarcodeGrid(data.barcode_la, 'la', prosesId));
+                            $('#barcode-aux-list').html(renderBarcodeGrid(data.barcode_aux, 'aux', prosesId));
+                        });
+
+
+                        
                         const selectedProgress = data.barcode_kain_progress || [];
                         const allProgress = data.all_barcode_kain_progress || [];
                         const incompleteDetails = data.incomplete_details || [];
@@ -6733,13 +6806,15 @@
                                                 return '<span style="color:#888;">Belum ada barcode.</span>';
                                             }
                                             // Cek apakah user bisa cancel barcode
-                                            const canCancel = window.canCancelBarcode !==
-                                                false;
+                                            const canCancel = window.canCancelBarcode !== false;
+                                            const canCancelByProses = window.canCancelByProses === true;
+
+                                            const allowCancel = canCancel && canCancelByProses;
                                             let html =
                                                 '<div style="display:flex;flex-wrap:wrap;gap:6px;">';
                                             activeBarcodes.forEach(function(bk, idx) {
                                                 // Hanya tampilkan button cancel jika user memiliki akses
-                                                const cancelButton = canCancel ?
+                                                const cancelButton = allowCancel ?
                                                     `<span style='position:absolute;top:2px;right:6px;cursor:pointer;font-weight:bold;color:#b00;font-size:16px;z-index:2;' class='cancel-barcode-btn' data-type='${barcodeType}' data-proses='${prosesId}' data-id='${bk.id}' data-matdok='${bk.matdok}' title='Cancel barcode'>&times;</span>` :
                                                     '';
                                                 html += `<div style="position:relative;flex:1 0 30%;max-width:32%;background:#f3f3f3;border-radius:6px;padding:6px 4px;margin-bottom:6px;text-align:center;font-weight:bold;font-size:13px;color:#222;box-shadow:0 1px 2px #0001;">
@@ -6783,16 +6858,26 @@
                                             });
                                         }
 
-                                        // Render ulang list barcode di modal
-                                        $('#barcode-kain-list').html(renderBarcodeGrid(data
-                                            .barcode_kain, 'kain',
-                                            currentProsesForRefresh));
-                                        $('#barcode-la-list').html(renderBarcodeGrid(data
-                                            .barcode_la, 'la',
-                                            currentProsesForRefresh));
-                                        $('#barcode-aux-list').html(renderBarcodeGrid(data
-                                            .barcode_aux, 'aux',
-                                            currentProsesForRefresh));
+
+                                        fetch(`/process-can-cancel/${currentProsesForRefresh}`)
+                                        .then(res => res.json())
+                                        .then(json => {
+
+                                            window.canCancelByProses = json.canCancelByProses;
+                                            // Render ulang list barcode di modal
+                                            $('#barcode-kain-list').html(renderBarcodeGrid(data
+                                                .barcode_kain, 'kain',
+                                                currentProsesForRefresh));
+                                            $('#barcode-la-list').html(renderBarcodeGrid(data
+                                                .barcode_la, 'la',
+                                                currentProsesForRefresh));
+                                            $('#barcode-aux-list').html(renderBarcodeGrid(data
+                                                .barcode_aux, 'aux',
+                                                currentProsesForRefresh));
+                                        });
+
+
+                                        
 
                                         // Tampilkan progress barcode kain
                                         // Gunakan barcode_kain_progress untuk detail yang dipilih (untuk display)

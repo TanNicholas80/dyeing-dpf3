@@ -1368,6 +1368,20 @@ class ProsesController extends Controller
         ]);
     }
 
+    //Proses bisa cancel atau tidak
+    public function processCanCancel($id)
+    {
+        $proses = Proses::select('mulai','selesai')
+            ->where('id', $id)
+            ->first();
+
+        $canCancelByProses = empty($proses->mulai) || empty($proses->selesai);
+
+        return response()->json([
+            'canCancelByProses' => $canCancelByProses
+        ]);
+    }
+
     // Cancel barcode (relay ke SAP API, update flag cancel)
     public function cancelBarcode(Request $request, $proses, $type, $barcode)
     {
