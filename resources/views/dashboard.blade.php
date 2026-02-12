@@ -4598,6 +4598,8 @@
                                 url: barcodesUrl,
                                 method: 'GET',
                                 success: function(data) {
+                                    // Ambil proses dari modal agar renderBarcodeGrid tidak error (barcode realtime setelah scan)
+                                    const proses = $('#modalDetailProses').data('proses') || {};
                                     // Helper untuk update warna blok G, D, A di card utama setelah perubahan barcode
                                     function updateGDAIndicators(prosesId, detailId, hasKain, hasLa, hasAux) {
                                         let $targets = $(`.status-card[data-proses-id="${prosesId}"] .op-row[data-detail-id="${detailId}"]`);
@@ -5090,6 +5092,8 @@
                     url: barcodesUrl,
                     method: 'GET',
                     success: function(data) {
+                        // Ambil proses dari modal atau card agar renderBarcodeGrid tidak error (realtime via WebSocket)
+                        const proses = $('#modalDetailProses').data('proses') || $('.status-card[data-proses-id="' + prosesId + '"]').data('proses') || {};
                         function updateGDAIndicatorsLocal(pid, detailId, hasKain, hasLa, hasAux) {
                             let $targets = $(`.status-card[data-proses-id="${pid}"] .op-row[data-detail-id="${detailId}"]`);
                             if (!$targets.length) $targets = $(`.status-card[data-proses-id="${pid}"]`);
