@@ -638,7 +638,7 @@ class ProsesController extends Controller
     public function barcodeKain(Request $request, $id)
     {
         $request->validate([
-            // 'barcode' => 'required|string|max:255|unique:barcode_kain,barcode',
+            'barcode' => 'required|string|max:255|unique:barcode_kain,barcode',
             'detail_proses_id' => 'nullable|exists:detail_proses,id',
         ]);
         try {
@@ -904,35 +904,6 @@ class ProsesController extends Controller
                 }
                 return redirect()->route('dashboard', ['page' => $page])->with('error', $msg);
             }
-
-
-            // Validasi Jenis Bahan untuk OP
-            // $jenis = Auxl::where('barcode', $barcode)
-            // ->value('jenis');
-
-            // foreach ($detailList as $detail) {
-
-            //     Log::info('DEBUG validateOpByJenis', [
-            //         'barcode' => $barcode,
-            //         'jenis' => $jenis,
-            //         'no_op'=> $detail->no_op
-            //     ]);
-            //     $opValidation = $this->validateOpByJenis($jenis, $detail->no_op);
-
-            //     if ($opValidation) {
-            //         if ($request->ajax() || $request->wantsJson()) {
-            //             return response()->json(['status' => 'error', 'message' => $opValidation], 400);
-            //         }
-            //         return redirect()->route('dashboard', ['page' => $page])->with('error', $opValidation);
-            //     }
-
-            //     Log::info('BarcodeLa: Successfully saved to all details', [
-            //         'barcode' => $barcode,
-            //         'proses_id' => $proses->id,
-            //         'detail_count' => $detailList->count(),
-            //     ]);
-            // }
-
 
             $matdok = $data[0]['mblnr'] ?? null;
 
