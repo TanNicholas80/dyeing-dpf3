@@ -1,8 +1,5 @@
 @extends('layout.main')
 @section('content')
-<<<<<<< HEAD
-    
-=======
     <style>
         .select2-container .select2-selection--single {
             height: 38px;
@@ -28,7 +25,6 @@
         }
     </style>
 
->>>>>>> 09197f200f437c5013b405f4b03bed51d60985c1
     <div class="content-wrapper">
         <div class="content-header">
             <div class="container-fluid">
