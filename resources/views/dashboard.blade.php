@@ -33,10 +33,13 @@
             padding: 6px 8px;
             cursor: pointer;
             user-select: none;
+            transition: background 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
         }
 
         .op-row:hover {
-            background: rgba(255, 255, 255, 0.18);
+            background: rgba(255, 255, 255, 0.55);
+            box-shadow: 0 0 12px rgba(255, 255, 255, 0.6);
+            border-color: rgba(255, 255, 255, 0.8);
         }
 
         .op-row-gda {
@@ -57,7 +60,7 @@
         }
 
         .op-row-info {
-            font-size: 10px;
+            font-size: 12px;
             color: #fff;
             text-shadow: 0 1px 2px #0008;
             text-align: center;
@@ -269,6 +272,11 @@
             padding: 4px 8px;
         }
 
+        /* Toggle mode Produksi / History */
+        #dashboard-mode-toggle .btn.active {
+            font-weight: bold;
+        }
+
         /* Pastikan machine-column memiliki height yang sesuai */
         .machine-column>div>div {
             display: flex;
@@ -303,7 +311,15 @@
                             </button>
                         </form>
                     </div>
-                    <div class="col-sm-4 d-flex justify-content-end">
+                    <div class="col-sm-4 d-flex justify-content-end align-items-center">
+                        <div class="btn-group btn-group-sm mr-2" role="group" id="dashboard-mode-toggle" title="Mode tampilan">
+                            <button type="button" class="btn btn-outline-primary" data-mode="produksi" id="mode-produksi-btn">
+                                <i class="fas fa-industry"></i> Produksi
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" data-mode="history" id="mode-history-btn">
+                                <i class="fas fa-history"></i> History
+                            </button>
+                        </div>
                         <div id="dashboard-controls" style="display: flex; justify-content: flex-end; gap: 10px;">
                             @if ($canAddProses ?? true)
                                 <button type="button" id="add-card-btn" class="btn btn-success" style="font-weight:bold;"
@@ -375,8 +391,10 @@
                                 '#002b80' => 'linear-gradient(180deg, #6dd5ed 0%, #2193b0 60%, #002b80 100%)',
                                 // Hijau (selesai normal)
                                 '#00c853' => 'linear-gradient(180deg, #b2f7c1 0%, #56ab2f 60%, #378a1b 100%)',
-                                // Merah (selesai overtime atau barcode belum lengkap)
-                                '#e53935' => 'linear-gradient(180deg, #ffb3b3 0%, #e53935 60%, #b71c1c 100%)',
+                                // Merah tua (proses selesai dengan masalah: overtime/durasi singkat) - solid
+                                '#e53935' => '#e53935',
+                                // Merah muda (proses berjalan dengan barcode belum lengkap) - solid
+                                '#ef9a9a' => '#ef9a9a',
                             ];
                             return $map[$bg] ?? $map['#757575'];
                         }
@@ -463,7 +481,7 @@
 
                                             {{-- PROSES HISTORY (Button di atas, Hidden by default, scroll bersama parent) --}}
                                             @if ($prosesHistory->count() > 0)
-                                                <div class="proses-history-wrapper" style="margin-bottom: 8px;">
+                                                <div class="proses-history-wrapper" data-section="history" style="margin-bottom: 8px;">
                                                     <button class="btn-toggle-history btn btn-sm btn-secondary"
                                                         data-mesin-id="{{ $mesin->id }}" type="button">
                                                         <i class="fas fa-history"></i> Tampilkan History
@@ -526,7 +544,16 @@
                                                                         $hasBarcodeAux ? 'green' : 'red',
                                                                     ];
                                                                 }
-                                                                $blocks = (($proses->mode ?? 'greige') === 'finish') ? ['F', 'D', 'A'] : ['G', 'D', 'A'];
+                                                                $barcodeKainOptional = $proses->barcode_kain_optional ?? false;
+                                                                if ($barcodeKainOptional) {
+                                                                    $blocks = ['D', 'A'];
+                                                                    $blockColors = [
+                                                                        $hasBarcodeLa ? 'green' : 'red',
+                                                                        $hasBarcodeAux ? 'green' : 'red',
+                                                                    ];
+                                                                } else {
+                                                                    $blocks = (($proses->mode ?? 'greige') === 'finish') ? ['F', 'D', 'A'] : ['G', 'D', 'A'];
+                                                                }
                                                                 if ($proses->mulai && !$proses->selesai) {
                                                                     $light = 'green';
                                                                 } else {
@@ -561,6 +588,51 @@
                                                                                     $appr->type === 'VP');
                                                                         });
                                                                     }
+                                                                    $pendingToppingLa = collect($proses->approvals ?? [])->contains(fn ($a) => ($a->action ?? '') === 'topping_la' && ($a->status ?? '') === 'pending');
+                                                                    $pendingToppingAux = collect($proses->approvals ?? [])->contains(fn ($a) => ($a->action ?? '') === 'topping_aux' && ($a->status ?? '') === 'pending');
+                                                                    $hasToppingLa = collect($proses->approvals ?? [])->contains(fn ($a) => ($a->action ?? '') === 'topping_la');
+                                                                    $hasToppingAux = collect($proses->approvals ?? [])->contains(fn ($a) => ($a->action ?? '') === 'topping_aux');
+                                                                    $approvedToppingLaNotScanned = collect($proses->approvals ?? [])->contains(function ($a) {
+                                                                        if (($a->action ?? '') !== 'topping_la' || ($a->status ?? '') !== 'approved') return false;
+                                                                        return !($a->barcodeLas && $a->barcodeLas->where('cancel', false)->count() > 0);
+                                                                    });
+                                                                    $approvedToppingAuxNotScanned = collect($proses->approvals ?? [])->contains(function ($a) {
+                                                                        if (($a->action ?? '') !== 'topping_aux' || ($a->status ?? '') !== 'approved') return false;
+                                                                        return !($a->barcodeAuxs && $a->barcodeAuxs->where('cancel', false)->count() > 0);
+                                                                    });
+                                                                    $tdColor = $hasToppingLa ? ($pendingToppingLa ? 'yellow' : ($approvedToppingLaNotScanned ? 'red' : 'green')) : null;
+                                                                    $taColor = $hasToppingAux ? ($pendingToppingAux ? 'yellow' : ($approvedToppingAuxNotScanned ? 'red' : 'green')) : null;
+                                                                    $laToppingRequired = collect($proses->approvals ?? [])->where('action', 'topping_la')->where('status', 'approved')->count();
+                                                                    $auxToppingRequired = collect($proses->approvals ?? [])->where('action', 'topping_aux')->where('status', 'approved')->count();
+                                                                    $laToppingScanned = 0;
+                                                                    $auxToppingScanned = 0;
+                                                                    foreach ($proses->approvals ?? [] as $a) {
+                                                                        if (($a->action ?? '') === 'topping_la' && ($a->status ?? '') === 'approved' && $a->barcodeLas && $a->barcodeLas->where('cancel', false)->count() > 0) $laToppingScanned++;
+                                                                        if (($a->action ?? '') === 'topping_aux' && ($a->status ?? '') === 'approved' && $a->barcodeAuxs && $a->barcodeAuxs->where('cancel', false)->count() > 0) $auxToppingScanned++;
+                                                                    }
+                                                                    $laInitialScanned = 0;
+                                                                    foreach ($proses->details ?? [] as $d) {
+                                                                        if ($d->barcodeLas && $d->barcodeLas->where('cancel', false)->filter(fn($b) => $b->approval_id === null)->count() > 0) { $laInitialScanned = 1; break; }
+                                                                    }
+                                                                    $auxInitialScanned = 0;
+                                                                    foreach ($proses->details ?? [] as $d) {
+                                                                        if ($d->barcodeAuxs && $d->barcodeAuxs->where('cancel', false)->filter(fn($b) => $b->approval_id === null)->count() > 0) { $auxInitialScanned = 1; break; }
+                                                                    }
+                                                                    $laComplete = ($laInitialScanned + $laToppingScanned) >= (1 + $laToppingRequired);
+                                                                    $auxComplete = ($auxInitialScanned + $auxToppingScanned) >= (1 + $auxToppingRequired);
+                                                                    $laInitialComplete = $laInitialScanned >= 1;
+                                                                    $auxInitialComplete = $auxInitialScanned >= 1;
+                                                                    if ($barcodeKainOptional) {
+                                                                        $blockColors = [$laInitialComplete ? 'green' : 'red', $auxInitialComplete ? 'green' : 'red'];
+                                                                    } else {
+                                                                        $blockColors[1] = $laInitialComplete ? 'green' : 'red';
+                                                                        $blockColors[2] = $auxInitialComplete ? 'green' : 'red';
+                                                                    }
+                                                                } else {
+                                                                    $pendingToppingLa = $hasToppingLa = $hasToppingAux = false;
+                                                                    $tdColor = $taColor = null;
+                                                                    $laComplete = $hasBarcodeLa;
+                                                                    $auxComplete = $hasBarcodeAux;
                                                                 }
                                                                 // Cek apakah proses ini terlibat dalam swap position approval dari proses lain
                                                                 // (sebagai swapped_proses_id atau affected_proses_ids di history_data approval swap_position)
@@ -589,10 +661,13 @@
                                                                     $cycle_time_actual = $proses->cycle_time_actual
                                                                         ? (int) $proses->cycle_time_actual
                                                                         : 0;
-                                                                    if ($cycle_time_actual > $cycle_time + 3600) {
-                                                                        $bg = '#e53935';
+                                                                    // Merah: durasi sangat singkat (< 1 jam). Hijau: sudah lebih dari 1 jam berjalan dan berhenti.
+                                                                    if ($cycle_time_actual < 3600) {
+                                                                        $bg = '#e53935'; // merah (durasi terlalu singkat)
+                                                                    } elseif ($cycle_time_actual > $cycle_time + 3600) {
+                                                                        $bg = '#e53935'; // merah (overtime)
                                                                     } else {
-                                                                        $bg = '#00c853';
+                                                                        $bg = '#00c853'; // hijau (>= 1 jam)
                                                                     }
                                                                 } else {
                                                                     // Proses sedang berjalan (mulai ada, selesai belum)
@@ -619,15 +694,12 @@
                                                                             }
                                                                         }
                                                                     }
-                                                                    if (
-                                                                        $proses->jenis !== 'Maintenance' &&
-                                                                        (!$hasBarcodeKain ||
-                                                                            !$hasBarcodeLa ||
-                                                                            !$hasBarcodeAux)
-                                                                    ) {
-                                                                        $bg = '#e53935'; // merah (barcode belum lengkap)
+                                                                    $barcodeKainOptionalLocal = $barcodeKainOptional ?? false;
+                                                                    if ($proses->jenis !== 'Maintenance') {
+                                                                        $incomplete = (!$barcodeKainOptionalLocal && !$hasBarcodeKain) || !$laComplete || !$auxComplete;
+                                                                        $bg = $incomplete ? '#ef9a9a' : '#002b80'; // merah muda jika belum lengkap, biru jika lengkap
                                                                     } else {
-                                                                        $bg = '#002b80'; // biru (berjalan dengan barcode lengkap)
+                                                                        $bg = '#002b80';
                                                                     }
                                                                 }
                                                                 $gradient = getGradient($bg);
@@ -695,6 +767,18 @@
                                                                                 {{ $b }}
                                                                             </span>
                                                                         @endforeach
+                                                                        @if($proses->jenis !== 'Maintenance')
+                                                                            @php
+                                                                                $tdStyle = $tdColor === 'yellow' ? 'background:#fff9c4;color:#111;border:2.5px solid #f9a825' : ($tdColor === 'red' ? 'background:#ffb3b3;color:#111;border:2.5px solid #c62828' : ($tdColor === 'green' ? 'background:#d4f8e8;color:#111;border:2.5px solid #43a047' : ''));
+                                                                                $taStyle = $taColor === 'yellow' ? 'background:#fff9c4;color:#111;border:2.5px solid #f9a825' : ($taColor === 'red' ? 'background:#ffb3b3;color:#111;border:2.5px solid #c62828' : ($taColor === 'green' ? 'background:#d4f8e8;color:#111;border:2.5px solid #43a047' : ''));
+                                                                            @endphp
+                                                                            @if($hasToppingLa ?? false)
+                                                                            <span class="topping-indicator topping-td" data-block-type="TD" title="Topping Dyes - {{ $tdColor === 'yellow' ? 'Menunggu approval' : ($tdColor === 'red' ? 'Menunggu scan barcode' : 'Lengkap') }}" style="display: inline-block; {{ $tdStyle }}; font-weight: bold; font-size: 18px; padding: 2px 8px; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.10); letter-spacing: 1px;">TD</span>
+                                                                            @endif
+                                                                            @if($hasToppingAux ?? false)
+                                                                            <span class="topping-indicator topping-ta" data-block-type="TA" title="Topping Auxiliaries - {{ $taColor === 'yellow' ? 'Menunggu approval' : ($taColor === 'red' ? 'Menunggu scan barcode' : 'Lengkap') }}" style="display: inline-block; {{ $taStyle }}; font-weight: bold; font-size: 18px; padding: 2px 8px; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.10); letter-spacing: 1px;">TA</span>
+                                                                            @endif
+                                                                        @endif
                                                                     </div>
                                                                     <div style="flex: 1; text-align: right;">
                                                                         <div class="status-light {{ $light == 'green' ? 'running-light' : '' }}"
@@ -731,8 +815,11 @@
                                                                                     style="font-weight: bold; color: #111; font-size: 22px; letter-spacing: 2px; text-shadow: 0 1px 4px #fff8; margin-bottom: 4px;">
                                                                                     {{ $firstDetail->no_op ?? '-' }}
                                                                                 </div>
+                                                                                @if($firstDetail->customer)
+                                                                                <div style="font-size: 16px; margin: 2px 0; color: #111; font-weight: bold; text-shadow: 0 1px 2px #fff8;">{{ $firstDetail->customer }}</div>
+                                                                                @endif
                                                                                 <div class="op-row-info"
-                                                                                    style="font-size: 9px; margin: 2px 0; color: #fff; text-shadow: 0 1px 2px #0008;">
+                                                                                    style="margin: 2px 0; color: #fff; text-shadow: 0 1px 2px #0008;">
                                                                                     <div>
                                                                                         {{ $firstDetail->warna ?? 'Warna' }} -
                                                                                         {{ $firstDetail->kategori_warna ?? 'Kategori' }} -
@@ -757,15 +844,13 @@
                                                                                     $subHasAux = isset($d->barcodeAuxs)
                                                                                         ? $d->barcodeAuxs->where('cancel', false)->count() > 0
                                                                                         : false;
-                                                                                    $subMap = [
-                                                                                        $blocks[0] => $subHasKain ? 'green' : 'red',
-                                                                                        $blocks[1] => $subHasLa ? 'green' : 'red',
-                                                                                        $blocks[2] => $subHasAux ? 'green' : 'red',
-                                                                                    ];
+                                                                                    $subMap = $barcodeKainOptional
+                                                                                        ? [$blocks[0] => $subHasLa ? 'green' : 'red', $blocks[1] => $subHasAux ? 'green' : 'red']
+                                                                                        : [$blocks[0] => $subHasKain ? 'green' : 'red', $blocks[1] => $subHasLa ? 'green' : 'red', $blocks[2] => $subHasAux ? 'green' : 'red'];
                                                                                 @endphp
                                                                                 {{-- Garis pemisah --}}
                                                                                 <div style="border-top: 1px solid rgba(255,255,255,0.3); margin: 8px 0; padding-top: 8px;"></div>
-                                                                                {{-- GDA/FDA per OP (di luar detail OP, ukuran sama dengan header) --}}
+                                                                                {{-- GDA/FDA + TD/TA per OP (di luar detail OP, ukuran sama dengan header) --}}
                                                                                 <div style="display: flex; justify-content: center; gap: 6px; margin-bottom: 6px;">
                                                                                     @foreach ($blocks as $b)
                                                                                         @php
@@ -779,6 +864,12 @@
                                                                                             {{ $b }}
                                                                                         </span>
                                                                                     @endforeach
+                                                                                    @if($proses->jenis !== 'Maintenance' && ($hasToppingLa ?? false))
+                                                                                    <span class="topping-indicator topping-td" data-block-type="TD" title="Topping Dyes - {{ $tdColor === 'yellow' ? 'Menunggu approval' : ($tdColor === 'red' ? 'Menunggu scan barcode' : 'Lengkap') }}" style="display: inline-block; {{ $tdStyle }}; font-weight: bold; font-size: 18px; padding: 2px 8px; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.10); letter-spacing: 1px;">TD</span>
+                                                                                    @endif
+                                                                                    @if($proses->jenis !== 'Maintenance' && ($hasToppingAux ?? false))
+                                                                                    <span class="topping-indicator topping-ta" data-block-type="TA" title="Topping Auxiliaries - {{ $taColor === 'yellow' ? 'Menunggu approval' : ($taColor === 'red' ? 'Menunggu scan barcode' : 'Lengkap') }}" style="display: inline-block; {{ $taStyle }}; font-weight: bold; font-size: 18px; padding: 2px 8px; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.10); letter-spacing: 1px;">TA</span>
+                                                                                    @endif
                                                                                 </div>
                                                                                 {{-- Detail OP (No OP + Info) --}}
                                                                                 <div class="op-row" data-detail-id="{{ $d->id }}">
@@ -787,9 +878,12 @@
                                                                                         style="font-weight: bold; color: #111; font-size: 22px; letter-spacing: 2px; text-shadow: 0 1px 4px #fff8; margin-bottom: 4px;">
                                                                                         {{ $d->no_op ?? '-' }}
                                                                                     </div>
+                                                                                    @if($d->customer)
+                                                                                    <div style="font-size: 16px; margin: 2px 0; color: #111; font-weight: bold; text-shadow: 0 1px 2px #fff8;">{{ $d->customer }}</div>
+                                                                                    @endif
                                                                                     {{-- Info warna/kategori/konstruksi --}}
                                                                                     <div class="op-row-info"
-                                                                                        style="font-size: 9px; margin: 2px 0; color: #fff; text-shadow: 0 1px 2px #0008;">
+                                                                                        style="margin: 2px 0; color: #fff; text-shadow: 0 1px 2px #0008;">
                                                                                         <div>
                                                                                             {{ $d->warna ?? 'Warna' }} -
                                                                                             {{ $d->kategori_warna ?? 'Kategori' }} -
@@ -809,8 +903,11 @@
                                                                                     style="font-weight: bold; color: #111; font-size: 22px; letter-spacing: 2px; text-shadow: 0 1px 4px #fff8;">
                                                                                     {{ $singleDetail->no_op ?? '-' }}
                                                                                 </div>
+                                                                                @if($singleDetail->customer)
+                                                                                <div style="font-size: 16px; margin: 2px 0; color: #111; font-weight: bold; text-shadow: 0 1px 2px #fff8;">{{ $singleDetail->customer }}</div>
+                                                                                @endif
                                                                                 <div class="op-row-info"
-                                                                                    style="font-size: 9px; margin: 2px 0; color: #fff; text-shadow: 0 1px 2px #0008;">
+                                                                                    style="margin: 2px 0; color: #fff; text-shadow: 0 1px 2px #0008;">
                                                                                     <div>
                                                                                         {{ $singleDetail->warna ?? 'Warna' }} -
                                                                                         {{ $singleDetail->kategori_warna ?? 'Kategori' }} -
@@ -905,7 +1002,7 @@
                                             @endif
 
                                             {{-- PROSES AKTIF (Default Visible, scroll bersama parent) --}}
-                                            <div class="proses-aktif-container">
+                                            <div class="proses-aktif-container" data-section="produksi">
                                                 @foreach ($prosesAktif as $proses)
                                                     @php
                                                         // Jenis proses: P/R/M
@@ -964,7 +1061,16 @@
                                                                 $hasBarcodeAux ? 'green' : 'red',
                                                             ];
                                                         }
-                                                        $blocks = (($proses->mode ?? 'greige') === 'finish') ? ['F', 'D', 'A'] : ['G', 'D', 'A'];
+                                                        $barcodeKainOptional = $proses->barcode_kain_optional ?? false;
+                                                        if ($barcodeKainOptional) {
+                                                            $blocks = ['D', 'A'];
+                                                            $blockColors = [
+                                                                $hasBarcodeLa ? 'green' : 'red',
+                                                                $hasBarcodeAux ? 'green' : 'red',
+                                                            ];
+                                                        } else {
+                                                            $blocks = (($proses->mode ?? 'greige') === 'finish') ? ['F', 'D', 'A'] : ['G', 'D', 'A'];
+                                                        }
                                                         // Lampu indikator: hijau jika mulai ada dan selesai null, merah jika mulai dan selesai ada, atau mulai null
                                                         if ($proses->mulai && !$proses->selesai) {
                                                             $light = 'green';
@@ -1003,6 +1109,59 @@
                                                                         ($appr->type === 'FM' || $appr->type === 'VP');
                                                                 });
                                                             }
+                                                            $pendingToppingLa = collect($proses->approvals ?? [])->contains(fn ($a) => ($a->action ?? '') === 'topping_la' && ($a->status ?? '') === 'pending');
+                                                            $pendingToppingAux = collect($proses->approvals ?? [])->contains(fn ($a) => ($a->action ?? '') === 'topping_aux' && ($a->status ?? '') === 'pending');
+                                                            $hasToppingLa = collect($proses->approvals ?? [])->contains(fn ($a) => ($a->action ?? '') === 'topping_la');
+                                                            $hasToppingAux = collect($proses->approvals ?? [])->contains(fn ($a) => ($a->action ?? '') === 'topping_aux');
+                                                            $approvedToppingLaNotScanned = collect($proses->approvals ?? [])->contains(function ($a) {
+                                                                if (($a->action ?? '') !== 'topping_la' || ($a->status ?? '') !== 'approved') return false;
+                                                                return !($a->barcodeLas && $a->barcodeLas->where('cancel', false)->count() > 0);
+                                                            });
+                                                            $approvedToppingAuxNotScanned = collect($proses->approvals ?? [])->contains(function ($a) {
+                                                                if (($a->action ?? '') !== 'topping_aux' || ($a->status ?? '') !== 'approved') return false;
+                                                                return !($a->barcodeAuxs && $a->barcodeAuxs->where('cancel', false)->count() > 0);
+                                                            });
+                                                            $tdColor = $hasToppingLa ? ($pendingToppingLa ? 'yellow' : ($approvedToppingLaNotScanned ? 'red' : 'green')) : null;
+                                                            $taColor = $hasToppingAux ? ($pendingToppingAux ? 'yellow' : ($approvedToppingAuxNotScanned ? 'red' : 'green')) : null;
+                                                            $laToppingRequired = collect($proses->approvals ?? [])->where('action', 'topping_la')->where('status', 'approved')->count();
+                                                            $auxToppingRequired = collect($proses->approvals ?? [])->where('action', 'topping_aux')->where('status', 'approved')->count();
+                                                            $laToppingScanned = 0;
+                                                            $auxToppingScanned = 0;
+                                                            foreach ($proses->approvals ?? [] as $a) {
+                                                                if (($a->action ?? '') === 'topping_la' && ($a->status ?? '') === 'approved' && $a->barcodeLas && $a->barcodeLas->where('cancel', false)->count() > 0) $laToppingScanned++;
+                                                                if (($a->action ?? '') === 'topping_aux' && ($a->status ?? '') === 'approved' && $a->barcodeAuxs && $a->barcodeAuxs->where('cancel', false)->count() > 0) $auxToppingScanned++;
+                                                            }
+                                                            $laInitialScanned = 0;
+                                                            foreach ($proses->details ?? [] as $d) {
+                                                                if ($d->barcodeLas && $d->barcodeLas->where('cancel', false)->filter(fn($b) => $b->approval_id === null)->count() > 0) { $laInitialScanned = 1; break; }
+                                                            }
+                                                            $auxInitialScanned = 0;
+                                                            foreach ($proses->details ?? [] as $d) {
+                                                                if ($d->barcodeAuxs && $d->barcodeAuxs->where('cancel', false)->filter(fn($b) => $b->approval_id === null)->count() > 0) { $auxInitialScanned = 1; break; }
+                                                            }
+                                                            $laComplete = ($laInitialScanned + $laToppingScanned) >= (1 + $laToppingRequired);
+                                                            $auxComplete = ($auxInitialScanned + $auxToppingScanned) >= (1 + $auxToppingRequired);
+                                                            $laInitialComplete = $laInitialScanned >= 1;
+                                                            $auxInitialComplete = $auxInitialScanned >= 1;
+                                                            if ($barcodeKainOptional) {
+                                                                $blockColors = [$laInitialComplete ? 'green' : 'red', $auxInitialComplete ? 'green' : 'red'];
+                                                            } else {
+                                                                $blockColors[1] = $laInitialComplete ? 'green' : 'red';
+                                                                $blockColors[2] = $auxInitialComplete ? 'green' : 'red';
+                                                            }
+                                                        } else {
+                                                            $pendingToppingLa = $hasToppingLa = $hasToppingAux = false;
+                                                            $tdColor = $taColor = null;
+                                                            $laComplete = $hasBarcodeLa;
+                                                            $auxComplete = $hasBarcodeAux;
+                                                            $laInitialComplete = $hasBarcodeLa;
+                                                            $auxInitialComplete = $hasBarcodeAux;
+                                                            if ($barcodeKainOptional) {
+                                                                $blockColors = [$laInitialComplete ? 'green' : 'red', $auxInitialComplete ? 'green' : 'red'];
+                                                            } else {
+                                                                $blockColors[1] = $laInitialComplete ? 'green' : 'red';
+                                                                $blockColors[2] = $auxInitialComplete ? 'green' : 'red';
+                                                            }
                                                         }
                                                         // Cek apakah proses ini terlibat dalam swap position approval dari proses lain
                                                         // (sebagai swapped_proses_id atau affected_proses_ids di history_data approval swap_position)
@@ -1039,10 +1198,13 @@
                                                             $cycle_time_actual = $cycle_time_actual
                                                                 ? (int) $cycle_time_actual
                                                                 : 0;
-                                                            if ($cycle_time_actual > $cycle_time + 3600) {
+                                                            // Merah: durasi sangat singkat (< 1 jam). Hijau: sudah lebih dari 1 jam berjalan dan berhenti.
+                                                            if ($cycle_time_actual < 3600) {
+                                                                $bg = '#e53935'; // merah (durasi terlalu singkat)
+                                                            } elseif ($cycle_time_actual > $cycle_time + 3600) {
                                                                 $bg = '#e53935'; // merah (overtime)
                                                             } else {
-                                                                $bg = '#00c853'; // hijau (selesai normal)
+                                                                $bg = '#00c853'; // hijau (>= 1 jam)
                                                             }
                                                         } else {
                                                             // Proses sedang berjalan (mulai ada, selesai belum)
@@ -1069,13 +1231,12 @@
                                                                     }
                                                                 }
                                                             }
-                                                            if (
-                                                                $proses->jenis !== 'Maintenance' &&
-                                                                (!$hasBarcodeKain || !$hasBarcodeLa || !$hasBarcodeAux)
-                                                            ) {
-                                                                $bg = '#e53935'; // merah (barcode belum lengkap)
+                                                            $barcodeKainOpt = $barcodeKainOptional ?? false;
+                                                            if ($proses->jenis !== 'Maintenance') {
+                                                                $incomplete = (!$barcodeKainOpt && !$hasBarcodeKain) || !$laComplete || !$auxComplete;
+                                                                $bg = $incomplete ? '#ef9a9a' : '#002b80';
                                                             } else {
-                                                                $bg = '#002b80'; // biru (berjalan dengan barcode lengkap)
+                                                                $bg = '#002b80';
                                                             }
                                                         }
                                                         $gradient = getGradient($bg);
@@ -1151,6 +1312,18 @@
                                                                         {{ $b }}
                                                                     </span>
                                                                 @endforeach
+                                                                @if($proses->jenis !== 'Maintenance')
+                                                                    @php
+                                                                        $tdStyle2 = $tdColor === 'yellow' ? 'background:#fff9c4;color:#111;border:2.5px solid #f9a825' : ($tdColor === 'red' ? 'background:#ffb3b3;color:#111;border:2.5px solid #c62828' : ($tdColor === 'green' ? 'background:#d4f8e8;color:#111;border:2.5px solid #43a047' : ''));
+                                                                        $taStyle2 = $taColor === 'yellow' ? 'background:#fff9c4;color:#111;border:2.5px solid #f9a825' : ($taColor === 'red' ? 'background:#ffb3b3;color:#111;border:2.5px solid #c62828' : ($taColor === 'green' ? 'background:#d4f8e8;color:#111;border:2.5px solid #43a047' : ''));
+                                                                    @endphp
+                                                                    @if($hasToppingLa ?? false)
+                                                                    <span class="topping-indicator topping-td" data-block-type="TD" title="Topping Dyes - {{ $tdColor === 'yellow' ? 'Menunggu approval' : ($tdColor === 'red' ? 'Menunggu scan barcode' : 'Lengkap') }}" style="display: inline-block; {{ $tdStyle2 }}; font-weight: bold; font-size: 18px; padding: 2px 8px; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.10); letter-spacing: 1px;">TD</span>
+                                                                    @endif
+                                                                    @if($hasToppingAux ?? false)
+                                                                    <span class="topping-indicator topping-ta" data-block-type="TA" title="Topping Auxiliaries - {{ $taColor === 'yellow' ? 'Menunggu approval' : ($taColor === 'red' ? 'Menunggu scan barcode' : 'Lengkap') }}" style="display: inline-block; {{ $taStyle2 }}; font-weight: bold; font-size: 18px; padding: 2px 8px; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.10); letter-spacing: 1px;">TA</span>
+                                                                    @endif
+                                                                @endif
                                                             </div>
                                                             <div style="flex: 1; text-align: right;">
                                                                 <div class="status-light {{ $light == 'green' ? 'running-light' : '' }}"
@@ -1192,11 +1365,9 @@
                                                                         $firstHasAux = isset($firstDetail->barcodeAuxs)
                                                                             ? $firstDetail->barcodeAuxs->where('cancel', false)->count() > 0
                                                                             : false;
-                                                                        $firstMap = [
-                                                                            $blocks[0] => $firstHasKain ? 'green' : 'red',
-                                                                            $blocks[1] => $firstHasLa ? 'green' : 'red',
-                                                                            $blocks[2] => $firstHasAux ? 'green' : 'red',
-                                                                        ];
+                                                                        $firstMap = $barcodeKainOptional
+                                                                            ? [$blocks[0] => $firstHasLa ? 'green' : 'red', $blocks[1] => $firstHasAux ? 'green' : 'red']
+                                                                            : [$blocks[0] => $firstHasKain ? 'green' : 'red', $blocks[1] => $firstHasLa ? 'green' : 'red', $blocks[2] => $firstHasAux ? 'green' : 'red'];
                                                                     @endphp
                                                                     {{-- OP Pertama: Detail lengkap dengan No OP dan Info --}}
                                                                     <div class="op-row" data-detail-id="{{ $firstDetail->id }}">
@@ -1204,8 +1375,11 @@
                                                                             style="font-weight: bold; color: #111; font-size: 22px; letter-spacing: 2px; text-shadow: 0 1px 4px #fff8; margin-bottom: 4px;">
                                                                             {{ $firstDetail->no_op ?? '-' }}
                                                                         </div>
+                                                                        @if($firstDetail->customer)
+                                                                        <div style="font-size: 16px; margin: 2px 0; color: #111; font-weight: 500; text-shadow: 0 1px 2px #fff8;">{{ $firstDetail->customer }}</div>
+                                                                        @endif
                                                                         <div class="op-row-info"
-                                                                            style="font-size: 9px; margin: 2px 0; color: #fff; text-shadow: 0 1px 2px #0008;">
+                                                                            style="margin: 2px 0; color: #fff; text-shadow: 0 1px 2px #0008;">
                                                                             <div>
                                                                                 {{ $firstDetail->warna ?? 'Warna' }} -
                                                                                 {{ $firstDetail->kategori_warna ?? 'Kategori' }} -
@@ -1230,15 +1404,13 @@
                                                                             $subHasAux = isset($d->barcodeAuxs)
                                                                                 ? $d->barcodeAuxs->where('cancel', false)->count() > 0
                                                                                 : false;
-                                                                            $subMap = [
-                                                                                $blocks[0] => $subHasKain ? 'green' : 'red',
-                                                                                $blocks[1] => $subHasLa ? 'green' : 'red',
-                                                                                $blocks[2] => $subHasAux ? 'green' : 'red',
-                                                                            ];
+                                                                            $subMap = $barcodeKainOptional
+                                                                                ? [$blocks[0] => $subHasLa ? 'green' : 'red', $blocks[1] => $subHasAux ? 'green' : 'red']
+                                                                                : [$blocks[0] => $subHasKain ? 'green' : 'red', $blocks[1] => $subHasLa ? 'green' : 'red', $blocks[2] => $subHasAux ? 'green' : 'red'];
                                                                         @endphp
                                                                         {{-- Garis pemisah --}}
                                                                         <div style="border-top: 1px solid rgba(255,255,255,0.3); margin: 8px 0; padding-top: 8px;"></div>
-                                                                        {{-- GDA/FDA per OP (di luar detail OP, ukuran sama dengan header) --}}
+                                                                        {{-- GDA/FDA + TD/TA per OP (di luar detail OP, ukuran sama dengan header) --}}
                                                                         <div style="display: flex; justify-content: center; gap: 6px; margin-bottom: 6px;">
                                                                             @foreach ($blocks as $b)
                                                                                 @php
@@ -1252,6 +1424,12 @@
                                                                                     {{ $b }}
                                                                                 </span>
                                                                             @endforeach
+                                                                            @if($proses->jenis !== 'Maintenance' && ($hasToppingLa ?? false))
+                                                                            <span class="topping-indicator topping-td" data-block-type="TD" title="Topping Dyes - {{ $tdColor === 'yellow' ? 'Menunggu approval' : ($tdColor === 'red' ? 'Menunggu scan barcode' : 'Lengkap') }}" style="display: inline-block; {{ $tdStyle2 }}; font-weight: bold; font-size: 18px; padding: 2px 8px; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.10); letter-spacing: 1px;">TD</span>
+                                                                            @endif
+                                                                            @if($proses->jenis !== 'Maintenance' && ($hasToppingAux ?? false))
+                                                                            <span class="topping-indicator topping-ta" data-block-type="TA" title="Topping Auxiliaries - {{ $taColor === 'yellow' ? 'Menunggu approval' : ($taColor === 'red' ? 'Menunggu scan barcode' : 'Lengkap') }}" style="display: inline-block; {{ $taStyle2 }}; font-weight: bold; font-size: 18px; padding: 2px 8px; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.10); letter-spacing: 1px;">TA</span>
+                                                                            @endif
                                                                         </div>
                                                                         {{-- Detail OP (No OP + Info) --}}
                                                                         <div class="op-row" data-detail-id="{{ $d->id }}">
@@ -1260,9 +1438,12 @@
                                                                                 style="font-weight: bold; color: #111; font-size: 22px; letter-spacing: 2px; text-shadow: 0 1px 4px #fff8; margin-bottom: 4px;">
                                                                                 {{ $d->no_op ?? '-' }}
                                                                             </div>
+                                                                            @if($d->customer)
+                                                                            <div style="font-size: 16px; margin: 2px 0; color: #111; font-weight: bold; text-shadow: 0 1px 2px #fff8;">{{ $d->customer }}</div>
+                                                                            @endif
                                                                             {{-- Info warna/kategori/konstruksi --}}
                                                                             <div class="op-row-info"
-                                                                                style="font-size: 9px; margin: 2px 0; color: #fff; text-shadow: 0 1px 2px #0008;">
+                                                                                style="margin: 2px 0; color: #fff; text-shadow: 0 1px 2px #0008;">
                                                                                 <div>
                                                                                     {{ $d->warna ?? 'Warna' }} -
                                                                                     {{ $d->kategori_warna ?? 'Kategori' }} -
@@ -1282,8 +1463,11 @@
                                                                             style="font-weight: bold; color: #111; font-size: 22px; letter-spacing: 2px; text-shadow: 0 1px 4px #fff8;">
                                                                             {{ $singleDetail->no_op ?? '-' }}
                                                                         </div>
+                                                                        @if($singleDetail->customer)
+                                                                        <div style="font-size: 16px; margin: 2px 0; color: #111; font-weight: bold; text-shadow: 0 1px 2px #fff8;">{{ $singleDetail->customer }}</div>
+                                                                        @endif
                                                                         <div class="op-row-info"
-                                                                            style="font-size: 9px; margin: 2px 0; color: #fff; text-shadow: 0 1px 2px #0008;">
+                                                                            style="margin: 2px 0; color: #fff; text-shadow: 0 1px 2px #0008;">
                                                                             <div>
                                                                                 {{ $singleDetail->warna ?? 'Warna' }} -
                                                                                 {{ $singleDetail->kategori_warna ?? 'Kategori' }} -
@@ -1391,6 +1575,19 @@
 
                         <!-- Body -->
                         <div class="modal-body py-3 px-4">
+                            @if (isset($errors) && $errors->any())
+                                <div class="alert alert-danger alert-dismissible fade show mb-3" role="alert">
+                                    <strong><i class="fas fa-exclamation-circle"></i> Error validasi</strong>
+                                    <ul class="mb-0 mt-2 pl-3">
+                                        @foreach ($errors->all() as $err)
+                                            <li>{{ $err }}</li>
+                                        @endforeach
+                                    </ul>
+                                    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                        <span aria-hidden="true">&times;</span>
+                                    </button>
+                                </div>
+                            @endif
                             <!-- Pilihan Mode (di dalam modal) -->
                             <div class="row mb-3">
                                 <div class="col-12">
@@ -1412,13 +1609,13 @@
                             <hr class="my-3">
                             <div class="row">
 
-                                <!-- Jenis Proses (Greige: Produksi/Maintenance/Reproses, Finish: hanya Maintenance & Reproses) -->
+                                <!-- Jenis Proses (Greige: Produksi/Maintenance/Reproses, Finish: hanya Reproses) -->
                                 <div class="col-md-6">
                                     <div class="form-group">
                                         <label class="form-label fw-semibold">Jenis Proses</label>
                                         <select name="jenis" id="jenis" class="form-control" required>
                                             <option value="Produksi" selected id="jenis-option-produksi">Produksi</option>
-                                            <option value="Maintenance">Maintenance</option>
+                                            <option value="Maintenance" id="jenis-option-maintenance">Maintenance</option>
                                             <option value="Reproses" id="jenis-option-reproses">Reproses</option>
                                         </select>
                                         <small id="reprocess-hint-greige" class="form-text text-info mt-1" style="display:none;">
@@ -1496,6 +1693,22 @@
                                                                 style="width: 100%;" required>
                                                                 <option value="" disabled>-- Pilih No. Partai --</option>
                                                             </select>
+                                                        </div>
+                                                    </div>
+
+                                                    <!-- Customer -->
+                                                    <div class="col-md-6">
+                                                        <div class="form-group">
+                                                            <label class="form-label fw-semibold">Customer</label>
+                                                            <input type="text" name="details[0][customer]" class="form-control auto-field-detail" readonly>
+                                                        </div>
+                                                    </div>
+
+                                                    <!-- Marketing -->
+                                                    <div class="col-md-6">
+                                                        <div class="form-group">
+                                                            <label class="form-label fw-semibold">Marketing</label>
+                                                            <input type="text" name="details[0][marketing]" class="form-control auto-field-detail" readonly>
                                                         </div>
                                                     </div>
 
@@ -1953,6 +2166,13 @@
 @endsection
 
 @section('scripts')
+    @if (isset($errors) && $errors->any())
+    <script>
+        $(function() {
+            $('#modalProses').modal('show');
+        });
+    </script>
+    @endif
     {{-- Script drag & drop dan select2 dashboard tanpa log console --}}
     <script>
         // Simpan data mesin ke variabel global untuk digunakan di modal pindah mesin
@@ -1970,6 +2190,29 @@
         window.canMoveProses = @json($canMoveProses ?? true);
         window.canSwapProses = @json($canSwapProses ?? true);
         window.canScanBarcode = @json($canScanBarcode ?? true);
+
+        // Toast mixin global: Error = close button (tanpa timer), Success = timer 8 detik (tanpa close button)
+        window.ToastError = Swal.mixin({
+            toast: true,
+            position: 'top-end',
+            icon: 'error',
+            showConfirmButton: true,
+            confirmButtonText: 'Tutup',
+            showCloseButton: true,
+            timer: undefined,
+            timerProgressBar: false
+        });
+        window.ToastSuccess = Swal.mixin({
+            toast: true,
+            position: 'top-end',
+            icon: 'success',
+            showConfirmButton: false,
+            timer: 8000,
+            timerProgressBar: true
+        });
+        const ToastError = window.ToastError;
+        const ToastSuccess = window.ToastSuccess;
+
         document.addEventListener('DOMContentLoaded', () => {
             const draggables = document.querySelectorAll('.draggable');
             const containers = document.querySelectorAll('.card-dropzone');
@@ -2218,14 +2461,6 @@
                         dragging.classList.remove('dragging');
 
                         // Tampilkan notification error
-                        const ToastError = Swal.mixin({
-                            toast: true,
-                            position: 'top-end',
-                            icon: 'error',
-                            showConfirmButton: false,
-                            timer: 4000,
-                            timerProgressBar: true,
-                        });
                         ToastError.fire({
                             title: 'Tidak dapat memindahkan proses. Proses sudah dimulai.'
                         });
@@ -2240,14 +2475,6 @@
                         dragging.classList.remove('dragging');
 
                         // Tampilkan notification error
-                        const ToastError = Swal.mixin({
-                            toast: true,
-                            position: 'top-end',
-                            icon: 'error',
-                            showConfirmButton: false,
-                            timer: 4000,
-                            timerProgressBar: true,
-                        });
                         ToastError.fire({
                             title: 'Tidak dapat memindahkan proses. Proses Reproses masih menunggu persetujuan VP.'
                         });
@@ -2276,14 +2503,6 @@
                                     dragging.classList.remove('dragging');
 
                                     // Tampilkan notification error
-                                    const ToastError = Swal.mixin({
-                                        toast: true,
-                                        position: 'top-end',
-                                        icon: 'error',
-                                        showConfirmButton: false,
-                                        timer: 4000,
-                                        timerProgressBar: true,
-                                    });
                                     ToastError.fire({
                                         title: 'Tidak dapat memindahkan proses. Proses yang belum mulai tidak dapat diletakkan di atas proses yang sudah selesai atau sedang berjalan.'
                                     });
@@ -2394,14 +2613,6 @@
                             restoreCardToOriginalPosition(dragging);
                             dragging.classList.remove('dragging');
 
-                            const ToastError = Swal.mixin({
-                                toast: true,
-                                position: 'top-end',
-                                icon: 'error',
-                                showConfirmButton: false,
-                                timer: 4000,
-                                timerProgressBar: true,
-                            });
                             ToastError.fire({
                                 title: 'Tidak ada proses yang valid untuk ditukar posisinya.'
                             });
@@ -2416,14 +2627,6 @@
                             restoreCardToOriginalPosition(dragging);
                             dragging.classList.remove('dragging');
 
-                            const ToastError = Swal.mixin({
-                                toast: true,
-                                position: 'top-end',
-                                icon: 'error',
-                                showConfirmButton: false,
-                                timer: 4000,
-                                timerProgressBar: true,
-                            });
                             ToastError.fire({
                                 title: 'Salah satu proses masih memiliki permintaan yang menunggu persetujuan FM.'
                             });
@@ -2656,16 +2859,8 @@
                     // Tutup modal
                     $('#modalConfirmMoveDragDrop').modal('hide');
 
-                    // Tampilkan notification success dengan delay sangat singkat
+                    // Tampilkan notification success
                     if (response && response.status === 'success' && response.message) {
-                        const ToastSuccess = Swal.mixin({
-                            toast: true,
-                            position: 'top-end',
-                            icon: 'success',
-                            showConfirmButton: false,
-                            timer: 1500,
-                            timerProgressBar: true,
-                        });
                         ToastSuccess.fire({
                             title: response.message
                         });
@@ -2713,14 +2908,6 @@
                         }
                     }
 
-                    const ToastError = Swal.mixin({
-                        toast: true,
-                        position: 'top-end',
-                        icon: 'error',
-                        showConfirmButton: false,
-                        timer: 4000,
-                        timerProgressBar: true,
-                    });
                     ToastError.fire({
                         title: errorMsg
                     });
@@ -2789,14 +2976,6 @@
 
                     // Tampilkan notification success
                     if (response && response.status === 'success' && response.message) {
-                        const ToastSuccess = Swal.mixin({
-                            toast: true,
-                            position: 'top-end',
-                            icon: 'success',
-                            showConfirmButton: false,
-                            timer: 1500,
-                            timerProgressBar: true,
-                        });
                         ToastSuccess.fire({
                             title: response.message
                         });
@@ -2920,14 +3099,6 @@
                         }
                     }
 
-                    const ToastError = Swal.mixin({
-                        toast: true,
-                        position: 'top-end',
-                        icon: 'error',
-                        showConfirmButton: false,
-                        timer: 4000,
-                        timerProgressBar: true,
-                    });
                     ToastError.fire({
                         title: errorMsg
                     });
@@ -3452,7 +3623,7 @@
                 // Format detail proses tanpa barcode
                 const hiddenFields = ['id', 'created_at', 'updated_at', 'deleted_at', 'mesin_id'];
                 const maintenanceFields = [
-                    'no_op', 'item_op', 'kode_material', 'konstruksi', 'no_partai',
+                    'no_op', 'item_op', 'customer', 'marketing', 'kode_material', 'konstruksi', 'no_partai',
                     'gramasi', 'lebar', 'hfeel', 'warna', 'kode_warna', 'kategori_warna', 'qty', 'roll'
                 ];
 
@@ -3482,7 +3653,7 @@
                 if (firstDetail) {
                     // Override field yang ada di DetailProses dengan data dari DetailProses
                     Object.keys(firstDetail).forEach(key => {
-                        if (maintenanceFields.includes(key) || ['no_op', 'no_partai', 'item_op', 'kode_material', 'konstruksi', 'gramasi', 'lebar', 'hfeel', 'warna', 'kode_warna', 'kategori_warna', 'qty', 'roll'].includes(key)) {
+                        if (maintenanceFields.includes(key) || ['no_op', 'no_partai', 'item_op', 'customer', 'marketing', 'kode_material', 'konstruksi', 'gramasi', 'lebar', 'hfeel', 'warna', 'kode_warna', 'kategori_warna', 'qty', 'roll'].includes(key)) {
                             prosesData[key] = firstDetail[key];
                         }
                     });
@@ -3604,7 +3775,7 @@
             const hiddenFields = ['id', 'created_at', 'updated_at', 'deleted_at', 'mesin_id'];
             // Daftar field yang harus disembunyikan jika Maintenance
             const maintenanceFields = [
-                'no_op', 'item_op', 'kode_material', 'konstruksi', 'no_partai',
+                'no_op', 'item_op', 'customer', 'marketing', 'kode_material', 'konstruksi', 'no_partai',
                 'gramasi', 'lebar', 'hfeel', 'warna', 'kode_warna', 'kategori_warna', 'qty', 'roll'
             ];
 
@@ -3632,7 +3803,7 @@
             if (firstDetail) {
                 // Override field yang ada di DetailProses dengan data dari DetailProses
                 Object.keys(firstDetail).forEach(key => {
-                    if (maintenanceFields.includes(key) || ['no_op', 'no_partai', 'item_op', 'kode_material', 'konstruksi', 'gramasi', 'lebar', 'hfeel', 'warna', 'kode_warna', 'kategori_warna', 'qty', 'roll'].includes(key)) {
+                    if (maintenanceFields.includes(key) || ['no_op', 'no_partai', 'item_op', 'customer', 'marketing', 'kode_material', 'konstruksi', 'gramasi', 'lebar', 'hfeel', 'warna', 'kode_warna', 'kategori_warna', 'qty', 'roll'].includes(key)) {
                         prosesData[key] = firstDetail[key];
                     }
                 });
@@ -3670,32 +3841,25 @@
             }
             // Tampilkan barcode hanya jika proses.jenis !== 'Maintenance'
             if (proses.jenis !== 'Maintenance') {
+                const barcodeKainOptionalModal = proses.barcode_kain_optional === true;
                 const showScanBtn = window.canScanBarcode !== false;
-                html += '<tr><th colspan="4" style="background:#f8f8f8;">Barcode Kain';
-                if (showScanBtn) {
-                    html +=
-                        ' <button type="button" id = btn-scan-kain class="btn btn-sm btn-success scan-barcode-btn" data-barcode="barcode_kain" data-id="' +
-                        proses.id + '" data-detail-id="' + (selectedDetailId || '') + '" style="float:right;"><i class="fas fa-barcode"></i> Scan</button>';
+                if (!barcodeKainOptionalModal) {
+                    html += '<tr><th colspan="4" style="background:#f8f8f8;">Barcode Kain';
+                    if (showScanBtn) {
+                        html +=
+                            ' <button type="button" id = btn-scan-kain class="btn btn-sm btn-success scan-barcode-btn" data-barcode="barcode_kain" data-id="' +
+                            proses.id + '" data-detail-id="' + (selectedDetailId || '') + '" style="float:right;"><i class="fas fa-barcode"></i> Scan</button>';
+                    }
+                    html += '</th></tr>';
+                    html += '<tr><td colspan="4" id="barcode-kain-list">Loading...</td></tr>';
+                    html += '<tr><td colspan="4" id="barcode-kain-progress" style="padding:8px;background:#f9f9f9;font-size:12px;"></td></tr>';
                 }
-                html += '</th></tr>';
-                html += '<tr><td colspan="4" id="barcode-kain-list">Loading...</td></tr>';
-                html += '<tr><td colspan="4" id="barcode-kain-progress" style="padding:8px;background:#f9f9f9;font-size:12px;"></td></tr>';
-                html += '<tr><th colspan="4" style="background:#f8f8f8;">Barcode LA';
-                if (showScanBtn) {
-                    html +=
-                        ' <button type="button" id="btn-scan-la" class="btn btn-sm btn-success scan-barcode-btn" data-barcode="barcode_la" data-id="' +
-                        proses.id + '" data-detail-id="' + (selectedDetailId || '') + '" style="float:right;"><i class="fas fa-barcode"></i> Scan</button>';
-                }
-                html += '</th></tr>';
+                html += '<tr><th colspan="4" id="barcode-la-header" style="background:#f8f8f8;">Barcode LA <span id="barcode-la-badges"></span><span id="barcode-la-buttons" style="float:right;"></span></th></tr>';
                 html += '<tr><td colspan="4" id="barcode-la-list">Loading...</td></tr>';
-                html += '<tr><th colspan="4" style="background:#f8f8f8;">Barcode AUX';
-                if (showScanBtn) {
-                    html +=
-                        ' <button type="button" id="btn-scan-aux" class="btn btn-sm btn-success scan-barcode-btn" data-barcode="barcode_aux" data-id="' +
-                        proses.id + '" data-detail-id="' + (selectedDetailId || '') + '" style="float:right;"><i class="fas fa-barcode"></i> Scan</button>';
-                }
-                html += '</th></tr>';
+                html += '<tr><td colspan="4" id="barcode-la-progress" style="padding:8px;background:#f9f9f9;font-size:12px;"></td></tr>';
+                html += '<tr><th colspan="4" id="barcode-aux-header" style="background:#f8f8f8;">Barcode AUX <span id="barcode-aux-badges"></span><span id="barcode-aux-buttons" style="float:right;"></span></th></tr>';
                 html += '<tr><td colspan="4" id="barcode-aux-list">Loading...</td></tr>';
+                html += '<tr><td colspan="4" id="barcode-aux-progress" style="padding:8px;background:#f9f9f9;font-size:12px;"></td></tr>';
             }
             $('#detail-proses-body').html(html);
             // Ambil barcode dari relasi dan render di modal detail proses hanya jika bukan Maintenance
@@ -3705,6 +3869,7 @@
                     url: barcodesUrl,
                     method: 'GET',
                     success: function(data) {
+                        const barcodeKainOptional = data.barcode_kain_optional === true;
                         // Helper untuk update warna blok G, D, A di card utama setelah perubahan barcode
                         function updateGDAIndicators(prosesId, detailId, hasKain, hasLa, hasAux) {
                             let $targets = $(`.status-card[data-proses-id="${prosesId}"] .op-row[data-detail-id="${detailId}"]`);
@@ -3720,8 +3885,6 @@
                                 if (!prosesData || prosesData.jenis === 'Maintenance') {
                                     return; // Tidak ada G/D/A atau F/D/A untuk Maintenance
                                 }
-                                const firstBlock = (prosesData.mode === 'finish') ? 'F' : 'G';
-
                                 // Update warna blok berdasarkan status barcode
                                 function setBlockColor(blockType, ok) {
                                     const $block = $card.find(
@@ -3736,7 +3899,11 @@
                                     });
                                 }
 
-                                setBlockColor(firstBlock, !!hasKain);
+                                const barcodeKainOpt = prosesData.barcode_kain_optional === true;
+                                if (!barcodeKainOpt) {
+                                    const firstBlock = (prosesData.mode === 'finish') ? 'F' : 'G';
+                                    setBlockColor(firstBlock, !!hasKain);
+                                }
                                 setBlockColor('D', !!hasLa);
                                 setBlockColor('A', !!hasAux);
                             });
@@ -3769,11 +3936,84 @@
                         }
 
                         // Render ulang list barcode di modal
-                        $('#barcode-kain-list').html(renderBarcodeGrid(data.barcode_kain, 'kain', proses
-                            .id));
+                        if (!barcodeKainOptional && $('#barcode-kain-list').length) {
+                            $('#barcode-kain-list').html(renderBarcodeGrid(data.barcode_kain, 'kain', proses.id));
+                        }
                         $('#barcode-la-list').html(renderBarcodeGrid(data.barcode_la, 'la', proses.id));
                         $('#barcode-aux-list').html(renderBarcodeGrid(data.barcode_aux, 'aux', proses
                             .id));
+
+                        // Topping LA/AUX: badges TD/TA, tombol Request, tombol Scan
+                        const userRole = window.userRole || '';
+                        const canRequestLa = data.can_request_topping_la && (userRole === 'kepala_ruangan' || userRole === 'super_admin');
+                        const canRequestAux = data.can_request_topping_aux && (userRole === 'kepala_ruangan' || userRole === 'super_admin');
+                        const canScanLa = data.can_scan_la === true;
+                        const canScanAux = data.can_scan_aux === true;
+                        const approvedToppingLa = data.approved_topping_la || null;
+                        const approvedToppingAux = data.approved_topping_aux || null;
+                        const isMultipleOp = data.is_multiple_op === true;
+                        const detailIdAttr = selectedDetailId ? (selectedDetailId + '') : '';
+                        const reqToppingTitle = isMultipleOp ? 'Request Topping untuk semua OP. Kepala Shift hanya perlu approve sekali.' : '';
+
+                        let laBadges = '';
+                        if (data.pending_topping_la) {
+                            laBadges += ' <span class="badge badge-warning" title="Topping Dyes - Menunggu approval">TD</span>';
+                        }
+                        let laBtns = '';
+                        if (canRequestLa) {
+                            laBtns += ' <button type="button" class="btn btn-sm btn-info request-topping-btn mr-1" data-type="la" data-id="' + proses.id + '" title="' + reqToppingTitle + '"><i class="fas fa-plus"></i> Request Topping' + (isMultipleOp ? ' (semua OP)' : '') + '</button>';
+                        }
+                        if (canScanLa) {
+                            const approvalAttr = approvedToppingLa ? ' data-approval-id="' + approvedToppingLa.id + '"' : '';
+                            laBtns += ' <button type="button" class="btn btn-sm btn-success scan-barcode-btn" data-barcode="barcode_la" data-id="' + proses.id + '" data-detail-id="' + detailIdAttr + '"' + approvalAttr + '><i class="fas fa-barcode"></i> ' + (approvedToppingLa ? 'Scan (Topping)' : 'Scan') + '</button>';
+                        }
+                        $('#barcode-la-badges').html(laBadges);
+                        $('#barcode-la-buttons').html(laBtns);
+
+                        // Progress LA: keterangan kebutuhan awal + topping
+                        const laProgress = data.la_progress || {};
+                        const laReq = laProgress.required ?? 1;
+                        const laScn = laProgress.scanned ?? 0;
+                        const laComplete = laProgress.is_complete === true;
+                        const laToppingReq = laProgress.topping_required ?? 0;
+                        let laProgressHtml = '';
+                        if (laToppingReq > 0) {
+                            laProgressHtml = `Kebutuhan: 1 awal + ${laToppingReq} topping (TD) = ${laReq} total | Sudah: ${laScn} | ${laComplete ? '<span style="color:#43a047;"><i class="fas fa-check"></i> Lengkap</span>' : '<span style="color:#c62828;">Kurang: ' + (laReq - laScn) + '</span>'}`;
+                        } else {
+                            laProgressHtml = `Kebutuhan: 1 awal | Sudah: ${laScn} | ${laComplete ? '<span style="color:#43a047;"><i class="fas fa-check"></i> Lengkap</span>' : '<span style="color:#c62828;">Kurang: ' + (1 - laScn) + '</span>'}`;
+                        }
+                        const laProgressBg = laComplete ? '#e8f5e9' : '#fff3e0';
+                        $('#barcode-la-progress').html('<div style="padding:4px 8px;background:' + laProgressBg + ';border-radius:4px;">' + laProgressHtml + '</div>').show();
+
+                        let auxBadges = '';
+                        if (data.pending_topping_aux) {
+                            auxBadges += ' <span class="badge badge-warning" title="Topping Auxiliaries - Menunggu approval">TA</span>';
+                        }
+                        let auxBtns = '';
+                        if (canRequestAux) {
+                            auxBtns += ' <button type="button" class="btn btn-sm btn-info request-topping-btn mr-1" data-type="aux" data-id="' + proses.id + '" title="' + reqToppingTitle + '"><i class="fas fa-plus"></i> Request Topping' + (isMultipleOp ? ' (semua OP)' : '') + '</button>';
+                        }
+                        if (canScanAux) {
+                            const approvalAttrAux = approvedToppingAux ? ' data-approval-id="' + approvedToppingAux.id + '"' : '';
+                            auxBtns += ' <button type="button" class="btn btn-sm btn-success scan-barcode-btn" data-barcode="barcode_aux" data-id="' + proses.id + '" data-detail-id="' + detailIdAttr + '"' + approvalAttrAux + '><i class="fas fa-barcode"></i> ' + (approvedToppingAux ? 'Scan (Topping)' : 'Scan') + '</button>';
+                        }
+                        $('#barcode-aux-badges').html(auxBadges);
+                        $('#barcode-aux-buttons').html(auxBtns);
+
+                        // Progress AUX: keterangan kebutuhan awal + topping
+                        const auxProgress = data.aux_progress || {};
+                        const auxReq = auxProgress.required ?? 1;
+                        const auxScn = auxProgress.scanned ?? 0;
+                        const auxComplete = auxProgress.is_complete === true;
+                        const auxToppingReq = auxProgress.topping_required ?? 0;
+                        let auxProgressHtml = '';
+                        if (auxToppingReq > 0) {
+                            auxProgressHtml = `Kebutuhan: 1 awal + ${auxToppingReq} topping (TA) = ${auxReq} total | Sudah: ${auxScn} | ${auxComplete ? '<span style="color:#43a047;"><i class="fas fa-check"></i> Lengkap</span>' : '<span style="color:#c62828;">Kurang: ' + (auxReq - auxScn) + '</span>'}`;
+                        } else {
+                            auxProgressHtml = `Kebutuhan: 1 awal | Sudah: ${auxScn} | ${auxComplete ? '<span style="color:#43a047;"><i class="fas fa-check"></i> Lengkap</span>' : '<span style="color:#c62828;">Kurang: ' + (1 - auxScn) + '</span>'}`;
+                        }
+                        const auxProgressBg = auxComplete ? '#e8f5e9' : '#fff3e0';
+                        $('#barcode-aux-progress').html('<div style="padding:4px 8px;background:' + auxProgressBg + ';border-radius:4px;">' + auxProgressHtml + '</div>').show();
 
                         // Tampilkan progress barcode kain
                         // Gunakan barcode_kain_progress untuk detail yang dipilih (untuk display)
@@ -3802,7 +4042,6 @@
                         }
                         
                         // Tampilkan status keseluruhan (untuk validasi scan LA/AUX)
-                        const barcodeKainOptional = data.barcode_kain_optional === true;
                         if (barcodeKainOptional) {
                             const hintHtml = '<div style="padding:6px 8px;background:#e3f2fd;border-radius:4px;margin-bottom:8px;font-size:12px;color:#1565c0;"><i class="fas fa-info-circle"></i> <strong>Proses ini hanya wajib Barcode LA &amp; AUX (D &amp; A).</strong> Barcode Kain (G/F) tidak wajib.</div>';
                             progressHtml = hintHtml + progressHtml;
@@ -3825,84 +4064,69 @@
                                 progressHtml += '</div>';
                             }
                         }
-                        $('#barcode-kain-progress').html(progressHtml);
+                        if ($('#barcode-kain-progress').length) {
+                            $('#barcode-kain-progress').html(progressHtml);
+                        }
 
-                        // Cek apakah proses sudah dimulai
-                        const isStarted = proses.mulai !== null && proses.mulai !== undefined && proses.mulai !== '';
-
-                        // Cek apakah proses sudah selesai
-                        const isEnded = proses.mulai !== null && proses.mulai !== undefined && proses.mulai !== ''
-                        && proses.selesai !== null && proses.selesai !== undefined && proses.selesai !== '';
-
-                        // Enable/disable tombol scan LA dan AUX berdasarkan status progress SEMUA detail
+                        // Barcode dapat ditambahkan kapanpun (belum mulai, sedang berjalan, atau sudah selesai)
+                        // Rules: LA & AUX memerlukan barcode kain lengkap (kecuali barcodeKainOptional)
                         const canScanLaAux = data.can_scan_la_aux !== false;
                         const $btnScanKain = $('#btn-scan-kain');
-                        const $btnScanLa = $('#btn-scan-la');
-                        const $btnScanAux = $('#btn-scan-aux'); 
-                        
-                        if (!canScanLaAux) {
-                            // Buat pesan tooltip yang informatif dengan detail yang belum lengkap
-                            let tooltipMsg = 'Tidak dapat scan. ';
-                            if (incompleteDetails.length > 0) {
-                                tooltipMsg += 'Detail OP belum lengkap: ';
-                                const detailMsgs = incompleteDetails.map(d => `OP ${d.no_op} (kurang ${d.remaining} roll)`);
-                                tooltipMsg += detailMsgs.join(', ');
-                            } else {
-                                tooltipMsg += 'Pastikan semua barcode kain sudah memenuhi jumlah roll terlebih dahulu.';
-                            }
-                            
-                            // Disable tombol scan LA dan AUX
-                            $btnScanLa.prop('disabled', true)
-                                .removeClass('btn-success')
-                                .addClass('btn-secondary')
-                                .css('cursor', 'not-allowed')
-                                .attr('title', tooltipMsg);
-                            
-                            $btnScanAux.prop('disabled', true)
-                                .removeClass('btn-success')
-                                .addClass('btn-secondary')
-                                .css('cursor', 'not-allowed')
-                                .attr('title', tooltipMsg);
-                        } else if (isEnded) {
-                            // Buat pesan tooltip
-                            let tooltipMsg = 'Tidak dapat scan karena proses sudah selesai';
+                        const $btnScanLa = $('#barcode-la-buttons .scan-barcode-btn');
+                        const $btnScanAux = $('#barcode-aux-buttons .scan-barcode-btn');
 
-                            // Disable tombol scan Kain LA dan AUX
+                        // Scan Kain (G/F): disable jika semua roll sudah terpenuhi
+                        const allProgressKain = data.all_barcode_kain_progress || [];
+                        const allRollComplete = allProgressKain.length > 0 && allProgressKain.every(p => p.is_complete);
+                        if (allRollComplete) {
                             $btnScanKain.prop('disabled', true)
                                 .removeClass('btn-success')
                                 .addClass('btn-secondary')
                                 .css('cursor', 'not-allowed')
-                                .attr('title', tooltipMsg);
-
-                            $btnScanLa.prop('disabled', true)
-                                .removeClass('btn-success')
-                                .addClass('btn-secondary')
-                                .css('cursor', 'not-allowed')
-                                .attr('title', tooltipMsg);
-                            
-                            $btnScanAux.prop('disabled', true)
-                                .removeClass('btn-success')
-                                .addClass('btn-secondary')
-                                .css('cursor', 'not-allowed')
-                                .attr('title', tooltipMsg);
-                        } else if (isStarted) {
-                            // Buat pesan tooltip
-                            let tooltipMsg = 'Tidak dapat scan karena proses sudah dimulai';
-
-                            // Disable tombol scan Kain LA dan AUX
-                            $btnScanKain.prop('disabled', true)
-                                .removeClass('btn-success')
-                                .addClass('btn-secondary')
-                                .css('cursor', 'not-allowed')
-                                .attr('title', tooltipMsg);
+                                .attr('title', 'Barcode kain sudah lengkap sesuai roll');
                         } else {
-                            // Enable tombol scan LA dan AUX
+                            $btnScanKain.prop('disabled', false)
+                                .removeClass('btn-secondary')
+                                .addClass('btn-success')
+                                .css('cursor', 'pointer')
+                                .removeAttr('title');
+                        }
+
+                        let tooltipLa = '';
+                        let tooltipAux = '';
+                        if (!canScanLaAux) {
+                            tooltipLa = tooltipAux = 'Tidak dapat scan LA/AUX. ';
+                            if (incompleteDetails.length > 0) {
+                                const detailMsgs = incompleteDetails.map(d => `OP ${d.no_op} (kurang ${d.remaining} roll)`);
+                                tooltipLa = tooltipAux += 'Detail OP belum lengkap: ' + detailMsgs.join(', ');
+                            } else {
+                                tooltipLa = tooltipAux += 'Pastikan semua barcode kain sudah memenuhi jumlah roll terlebih dahulu.';
+                            }
+                        } else if (laComplete) {
+                            tooltipLa = 'Barcode LA sudah lengkap sesuai kebutuhan (awal + topping).';
+                        } else if (auxComplete) {
+                            tooltipAux = 'Barcode AUX sudah lengkap sesuai kebutuhan (awal + topping).';
+                        }
+                        if (!canScanLaAux || laComplete) {
+                            $btnScanLa.prop('disabled', true)
+                                .removeClass('btn-success')
+                                .addClass('btn-secondary')
+                                .css('cursor', 'not-allowed')
+                                .attr('title', tooltipLa || 'Barcode LA sudah lengkap');
+                        } else {
                             $btnScanLa.prop('disabled', false)
                                 .removeClass('btn-secondary')
                                 .addClass('btn-success')
                                 .css('cursor', 'pointer')
                                 .removeAttr('title');
-                            
+                        }
+                        if (!canScanLaAux || auxComplete) {
+                            $btnScanAux.prop('disabled', true)
+                                .removeClass('btn-success')
+                                .addClass('btn-secondary')
+                                .css('cursor', 'not-allowed')
+                                .attr('title', tooltipAux || 'Barcode AUX sudah lengkap');
+                        } else {
                             $btnScanAux.prop('disabled', false)
                                 .removeClass('btn-secondary')
                                 .addClass('btn-success')
@@ -3923,12 +4147,14 @@
                         $('#barcode-kain-progress').html('');
                         $('#barcode-la-list').html(
                             '<span style="color:#888;">Belum ada barcode LA.</span>');
+                        $('#barcode-la-progress').html('');
                         $('#barcode-aux-list').html(
                             '<span style="color:#888;">Belum ada barcode AUX.</span>');
-                        
+                        $('#barcode-aux-progress').html('');
+
                         // Disable tombol scan LA dan AUX jika error
-                        const $btnScanLa = $('#btn-scan-la');
-                        const $btnScanAux = $('#btn-scan-aux');
+                        const $btnScanLa = $('#barcode-la-buttons .scan-barcode-btn');
+                        const $btnScanAux = $('#barcode-aux-buttons .scan-barcode-btn');
                         $btnScanLa.prop('disabled', true)
                             .removeClass('btn-success')
                             .addClass('btn-secondary')
@@ -3987,14 +4213,6 @@
 
             // Validasi: cek apakah proses sudah dimulai
             if (proses.mulai !== null && proses.mulai !== undefined && proses.mulai !== '') {
-                const ToastError = Swal.mixin({
-                    toast: true,
-                    position: 'top-end',
-                    icon: 'error',
-                    showConfirmButton: false,
-                    timer: 4000,
-                    timerProgressBar: true,
-                });
                 ToastError.fire({
                     title: 'Tidak dapat mengubah cycle time. Proses sudah dimulai.'
                 });
@@ -4004,14 +4222,6 @@
             // Validasi: cek pending approval VP untuk Reproses
             const hasPendingReprocess = hasPendingReprocessApproval(proses);
             if (hasPendingReprocess) {
-                const ToastError = Swal.mixin({
-                    toast: true,
-                    position: 'top-end',
-                    icon: 'error',
-                    showConfirmButton: false,
-                    timer: 4000,
-                    timerProgressBar: true,
-                });
                 ToastError.fire({
                     title: 'Tidak dapat mengubah cycle time. Proses Reproses masih menunggu persetujuan VP.'
                 });
@@ -4071,14 +4281,6 @@
 
             // Validasi: cek apakah proses sudah dimulai
             if (proses.mulai !== null && proses.mulai !== undefined && proses.mulai !== '') {
-                const ToastError = Swal.mixin({
-                    toast: true,
-                    position: 'top-end',
-                    icon: 'error',
-                    showConfirmButton: false,
-                    timer: 4000,
-                    timerProgressBar: true,
-                });
                 ToastError.fire({
                     title: 'Tidak dapat memindahkan proses. Proses sudah dimulai.'
                 });
@@ -4088,14 +4290,6 @@
             // Validasi: cek pending approval VP untuk Reproses
             const hasPendingReprocess = hasPendingReprocessApproval(proses);
             if (hasPendingReprocess) {
-                const ToastError = Swal.mixin({
-                    toast: true,
-                    position: 'top-end',
-                    icon: 'error',
-                    showConfirmButton: false,
-                    timer: 4000,
-                    timerProgressBar: true,
-                });
                 ToastError.fire({
                     title: 'Tidak dapat memindahkan proses. Proses Reproses masih menunggu persetujuan VP.'
                 });
@@ -4201,14 +4395,6 @@
 
                     // Tampilkan notification success jika ada
                     if (response && response.status === 'success' && response.message) {
-                        const ToastSuccess = Swal.mixin({
-                            toast: true,
-                            position: 'top-end',
-                            icon: 'success',
-                            showConfirmButton: false,
-                            timer: 3000,
-                            timerProgressBar: true,
-                        });
                         ToastSuccess.fire({
                             title: response.message
                         });
@@ -4239,14 +4425,6 @@
                     }
 
                     // Tampilkan notification error menggunakan SweetAlert
-                    const ToastError = Swal.mixin({
-                        toast: true,
-                        position: 'top-end',
-                        icon: 'error',
-                        showConfirmButton: false,
-                        timer: 4000,
-                        timerProgressBar: true,
-                    });
                     ToastError.fire({
                         title: errorMsg
                     });
@@ -4266,14 +4444,6 @@
 
             // Validasi: cek apakah proses sudah dimulai
             if (proses.mulai !== null && proses.mulai !== undefined && proses.mulai !== '') {
-                const ToastError = Swal.mixin({
-                    toast: true,
-                    position: 'top-end',
-                    icon: 'error',
-                    showConfirmButton: false,
-                    timer: 4000,
-                    timerProgressBar: true,
-                });
                 ToastError.fire({
                     title: 'Tidak dapat menghapus proses. Proses sudah dimulai.'
                 });
@@ -4283,14 +4453,6 @@
             // Validasi: cek pending approval VP untuk Reproses
             const hasPendingReprocess = hasPendingReprocessApproval(proses);
             if (hasPendingReprocess) {
-                const ToastError = Swal.mixin({
-                    toast: true,
-                    position: 'top-end',
-                    icon: 'error',
-                    showConfirmButton: false,
-                    timer: 4000,
-                    timerProgressBar: true,
-                });
                 ToastError.fire({
                     title: 'Tidak dapat menghapus proses. Proses Reproses masih menunggu persetujuan VP.'
                 });
@@ -4335,6 +4497,7 @@
                             @csrf
                             <input type="hidden" name="barcode" id="inputBarcodeValue">
                             <input type="hidden" name="detail_proses_id" id="inputDetailProsesId">
+                            <input type="hidden" name="approval_id" id="inputApprovalId">
                             <div class="modal-header bg-success text-white">
                                 <h5 class="modal-title fw-bold" id="modalScanBarcodeLabel">Input Barcode</h5>
                                 <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
@@ -4388,6 +4551,7 @@
             const barcodeType = $(this).data('barcode');
             const prosesId = $(this).data('id');
             const detailId = $(this).data('detail-id') || $('#modalDetailProses').data('detailProsesId') || '';
+            const approvalId = $(this).data('approval-id') || '';
             let actionUrl = '';
             if (barcodeType === 'barcode_kain') {
                 actionUrl = `/proses/${prosesId}/barcode/kain`;
@@ -4397,12 +4561,66 @@
                 actionUrl = `/proses/${prosesId}/barcode/aux`;
             }
             $('#formScanBarcode').attr('action', actionUrl);
-            // Simpan prosesId dan barcodeType untuk refresh setelah sukses
             $('#formScanBarcode').data('proses-id', prosesId);
             $('#formScanBarcode').data('barcode-type', barcodeType);
             $('#inputBarcodeValue').val('');
             $('#inputDetailProsesId').val(detailId);
+            $('#inputApprovalId').val(approvalId);
             $('#modalScanBarcode').modal('show');
+        });
+
+        // Handler klik tombol Request Topping LA/AUX
+        $(document).on('click', '.request-topping-btn', function() {
+            const type = $(this).data('type');
+            const prosesId = $(this).data('id');
+            const url = `/proses/${prosesId}/topping/${type}/request`;
+            const label = type.toUpperCase();
+            const $btn = $(this);
+            $btn.prop('disabled', true);
+            $.ajax({
+                url: url,
+                method: 'POST',
+                data: {
+                    _token: $('meta[name="csrf-token"]').attr('content')
+                },
+                success: function(res) {
+                    if (res.status === 'success') {
+                        ToastSuccess.fire({ title: res.message });
+                        const $modal = $('#modalDetailProses');
+                        if ($modal.length && $modal.data('proses') && $('#modalDetailProses').hasClass('show')) {
+                            const proses = $modal.data('proses');
+                            const selectedDetailId = $('#detail-proses-select').val() || $modal.data('detailProsesId') || '';
+                            if (window.loadBarcodesIntoDetailModal) {
+                                window.loadBarcodesIntoDetailModal(proses.id, selectedDetailId);
+                            }
+                        }
+                        // Inject indikator TD/TA kuning di card dashboard (header + setiap blok per OP untuk multiple)
+                        const $card = $('.status-card[data-proses-id="' + prosesId + '"]');
+                        if ($card.length) {
+                            const $header = $card.find('.card-header > div:nth-child(2)');
+                            const $gdaContainers = $card.find('.op-list > div:has(.gda-block)');
+                            const tdHtml = '<span class="topping-indicator topping-td" data-block-type="TD" title="Topping Dyes - Menunggu approval" style="display: inline-block; background:#fff9c4;color:#111;border:2.5px solid #f9a825; font-weight: bold; font-size: 18px; padding: 2px 8px; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.10); letter-spacing: 1px;">TD</span>';
+                            const taHtml = '<span class="topping-indicator topping-ta" data-block-type="TA" title="Topping Auxiliaries - Menunggu approval" style="display: inline-block; background:#fff9c4;color:#111;border:2.5px solid #f9a825; font-weight: bold; font-size: 18px; padding: 2px 8px; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.10); letter-spacing: 1px;">TA</span>';
+                            if (type === 'la' && !$card.find('.topping-td').length) {
+                                $header.append(tdHtml);
+                                $gdaContainers.each(function() { if (!$(this).find('.topping-td').length) $(this).append(tdHtml); });
+                            } else if (type === 'aux' && !$card.find('.topping-ta').length) {
+                                $header.append(taHtml);
+                                $gdaContainers.each(function() { if (!$(this).find('.topping-ta').length) $(this).append(taHtml); });
+                            }
+                        }
+                    } else {
+                        ToastError.fire({ title: res.message || 'Gagal request topping' });
+                    }
+                },
+                error: function(xhr) {
+                    const msg = xhr.responseJSON && xhr.responseJSON.message ? xhr.responseJSON.message : 'Gagal request topping ' + label;
+                    ToastError.fire({ title: msg });
+                },
+                complete: function() {
+                    $btn.prop('disabled', false);
+                }
+            });
         });
 
         // Pastikan scroll modal detail tetap berfungsi saat modal scan dibuka
@@ -4533,6 +4751,7 @@
             const actionUrl = form.attr('action');
             const barcode = $('#inputBarcodeValue').val();
             const detailProsesId = $('#inputDetailProsesId').val();
+            const approvalId = $('#inputApprovalId').val();
             const prosesId = form.data('proses-id');
             const barcodeType = form.data('barcode-type');
             
@@ -4566,11 +4785,11 @@
                     'X-Requested-With': 'XMLHttpRequest',
                     'Accept': 'application/json'
                 },
-                data: {
+                data: Object.assign({
                     barcode: barcode,
                     detail_proses_id: detailProsesId,
                     _token: $('meta[name="csrf-token"]').attr('content')
-                },
+                }, approvalId ? { approval_id: approvalId } : {}),
                 success: function(response) {
                     // Tampilkan notifikasi success
                     let successMessage = 'Barcode berhasil disimpan!';
@@ -4600,6 +4819,7 @@
                                 success: function(data) {
                                     // Ambil proses dari modal agar renderBarcodeGrid tidak error (barcode realtime setelah scan)
                                     const proses = $('#modalDetailProses').data('proses') || {};
+                                    const barcodeKainOptionalScan = data.barcode_kain_optional === true;
                                     // Helper untuk update warna blok G, D, A di card utama setelah perubahan barcode
                                     function updateGDAIndicators(prosesId, detailId, hasKain, hasLa, hasAux) {
                                         let $targets = $(`.status-card[data-proses-id="${prosesId}"] .op-row[data-detail-id="${detailId}"]`);
@@ -4615,7 +4835,6 @@
                                             if (!prosesData || prosesData.jenis === 'Maintenance') {
                                                 return;
                                             }
-                                            const firstBlock = (prosesData.mode === 'finish') ? 'F' : 'G';
 
                                             function setBlockColor(blockType, ok) {
                                                 const $block = $card.find(
@@ -4630,7 +4849,10 @@
                                                 });
                                             }
 
-                                            setBlockColor(firstBlock, !!hasKain);
+                                            if (!(prosesData.barcode_kain_optional === true)) {
+                                                const firstBlock = (prosesData.mode === 'finish') ? 'F' : 'G';
+                                                setBlockColor(firstBlock, !!hasKain);
+                                            }
                                             setBlockColor('D', !!hasLa);
                                             setBlockColor('A', !!hasAux);
                                         });
@@ -4659,7 +4881,9 @@
                                         return html;
                                     }
                                         // Render ulang list barcode di modal
-                                        $('#barcode-kain-list').html(renderBarcodeGrid(data.barcode_kain, 'kain', currentProsesId));
+                                        if (!barcodeKainOptionalScan && $('#barcode-kain-list').length) {
+                                            $('#barcode-kain-list').html(renderBarcodeGrid(data.barcode_kain, 'kain', currentProsesId));
+                                        }
                                         $('#barcode-la-list').html(renderBarcodeGrid(data.barcode_la, 'la', currentProsesId));
                                         $('#barcode-aux-list').html(renderBarcodeGrid(data.barcode_aux, 'aux', currentProsesId));
 
@@ -4690,7 +4914,6 @@
                                     }
                                     
                                     // Tampilkan status keseluruhan (untuk validasi scan LA/AUX)
-                                    const barcodeKainOptionalScan = data.barcode_kain_optional === true;
                                     if (barcodeKainOptionalScan) {
                                         const hintHtmlScan = '<div style="padding:6px 8px;background:#e3f2fd;border-radius:4px;margin-bottom:8px;font-size:12px;color:#1565c0;"><i class="fas fa-info-circle"></i> <strong>Proses ini hanya wajib Barcode LA &amp; AUX (D &amp; A).</strong> Barcode Kain (G/F) tidak wajib.</div>';
                                         progressHtml = hintHtmlScan + progressHtml;
@@ -4713,13 +4936,24 @@
                                             progressHtml += '</div>';
                                         }
                                     }
-                                    $('#barcode-kain-progress').html(progressHtml);
+                                    if ($('#barcode-kain-progress').length) {
+                                        $('#barcode-kain-progress').html(progressHtml);
+                                    }
 
-                                    // Enable/disable tombol scan LA dan AUX (berdasarkan validasi semua detail)
+                                    // Barcode dapat ditambahkan kapanpun; LA/AUX memerlukan barcode kain lengkap
                                     const canScanLaAux = data.can_scan_la_aux !== false;
-                                    const $btnScanLa = $('#btn-scan-la');
-                                    const $btnScanAux = $('#btn-scan-aux');
-                                    
+                                    const $btnScanKain = $('#btn-scan-kain');
+                                    const $btnScanLa = $('#barcode-la-buttons .scan-barcode-btn');
+                                    const $btnScanAux = $('#barcode-aux-buttons .scan-barcode-btn');
+                                    if ($btnScanKain.length) {
+                                        const allProgressScan = data.all_barcode_kain_progress || [];
+                                        const allRollCompleteScan = allProgressScan.length > 0 && allProgressScan.every(p => p.is_complete);
+                                        if (allRollCompleteScan) {
+                                            $btnScanKain.prop('disabled', true).removeClass('btn-success').addClass('btn-secondary').css('cursor', 'not-allowed').attr('title', 'Barcode kain sudah lengkap sesuai roll');
+                                        } else {
+                                            $btnScanKain.prop('disabled', false).removeClass('btn-secondary').addClass('btn-success').css('cursor', 'pointer').removeAttr('title');
+                                        }
+                                    }
                                     if (!canScanLaAux) {
                                         let tooltipMsg = 'Tidak dapat scan. ';
                                         if (incompleteDetails.length > 0) {
@@ -4979,12 +5213,12 @@
             // Bangun HTML body tabel detail proses (entries saja, untuk modal pending) dari objek proses
             function buildDetailProsesPendingBodyHtml(proses, selectedDetailId) {
                 const hiddenFields = ['id', 'created_at', 'updated_at', 'deleted_at', 'mesin_id'];
-                const maintenanceFields = ['no_op', 'item_op', 'kode_material', 'konstruksi', 'no_partai', 'gramasi', 'lebar', 'hfeel', 'warna', 'kode_warna', 'kategori_warna', 'qty', 'roll'];
+                const maintenanceFields = ['no_op', 'item_op', 'customer', 'marketing', 'kode_material', 'konstruksi', 'no_partai', 'gramasi', 'lebar', 'hfeel', 'warna', 'kode_warna', 'kategori_warna', 'qty', 'roll'];
                 const firstDetail = getDetailProsesById(proses, selectedDetailId) || getFirstDetailProses(proses);
                 const prosesData = {...proses};
                 if (firstDetail) {
                     Object.keys(firstDetail).forEach(function(key) {
-                        if (maintenanceFields.indexOf(key) !== -1 || ['no_op', 'no_partai', 'item_op', 'kode_material', 'konstruksi', 'gramasi', 'lebar', 'hfeel', 'warna', 'kode_warna', 'kategori_warna', 'qty', 'roll'].indexOf(key) !== -1) {
+                        if (maintenanceFields.indexOf(key) !== -1 || ['no_op', 'no_partai', 'item_op', 'customer', 'marketing', 'kode_material', 'konstruksi', 'gramasi', 'lebar', 'hfeel', 'warna', 'kode_warna', 'kategori_warna', 'qty', 'roll'].indexOf(key) !== -1) {
                             prosesData[key] = firstDetail[key];
                         }
                     });
@@ -5024,12 +5258,12 @@
             // Bangun HTML body tabel detail proses LENGKAP (entries + section Barcode Kain, LA, AUX) untuk modal normal
             function buildDetailProsesBodyHtml(proses, selectedDetailId) {
                 const hiddenFields = ['id', 'created_at', 'updated_at', 'deleted_at', 'mesin_id'];
-                const maintenanceFields = ['no_op', 'item_op', 'kode_material', 'konstruksi', 'no_partai', 'gramasi', 'lebar', 'hfeel', 'warna', 'kode_warna', 'kategori_warna', 'qty', 'roll'];
+                const maintenanceFields = ['no_op', 'item_op', 'customer', 'marketing', 'kode_material', 'konstruksi', 'no_partai', 'gramasi', 'lebar', 'hfeel', 'warna', 'kode_warna', 'kategori_warna', 'qty', 'roll'];
                 const firstDetail = getDetailProsesById(proses, selectedDetailId) || getFirstDetailProses(proses);
                 const prosesData = {...proses};
                 if (firstDetail) {
                     Object.keys(firstDetail).forEach(function(key) {
-                        if (maintenanceFields.indexOf(key) !== -1 || ['no_op', 'no_partai', 'item_op', 'kode_material', 'konstruksi', 'gramasi', 'lebar', 'hfeel', 'warna', 'kode_warna', 'kategori_warna', 'qty', 'roll'].indexOf(key) !== -1) {
+                        if (maintenanceFields.indexOf(key) !== -1 || ['no_op', 'no_partai', 'item_op', 'customer', 'marketing', 'kode_material', 'konstruksi', 'gramasi', 'lebar', 'hfeel', 'warna', 'kode_warna', 'kategori_warna', 'qty', 'roll'].indexOf(key) !== -1) {
                             prosesData[key] = firstDetail[key];
                         }
                     });
@@ -5064,23 +5298,18 @@
                     html += '</tr>';
                 }
                 if (proses.jenis !== 'Maintenance') {
+                    const barcodeKainOptionalBuild = proses.barcode_kain_optional === true;
                     const showScanBtn = window.canScanBarcode !== false;
                     const detailIdAttr = selectedDetailId ? (selectedDetailId + '') : '';
-                    html += '<tr><th colspan="4" style="background:#f8f8f8;">Barcode Kain';
-                    if (showScanBtn) {
-                        html += ' <button type="button" id="btn-scan-kain" class="btn btn-sm btn-success scan-barcode-btn" data-barcode="barcode_kain" data-id="' + proses.id + '" data-detail-id="' + detailIdAttr + '" style="float:right;"><i class="fas fa-barcode"></i> Scan</button>';
+                    if (!barcodeKainOptionalBuild) {
+                        html += '<tr><th colspan="4" style="background:#f8f8f8;">Barcode Kain';
+                        if (showScanBtn) {
+                            html += ' <button type="button" id="btn-scan-kain" class="btn btn-sm btn-success scan-barcode-btn" data-barcode="barcode_kain" data-id="' + proses.id + '" data-detail-id="' + detailIdAttr + '" style="float:right;"><i class="fas fa-barcode"></i> Scan</button>';
+                        }
+                        html += '</th></tr><tr><td colspan="4" id="barcode-kain-list">Loading...</td></tr><tr><td colspan="4" id="barcode-kain-progress" style="padding:8px;background:#f9f9f9;font-size:12px;"></td></tr>';
                     }
-                    html += '</th></tr><tr><td colspan="4" id="barcode-kain-list">Loading...</td></tr><tr><td colspan="4" id="barcode-kain-progress" style="padding:8px;background:#f9f9f9;font-size:12px;"></td></tr>';
-                    html += '<tr><th colspan="4" style="background:#f8f8f8;">Barcode LA';
-                    if (showScanBtn) {
-                        html += ' <button type="button" id="btn-scan-la" class="btn btn-sm btn-success scan-barcode-btn" data-barcode="barcode_la" data-id="' + proses.id + '" data-detail-id="' + detailIdAttr + '" style="float:right;"><i class="fas fa-barcode"></i> Scan</button>';
-                    }
-                    html += '</th></tr><tr><td colspan="4" id="barcode-la-list">Loading...</td></tr>';
-                    html += '<tr><th colspan="4" style="background:#f8f8f8;">Barcode AUX';
-                    if (showScanBtn) {
-                        html += ' <button type="button" id="btn-scan-aux" class="btn btn-sm btn-success scan-barcode-btn" data-barcode="barcode_aux" data-id="' + proses.id + '" data-detail-id="' + detailIdAttr + '" style="float:right;"><i class="fas fa-barcode"></i> Scan</button>';
-                    }
-                    html += '</th></tr><tr><td colspan="4" id="barcode-aux-list">Loading...</td></tr>';
+                    html += '<tr><th colspan="4" id="barcode-la-header" style="background:#f8f8f8;">Barcode LA <span id="barcode-la-badges"></span><span id="barcode-la-buttons" style="float:right;"></span></th></tr><tr><td colspan="4" id="barcode-la-list">Loading...</td></tr><tr><td colspan="4" id="barcode-la-progress" style="padding:8px;background:#f9f9f9;font-size:12px;"></td></tr>';
+                    html += '<tr><th colspan="4" id="barcode-aux-header" style="background:#f8f8f8;">Barcode AUX <span id="barcode-aux-badges"></span><span id="barcode-aux-buttons" style="float:right;"></span></th></tr><tr><td colspan="4" id="barcode-aux-list">Loading...</td></tr><tr><td colspan="4" id="barcode-aux-progress" style="padding:8px;background:#f9f9f9;font-size:12px;"></td></tr>';
                 }
                 return html;
             }
@@ -5094,6 +5323,7 @@
                     success: function(data) {
                         // Ambil proses dari modal atau card agar renderBarcodeGrid tidak error (realtime via WebSocket)
                         const proses = $('#modalDetailProses').data('proses') || $('.status-card[data-proses-id="' + prosesId + '"]').data('proses') || {};
+                        const barcodeKainOptionalLoad = data.barcode_kain_optional === true;
                         function updateGDAIndicatorsLocal(pid, detailId, hasKain, hasLa, hasAux) {
                             let $targets = $(`.status-card[data-proses-id="${pid}"] .op-row[data-detail-id="${detailId}"]`);
                             if (!$targets.length) $targets = $(`.status-card[data-proses-id="${pid}"]`);
@@ -5101,13 +5331,15 @@
                                 const $card = $(this);
                                 const pData = $card.data('proses');
                                 if (!pData || pData.jenis === 'Maintenance') return;
-                                const firstBlock = (pData.mode === 'finish') ? 'F' : 'G';
                                 function setBlockColor(blockType, ok) {
                                     const $block = $card.find('.gda-block[data-block-type="' + blockType + '"]');
                                     if (!$block.length) return;
                                     $block.css({ background: ok ? '#d4f8e8' : '#ffb3b3', borderColor: ok ? '#43a047' : '#c62828' });
                                 }
-                                setBlockColor(firstBlock, !!hasKain);
+                                if (!(pData.barcode_kain_optional === true)) {
+                                    const firstBlock = (pData.mode === 'finish') ? 'F' : 'G';
+                                    setBlockColor(firstBlock, !!hasKain);
+                                }
                                 setBlockColor('D', !!hasLa);
                                 setBlockColor('A', !!hasAux);
                             });
@@ -5128,9 +5360,62 @@
                             h += '</div>';
                             return h;
                         }
-                            $('#barcode-kain-list').html(renderBarcodeGrid(data.barcode_kain, 'kain', prosesId));
+                            if (!barcodeKainOptionalLoad && $('#barcode-kain-list').length) {
+                                $('#barcode-kain-list').html(renderBarcodeGrid(data.barcode_kain, 'kain', prosesId));
+                            }
                             $('#barcode-la-list').html(renderBarcodeGrid(data.barcode_la, 'la', prosesId));
                             $('#barcode-aux-list').html(renderBarcodeGrid(data.barcode_aux, 'aux', prosesId));
+
+                        const userRoleLocal = window.userRole || '';
+                        const canRequestLa = data.can_request_topping_la && (userRoleLocal === 'kepala_ruangan' || userRoleLocal === 'super_admin');
+                        const canRequestAux = data.can_request_topping_aux && (userRoleLocal === 'kepala_ruangan' || userRoleLocal === 'super_admin');
+                        const canScanLa = data.can_scan_la === true;
+                        const canScanAux = data.can_scan_aux === true;
+                        const approvedToppingLaLocal = data.approved_topping_la || null;
+                        const approvedToppingAuxLocal = data.approved_topping_aux || null;
+                        const isMultipleOpLocal = data.is_multiple_op === true;
+                        const detailIdAttrLocal = selectedDetailId ? (selectedDetailId + '') : '';
+                        const reqToppingTitleLocal = isMultipleOpLocal ? 'Request Topping untuk semua OP. Kepala Shift hanya perlu approve sekali.' : '';
+                        let laBadgesLocal = '';
+                        if (data.pending_topping_la) laBadgesLocal += ' <span class="badge badge-warning" title="Topping Dyes - Menunggu approval">TD</span>';
+                        let laBtnsLocal = '';
+                        if (canRequestLa) laBtnsLocal += ' <button type="button" class="btn btn-sm btn-info request-topping-btn mr-1" data-type="la" data-id="' + prosesId + '" title="' + reqToppingTitleLocal + '"><i class="fas fa-plus"></i> Request Topping' + (isMultipleOpLocal ? ' (semua OP)' : '') + '</button>';
+                        if (canScanLa) {
+                            const approvalAttrLocal = approvedToppingLaLocal ? ' data-approval-id="' + approvedToppingLaLocal.id + '"' : '';
+                            laBtnsLocal += ' <button type="button" class="btn btn-sm btn-success scan-barcode-btn" data-barcode="barcode_la" data-id="' + prosesId + '" data-detail-id="' + detailIdAttrLocal + '"' + approvalAttrLocal + '><i class="fas fa-barcode"></i> ' + (approvedToppingLaLocal ? 'Scan (Topping)' : 'Scan') + '</button>';
+                        }
+                        $('#barcode-la-badges').html(laBadgesLocal);
+                        $('#barcode-la-buttons').html(laBtnsLocal);
+                        let auxBadgesLocal = '';
+                        if (data.pending_topping_aux) auxBadgesLocal += ' <span class="badge badge-warning" title="Topping Auxiliaries - Menunggu approval">TA</span>';
+                        let auxBtnsLocal = '';
+                        if (canRequestAux) auxBtnsLocal += ' <button type="button" class="btn btn-sm btn-info request-topping-btn mr-1" data-type="aux" data-id="' + prosesId + '" title="' + reqToppingTitleLocal + '"><i class="fas fa-plus"></i> Request Topping' + (isMultipleOpLocal ? ' (semua OP)' : '') + '</button>';
+                        if (canScanAux) {
+                            const approvalAttrAuxLocal = approvedToppingAuxLocal ? ' data-approval-id="' + approvedToppingAuxLocal.id + '"' : '';
+                            auxBtnsLocal += ' <button type="button" class="btn btn-sm btn-success scan-barcode-btn" data-barcode="barcode_aux" data-id="' + prosesId + '" data-detail-id="' + detailIdAttrLocal + '"' + approvalAttrAuxLocal + '><i class="fas fa-barcode"></i> ' + (approvedToppingAuxLocal ? 'Scan (Topping)' : 'Scan') + '</button>';
+                        }
+                        $('#barcode-aux-badges').html(auxBadgesLocal);
+                        $('#barcode-aux-buttons').html(auxBtnsLocal);
+
+                        // Progress LA & AUX
+                        const laProgressLocal = data.la_progress || {};
+                        const laReqLocal = laProgressLocal.required ?? 1;
+                        const laScnLocal = laProgressLocal.scanned ?? 0;
+                        const laCompleteLocal = laProgressLocal.is_complete === true;
+                        const laToppingReqLocal = laProgressLocal.topping_required ?? 0;
+                        let laProgressHtmlLocal = laToppingReqLocal > 0 ?
+                            'Kebutuhan: 1 awal + ' + laToppingReqLocal + ' topping (TD) = ' + laReqLocal + ' total | Sudah: ' + laScnLocal + ' | ' + (laCompleteLocal ? '<span style="color:#43a047;"><i class="fas fa-check"></i> Lengkap</span>' : '<span style="color:#c62828;">Kurang: ' + (laReqLocal - laScnLocal) + '</span>') :
+                            'Kebutuhan: 1 awal | Sudah: ' + laScnLocal + ' | ' + (laCompleteLocal ? '<span style="color:#43a047;"><i class="fas fa-check"></i> Lengkap</span>' : '<span style="color:#c62828;">Kurang: ' + (1 - laScnLocal) + '</span>');
+                        $('#barcode-la-progress').html('<div style="padding:4px 8px;background:' + (laCompleteLocal ? '#e8f5e9' : '#fff3e0') + ';border-radius:4px;">' + laProgressHtmlLocal + '</div>').show();
+                        const auxProgressLocal = data.aux_progress || {};
+                        const auxReqLocal = auxProgressLocal.required ?? 1;
+                        const auxScnLocal = auxProgressLocal.scanned ?? 0;
+                        const auxCompleteLocal = auxProgressLocal.is_complete === true;
+                        const auxToppingReqLocal = auxProgressLocal.topping_required ?? 0;
+                        let auxProgressHtmlLocal = auxToppingReqLocal > 0 ?
+                            'Kebutuhan: 1 awal + ' + auxToppingReqLocal + ' topping (TA) = ' + auxReqLocal + ' total | Sudah: ' + auxScnLocal + ' | ' + (auxCompleteLocal ? '<span style="color:#43a047;"><i class="fas fa-check"></i> Lengkap</span>' : '<span style="color:#c62828;">Kurang: ' + (auxReqLocal - auxScnLocal) + '</span>') :
+                            'Kebutuhan: 1 awal | Sudah: ' + auxScnLocal + ' | ' + (auxCompleteLocal ? '<span style="color:#43a047;"><i class="fas fa-check"></i> Lengkap</span>' : '<span style="color:#c62828;">Kurang: ' + (1 - auxScnLocal) + '</span>');
+                        $('#barcode-aux-progress').html('<div style="padding:4px 8px;background:' + (auxCompleteLocal ? '#e8f5e9' : '#fff3e0') + ';border-radius:4px;">' + auxProgressHtmlLocal + '</div>').show();
 
                         const selectedProgress = data.barcode_kain_progress || [];
                         const allProgress = data.all_barcode_kain_progress || [];
@@ -5146,8 +5431,7 @@
                             });
                             progressHtml += '</div>';
                         }
-                        const barcodeKainOptionalLocal = data.barcode_kain_optional === true;
-                        if (barcodeKainOptionalLocal) {
+                        if (barcodeKainOptionalLoad) {
                             const hintHtmlLocal = '<div style="padding:6px 8px;background:#e3f2fd;border-radius:4px;margin-bottom:8px;font-size:12px;color:#1565c0;"><i class="fas fa-info-circle"></i> <strong>Proses ini hanya wajib Barcode LA &amp; AUX (D &amp; A).</strong> Barcode Kain (G/F) tidak wajib.</div>';
                             progressHtml = hintHtmlLocal + progressHtml;
                         } else if (allProgress.length > 0) {
@@ -5160,23 +5444,35 @@
                                 progressHtml = '<div style="padding:4px 0;background:#ffebee;border-radius:4px;margin-bottom:8px;">' + progressHtml + '<div style="padding:4px 0;background:#ffebee;border-radius:4px;margin-top:8px;"><strong style="color:#c62828;"><i class="fas fa-exclamation-triangle"></i> ' + completeCount + ' dari ' + totalDetails + ' Detail OP Lengkap</strong><br><span style="color:#c62828;font-size:12px;">Semua Detail OP harus lengkap sebelum scan Barcode LA & AUX.</span></div>';
                             }
                         }
-                        $('#barcode-kain-progress').html(progressHtml);
-                        const canScanLaAux = data.can_scan_la_aux !== false;
-                        const $btnScanLa = $('#btn-scan-la');
-                        const $btnScanAux = $('#btn-scan-aux');
-                        if (!canScanLaAux) {
-                            let tooltipMsg = 'Tidak dapat scan. ';
-                            if (incompleteDetails.length > 0) {
-                                tooltipMsg += 'Detail OP belum lengkap: ';
-                                tooltipMsg += incompleteDetails.map(function(d) { return 'OP ' + d.no_op + ' (kurang ' + d.remaining + ' roll)'; }).join(', ');
+                        if ($('#barcode-kain-progress').length) {
+                            $('#barcode-kain-progress').html(progressHtml);
+                        }
+                        const $btnScanKainLocal = $('#btn-scan-kain');
+                        if ($btnScanKainLocal.length) {
+                            const allProgressLocal = data.all_barcode_kain_progress || [];
+                            const allRollCompleteLocal = allProgressLocal.length > 0 && allProgressLocal.every(function(p) { return p.is_complete; });
+                            if (allRollCompleteLocal) {
+                                $btnScanKainLocal.prop('disabled', true).removeClass('btn-success').addClass('btn-secondary').css('cursor', 'not-allowed').attr('title', 'Barcode kain sudah lengkap sesuai roll');
                             } else {
-                                tooltipMsg += 'Pastikan semua barcode kain sudah memenuhi jumlah roll terlebih dahulu.';
+                                $btnScanKainLocal.prop('disabled', false).removeClass('btn-secondary').addClass('btn-success').css('cursor', 'pointer').removeAttr('title');
                             }
-                            $btnScanLa.prop('disabled', true).removeClass('btn-success').addClass('btn-secondary').css('cursor', 'not-allowed').attr('title', tooltipMsg);
-                            $btnScanAux.prop('disabled', true).removeClass('btn-success').addClass('btn-secondary').css('cursor', 'not-allowed').attr('title', tooltipMsg);
-                        } else {
-                            $btnScanLa.prop('disabled', false).removeClass('btn-secondary').addClass('btn-success').css('cursor', 'pointer').removeAttr('title');
-                            $btnScanAux.prop('disabled', false).removeClass('btn-secondary').addClass('btn-success').css('cursor', 'pointer').removeAttr('title');
+                        }
+                        const canScanLaAuxLocal = data.can_scan_la_aux !== false;
+                        const $btnScanLaLocal = $('#barcode-la-buttons .scan-barcode-btn');
+                        const $btnScanAuxLocal = $('#barcode-aux-buttons .scan-barcode-btn');
+                        if ($btnScanLaLocal.length) {
+                            if (!canScanLaAuxLocal || laCompleteLocal) {
+                                $btnScanLaLocal.prop('disabled', true).removeClass('btn-success').addClass('btn-secondary').css('cursor', 'not-allowed').attr('title', laCompleteLocal ? 'Barcode LA sudah lengkap sesuai kebutuhan' : 'Detail OP belum lengkap');
+                            } else {
+                                $btnScanLaLocal.prop('disabled', false).removeClass('btn-secondary').addClass('btn-success').css('cursor', 'pointer').removeAttr('title');
+                            }
+                        }
+                        if ($btnScanAuxLocal.length) {
+                            if (!canScanLaAuxLocal || auxCompleteLocal) {
+                                $btnScanAuxLocal.prop('disabled', true).removeClass('btn-success').addClass('btn-secondary').css('cursor', 'not-allowed').attr('title', auxCompleteLocal ? 'Barcode AUX sudah lengkap sesuai kebutuhan' : 'Detail OP belum lengkap');
+                            } else {
+                                $btnScanAuxLocal.prop('disabled', false).removeClass('btn-secondary').addClass('btn-success').css('cursor', 'pointer').removeAttr('title');
+                            }
                         }
                         const hasKainActive = data.can_scan_la_aux === true;
                         const hasLaActive = (data.barcode_la || []).some(function(bk) { return !bk.cancel; });
@@ -5184,15 +5480,20 @@
                         updateGDAIndicatorsLocal(prosesId, selectedDetailId, hasKainActive, hasLaActive, hasAuxActive);
                     },
                     error: function() {
-                        $('#barcode-kain-list').html('<span style="color:#888;">Belum ada barcode kain.</span>');
-                        $('#barcode-kain-progress').html('');
+                        if ($('#barcode-kain-list').length) $('#barcode-kain-list').html('<span style="color:#888;">Belum ada barcode kain.</span>');
+                        if ($('#barcode-kain-progress').length) $('#barcode-kain-progress').html('');
                         $('#barcode-la-list').html('<span style="color:#888;">Belum ada barcode LA.</span>');
                         $('#barcode-aux-list').html('<span style="color:#888;">Belum ada barcode AUX.</span>');
-                        $('#btn-scan-la').prop('disabled', true).removeClass('btn-success').addClass('btn-secondary').css('cursor', 'not-allowed');
-                        $('#btn-scan-aux').prop('disabled', true).removeClass('btn-success').addClass('btn-secondary').css('cursor', 'not-allowed');
+                        $('#barcode-la-badges').html('');
+                        $('#barcode-la-buttons').html('');
+                        $('#barcode-la-progress').html('');
+                        $('#barcode-aux-badges').html('');
+                        $('#barcode-aux-buttons').html('');
+                        $('#barcode-aux-progress').html('');
                     }
                 });
             }
+            window.loadBarcodesIntoDetailModal = loadBarcodesIntoDetailModal;
 
             // Refresh modal detail proses jika sedang terbuka untuk proses ini (setelah approval FM/VP disetujui)
             function refreshDetailModalIfOpen(prosesId, statusData, prosesFromCard) {
@@ -5267,8 +5568,10 @@
                     '#002b80': 'linear-gradient(180deg, #6dd5ed 0%, #2193b0 60%, #002b80 100%)',
                     // Hijau (selesai normal)
                     '#00c853': 'linear-gradient(180deg, #b2f7c1 0%, #56ab2f 60%, #378a1b 100%)',
-                    // Merah (selesai overtime atau barcode belum lengkap)
-                    '#e53935': 'linear-gradient(180deg, #ffb3b3 0%, #e53935 60%, #b71c1c 100%)'
+                    // Merah tua (proses selesai dengan masalah: overtime/durasi singkat) - solid
+                    '#e53935': '#e53935',
+                    // Merah muda (proses berjalan dengan barcode belum lengkap) - solid
+                    '#ef9a9a': '#ef9a9a'
                 };
                 return gradientMap[bg] || gradientMap['#757575'];
             }
@@ -5283,7 +5586,7 @@
                 if (historyContainer.length === 0) {
                     const $prosesAktifContainer = $dropzone.find('.proses-aktif-container').first();
                     const newHistoryWrapper = $(`
-                    <div class="proses-history-wrapper" data-mesin-id="${mesinId}" style="margin-bottom: 8px;">
+                    <div class="proses-history-wrapper" data-section="history" data-mesin-id="${mesinId}" style="margin-bottom: 8px;">
                         <button class="btn-toggle-history btn btn-sm btn-secondary" 
                                 data-mesin-id="${mesinId}" type="button">
                             <i class="fas fa-history"></i> Tampilkan History
@@ -5313,6 +5616,7 @@
                 const count = historyContainer.find('.status-card').length;
                 $(`.btn-toggle-history[data-mesin-id="${mesinId}"]`)
                     .html(`<i class="fas fa-history"></i> Tampilkan History (${count})`);
+                if (typeof window.applyDashboardMode === 'function') window.applyDashboardMode();
             }
 
             // Fungsi untuk reorder card berdasarkan order
@@ -5383,6 +5687,7 @@
                 if (!prosesData || prosesData.jenis === 'Maintenance') {
                     return; // Tidak ada G/D/A atau F/D/A untuk Maintenance
                 }
+                const barcodeKainOptGlobal = prosesData.barcode_kain_optional === true;
                 const firstBlock = (prosesData.mode === 'finish') ? 'F' : 'G';
 
                 // Fungsi helper untuk set warna blok GDA/FDA
@@ -5408,7 +5713,7 @@
                 // Jika detailId tidak ada atau kosong, update GDA/FDA di header card (untuk single OP atau OP pertama)
                 if (!detailIdStr || detailIdStr === '' || detailIdStr === 'null' || detailIdStr === 'undefined') {
                     console.log('Updating blocks in header card (no detailId)');
-                    setBlockColor($card, firstBlock, !!hasKain);
+                    if (!barcodeKainOptGlobal) setBlockColor($card, firstBlock, !!hasKain);
                     setBlockColor($card, 'D', !!hasLa);
                     setBlockColor($card, 'A', !!hasAux);
                     return;
@@ -5429,7 +5734,7 @@
                 if (isFirstOp) {
                     // OP pertama: update blok di header card
                     console.log('Updating blocks in header card (first OP), detailId:', detailIdStr);
-                    setBlockColor($card, firstBlock, !!hasKain);
+                    if (!barcodeKainOptGlobal) setBlockColor($card, firstBlock, !!hasKain);
                     setBlockColor($card, 'D', !!hasLa);
                     setBlockColor($card, 'A', !!hasAux);
                 } else if ($opRow.length) {
@@ -5459,20 +5764,20 @@
                     
                     if ($gdaContainer && $gdaContainer.length) {
                         console.log('Updating blocks in container for OP:', detailIdStr);
-                        setBlockColor($gdaContainer, firstBlock, !!hasKain);
+                        if (!barcodeKainOptGlobal) setBlockColor($gdaContainer, firstBlock, !!hasKain);
                         setBlockColor($gdaContainer, 'D', !!hasLa);
                         setBlockColor($gdaContainer, 'A', !!hasAux);
                     } else {
                         // Fallback: update di header card jika container tidak ditemukan
                         console.log('Block container not found, updating in header card as fallback');
-                        setBlockColor($card, firstBlock, !!hasKain);
+                        if (!barcodeKainOptGlobal) setBlockColor($card, firstBlock, !!hasKain);
                         setBlockColor($card, 'D', !!hasLa);
                         setBlockColor($card, 'A', !!hasAux);
                     }
                 } else {
                     // Jika OP row tidak ditemukan, update di header card sebagai fallback
                     console.log('OP row not found, updating in header card as fallback. detailId:', detailIdStr);
-                    setBlockColor($card, firstBlock, !!hasKain);
+                    if (!barcodeKainOptGlobal) setBlockColor($card, firstBlock, !!hasKain);
                     setBlockColor($card, 'D', !!hasLa);
                     setBlockColor($card, 'A', !!hasAux);
                 }
@@ -5933,6 +6238,59 @@
                     console.warn('No gda_details in statusData:', statusData);
                 }
 
+                // Update TD/TA indicators dan D/A blocks dengan la_complete, aux_complete
+                // Untuk multiple OP: update semua .topping-td/.topping-ta dalam card (header + per OP)
+                if (statusData.has_topping_la !== undefined || statusData.has_topping_aux !== undefined ||
+                    statusData.td_color !== undefined || statusData.ta_color !== undefined ||
+                    statusData.la_complete !== undefined || statusData.aux_complete !== undefined ||
+                    statusData.la_initial_complete !== undefined || statusData.aux_initial_complete !== undefined) {
+                    const $header = $card.find('.card-header > div:nth-child(2)');
+                    const $gdaContainers = $card.find('.op-list > div:has(.gda-block)');
+                    const getTdStyle = (c) => c === 'yellow' ? 'background:#fff9c4;color:#111;border:2.5px solid #f9a825' : (c === 'red' ? 'background:#ffb3b3;color:#111;border:2.5px solid #c62828' : (c === 'green' ? 'background:#d4f8e8;color:#111;border:2.5px solid #43a047' : ''));
+                    if (statusData.has_topping_la && statusData.td_color) {
+                        const style = getTdStyle(statusData.td_color);
+                        const title = statusData.td_color === 'yellow' ? 'Menunggu approval' : (statusData.td_color === 'red' ? 'Menunggu scan barcode' : 'Lengkap');
+                        const tdHtml = '<span class="topping-indicator topping-td" data-block-type="TD" title="Topping Dyes - ' + title + '" style="display: inline-block; ' + style + '; font-weight: bold; font-size: 18px; padding: 2px 8px; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.10); letter-spacing: 1px;">TD</span>';
+                        let $tdAll = $card.find('.topping-td');
+                        if ($tdAll.length) {
+                            $tdAll.attr('style', 'display: inline-block; ' + style + '; font-weight: bold; font-size: 18px; padding: 2px 8px; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.10); letter-spacing: 1px;').attr('title', 'Topping Dyes - ' + title);
+                        } else {
+                            $header.append(tdHtml);
+                            $gdaContainers.each(function() { if (!$(this).find('.topping-td').length) $(this).append(tdHtml); });
+                        }
+                    } else if (!statusData.has_topping_la) {
+                        $card.find('.topping-td').remove();
+                    }
+                    if (statusData.has_topping_aux && statusData.ta_color) {
+                        const style = getTdStyle(statusData.ta_color);
+                        const title = statusData.ta_color === 'yellow' ? 'Menunggu approval' : (statusData.ta_color === 'red' ? 'Menunggu scan barcode' : 'Lengkap');
+                        const taHtml = '<span class="topping-indicator topping-ta" data-block-type="TA" title="Topping Auxiliaries - ' + title + '" style="display: inline-block; ' + style + '; font-weight: bold; font-size: 18px; padding: 2px 8px; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.10); letter-spacing: 1px;">TA</span>';
+                        let $taAll = $card.find('.topping-ta');
+                        if ($taAll.length) {
+                            $taAll.attr('style', 'display: inline-block; ' + style + '; font-weight: bold; font-size: 18px; padding: 2px 8px; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.10); letter-spacing: 1px;').attr('title', 'Topping Auxiliaries - ' + title);
+                        } else {
+                            $header.append(taHtml);
+                            $gdaContainers.each(function() { if (!$(this).find('.topping-ta').length) $(this).append(taHtml); });
+                        }
+                    } else if (!statusData.has_topping_aux) {
+                        $card.find('.topping-ta').remove();
+                    }
+                    if (statusData.la_initial_complete !== undefined || statusData.aux_initial_complete !== undefined ||
+                        statusData.la_complete !== undefined || statusData.aux_complete !== undefined) {
+                        const laD = statusData.la_initial_complete !== undefined ? statusData.la_initial_complete : statusData.la_complete;
+                        const auxA = statusData.aux_initial_complete !== undefined ? statusData.aux_initial_complete : statusData.aux_complete;
+                        const $blocks = $card.find('.gda-block');
+                        $blocks.each(function() {
+                            const t = $(this).data('block-type');
+                            if (t === 'D' && laD !== undefined) {
+                                $(this).css({ background: laD ? '#d4f8e8' : '#ffb3b3', borderColor: laD ? '#43a047' : '#c62828' });
+                            } else if (t === 'A' && auxA !== undefined) {
+                                $(this).css({ background: auxA ? '#d4f8e8' : '#ffb3b3', borderColor: auxA ? '#43a047' : '#c62828' });
+                            }
+                        });
+                    }
+                }
+
                 // Reorder jika order berubah dan proses masih pending
                 if (!proses.selesai && !proses.mulai && statusData.order !== undefined) {
                     const newOrder = parseInt(statusData.order || 0);
@@ -6118,6 +6476,8 @@
                 
                 if (row) {
                     $item.find('[name*="[item_op]"]').val(row.item_op || '');
+                    $item.find('[name*="[customer]"]').val(row.customer || row.Customer || '');
+                    $item.find('[name*="[marketing]"]').val(row.marketing || row.Marketing || '');
                     $item.find('[name*="[kode_material]"]').val(row.kode_material || '');
                     $item.find('[name*="[konstruksi]"]').val(row.konstruksi || '');
                     $item.find('[name*="[gramasi]"]').val(row.gramasi || '');
@@ -6357,13 +6717,18 @@
                 $('#proses_mode').val(mode);
                 $('#modalProsesLabel').text(mode === 'finish' ? 'Tambah Proses (Finish)' : 'Tambah Proses (Greige)');
                 var $produksi = $('#jenis-option-produksi');
+                var $maintenance = $('#jenis-option-maintenance');
                 var $reproses = $('#jenis-option-reproses');
                 if (mode === 'finish') {
                     $produksi.prop('disabled', true).hide();
+                    $maintenance.prop('disabled', true).hide();
                     $reproses.prop('disabled', false).show();
-                    if ($('#jenis').val() === 'Produksi') { $('#jenis').val('Maintenance'); }
+                    if ($('#jenis').val() === 'Produksi' || $('#jenis').val() === 'Maintenance') {
+                        $('#jenis').val('Reproses');
+                    }
                 } else {
                     $produksi.prop('disabled', false).show();
+                    $maintenance.prop('disabled', false).show();
                     $reproses.prop('disabled', false).show();
                 }
                 toggleReprocessHint();
@@ -6600,17 +6965,10 @@
             });
         });
 
-        // Helper function untuk notifikasi Swal Toast
+        // Helper function untuk notifikasi Swal Toast (tetap muncul hingga user tutup)
         function showToastNotification(type, message) {
-            const Toast = Swal.mixin({
-                toast: true,
-                position: 'top-end',
-                icon: type,
-                showConfirmButton: false,
-                timer: 3000,
-                timerProgressBar: true,
-            });
-            Toast.fire({
+            const toastMixin = type === 'success' ? window.ToastSuccess : window.ToastError;
+            toastMixin.fire({
                 title: message
             });
         }
@@ -6808,6 +7166,7 @@
                                             html += '</div>';
                                             return html;
                                         }
+                                        const barcodeKainOptionalRefresh = data.barcode_kain_optional === true;
                                         // Helper untuk update warna blok G, D, A di card utama setelah perubahan barcode
                                         function updateGDAIndicators(prosesId, detailId, hasKain, hasLa, hasAux) {
                                             let $targets = $(`.status-card[data-proses-id="${prosesId}"] .op-row[data-detail-id="${detailId}"]`);
@@ -6819,7 +7178,7 @@
                                             $targets.each(function() {
                                                 const $card = $(this);
                                                 const prosesData = $card.data('proses');
-                                                const firstBlock = (prosesData && prosesData.mode === 'finish') ? 'F' : 'G';
+                                                if (!prosesData || prosesData.jenis === 'Maintenance') return;
 
                                                 function setBlockColor(blockType, ok) {
                                                     const $block = $card.find(
@@ -6835,16 +7194,21 @@
                                                     });
                                                 }
 
-                                                setBlockColor(firstBlock, !!hasKain);
+                                                if (!(prosesData.barcode_kain_optional === true)) {
+                                                    const firstBlock = (prosesData && prosesData.mode === 'finish') ? 'F' : 'G';
+                                                    setBlockColor(firstBlock, !!hasKain);
+                                                }
                                                 setBlockColor('D', !!hasLa);
                                                 setBlockColor('A', !!hasAux);
                                             });
                                         }
 
                                             // Render ulang list barcode di modal
-                                            $('#barcode-kain-list').html(renderBarcodeGrid(data
-                                                .barcode_kain, 'kain',
-                                                currentProsesForRefresh));
+                                            if (!barcodeKainOptionalRefresh && $('#barcode-kain-list').length) {
+                                                $('#barcode-kain-list').html(renderBarcodeGrid(data
+                                                    .barcode_kain, 'kain',
+                                                    currentProsesForRefresh));
+                                            }
                                             $('#barcode-la-list').html(renderBarcodeGrid(data
                                                 .barcode_la, 'la',
                                                 currentProsesForRefresh));
@@ -6880,7 +7244,6 @@
                                         }
                                         
                                         // Tampilkan status keseluruhan (untuk validasi scan LA/AUX)
-                                        const barcodeKainOptionalRefresh = data.barcode_kain_optional === true;
                                         if (barcodeKainOptionalRefresh) {
                                             const hintHtmlRefresh = '<div style="padding:6px 8px;background:#e3f2fd;border-radius:4px;margin-bottom:8px;font-size:12px;color:#1565c0;"><i class="fas fa-info-circle"></i> <strong>Proses ini hanya wajib Barcode LA &amp; AUX (D &amp; A).</strong> Barcode Kain (G/F) tidak wajib.</div>';
                                             progressHtml = hintHtmlRefresh + progressHtml;
@@ -6903,13 +7266,24 @@
                                                 progressHtml += '</div>';
                                             }
                                         }
-                                        $('#barcode-kain-progress').html(progressHtml);
+                                        if ($('#barcode-kain-progress').length) {
+                                            $('#barcode-kain-progress').html(progressHtml);
+                                        }
 
-                                        // Enable/disable tombol scan LA dan AUX berdasarkan status progress SEMUA detail
+                                        // Barcode dapat ditambahkan kapanpun; LA/AUX memerlukan barcode kain lengkap
                                         const canScanLaAux = data.can_scan_la_aux !== false;
-                                        const $btnScanLa = $('#btn-scan-la');
-                                        const $btnScanAux = $('#btn-scan-aux');
-                                        
+                                        const $btnScanKain = $('#btn-scan-kain');
+                                        const $btnScanLa = $('#barcode-la-buttons .scan-barcode-btn');
+                                        const $btnScanAux = $('#barcode-aux-buttons .scan-barcode-btn');
+                                        if ($btnScanKain.length) {
+                                            const allProgressRefresh = data.all_barcode_kain_progress || [];
+                                            const allRollCompleteRefresh = allProgressRefresh.length > 0 && allProgressRefresh.every(p => p.is_complete);
+                                            if (allRollCompleteRefresh) {
+                                                $btnScanKain.prop('disabled', true).removeClass('btn-success').addClass('btn-secondary').css('cursor', 'not-allowed').attr('title', 'Barcode kain sudah lengkap sesuai roll');
+                                            } else {
+                                                $btnScanKain.prop('disabled', false).removeClass('btn-secondary').addClass('btn-success').css('cursor', 'pointer').removeAttr('title');
+                                            }
+                                        }
                                         if (!canScanLaAux) {
                                             let tooltipMsg = 'Tidak dapat scan. ';
                                             if (incompleteDetails.length > 0) {
@@ -7056,8 +7430,9 @@
             });
         });
 
-        // Toggle history per mesin
+        // Toggle history per mesin (hanya berlaku di Mode Produksi)
         $(document).on('click', '.btn-toggle-history', function() {
+            if (window.dashboardViewMode === 'history') return;
             const mesinId = $(this).data('mesin-id');
             const historyContainer = $(`#history-${mesinId}`);
             const btn = $(this);
@@ -7073,6 +7448,58 @@
                 btn.html(`<i class="fas fa-chevron-up"></i> Sembunyikan History`);
             }
         });
+
+        // Toggle Mode Produksi / History
+        (function() {
+            const MODE_KEY = 'dashboard_view_mode';
+
+            function getMode() {
+                return localStorage.getItem(MODE_KEY) || 'produksi';
+            }
+            function setMode(mode) {
+                localStorage.setItem(MODE_KEY, mode);
+                window.dashboardViewMode = mode;
+            }
+
+            function applyMode(mode) {
+                const isProduksi = mode === 'produksi';
+
+                $('[data-section="produksi"]').css('display', isProduksi ? '' : 'none');
+                $('[data-section="history"]').each(function() {
+                    const $wrapper = $(this);
+                    const $container = $wrapper.find('.proses-history-container');
+                    const $btn = $wrapper.find('.btn-toggle-history');
+                    if (isProduksi) {
+                        $wrapper.hide();
+                    } else {
+                        $wrapper.show();
+                        $btn.hide();
+                        $container.show();
+                    }
+                });
+
+                $('#mode-produksi-btn, #mode-history-btn').removeClass('active btn-primary btn-outline-primary btn-outline-secondary')
+                    .addClass('btn-outline-secondary');
+                if (isProduksi) {
+                    $('#mode-produksi-btn').addClass('active btn-primary').removeClass('btn-outline-secondary');
+                } else {
+                    $('#mode-history-btn').addClass('active btn-primary').removeClass('btn-outline-secondary');
+                }
+            }
+
+            $('#mode-produksi-btn, #mode-history-btn').on('click', function() {
+                const mode = $(this).data('mode');
+                setMode(mode);
+                applyMode(mode);
+            });
+
+            window.dashboardViewMode = getMode();
+            applyMode(window.dashboardViewMode);
+
+            window.applyDashboardMode = function() {
+                applyMode(getMode());
+            };
+        })();
     </script>
 
 @endsection

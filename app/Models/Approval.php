@@ -67,4 +67,20 @@ class Approval extends Model
     {
         return $this->belongsTo(User::class, 'approved_by');
     }
+
+    /**
+     * Relasi ke BarcodeLa (untuk topping LA).
+     */
+    public function barcodeLas()
+    {
+        return $this->hasMany(BarcodeLa::class);
+    }
+
+    /**
+     * Relasi ke BarcodeAux (untuk topping AUX).
+     */
+    public function barcodeAuxs()
+    {
+        return $this->hasMany(BarcodeAux::class);
+    }
 }

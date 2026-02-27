@@ -17,7 +17,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
     // Dashboard: Semua role bisa akses kecuali aux
-    Route::middleware('role:super_admin,ds,mesin,ppic,fm,vp,owner')->group(function () {
+    Route::middleware('role:super_admin,ds,mesin,ppic,fm,vp,owner,kepala_ruangan,kepala_shift')->group(function () {
         Route::get('/dashboard', [DashboardController::class, 'dashboard'])->name('dashboard');
         Route::get('/dashboard/proses-statuses', [DashboardController::class, 'prosesStatuses'])->name('dashboard.proses-statuses');
     });
@@ -69,19 +69,27 @@ Route::middleware(['auth'])->group(function () {
     });
 
     Route::middleware('role:super_admin,mesin,ppic')->group(function () {
-        // Tambah barcode
+        // Tambah barcode (mesin hanya barcode kain; LA/AUX: ppic, super_admin, kepala_ruangan)
         Route::post('/proses/{id}/barcode/kain', [ProsesController::class, 'barcodeKain'])->name('proses.barcode.kain');
+    });
+    Route::middleware('role:super_admin,ppic,kepala_ruangan')->group(function () {
         Route::post('/proses/{id}/barcode/la', [ProsesController::class, 'barcodeLa'])->name('proses.barcode.la');
         Route::post('/proses/{id}/barcode/aux', [ProsesController::class, 'barcodeAux'])->name('proses.barcode.aux');
     });
 
+    // Request topping LA/AUX (Kepala Ruangan)
+    Route::middleware('role:super_admin,kepala_ruangan')->group(function () {
+        Route::post('/proses/{id}/topping/la/request', [ProsesController::class, 'requestToppingLa'])->name('proses.topping.la.request');
+        Route::post('/proses/{id}/topping/aux/request', [ProsesController::class, 'requestToppingAux'])->name('proses.topping.aux.request');
+    });
+
     // View barcode: SuperAdmin, DS, Mesin, PPIC, FM, VP, Owner (untuk melihat barcode yang sudah ditambahkan)
-    Route::middleware('role:super_admin,ds,mesin,ppic,fm,vp,owner')->group(function () {
+    Route::middleware('role:super_admin,ds,mesin,ppic,fm,vp,kepala_ruangan,kepala_shift,owner')->group(function () {
         Route::get('/proses/{id}/barcodes', [ProsesController::class, 'barcodes'])->name('proses.barcodes');
     });
 
     // Cancel barcode: SuperAdmin, PPIC
-    Route::middleware('role:super_admin,ppic')->group(function () {
+    Route::middleware('role:super_admin,ppic,kepala_shift')->group(function () {
         Route::post('/proses/{proses}/barcode/{type}/{barcode}/cancel', [ProsesController::class, 'cancelBarcode']);
     });
 
@@ -97,8 +105,11 @@ Route::middleware(['auth'])->group(function () {
     Route::middleware('role:super_admin,vp')->group(function () {
         Route::get('/approval/vp', [ApprovalController::class, 'approval_vp'])->name('approval.vp');
     });
+    Route::middleware('role:super_admin,kepala_shift')->group(function () {
+        Route::get('/approval/kepala_shift', [ApprovalController::class, 'approval_kepala_shift'])->name('approval.kepala_shift');
+    });
     // Ubah status approval hanya oleh SuperAdmin, FM, VP
-    Route::middleware('role:super_admin,fm,vp')->group(function () {
+    Route::middleware('role:super_admin,fm,vp,kepala_shift')->group(function () {
         Route::post('/approval/status', [ApprovalController::class, 'approval_status'])->name('approval.status');
     });
 
@@ -123,8 +134,10 @@ Route::middleware(['auth'])->group(function () {
 });
 
 // Tambahkan di luar middleware auth agar bisa diakses select2
-Route::post('/api/proxy-op', [App\Http\Controllers\ProsesController::class, 'proxyOpSearch']);
+Route::post('/api/proxy-op', [ProsesController::class, 'proxyOpSearch']);
 // Tambahkan route API proxy auxiliary untuk select2
-Route::post('/api/proxy-auxiliary', [\App\Http\Controllers\AuxlController::class, 'proxyAuxiliary']);
+Route::post('/api/proxy-auxiliary', [AuxlController::class, 'proxyAuxiliary']);
+Route::post('/api/proxy-customer', [AuxlController::class, 'proxyCustomerSearch']);
+Route::post('/api/proxy-marketing', [AuxlController::class, 'proxyMarketingSearch']);
 // Cek (no_op, no_partai) sudah terpakai di proses lain (validasi tambah proses)
-Route::post('/api/check-partai-used', [App\Http\Controllers\ProsesController::class, 'checkPartaiUsed']);
+Route::post('/api/check-partai-used', [ProsesController::class, 'checkPartaiUsed']);

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use App\Models\Approval;
 use App\Models\Mesin;
 use App\Models\Proses;
 use App\Models\DetailProses;
@@ -59,6 +60,14 @@ class ApiCheckStatusBarcodeController extends Controller
         // TTL pendek supaya kalau device mati, status tidak stale terlalu lama
         Cache::put($cacheKey, $payload, now()->addMinutes(2));
 
+        // Mesin OFF: clear latch alarm (alarm akan mati ketika mesin off)
+        if (!$isOn) {
+            Cache::forget("iot:mesin:{$mesin->id}:alarm_latched");
+        }
+
+        // Invalidate cache alarm agar polling berikutnya mendapat status terbaru
+        Cache::forget("iot:mesin:{$mesin->id}:alarm_result");
+
         // Update status mesin di database (1 = Hidup/ON, 0 = Mati/OFF)
         $mesin->status = $isOn;
         $mesin->save();
@@ -85,6 +94,16 @@ class ApiCheckStatusBarcodeController extends Controller
     {
         $this->assertDeviceToken($request);
         $full = filter_var($request->query('full'), FILTER_VALIDATE_BOOLEAN);
+        $latchKey = "iot:mesin:{$mesin->id}:alarm_latched";
+        $alarmCacheKey = "iot:mesin:{$mesin->id}:alarm_result";
+
+        // Optimasi: cache response minimal 3 detik untuk Arduino polling
+        if (!$full) {
+            $cached = Cache::get($alarmCacheKey);
+            if ($cached !== null) {
+                return response()->json($cached);
+            }
+        }
 
         // Ambil state mesin dari cache; jika tidak ada, fallback ke DB (mesins.status)
         $cacheState = Cache::get("iot:mesin:{$mesin->id}:state", null);
@@ -96,6 +115,18 @@ class ApiCheckStatusBarcodeController extends Controller
         // Prioritas: cache (sinyal PLC real-time) -> fallback DB
         $isOn = ($cacheIsOn !== null) ? $cacheIsOn : $dbIsOn;
 
+        // Optimasi: early exit saat mesin ON dan alarm latched - skip semua query DB
+        if ($isOn) {
+            $isLatched = (bool) Cache::get($latchKey, false);
+            if ($isLatched) {
+                $minimal = ['mesin_id' => $mesin->id, 'alarm_on' => true];
+                if (!$full) {
+                    Cache::put($alarmCacheKey, $minimal, now()->addSeconds(3));
+                    return response()->json($minimal);
+                }
+            }
+        }
+
         // Pilih proses yang paling "aktif":
         // - prioritas proses yang sudah mulai (mulai != null) tapi belum selesai
         // - fallback ke proses antri (mulai null) yang belum selesai
@@ -106,69 +137,49 @@ class ApiCheckStatusBarcodeController extends Controller
             ->orderBy('order', 'asc')
             ->first();
 
+        // Proses sebelumnya yang sudah selesai (paling terakhir selesai)
+        $prosesSelesai = Proses::where('mesin_id', $mesin->id)
+            ->whereNotNull('selesai')
+            ->orderByDesc('selesai')
+            ->first();
+
         $alarmOn = false;
+        $barcodeIncomplete = false;
 
-        if ($isOn && $proses && ($proses->jenis ?? null) !== 'Maintenance') {
-            $details = DetailProses::where('proses_id', $proses->id)->get(['id', 'no_op', 'no_partai', 'roll']);
-            $detailIds = $details->pluck('id')->all();
+        // Cek barcode proses aktif (jika ada dan bukan Maintenance)
+        $barcodeIncompleteAktif = $this->checkProsesBarcodeIncomplete($proses);
+        // Cek barcode proses sebelumnya yang sudah selesai (kecuali Maintenance)
+        $barcodeIncompleteSelesai = $this->checkProsesBarcodeIncomplete($prosesSelesai);
 
-            $mode = $proses->mode ?? 'greige';
-            $jenis = $proses->jenis ?? null;
+        $barcodeIncomplete = $barcodeIncompleteAktif || $barcodeIncompleteSelesai;
 
-            // Apakah barcode kain (G/F) wajib untuk alarm? Jika tidak wajib = hanya D & A yang dianggap.
-            $requireKain = true;
-            if ($jenis === 'Reproses' && $mode === 'greige') {
-                $requireKain = false; // Greige Reproses: hanya D & A
-            } elseif ($jenis === 'Reproses' && $mode === 'finish') {
-                // Finish Reproses: wajib kain hanya jika reproses pertama kali (belum pernah ada reproses finish selesai untuk no_op+no_partai)
-                $allDetailSecondOrMore = true;
-                foreach ($details as $d) {
-                    $noOp = $d->no_op ?? '';
-                    $noPartai = $d->no_partai ?? '';
-                    if ($noOp === '' || $noPartai === '') {
-                        $allDetailSecondOrMore = false;
-                        break;
-                    }
-                    $countFinishReprosesSelesai = Proses::where('jenis', 'Reproses')
-                        ->where('mode', 'finish')
-                        ->whereNotNull('selesai')
-                        ->where('id', '!=', $proses->id)
-                        ->whereHas('details', function ($q) use ($noOp, $noPartai) {
-                            $q->where('no_op', $noOp)->where('no_partai', $noPartai);
-                        })
-                        ->count();
-                    if ($countFinishReprosesSelesai < 1) {
-                        $allDetailSecondOrMore = false;
-                        break;
-                    }
-                }
-                $requireKain = !$allDetailSecondOrMore; // pertama kali = wajib FDA; ke-2+ = hanya D & A
+        // Simpan progress untuk response full (dari proses aktif) - hanya saat full=1
+        $laRequired = null;
+        $laScanned = null;
+        $laComplete = null;
+        $auxRequired = null;
+        $auxScanned = null;
+        $auxComplete = null;
+        if ($full && $proses && ($proses->jenis ?? null) !== 'Maintenance') {
+            [$laRequired, $laScanned, $laComplete, $auxRequired, $auxScanned, $auxComplete] = $this->getProsesBarcodeProgress($proses);
+        }
+
+        // Logic alarm baru:
+        // - Mesin ON + barcode incomplete -> Alarm ON, latch (tetap ON walau barcode nanti lengkap, sampai mesin OFF)
+        // - Mesin OFF -> Alarm mati HANYA jika barcode complete; jika barcode incomplete tetap berbunyi
+        if (!$isOn) {
+            Cache::forget($latchKey);
+            $alarmOn = $barcodeIncomplete;
+        } else {
+            $isLatched = (bool) Cache::get($latchKey, false);
+            if ($isLatched) {
+                $alarmOn = true;
+            } elseif ($barcodeIncomplete) {
+                $alarmOn = true;
+                Cache::put($latchKey, true, now()->addHours(24));
+            } else {
+                $alarmOn = false;
             }
-            // Produksi (Greige/Finish): selalu wajib G/F (requireKain tetap true)
-
-            $kainIncomplete = false;
-            if ($requireKain) {
-                foreach ($details as $d) {
-                    $roll = (int) ($d->roll ?? 0);
-                    $scanned = BarcodeKain::where('detail_proses_id', $d->id)
-                        ->where('cancel', false)
-                        ->count();
-                    $isComplete = ($roll > 0) ? ($scanned >= $roll) : true;
-                    if (!$isComplete) {
-                        $kainIncomplete = true;
-                        break;
-                    }
-                }
-            }
-
-            $hasLa = !empty($detailIds)
-                ? BarcodeLa::whereIn('detail_proses_id', $detailIds)->where('cancel', false)->exists()
-                : false;
-            $hasAux = !empty($detailIds)
-                ? BarcodeAux::whereIn('detail_proses_id', $detailIds)->where('cancel', false)->exists()
-                : false;
-
-            $alarmOn = $kainIncomplete || !$hasLa || !$hasAux;
         }
 
         $minimal = [
@@ -177,6 +188,7 @@ class ApiCheckStatusBarcodeController extends Controller
         ];
 
         if (!$full) {
+            Cache::put($alarmCacheKey, $minimal, now()->addSeconds(3));
             return response()->json($minimal);
         }
 
@@ -188,15 +200,188 @@ class ApiCheckStatusBarcodeController extends Controller
             'db' => ['status' => $dbIsOn],
         ];
 
-        $reason = !$isOn ? "Mesin OFF" : (!$proses ? 'Tidak ada proses aktif' : (($proses->jenis ?? null) === 'Maintenance' ? 'Maintenance' : ($alarmOn ? 'Barcode belum lengkap' : 'Barcode lengkap')));
+        $reason = !$isOn
+            ? ($alarmOn ? 'Mesin OFF, barcode belum lengkap' : 'Mesin OFF')
+            : ($alarmOn
+                ? ($barcodeIncompleteSelesai && !$barcodeIncompleteAktif
+                    ? 'Proses sebelumnya belum lengkap barcode / alarm latched'
+                    : 'Barcode belum lengkap / alarm latched')
+                : (!$proses ? 'Tidak ada proses aktif' : (($proses->jenis ?? null) === 'Maintenance' ? 'Maintenance' : 'Barcode lengkap')));
 
-        return response()->json(array_merge($minimal, [
+        $fullPayload = array_merge($minimal, [
             'status' => 'success',
             'mesin' => $mesin->jenis_mesin,
             'is_on' => $isOn,
             'reason' => $reason,
             'state' => $state,
             'proses_id' => $proses?->id,
-        ]));
+            'proses_selesai_id' => $prosesSelesai?->id,
+        ]);
+
+        if ($proses && ($proses->jenis ?? null) !== 'Maintenance' && isset($laComplete, $auxComplete)) {
+            $fullPayload['la_progress'] = [
+                'required' => $laRequired,
+                'scanned' => $laScanned,
+                'is_complete' => $laComplete,
+            ];
+            $fullPayload['aux_progress'] = [
+                'required' => $auxRequired,
+                'scanned' => $auxScanned,
+                'is_complete' => $auxComplete,
+            ];
+        }
+
+        return response()->json($fullPayload);
+    }
+
+    /**
+     * Cek apakah barcode proses belum lengkap (GDA/FDA + TD/TA).
+     * Kecuali Maintenance: selalu false (tidak perlu barcode).
+     *
+     * @param Proses|null $proses
+     * @return bool true jika barcode incomplete
+     */
+    private function checkProsesBarcodeIncomplete(?Proses $proses): bool
+    {
+        if (!$proses || ($proses->jenis ?? null) === 'Maintenance') {
+            return false;
+        }
+
+        $details = DetailProses::where('proses_id', $proses->id)->get(['id', 'no_op', 'no_partai', 'roll']);
+        $mode = $proses->mode ?? 'greige';
+        $jenis = $proses->jenis ?? null;
+
+        // Apakah barcode kain (G/F) wajib untuk alarm?
+        $requireKain = true;
+        if ($jenis === 'Reproses' && $mode === 'greige') {
+            $requireKain = false;
+        } elseif ($jenis === 'Reproses' && $mode === 'finish') {
+            $allDetailSecondOrMore = true;
+            foreach ($details as $d) {
+                $noOp = $d->no_op ?? '';
+                $noPartai = $d->no_partai ?? '';
+                if ($noOp === '' || $noPartai === '') {
+                    $allDetailSecondOrMore = false;
+                    break;
+                }
+                $countFinishReprosesSelesai = Proses::where('jenis', 'Reproses')
+                    ->where('mode', 'finish')
+                    ->whereNotNull('selesai')
+                    ->where('id', '!=', $proses->id)
+                    ->whereHas('details', function ($q) use ($noOp, $noPartai) {
+                        $q->where('no_op', $noOp)->where('no_partai', $noPartai);
+                    })
+                    ->count();
+                if ($countFinishReprosesSelesai < 1) {
+                    $allDetailSecondOrMore = false;
+                    break;
+                }
+            }
+            $requireKain = !$allDetailSecondOrMore;
+        }
+
+        $kainIncomplete = false;
+        if ($requireKain) {
+            $detailIds = $details->pluck('id');
+            $scannedCounts = BarcodeKain::whereIn('detail_proses_id', $detailIds)
+                ->where('cancel', false)
+                ->selectRaw('detail_proses_id, COUNT(*) as cnt')
+                ->groupBy('detail_proses_id')
+                ->pluck('cnt', 'detail_proses_id');
+            foreach ($details as $d) {
+                $roll = (int) ($d->roll ?? 0);
+                $scanned = (int) ($scannedCounts[$d->id] ?? 0);
+                $isComplete = ($roll > 0) ? ($scanned >= $roll) : true;
+                if (!$isComplete) {
+                    $kainIncomplete = true;
+                    break;
+                }
+            }
+        }
+
+        // Validasi LA & AUX: kebutuhan awal (1) + topping yang sudah di-approve (TD/TA)
+        $laInitialScanned = BarcodeLa::whereHas('detailProses', fn ($q) => $q->where('proses_id', $proses->id))
+            ->whereNull('approval_id')
+            ->where('cancel', false)
+            ->exists() ? 1 : 0;
+        $laToppingRequired = Approval::where('proses_id', $proses->id)
+            ->where('type', 'KEPALA_SHIFT')
+            ->where('action', 'topping_la')
+            ->where('status', 'approved')
+            ->count();
+        $laToppingScanned = Approval::where('proses_id', $proses->id)
+            ->where('type', 'KEPALA_SHIFT')
+            ->where('action', 'topping_la')
+            ->where('status', 'approved')
+            ->whereHas('barcodeLas', fn ($q) => $q->where('cancel', false))
+            ->count();
+        $laComplete = ($laInitialScanned + $laToppingScanned) >= (1 + $laToppingRequired);
+
+        $auxInitialScanned = BarcodeAux::whereHas('detailProses', fn ($q) => $q->where('proses_id', $proses->id))
+            ->whereNull('approval_id')
+            ->where('cancel', false)
+            ->exists() ? 1 : 0;
+        $auxToppingRequired = Approval::where('proses_id', $proses->id)
+            ->where('type', 'KEPALA_SHIFT')
+            ->where('action', 'topping_aux')
+            ->where('status', 'approved')
+            ->count();
+        $auxToppingScanned = Approval::where('proses_id', $proses->id)
+            ->where('type', 'KEPALA_SHIFT')
+            ->where('action', 'topping_aux')
+            ->where('status', 'approved')
+            ->whereHas('barcodeAuxs', fn ($q) => $q->where('cancel', false))
+            ->count();
+        $auxComplete = ($auxInitialScanned + $auxToppingScanned) >= (1 + $auxToppingRequired);
+
+        return $kainIncomplete || !$laComplete || !$auxComplete;
+    }
+
+    /**
+     * Ambil progress barcode LA/AUX untuk proses (untuk response full).
+     *
+     * @return array [laRequired, laScanned, laComplete, auxRequired, auxScanned, auxComplete]
+     */
+    private function getProsesBarcodeProgress(Proses $proses): array
+    {
+        $laInitialScanned = BarcodeLa::whereHas('detailProses', fn ($q) => $q->where('proses_id', $proses->id))
+            ->whereNull('approval_id')
+            ->where('cancel', false)
+            ->exists() ? 1 : 0;
+        $laToppingRequired = Approval::where('proses_id', $proses->id)
+            ->where('type', 'KEPALA_SHIFT')
+            ->where('action', 'topping_la')
+            ->where('status', 'approved')
+            ->count();
+        $laToppingScanned = Approval::where('proses_id', $proses->id)
+            ->where('type', 'KEPALA_SHIFT')
+            ->where('action', 'topping_la')
+            ->where('status', 'approved')
+            ->whereHas('barcodeLas', fn ($q) => $q->where('cancel', false))
+            ->count();
+        $laRequired = 1 + $laToppingRequired;
+        $laScanned = $laInitialScanned + $laToppingScanned;
+        $laComplete = $laScanned >= $laRequired;
+
+        $auxInitialScanned = BarcodeAux::whereHas('detailProses', fn ($q) => $q->where('proses_id', $proses->id))
+            ->whereNull('approval_id')
+            ->where('cancel', false)
+            ->exists() ? 1 : 0;
+        $auxToppingRequired = Approval::where('proses_id', $proses->id)
+            ->where('type', 'KEPALA_SHIFT')
+            ->where('action', 'topping_aux')
+            ->where('status', 'approved')
+            ->count();
+        $auxToppingScanned = Approval::where('proses_id', $proses->id)
+            ->where('type', 'KEPALA_SHIFT')
+            ->where('action', 'topping_aux')
+            ->where('status', 'approved')
+            ->whereHas('barcodeAuxs', fn ($q) => $q->where('cancel', false))
+            ->count();
+        $auxRequired = 1 + $auxToppingRequired;
+        $auxScanned = $auxInitialScanned + $auxToppingScanned;
+        $auxComplete = $auxScanned >= $auxRequired;
+
+        return [$laRequired, $laScanned, $laComplete, $auxRequired, $auxScanned, $auxComplete];
     }
 }

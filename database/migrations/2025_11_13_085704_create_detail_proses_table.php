@@ -16,6 +16,8 @@ return new class extends Migration
             $table->foreignId('proses_id')->constrained('proses')->onDelete('cascade');
             $table->string('no_op', 12)->nullable();
             $table->string('item_op')->nullable();
+            $table->string('customer')->nullable();
+            $table->string('marketing')->nullable();
             $table->string('kode_material')->nullable();
             $table->string('konstruksi')->nullable();
             $table->string('no_partai')->nullable();

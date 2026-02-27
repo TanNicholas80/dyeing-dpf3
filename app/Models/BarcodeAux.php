@@ -15,8 +15,13 @@ class BarcodeAux extends Model
     protected $table = 'barcode_aux';
 
     protected $fillable = [
-        'detail_proses_id', 'no_op', 'no_partai', 'barcode', 'matdok', 'mesin_id', 'cancel'
+        'detail_proses_id', 'no_op', 'no_partai', 'barcode', 'matdok', 'mesin_id', 'cancel', 'approval_id'
     ];
+
+    public function approval()
+    {
+        return $this->belongsTo(Approval::class);
+    }
 
     public function mesin()
     {
@@ -34,7 +39,7 @@ class BarcodeAux extends Model
      */
     public function getActivitylogOptions(): LogOptions
     {
-        $logFields = ['detail_proses_id', 'no_op', 'no_partai', 'barcode', 'matdok', 'mesin_id', 'cancel'];
+        $logFields = ['detail_proses_id', 'no_op', 'no_partai', 'barcode', 'matdok', 'mesin_id', 'cancel', 'approval_id'];
 
         return LogOptions::defaults()
             ->useLogName('Manajemen BarcodeAux')

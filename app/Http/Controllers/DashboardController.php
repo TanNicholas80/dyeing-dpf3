@@ -50,7 +50,7 @@ class DashboardController extends Controller
         }
 
         // Ambil proses, filter jika mesin dipilih
-        $prosesQuery = Proses::with(['mesin', 'approvals', 'details.barcodeKains', 'details.barcodeLas', 'details.barcodeAuxs']);
+        $prosesQuery = Proses::with(['mesin', 'approvals.barcodeLas', 'approvals.barcodeAuxs', 'details.barcodeKains', 'details.barcodeLas', 'details.barcodeAuxs']);
         if (count($restrictedMesinIds) > 0) {
             $prosesQuery->whereIn('mesin_id', $restrictedMesinIds);
         } elseif (count($selectedMesinArr) > 0) {
@@ -59,7 +59,10 @@ class DashboardController extends Controller
 
         // Urutkan berdasarkan order untuk proses pending (belum mulai), kemudian created_at dan id
         // Proses yang sudah mulai/selesai tetap diurutkan berdasarkan created_at dan id
-        $prosesList = $prosesQuery->get()->sort(function($a, $b) {
+        $prosesList = $prosesQuery->get()->map(function ($proses) {
+            $proses->barcode_kain_optional = $proses->isBarcodeKainOptionalForLaAux();
+            return $proses;
+        })->sort(function($a, $b) {
             // Proses pending (belum mulai) diurutkan berdasarkan order
             if (!$a->mulai && !$b->mulai) {
                 $orderA = (int)($a->order ?? 0);
@@ -139,7 +142,7 @@ class DashboardController extends Controller
 
             // Query proses dengan relasi approvals untuk cek pending
             $prosesQuery = Proses::select('id', 'jenis', 'mulai', 'selesai', 'cycle_time', 'cycle_time_actual', 'mesin_id', 'order')
-                ->with(['approvals', 'details.barcodeKains', 'details.barcodeLas', 'details.barcodeAuxs']);
+                ->with(['approvals.barcodeLas', 'approvals.barcodeAuxs', 'details.barcodeKains', 'details.barcodeLas', 'details.barcodeAuxs']);
             if (count($restrictedMesinIds) > 0) {
                 $prosesQuery->whereIn('mesin_id', $restrictedMesinIds);
             } elseif (count($selectedMesinArr) > 0) {
@@ -268,6 +271,59 @@ class DashboardController extends Controller
                     }
                 }
 
+                // Hitung la/aux complete termasuk topping (untuk block bg merah jika belum lengkap)
+                // Multiple OP: 1 approval per proses, barcode topping ditambahkan ke setiap OP saat scan
+                $laInitialScanned = 0;
+                $auxInitialScanned = 0;
+                foreach ($proses->details ?? [] as $d) {
+                    if ($d->barcodeLas && $d->barcodeLas->where('cancel', false)->filter(fn ($b) => $b->approval_id === null)->count() > 0) {
+                        $laInitialScanned = 1;
+                        break;
+                    }
+                }
+                foreach ($proses->details ?? [] as $d) {
+                    if ($d->barcodeAuxs && $d->barcodeAuxs->where('cancel', false)->filter(fn ($b) => $b->approval_id === null)->count() > 0) {
+                        $auxInitialScanned = 1;
+                        break;
+                    }
+                }
+                $laToppingRequired = collect($proses->approvals ?? [])->where('action', 'topping_la')->where('status', 'approved')->count();
+                $auxToppingRequired = collect($proses->approvals ?? [])->where('action', 'topping_aux')->where('status', 'approved')->count();
+                $laToppingScanned = 0;
+                $auxToppingScanned = 0;
+                foreach ($proses->approvals ?? [] as $a) {
+                    if (($a->action ?? '') === 'topping_la' && ($a->status ?? '') === 'approved') {
+                        if ($a->barcodeLas && $a->barcodeLas->where('cancel', false)->count() > 0) {
+                            $laToppingScanned++;
+                        }
+                    }
+                    if (($a->action ?? '') === 'topping_aux' && ($a->status ?? '') === 'approved') {
+                        if ($a->barcodeAuxs && $a->barcodeAuxs->where('cancel', false)->count() > 0) {
+                            $auxToppingScanned++;
+                        }
+                    }
+                }
+                $laRequired = 1 + $laToppingRequired;
+                $auxRequired = 1 + $auxToppingRequired;
+                $laComplete = ($laInitialScanned + $laToppingScanned) >= $laRequired;
+                $auxComplete = ($auxInitialScanned + $auxToppingScanned) >= $auxRequired;
+                $laInitialComplete = $laInitialScanned >= 1;
+                $auxInitialComplete = $auxInitialScanned >= 1;
+                $hasToppingLa = collect($proses->approvals ?? [])->contains(fn ($a) => ($a->action ?? '') === 'topping_la');
+                $hasToppingAux = collect($proses->approvals ?? [])->contains(fn ($a) => ($a->action ?? '') === 'topping_aux');
+                $pendingToppingLa = collect($proses->approvals ?? [])->contains(fn ($a) => ($a->action ?? '') === 'topping_la' && ($a->status ?? '') === 'pending');
+                $pendingToppingAux = collect($proses->approvals ?? [])->contains(fn ($a) => ($a->action ?? '') === 'topping_aux' && ($a->status ?? '') === 'pending');
+                $approvedToppingLaNotScanned = collect($proses->approvals ?? [])->contains(function ($a) {
+                    if (($a->action ?? '') !== 'topping_la' || ($a->status ?? '') !== 'approved') return false;
+                    return !($a->barcodeLas && $a->barcodeLas->where('cancel', false)->count() > 0);
+                });
+                $approvedToppingAuxNotScanned = collect($proses->approvals ?? [])->contains(function ($a) {
+                    if (($a->action ?? '') !== 'topping_aux' || ($a->status ?? '') !== 'approved') return false;
+                    return !($a->barcodeAuxs && $a->barcodeAuxs->where('cancel', false)->count() > 0);
+                });
+                $tdColor = $hasToppingLa ? ($pendingToppingLa ? 'yellow' : ($approvedToppingLaNotScanned ? 'red' : 'green')) : null;
+                $taColor = $hasToppingAux ? ($pendingToppingAux ? 'yellow' : ($approvedToppingAuxNotScanned ? 'red' : 'green')) : null;
+
                 // Tentukan warna background (sama seperti logika di blade)
                 $bg = '#757575'; // default abu-abu
                 if ($hasPendingChange || $hasPendingReprocessApproval) {
@@ -286,17 +342,27 @@ class DashboardController extends Controller
                     }
                     $cycle_time = $proses->cycle_time ? (int)$proses->cycle_time : 0;
                     $cycle_time_actual = $cycle_time_actual ? (int)$cycle_time_actual : 0;
-                    if ($cycle_time_actual > $cycle_time + 3600) {
+                    // Merah: durasi sangat singkat (< 1 jam). Hijau: sudah lebih dari 1 jam berjalan dan berhenti.
+                    if ($cycle_time_actual < 3600) {
+                        $bg = '#e53935'; // merah (durasi terlalu singkat, belum 1 jam)
+                    } elseif ($cycle_time_actual > $cycle_time + 3600) {
                         $bg = '#e53935'; // merah (overtime)
                     } else {
-                        $bg = '#00c853'; // hijau (selesai normal)
+                        $bg = '#00c853'; // hijau (selesai normal, >= 1 jam)
                     }
                 } else {
                     // Proses sedang berjalan (mulai ada, selesai belum)
-                    if ($proses->jenis !== 'Maintenance' && (!$hasBarcodeKain || !$hasBarcodeLa || !$hasBarcodeAux)) {
-                        $bg = '#e53935'; // merah (barcode belum lengkap)
+                    $barcodeKainOptional = $proses->isBarcodeKainOptionalForLaAux();
+                    if ($proses->jenis !== 'Maintenance') {
+                        $incomplete = !$barcodeKainOptional && !$hasBarcodeKain;
+                        $incomplete = $incomplete || !$laComplete || !$auxComplete;
+                        if ($incomplete) {
+                            $bg = '#ef9a9a'; // merah muda / merah (barcode termasuk topping belum lengkap)
+                        } else {
+                            $bg = '#002b80'; // biru (berjalan dengan barcode lengkap)
+                        }
                     } else {
-                        $bg = '#002b80'; // biru (berjalan dengan barcode lengkap)
+                        $bg = '#002b80';
                     }
                 }
 
@@ -315,10 +381,18 @@ class DashboardController extends Controller
                     'bg_color' => $bg,
                     'jenis' => $proses->jenis,
                     'order' => (int)($proses->order ?? 0),
-                    'gda_details' => $gdaDetails, // Status GDA per detail proses untuk update real-time
-                    'cycle_time' => $proses->cycle_time !== null ? (int) $proses->cycle_time : null, // detik, untuk update real-time setelah edit cycle time di-approve
+                    'gda_details' => $gdaDetails,
+                    'cycle_time' => $proses->cycle_time !== null ? (int) $proses->cycle_time : null,
                     'cycle_time_actual' => $proses->cycle_time_actual !== null ? (int) $proses->cycle_time_actual : null,
-                    'pending_approvals' => $pendingApprovals, // FM/VP step untuk sinkronisasi modal 2-step approval lintas browser
+                    'pending_approvals' => $pendingApprovals,
+                    'la_complete' => $laComplete,
+                    'aux_complete' => $auxComplete,
+                    'la_initial_complete' => $laInitialComplete,
+                    'aux_initial_complete' => $auxInitialComplete,
+                    'has_topping_la' => $hasToppingLa,
+                    'has_topping_aux' => $hasToppingAux,
+                    'td_color' => $tdColor,
+                    'ta_color' => $taColor,
                 ];
             }
 

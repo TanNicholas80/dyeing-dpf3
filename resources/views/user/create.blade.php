@@ -68,6 +68,8 @@
                                     <option value="ds" {{ old('role') == 'ds' ? 'selected' : '' }}>DS</option>
                                     <option value="fm" {{ old('role') == 'fm' ? 'selected' : '' }}>FM</option>
                                     <option value="vp" {{ old('role') == 'vp' ? 'selected' : '' }}>VP</option>
+                                    <option value="kepala_ruangan" {{ old('role') == 'kepala_ruangan' ? 'selected' : '' }}>Kepala Ruangan</option>
+                                    <option value="kepala_shift" {{ old('role') == 'kepala_shift' ? 'selected' : '' }}>Kepala Shift</option>
                                 </select>
                                 @error('role')
                                     <small class="text-danger">{{ $message }}</small>

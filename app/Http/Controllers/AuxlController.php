@@ -195,4 +195,86 @@ class AuxlController extends Controller
             return response()->json(['results' => []]);
         }
     }
+
+    /**
+     * Proxy untuk Select2 customer dari API SAP.
+     * Route: POST /api/proxy-customer
+     */
+    public function proxyCustomerSearch(Request $request)
+    {
+        $q = $request->input('q', '');
+        if (strlen($q) < 3) {
+            return response()->json(['results' => []]);
+        }
+        try {
+            $client = new \GuzzleHttp\Client();
+            $response = $client->request('POST', 'http://18.139.142.16:8020/sap/bc/zdyes/zterima_cstmr?sap-client=100', [
+                'headers' => [
+                    'Authorization' => 'Basic RFRfV01TOldtczAxMTEyMDI1QA==',
+                    'Content-Type' => 'text/plain',
+                    'Accept' => 'application/json',
+                ],
+                'body' => json_encode($q),
+                'timeout' => 10,
+            ]);
+            $data = json_decode($response->getBody(), true);
+            if (!is_array($data)) {
+                return response()->json(['results' => []]);
+            }
+            $results = collect($data)
+                ->filter(fn ($item) => isset($item['customer']))
+                ->map(function ($item) {
+                    $customer = $item['customer'];
+                    return [
+                        'id' => $customer,
+                        'text' => $customer,
+                    ];
+                })
+                ->unique('id')
+                ->values()
+                ->all();
+            return response()->json(['results' => $results]);
+        } catch (\Exception $e) {
+            return response()->json(['results' => []]);
+        }
+    }
+
+    public function proxyMarketingSearch(Request $request)
+    {
+        $q = $request->input('q', '');
+        if (strlen($q) < 3) {
+            return response()->json(['results' => []]);
+        }
+        try {
+            $client = new \GuzzleHttp\Client();
+            $response = $client->request('POST', 'http://18.139.142.16:8020/sap/bc/zdyes/zterima_mkt?sap-client=100', [
+                'headers' => [
+                    'Authorization' => 'Basic RFRfV01TOldtczAxMTEyMDI1QA==',
+                    'Content-Type' => 'text/plain',
+                    'Accept' => 'application/json',
+                ],
+                'body' => json_encode($q),
+                'timeout' => 10,
+            ]);
+            $data = json_decode($response->getBody(), true);
+            if (!is_array($data)) {
+                return response()->json(['results' => []]);
+            }
+            $results = collect($data)
+                ->filter(fn ($item) => isset($item['marketing']))
+                ->map(function ($item) {
+                    $marketing = $item['marketing'];
+                    return [
+                        'id' => $marketing,
+                        'text' => $marketing,
+                    ];
+                })
+                ->unique('id')
+                ->values()
+                ->all();
+            return response()->json(['results' => $results]);
+        } catch (\Exception $e) {
+            return response()->json(['results' => []]);
+        }
+    }
 }

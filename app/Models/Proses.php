@@ -46,7 +46,56 @@ class Proses extends Model
     {
         return $this->hasMany(Approval::class, 'proses_id', 'id');
     }
-    
+
+    /**
+     * Cek apakah proses ini boleh scan LA/AUX tanpa wajib barcode kain lengkap.
+     * - Greige Reproses: D & A saja wajib, G tidak wajib → true.
+     * - Finish Reproses (ke-2 dan seterusnya): D & A saja wajib, F tidak wajib → true.
+     *
+     * @return bool
+     */
+    public function isBarcodeKainOptionalForLaAux(): bool
+    {
+        if ($this->jenis !== 'Reproses') {
+            return false;
+        }
+        $mode = $this->mode ?? 'greige';
+
+        // Greige Reproses: hanya D & A wajib, G tidak wajib
+        if ($mode === 'greige') {
+            return true;
+        }
+
+        // Finish Reproses: hanya setelah reproses pertama, F tidak wajib (hanya D & A)
+        if ($mode === 'finish') {
+            $detailList = DetailProses::where('proses_id', $this->id)->get();
+            if ($detailList->isEmpty()) {
+                return false;
+            }
+            foreach ($detailList as $detail) {
+                $noOp = $detail->no_op ?? '';
+                $noPartai = $detail->no_partai ?? '';
+                if ($noOp === '' || $noPartai === '') {
+                    return false;
+                }
+                $countFinishReprosesSelesai = self::where('jenis', 'Reproses')
+                    ->where('mode', 'finish')
+                    ->whereNotNull('selesai')
+                    ->where('id', '!=', $this->id)
+                    ->whereHas('details', function ($q) use ($noOp, $noPartai) {
+                        $q->where('no_op', $noOp)->where('no_partai', $noPartai);
+                    })
+                    ->count();
+                if ($countFinishReprosesSelesai < 1) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        return false;
+    }
+
     /**
      * Konfigurasi logging untuk model Proses.
      */

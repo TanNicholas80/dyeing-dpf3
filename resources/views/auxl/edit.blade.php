@@ -72,11 +72,25 @@
                                 </div>
                                 <div class="col-md-4 mb-2">
                                     <label>Customer</label>
-                                    <input type="text" name="customer" class="form-control" value="{{ $auxl->customer }}">
+                                    <select name="customer" class="form-control select2-customer">
+                                        @php $customerVal = old('customer', $auxl->customer); @endphp
+                                        @if($customerVal)
+                                            <option value="{{ $customerVal }}" selected>{{ $customerVal }}</option>
+                                        @else
+                                            <option value="">-- Pilih atau cari Customer --</option>
+                                        @endif
+                                    </select>
                                 </div>
                                 <div class="col-md-4 mb-2">
                                     <label>Marketing</label>
-                                    <input type="text" name="marketing" class="form-control" value="{{ $auxl->marketing }}">
+                                    <select name="marketing" class="form-control select2-marketing">
+                                        @php $marketingVal = old('marketing', $auxl->marketing); @endphp
+                                        @if($marketingVal)
+                                            <option value="{{ $marketingVal }}" selected>{{ $marketingVal }}</option>
+                                        @else
+                                            <option value="">-- Pilih atau cari Marketing --</option>
+                                        @endif
+                                    </select>
                                 </div>
                                 <div class="col-md-4 mb-2">
                                     <label>Date</label>
@@ -174,6 +188,54 @@
 @section('scripts')
     <script>
         $(document).ready(function () {
+            // Select2 Customer dari API SAP
+            $('.select2-customer').select2({
+                placeholder: '-- Pilih atau cari Customer --',
+                allowClear: true,
+                minimumInputLength: 3,
+                ajax: {
+                    url: '/api/proxy-customer',
+                    type: 'POST',
+                    dataType: 'json',
+                    delay: 500,
+                    data: function (params) {
+                        return {
+                            q: params.term,
+                            _token: $('meta[name="csrf-token"]').attr('content')
+                        };
+                    },
+                    processResults: function (data) {
+                        return {
+                            results: Array.isArray(data.results) ? data.results : []
+                        };
+                    }
+                }
+            });
+
+            // Select2 Marketing dari API SAP
+            $('.select2-marketing').select2({
+                placeholder: '-- Pilih atau cari Marketing --',
+                allowClear: true,
+                minimumInputLength: 3,
+                ajax: {
+                    url: '/api/proxy-marketing',
+                    type: 'POST',
+                    dataType: 'json',
+                    delay: 500,
+                    data: function (params) {
+                        return {
+                            q: params.term,
+                            _token: $('meta[name="csrf-token"]').attr('content')
+                        };
+                    },
+                    processResults: function (data) {
+                        return {
+                            results: Array.isArray(data.results) ? data.results : []
+                        };
+                    }
+                }
+            });
+
             // Fungsi untuk inisialisasi Select2 pada detail rows (disamakan dengan create)
             function initAuxiliarySelect2(selector) {
                 $(selector).select2({

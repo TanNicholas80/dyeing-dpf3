@@ -22,8 +22,8 @@ class Auxl extends Model
     {
         return [
             'normal' => 'Normal',
-            'reproses' => 'Reproses',
-            'perbaikan' => 'Perbaikan',
+            'reproses' => 'Reproses FG',
+            'perbaikan' => 'Perbaikan BDP',
         ];
     }
 

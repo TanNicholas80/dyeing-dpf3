@@ -72,6 +72,21 @@ class ApprovalController extends Controller
     }
 
     /**
+     * Daftar approval untuk Kepala Shift (filter type = KEPALA_SHIFT, action topping_la/topping_aux).
+     */
+    public function approval_kepala_shift()
+    {
+        $approvals = Approval::with(['proses.details', 'requester', 'approver'])
+            ->where('type', 'KEPALA_SHIFT')
+            ->whereIn('action', ['topping_la', 'topping_aux'])
+            ->orderByRaw("FIELD(status, 'pending','approved','rejected')")
+            ->orderByDesc('created_at')
+            ->get();
+
+        return view('approval.approval_kepala_shift', compact('approvals'));
+    }
+
+    /**
      * Update status approval (pending -> approved / rejected).
      *
      * Request contoh:
@@ -209,6 +224,21 @@ class ApprovalController extends Controller
             }
 
             // Tidak ada eksekusi lanjutan untuk VP selain mencatat approval
+            return;
+        }
+
+        // Topping LA/AUX: cukup broadcast agar Kepala Ruangan bisa input barcode
+        if (in_array($approval->action, ['topping_la', 'topping_aux'])) {
+            $proses = $approval->proses;
+            if ($proses) {
+                $proses->refresh();
+                $proses->load(['approvals', 'details.barcodeKains', 'details.barcodeLas', 'details.barcodeAuxs']);
+                $statusService = new ProsesStatusService();
+                $affectedProsesIds = $statusService->getAffectedProsesIds();
+                $statusData = $statusService->generateProsesStatus($proses, $affectedProsesIds);
+                event(new ProsesStatusUpdated($proses->id, $statusData));
+                \Illuminate\Support\Facades\Cache::forget("iot:mesin:{$proses->mesin_id}:alarm_result");
+            }
             return;
         }
 
@@ -477,6 +507,20 @@ class ApprovalController extends Controller
                     
                     // Broadcast ProsesDeleted agar semua browser menghapus card dari tampilan
                     event(new ProsesDeleted($prosesId, $mesinId));
+                }
+                break;
+
+            case 'topping_la':
+            case 'topping_aux':
+                // Broadcast agar indikator TD/TA update (approval rejected, bukan pending lagi)
+                $proses = $approval->proses;
+                if ($proses) {
+                    $proses->refresh();
+                    $proses->load(['approvals', 'details.barcodeKains', 'details.barcodeLas', 'details.barcodeAuxs']);
+                    $statusService = new ProsesStatusService();
+                    $affectedProsesIds = $statusService->getAffectedProsesIds();
+                    $statusData = $statusService->generateProsesStatus($proses, $affectedProsesIds);
+                    event(new ProsesStatusUpdated($proses->id, $statusData));
                 }
                 break;
 

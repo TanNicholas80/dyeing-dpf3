@@ -73,7 +73,7 @@
                                                             data-customer="{{ $auxl->customer }}"
                                                             data-marketing="{{ $auxl->marketing }}"></td>
                                                     <td>{{ $auxl->barcode }}</td>
-                                                    <td>{{ ucfirst($auxl->jenis) }}</td>
+                                                    <td>{{ \App\Models\Auxl::getJenisOptions()[$auxl->jenis] ?? ucfirst($auxl->jenis ?? '-') }}</td>
                                                     <td>{{ $auxl->code }}</td>
                                                     <td>{{ $auxl->konstruksi }}</td>
                                                     <td>{{ $auxl->customer }}</td>

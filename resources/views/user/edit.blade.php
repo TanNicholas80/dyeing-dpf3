@@ -66,6 +66,8 @@
                                             'ds' => 'DS',
                                             'fm' => 'FM',
                                             'vp' => 'VP',
+                                            'kepala_ruangan' => 'Kepala Ruangan',
+                                            'kepala_shift' => 'Kepala Shift',
                                         ];
                                     @endphp
                                     @foreach ($roles as $value => $label)

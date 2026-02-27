@@ -44,9 +44,14 @@ class AppServiceProvider extends ServiceProvider
             $pendingApprovalVP = Approval::where('type', 'VP')
                 ->where('status', 'pending')
                 ->count();
+
+            $pendingApprovalKepalaShift = Approval::where('type', 'KEPALA_SHIFT')
+                ->where('status', 'pending')
+                ->count();
             
             $view->with('pendingApprovalFM', $pendingApprovalFM);
             $view->with('pendingApprovalVP', $pendingApprovalVP);
+            $view->with('pendingApprovalKepalaShift', $pendingApprovalKepalaShift);
         });
 
         // Register observer untuk Proses model

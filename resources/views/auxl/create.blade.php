@@ -88,8 +88,13 @@
 
                                 <div class="col-md-4 mb-2">
                                     <label>Customer</label>
-                                    <input type="text" name="customer" class="form-control" placeholder="Customer"
-                                        value="{{ old('customer') }}">
+                                    <select name="customer" class="form-control select2-customer">
+                                        @if(old('customer'))
+                                            <option value="{{ old('customer') }}" selected>{{ old('customer') }}</option>
+                                        @else
+                                            <option value="">-- Pilih atau cari Customer --</option>
+                                        @endif
+                                    </select>
                                     @error('customer')
                                         <small class="text-danger">{{ $message }}</small>
                                     @enderror
@@ -97,8 +102,13 @@
 
                                 <div class="col-md-4 mb-2">
                                     <label>Marketing</label>
-                                    <input type="text" name="marketing" class="form-control" placeholder="Marketing"
-                                        value="{{ old('marketing') }}">
+                                    <select name="marketing" class="form-control select2-marketing">
+                                        @if(old('marketing'))
+                                            <option value="{{ old('marketing') }}" selected>{{ old('marketing') }}</option>
+                                        @else
+                                            <option value="">-- Pilih atau cari Marketing --</option>
+                                        @endif
+                                    </select>
                                     @error('marketing')
                                         <small class="text-danger">{{ $message }}</small>
                                     @enderror
@@ -195,6 +205,54 @@
 @section('scripts')
     <script>
         $(document).ready(function() {
+            // Select2 Customer dari API SAP
+            $('.select2-customer').select2({
+                placeholder: '-- Pilih atau cari Customer --',
+                allowClear: true,
+                minimumInputLength: 3,
+                ajax: {
+                    url: '/api/proxy-customer',
+                    type: 'POST',
+                    dataType: 'json',
+                    delay: 500,
+                    data: function(params) {
+                        return {
+                            q: params.term,
+                            _token: $('meta[name="csrf-token"]').attr('content')
+                        };
+                    },
+                    processResults: function(data) {
+                        return {
+                            results: Array.isArray(data.results) ? data.results : []
+                        };
+                    }
+                }
+            });
+
+            // Select2 Marketing dari API SAP
+            $('.select2-marketing').select2({
+                placeholder: '-- Pilih atau cari Marketing --',
+                allowClear: true,
+                minimumInputLength: 3,
+                ajax: {
+                    url: '/api/proxy-marketing',
+                    type: 'POST',
+                    dataType: 'json',
+                    delay: 500,
+                    data: function(params) {
+                        return {
+                            q: params.term,
+                            _token: $('meta[name="csrf-token"]').attr('content')
+                        };
+                    },
+                    processResults: function(data) {
+                        return {
+                            results: Array.isArray(data.results) ? data.results : []
+                        };
+                    }
+                }
+            });
+
             // Fungsi untuk inisialisasi Select2 pada detail rows
             function initAuxiliarySelect2(selector) {
                 $(selector).select2({
