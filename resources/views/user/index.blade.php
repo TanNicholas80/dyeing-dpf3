@@ -50,7 +50,7 @@
                                             <th>Username</th>
                                             <th>Role</th>
                                             @if ($canManageUsers)
-                                            <th>Action</th>
+                                            <th>Aksi</th>
                                             @endif
                                         </tr>
                                     </thead>

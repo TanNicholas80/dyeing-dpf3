@@ -62,8 +62,8 @@
                                             'owner' => 'Owner',
                                             'aux' => 'Aux',
                                             'ppic' => 'PPIC',
-                                            'mesin' => 'Mesin',
-                                            'ds' => 'DS',
+                                            'operator' => 'Operator',
+                                            'dashboard' => 'Dashboard',
                                             'fm' => 'FM',
                                             'vp' => 'VP',
                                             'kepala_ruangan' => 'Kepala Ruangan',
@@ -110,7 +110,7 @@
         const mesinGroup = document.getElementById('mesin-group');
 
         function toggleMesinRequired() {
-            const isMesin = roleSelect.value === 'mesin';
+            const isMesin = roleSelect.value === 'operator';
             mesinGroup.style.display = isMesin ? 'block' : 'none';
             mesinSelect.required = isMesin;
             if (!isMesin) {

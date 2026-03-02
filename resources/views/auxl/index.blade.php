@@ -56,7 +56,8 @@
                                                 <th>Marketing</th>
                                                 <th>Date</th>
                                                 <th>Color</th>
-                                                <th>Action</th>
+                                                <th>Dipakai Proses</th>
+                                                <th>Aksi</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -80,6 +81,13 @@
                                                     <td>{{ $auxl->marketing }}</td>
                                                     <td>{{ $auxl->date }}</td>
                                                     <td>{{ $auxl->color }}</td>
+                                                    <td>
+                                                        @if ($auxl->isUsedByProses ?? false)
+                                                            <span class="badge badge-success">Sudah dipakai ({{ $auxl->usedCount ?? 0 }})</span>
+                                                        @else
+                                                            <span class="badge badge-secondary">Belum dipakai</span>
+                                                        @endif
+                                                    </td>
                                                     <td>
                                                         @if ($pendingApproval)
                                                             <span class="badge badge-warning text-dark">
@@ -225,7 +233,11 @@
         document.getElementById('bulkPrintBtn').addEventListener('click', function() {
             let selected = Array.from(document.querySelectorAll('.barcode-checkbox:checked'));
             if (selected.length === 0) {
-                alert('Pilih data barcode yang ingin di-print!');
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Validasi',
+                    text: 'Pilih data barcode yang ingin di-print!'
+                });
                 return;
             }
             const {

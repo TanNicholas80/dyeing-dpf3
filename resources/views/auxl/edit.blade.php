@@ -335,13 +335,20 @@
 
             // Set document title
             document.title = "Edit Auxiliary";
+            function showSwalWarning(message) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Validasi',
+                    text: message
+                });
+            }
 
             // Validasi form sebelum submit (disamakan dengan create)
             $('form').on('submit', function (e) {
                 const detailRows = $('.detail-row').length;
                 if (detailRows === 0) {
                     e.preventDefault();
-                    alert('Harap tambahkan minimal satu auxiliary detail.');
+                    showSwalWarning('Harap tambahkan minimal satu auxiliary detail.');
                     return false;
                 }
 
@@ -357,7 +364,7 @@
 
                 if (!isValid) {
                     e.preventDefault();
-                    alert('Harap pilih auxiliary untuk semua detail.');
+                    showSwalWarning('Harap pilih auxiliary untuk semua detail.');
                     return false;
                 }
             });

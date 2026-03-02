@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Auxl;
 use App\Models\AuxlDetail;
+use App\Models\BarcodeAux;
 use App\Models\Approval;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -14,6 +15,19 @@ class AuxlController extends Controller
     public function index()
     {
         $auxls = Auxl::with('details')->orderByDesc('created_at')->get();
+
+        // Tandai auxl yang sudah dipakai proses (ter-scan sebagai Barcode AUX aktif).
+        $usageCountsByBarcode = collect();
+        if ($auxls->isNotEmpty()) {
+            $barcodes = $auxls->pluck('barcode')->filter()->unique()->values();
+            if ($barcodes->isNotEmpty()) {
+                $usageCountsByBarcode = BarcodeAux::whereIn('barcode', $barcodes)
+                    ->where('cancel', false)
+                    ->selectRaw('barcode, COUNT(*) as total')
+                    ->groupBy('barcode')
+                    ->pluck('total', 'barcode');
+            }
+        }
 
         // Tandai auxl yang masih menunggu approval (FM atau VP) untuk jenis reproses
         if ($auxls->isNotEmpty()) {
@@ -30,6 +44,13 @@ class AuxlController extends Controller
                 return $auxl;
             });
         }
+
+        $auxls->transform(function ($auxl) use ($usageCountsByBarcode) {
+            $usedCount = (int) ($usageCountsByBarcode[$auxl->barcode] ?? 0);
+            $auxl->isUsedByProses = $usedCount > 0;
+            $auxl->usedCount = $usedCount;
+            return $auxl;
+        });
 
         return view('auxl.index', compact('auxls'));
     }

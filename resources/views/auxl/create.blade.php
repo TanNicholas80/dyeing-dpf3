@@ -45,6 +45,7 @@
 
         <section class="content">
             <div class="container-fluid">
+                <input type="hidden" id="initial-detail-index" value="{{ max(1, count(old('details', []))) }}">
                 <form action="{{ route('aux.store') }}" method="POST">
                     @csrf
                     <div class="card">
@@ -294,7 +295,7 @@
                 initAuxiliarySelect2(this);
             });
 
-            let detailIndex = {{ max(1, count(old('details', []))) }};
+            let detailIndex = Number(document.getElementById('initial-detail-index')?.value || 1);
 
             // Handler untuk menambah detail row
             $('#btn-add-detail').on('click', function() {
@@ -352,6 +353,13 @@
 
             // Set document title
             document.title = "Tambah Auxiliary";
+            function showSwalWarning(message) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Validasi',
+                    text: message
+                });
+            }
 
             // Validasi form sebelum submit
             $('form').on('submit', function(e) {
@@ -359,7 +367,7 @@
                 const detailRows = $('.detail-row').length;
                 if (detailRows === 0) {
                     e.preventDefault();
-                    alert('Harap tambahkan minimal satu auxiliary detail.');
+                    showSwalWarning('Harap tambahkan minimal satu auxiliary detail.');
                     return false;
                 }
 
@@ -378,7 +386,7 @@
 
                 if (!isValid) {
                     e.preventDefault();
-                    alert('Harap pilih auxiliary untuk semua detail.');
+                    showSwalWarning('Harap pilih auxiliary untuk semua detail.');
                     return false;
                 }
             });

@@ -234,15 +234,11 @@
             $('#dataModal').modal('show');
         } catch (e) {
             console.error('Error parsing JSON:', e);
-            if (typeof Swal !== 'undefined') {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error',
-                    text: 'Gagal memuat data'
-                });
-            } else {
-                alert('Gagal memuat data');
-            }
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: 'Gagal memuat data'
+            });
         }
     }
 </script>

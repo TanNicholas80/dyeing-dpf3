@@ -73,17 +73,40 @@ return new class extends Migration
                     IF OLD.status = 0 AND NEW.status = 1 THEN
                         -- Cari proses selanjutnya yang belum dimulai untuk mesin ini
                         -- Prioritas: proses yang belum dimulai, diurutkan berdasarkan order (untuk support reorder)
+                        -- SKIP proses Reproses jika masih pending approval create_reprocess (FM/VP)
                         SELECT id INTO proses_selanjutnya_id
                         FROM proses
                         WHERE mesin_id = NEW.id
                           AND mulai IS NULL
                           AND selesai IS NULL
                           AND `order` > 0
+                          AND NOT EXISTS (
+                              SELECT 1
+                              FROM approvals a
+                              WHERE a.proses_id = proses.id
+                                AND a.status = 'pending'
+                                AND a.action = 'create_reprocess'
+                                AND a.type IN ('FM', 'VP')
+                          )
                         ORDER BY `order` ASC, id ASC
                         LIMIT 1;
                         
                         -- Jika ada proses selanjutnya, update kolom mulai dan reset order
                         IF proses_selanjutnya_id IS NOT NULL THEN
+                            -- Auto reject approval pending aksi perubahan umum saat proses akan auto-start
+                            UPDATE approvals
+                            SET status = 'rejected',
+                                note = CASE
+                                    WHEN note IS NULL OR note = '' THEN 'Auto rejected by system: proses otomatis berjalan saat mesin ON.'
+                                    ELSE CONCAT(note, ' | Auto rejected by system: proses otomatis berjalan saat mesin ON.')
+                                END,
+                                approved_by = NULL,
+                                updated_at = NOW()
+                            WHERE proses_id = proses_selanjutnya_id
+                              AND status = 'pending'
+                              AND type = 'FM'
+                              AND action IN ('edit_cycle_time', 'delete_proses', 'move_machine', 'swap_position');
+
                             -- Update proses: set mulai dan reset order ke 0
                             UPDATE proses
                             SET mulai = NOW(),

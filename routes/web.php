@@ -50,6 +50,8 @@ Route::middleware(['auth'])->group(function () {
     });
     Route::middleware('role:super_admin')->group(function () {
         Route::resource('mesin', MesinController::class)->except(['show', 'index']);
+        Route::post('/mesin/{mesin}/alarm-force', [MesinController::class, 'toggleForceAlarmOff'])
+            ->name('mesin.alarm-force');
     });
     Route::get('/mesin/statuses', [MesinController::class, 'statuses'])->name('mesin.statuses');
 

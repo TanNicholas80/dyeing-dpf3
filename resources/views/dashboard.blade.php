@@ -264,6 +264,28 @@
             animation: pulse-soft-green 1.4s ease-in-out infinite;
         }
 
+        /* Efek kelap-kelip halus untuk indikator kuning (alarm ON) */
+        @keyframes pulse-soft-yellow {
+            0% {
+                opacity: 1;
+                box-shadow: 0 0 8px rgba(255, 235, 59, 0.6);
+            }
+
+            50% {
+                opacity: 0.45;
+                box-shadow: 0 0 2px rgba(255, 235, 59, 0.25);
+            }
+
+            100% {
+                opacity: 1;
+                box-shadow: 0 0 8px rgba(255, 235, 59, 0.6);
+            }
+        }
+
+        .status-light.running-light-yellow {
+            animation: pulse-soft-yellow 1.4s ease-in-out infinite;
+        }
+
         /* Tombol toggle history */
         .btn-toggle-history {
             width: 100%;
@@ -554,8 +576,9 @@
                                                                 } else {
                                                                     $blocks = (($proses->mode ?? 'greige') === 'finish') ? ['F', 'D', 'A'] : ['G', 'D', 'A'];
                                                                 }
+                                                                $alarmOnState = \Illuminate\Support\Facades\Cache::get("iot:mesin:{$proses->mesin_id}:alarm_on_state", null);
                                                                 if ($proses->mulai && !$proses->selesai) {
-                                                                    $light = 'green';
+                                                                    $light = $alarmOnState ? 'yellow' : 'green';
                                                                 } else {
                                                                     $light = 'red';
                                                                 }
@@ -590,8 +613,8 @@
                                                                     }
                                                                     $pendingToppingLa = collect($proses->approvals ?? [])->contains(fn ($a) => ($a->action ?? '') === 'topping_la' && ($a->status ?? '') === 'pending');
                                                                     $pendingToppingAux = collect($proses->approvals ?? [])->contains(fn ($a) => ($a->action ?? '') === 'topping_aux' && ($a->status ?? '') === 'pending');
-                                                                    $hasToppingLa = collect($proses->approvals ?? [])->contains(fn ($a) => ($a->action ?? '') === 'topping_la');
-                                                                    $hasToppingAux = collect($proses->approvals ?? [])->contains(fn ($a) => ($a->action ?? '') === 'topping_aux');
+                                                                    $hasToppingLa = collect($proses->approvals ?? [])->contains(fn ($a) => ($a->action ?? '') === 'topping_la' && in_array(($a->status ?? ''), ['pending', 'approved']));
+                                                                    $hasToppingAux = collect($proses->approvals ?? [])->contains(fn ($a) => ($a->action ?? '') === 'topping_aux' && in_array(($a->status ?? ''), ['pending', 'approved']));
                                                                     $approvedToppingLaNotScanned = collect($proses->approvals ?? [])->contains(function ($a) {
                                                                         if (($a->action ?? '') !== 'topping_la' || ($a->status ?? '') !== 'approved') return false;
                                                                         return !($a->barcodeLas && $a->barcodeLas->where('cancel', false)->count() > 0);
@@ -781,8 +804,8 @@
                                                                         @endif
                                                                     </div>
                                                                     <div style="flex: 1; text-align: right;">
-                                                                        <div class="status-light {{ $light == 'green' ? 'running-light' : '' }}"
-                                                                            style="width: 24px; height: 24px; border-radius: 50%; background: {{ $light == 'green' ? '#00ff1a' : '#ff2a2a' }}; display: inline-block; border: 3px solid #fff; box-shadow: 0 0 0 0 transparent; transition: background 0.2s;">
+                                                                        <div class="status-light {{ $light == 'green' ? 'running-light' : ($light == 'yellow' ? 'running-light-yellow' : '') }}"
+                                                                            style="width: 24px; height: 24px; border-radius: 50%; background: {{ $light == 'green' ? '#00ff1a' : ($light == 'yellow' ? '#ffeb3b' : '#ff2a2a') }}; display: inline-block; border: 3px solid #fff; box-shadow: 0 0 0 0 transparent; transition: background 0.2s;">
                                                                         </div>
                                                                     </div>
                                                                 </div>
@@ -1072,8 +1095,9 @@
                                                             $blocks = (($proses->mode ?? 'greige') === 'finish') ? ['F', 'D', 'A'] : ['G', 'D', 'A'];
                                                         }
                                                         // Lampu indikator: hijau jika mulai ada dan selesai null, merah jika mulai dan selesai ada, atau mulai null
+                                                        $alarmOnState = \Illuminate\Support\Facades\Cache::get("iot:mesin:{$proses->mesin_id}:alarm_on_state", null);
                                                         if ($proses->mulai && !$proses->selesai) {
-                                                            $light = 'green';
+                                                            $light = $alarmOnState ? 'yellow' : 'green';
                                                         } else {
                                                             $light = 'red';
                                                         }
@@ -1111,8 +1135,8 @@
                                                             }
                                                             $pendingToppingLa = collect($proses->approvals ?? [])->contains(fn ($a) => ($a->action ?? '') === 'topping_la' && ($a->status ?? '') === 'pending');
                                                             $pendingToppingAux = collect($proses->approvals ?? [])->contains(fn ($a) => ($a->action ?? '') === 'topping_aux' && ($a->status ?? '') === 'pending');
-                                                            $hasToppingLa = collect($proses->approvals ?? [])->contains(fn ($a) => ($a->action ?? '') === 'topping_la');
-                                                            $hasToppingAux = collect($proses->approvals ?? [])->contains(fn ($a) => ($a->action ?? '') === 'topping_aux');
+                                                            $hasToppingLa = collect($proses->approvals ?? [])->contains(fn ($a) => ($a->action ?? '') === 'topping_la' && in_array(($a->status ?? ''), ['pending', 'approved']));
+                                                            $hasToppingAux = collect($proses->approvals ?? [])->contains(fn ($a) => ($a->action ?? '') === 'topping_aux' && in_array(($a->status ?? ''), ['pending', 'approved']));
                                                             $approvedToppingLaNotScanned = collect($proses->approvals ?? [])->contains(function ($a) {
                                                                 if (($a->action ?? '') !== 'topping_la' || ($a->status ?? '') !== 'approved') return false;
                                                                 return !($a->barcodeLas && $a->barcodeLas->where('cancel', false)->count() > 0);
@@ -1326,8 +1350,8 @@
                                                                 @endif
                                                             </div>
                                                             <div style="flex: 1; text-align: right;">
-                                                                <div class="status-light {{ $light == 'green' ? 'running-light' : '' }}"
-                                                                    style="width: 24px; height: 24px; border-radius: 50%; background: {{ $light == 'green' ? '#00ff1a' : '#ff2a2a' }}; display: inline-block; border: 3px solid #fff; box-shadow: 0 0 0 0 transparent; transition: background 0.2s;">
+                                                                <div class="status-light {{ $light == 'green' ? 'running-light' : ($light == 'yellow' ? 'running-light-yellow' : '') }}"
+                                                                    style="width: 24px; height: 24px; border-radius: 50%; background: {{ $light == 'green' ? '#00ff1a' : ($light == 'yellow' ? '#ffeb3b' : '#ff2a2a') }}; display: inline-block; border: 3px solid #fff; box-shadow: 0 0 0 0 transparent; transition: background 0.2s;">
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -2476,7 +2500,7 @@
 
                         // Tampilkan notification error
                         ToastError.fire({
-                            title: 'Tidak dapat memindahkan proses. Proses Reproses masih menunggu persetujuan VP.'
+                            title: 'Tidak dapat memindahkan proses. Proses Reproses masih menunggu persetujuan FM/VP dan akan di-skip dari antrian start otomatis.'
                         });
                         return;
                     }
@@ -3737,7 +3761,7 @@
                 } else if (isStarted) {
                     tooltipText = 'Tidak dapat melakukan aksi. Proses sudah dimulai.';
                 } else if (hasPendingReprocess) {
-                    tooltipText = 'Tidak dapat melakukan aksi. Proses Reproses masih menunggu persetujuan VP.';
+                    tooltipText = 'Tidak dapat melakukan aksi. Proses Reproses masih menunggu persetujuan FM/VP dan akan di-skip dari antrian start otomatis.';
                 } else if (hasPending) {
                     tooltipText = pendingInfo ?
                         `Tidak dapat melakukan aksi. Masih ada permintaan ${pendingInfo.label} yang menunggu persetujuan FM.` :
@@ -3854,7 +3878,7 @@
                     html += '<tr><td colspan="4" id="barcode-kain-list">Loading...</td></tr>';
                     html += '<tr><td colspan="4" id="barcode-kain-progress" style="padding:8px;background:#f9f9f9;font-size:12px;"></td></tr>';
                 }
-                html += '<tr><th colspan="4" id="barcode-la-header" style="background:#f8f8f8;">Barcode LA <span id="barcode-la-badges"></span><span id="barcode-la-buttons" style="float:right;"></span></th></tr>';
+                html += '<tr><th colspan="4" id="barcode-la-header" style="background:#f8f8f8;">Barcode Dye Stuff <span id="barcode-la-badges"></span><span id="barcode-la-buttons" style="float:right;"></span></th></tr>';
                 html += '<tr><td colspan="4" id="barcode-la-list">Loading...</td></tr>';
                 html += '<tr><td colspan="4" id="barcode-la-progress" style="padding:8px;background:#f9f9f9;font-size:12px;"></td></tr>';
                 html += '<tr><th colspan="4" id="barcode-aux-header" style="background:#f8f8f8;">Barcode AUX <span id="barcode-aux-badges"></span><span id="barcode-aux-buttons" style="float:right;"></span></th></tr>';
@@ -4043,7 +4067,7 @@
                         
                         // Tampilkan status keseluruhan (untuk validasi scan LA/AUX)
                         if (barcodeKainOptional) {
-                            const hintHtml = '<div style="padding:6px 8px;background:#e3f2fd;border-radius:4px;margin-bottom:8px;font-size:12px;color:#1565c0;"><i class="fas fa-info-circle"></i> <strong>Proses ini hanya wajib Barcode LA &amp; AUX (D &amp; A).</strong> Barcode Kain (G/F) tidak wajib.</div>';
+                            const hintHtml = '<div style="padding:6px 8px;background:#e3f2fd;border-radius:4px;margin-bottom:8px;font-size:12px;color:#1565c0;"><i class="fas fa-info-circle"></i> <strong>Proses ini hanya wajib Barcode Dye Stuff &amp; AUX (D &amp; A).</strong> Barcode Kain (G/F) tidak wajib.</div>';
                             progressHtml = hintHtml + progressHtml;
                         } else if (allProgress.length > 0) {
                             const totalDetails = allProgress.length;
@@ -4054,13 +4078,13 @@
                                 progressHtml = '<div style="padding:4px 0;background:#e8f5e9;border-radius:4px;margin-bottom:8px;">' + progressHtml;
                                 progressHtml += '<div style="padding:4px 0;background:#e8f5e9;border-radius:4px;margin-top:8px;">';
                                 progressHtml += '<strong style="color:#2e7d32;"><i class="fas fa-check-circle"></i> Semua Detail OP Sudah Lengkap!</strong>';
-                                progressHtml += '<br><span style="color:#43a047;font-size:12px;">Scan Barcode LA & AUX sudah diizinkan.</span>';
+                                progressHtml += '<br><span style="color:#43a047;font-size:12px;">Scan Barcode Dye Stuff & AUX sudah diizinkan.</span>';
                                 progressHtml += '</div>';
                             } else {
                                 progressHtml = '<div style="padding:4px 0;background:#ffebee;border-radius:4px;margin-bottom:8px;">' + progressHtml;
                                 progressHtml += '<div style="padding:4px 0;background:#ffebee;border-radius:4px;margin-top:8px;">';
                                 progressHtml += `<strong style="color:#c62828;"><i class="fas fa-exclamation-triangle"></i> ${completeCount} dari ${totalDetails} Detail OP Lengkap</strong>`;
-                                progressHtml += '<br><span style="color:#c62828;font-size:12px;">Semua Detail OP harus lengkap sebelum scan Barcode LA & AUX.</span>';
+                                progressHtml += '<br><span style="color:#c62828;font-size:12px;">Semua Detail OP harus lengkap sebelum scan Barcode Dye Stuff & AUX.</span>';
                                 progressHtml += '</div>';
                             }
                         }
@@ -4103,7 +4127,7 @@
                                 tooltipLa = tooltipAux += 'Pastikan semua barcode kain sudah memenuhi jumlah roll terlebih dahulu.';
                             }
                         } else if (laComplete) {
-                            tooltipLa = 'Barcode LA sudah lengkap sesuai kebutuhan (awal + topping).';
+                            tooltipLa = 'Barcode Dye Stuff sudah lengkap sesuai kebutuhan (awal + topping).';
                         } else if (auxComplete) {
                             tooltipAux = 'Barcode AUX sudah lengkap sesuai kebutuhan (awal + topping).';
                         }
@@ -4112,7 +4136,7 @@
                                 .removeClass('btn-success')
                                 .addClass('btn-secondary')
                                 .css('cursor', 'not-allowed')
-                                .attr('title', tooltipLa || 'Barcode LA sudah lengkap');
+                                .attr('title', tooltipLa || 'Barcode Dye Stuff sudah lengkap');
                         } else {
                             $btnScanLa.prop('disabled', false)
                                 .removeClass('btn-secondary')
@@ -4146,7 +4170,7 @@
                             '<span style="color:#888;">Belum ada barcode kain.</span>');
                         $('#barcode-kain-progress').html('');
                         $('#barcode-la-list').html(
-                            '<span style="color:#888;">Belum ada barcode LA.</span>');
+                            '<span style="color:#888;">Belum ada barcode Dye Stuff.</span>');
                         $('#barcode-la-progress').html('');
                         $('#barcode-aux-list').html(
                             '<span style="color:#888;">Belum ada barcode AUX.</span>');
@@ -4223,7 +4247,7 @@
             const hasPendingReprocess = hasPendingReprocessApproval(proses);
             if (hasPendingReprocess) {
                 ToastError.fire({
-                    title: 'Tidak dapat mengubah cycle time. Proses Reproses masih menunggu persetujuan VP.'
+                    title: 'Tidak dapat mengubah cycle time. Proses Reproses masih menunggu persetujuan FM/VP dan akan di-skip dari antrian start otomatis.'
                 });
                 return false;
             }
@@ -4291,7 +4315,7 @@
             const hasPendingReprocess = hasPendingReprocessApproval(proses);
             if (hasPendingReprocess) {
                 ToastError.fire({
-                    title: 'Tidak dapat memindahkan proses. Proses Reproses masih menunggu persetujuan VP.'
+                    title: 'Tidak dapat memindahkan proses. Proses Reproses masih menunggu persetujuan FM/VP dan akan di-skip dari antrian start otomatis.'
                 });
                 return false;
             }
@@ -4454,7 +4478,7 @@
             const hasPendingReprocess = hasPendingReprocessApproval(proses);
             if (hasPendingReprocess) {
                 ToastError.fire({
-                    title: 'Tidak dapat menghapus proses. Proses Reproses masih menunggu persetujuan VP.'
+                    title: 'Tidak dapat menghapus proses. Proses Reproses masih menunggu persetujuan FM/VP dan akan di-skip dari antrian start otomatis.'
                 });
                 return false;
             }
@@ -4798,7 +4822,7 @@
                     } else if (barcodeType === 'barcode_kain') {
                         successMessage = 'Barcode kain berhasil disimpan!';
                     } else if (barcodeType === 'barcode_la') {
-                        successMessage = 'Barcode LA berhasil disimpan untuk semua OP pada proses ini!';
+                        successMessage = 'Barcode Dye Stuff berhasil disimpan untuk semua OP pada proses ini!';
                     } else if (barcodeType === 'barcode_aux') {
                         successMessage = 'Barcode AUX berhasil disimpan untuk semua OP pada proses ini!';
                     }
@@ -4915,7 +4939,7 @@
                                     
                                     // Tampilkan status keseluruhan (untuk validasi scan LA/AUX)
                                     if (barcodeKainOptionalScan) {
-                                        const hintHtmlScan = '<div style="padding:6px 8px;background:#e3f2fd;border-radius:4px;margin-bottom:8px;font-size:12px;color:#1565c0;"><i class="fas fa-info-circle"></i> <strong>Proses ini hanya wajib Barcode LA &amp; AUX (D &amp; A).</strong> Barcode Kain (G/F) tidak wajib.</div>';
+                                        const hintHtmlScan = '<div style="padding:6px 8px;background:#e3f2fd;border-radius:4px;margin-bottom:8px;font-size:12px;color:#1565c0;"><i class="fas fa-info-circle"></i> <strong>Proses ini hanya wajib Barcode Dye Stuff &amp; AUX (D &amp; A).</strong> Barcode Kain (G/F) tidak wajib.</div>';
                                         progressHtml = hintHtmlScan + progressHtml;
                                     } else if (allProgress.length > 0) {
                                         const totalDetails = allProgress.length;
@@ -4926,13 +4950,13 @@
                                             progressHtml = '<div style="padding:4px 0;background:#e8f5e9;border-radius:4px;margin-bottom:8px;">' + progressHtml;
                                             progressHtml += '<div style="padding:4px 0;background:#e8f5e9;border-radius:4px;margin-top:8px;">';
                                             progressHtml += '<strong style="color:#2e7d32;"><i class="fas fa-check-circle"></i> Semua Detail OP Sudah Lengkap!</strong>';
-                                            progressHtml += '<br><span style="color:#43a047;font-size:12px;">Scan Barcode LA & AUX sudah diizinkan.</span>';
+                                            progressHtml += '<br><span style="color:#43a047;font-size:12px;">Scan Barcode Dye Stuff & AUX sudah diizinkan.</span>';
                                             progressHtml += '</div>';
                                         } else {
                                             progressHtml = '<div style="padding:4px 0;background:#ffebee;border-radius:4px;margin-bottom:8px;">' + progressHtml;
                                             progressHtml += '<div style="padding:4px 0;background:#ffebee;border-radius:4px;margin-top:8px;">';
                                             progressHtml += `<strong style="color:#c62828;"><i class="fas fa-exclamation-triangle"></i> ${completeCount} dari ${totalDetails} Detail OP Lengkap</strong>`;
-                                            progressHtml += '<br><span style="color:#c62828;font-size:12px;">Semua Detail OP harus lengkap sebelum scan Barcode LA & AUX.</span>';
+                                            progressHtml += '<br><span style="color:#c62828;font-size:12px;">Semua Detail OP harus lengkap sebelum scan Barcode Dye Stuff & AUX.</span>';
                                             progressHtml += '</div>';
                                         }
                                     }
@@ -5308,7 +5332,7 @@
                         }
                         html += '</th></tr><tr><td colspan="4" id="barcode-kain-list">Loading...</td></tr><tr><td colspan="4" id="barcode-kain-progress" style="padding:8px;background:#f9f9f9;font-size:12px;"></td></tr>';
                     }
-                    html += '<tr><th colspan="4" id="barcode-la-header" style="background:#f8f8f8;">Barcode LA <span id="barcode-la-badges"></span><span id="barcode-la-buttons" style="float:right;"></span></th></tr><tr><td colspan="4" id="barcode-la-list">Loading...</td></tr><tr><td colspan="4" id="barcode-la-progress" style="padding:8px;background:#f9f9f9;font-size:12px;"></td></tr>';
+                    html += '<tr><th colspan="4" id="barcode-la-header" style="background:#f8f8f8;">Barcode Dye Stuff <span id="barcode-la-badges"></span><span id="barcode-la-buttons" style="float:right;"></span></th></tr><tr><td colspan="4" id="barcode-la-list">Loading...</td></tr><tr><td colspan="4" id="barcode-la-progress" style="padding:8px;background:#f9f9f9;font-size:12px;"></td></tr>';
                     html += '<tr><th colspan="4" id="barcode-aux-header" style="background:#f8f8f8;">Barcode AUX <span id="barcode-aux-badges"></span><span id="barcode-aux-buttons" style="float:right;"></span></th></tr><tr><td colspan="4" id="barcode-aux-list">Loading...</td></tr><tr><td colspan="4" id="barcode-aux-progress" style="padding:8px;background:#f9f9f9;font-size:12px;"></td></tr>';
                 }
                 return html;
@@ -5432,16 +5456,16 @@
                             progressHtml += '</div>';
                         }
                         if (barcodeKainOptionalLoad) {
-                            const hintHtmlLocal = '<div style="padding:6px 8px;background:#e3f2fd;border-radius:4px;margin-bottom:8px;font-size:12px;color:#1565c0;"><i class="fas fa-info-circle"></i> <strong>Proses ini hanya wajib Barcode LA &amp; AUX (D &amp; A).</strong> Barcode Kain (G/F) tidak wajib.</div>';
+                            const hintHtmlLocal = '<div style="padding:6px 8px;background:#e3f2fd;border-radius:4px;margin-bottom:8px;font-size:12px;color:#1565c0;"><i class="fas fa-info-circle"></i> <strong>Proses ini hanya wajib Barcode Dye Stuff &amp; AUX (D &amp; A).</strong> Barcode Kain (G/F) tidak wajib.</div>';
                             progressHtml = hintHtmlLocal + progressHtml;
                         } else if (allProgress.length > 0) {
                             const completeCount = allProgress.filter(function(p) { return p.is_complete; }).length;
                             const totalDetails = allProgress.length;
                             const allComplete = completeCount === totalDetails;
                             if (allComplete) {
-                                progressHtml = '<div style="padding:4px 0;background:#e8f5e9;border-radius:4px;margin-bottom:8px;">' + progressHtml + '<div style="padding:4px 0;background:#e8f5e9;border-radius:4px;margin-top:8px;"><strong style="color:#2e7d32;"><i class="fas fa-check-circle"></i> Semua Detail OP Sudah Lengkap!</strong><br><span style="color:#43a047;font-size:12px;">Scan Barcode LA & AUX sudah diizinkan.</span></div>';
+                                progressHtml = '<div style="padding:4px 0;background:#e8f5e9;border-radius:4px;margin-bottom:8px;">' + progressHtml + '<div style="padding:4px 0;background:#e8f5e9;border-radius:4px;margin-top:8px;"><strong style="color:#2e7d32;"><i class="fas fa-check-circle"></i> Semua Detail OP Sudah Lengkap!</strong><br><span style="color:#43a047;font-size:12px;">Scan Barcode Dye Stuff & AUX sudah diizinkan.</span></div>';
                             } else {
-                                progressHtml = '<div style="padding:4px 0;background:#ffebee;border-radius:4px;margin-bottom:8px;">' + progressHtml + '<div style="padding:4px 0;background:#ffebee;border-radius:4px;margin-top:8px;"><strong style="color:#c62828;"><i class="fas fa-exclamation-triangle"></i> ' + completeCount + ' dari ' + totalDetails + ' Detail OP Lengkap</strong><br><span style="color:#c62828;font-size:12px;">Semua Detail OP harus lengkap sebelum scan Barcode LA & AUX.</span></div>';
+                                progressHtml = '<div style="padding:4px 0;background:#ffebee;border-radius:4px;margin-bottom:8px;">' + progressHtml + '<div style="padding:4px 0;background:#ffebee;border-radius:4px;margin-top:8px;"><strong style="color:#c62828;"><i class="fas fa-exclamation-triangle"></i> ' + completeCount + ' dari ' + totalDetails + ' Detail OP Lengkap</strong><br><span style="color:#c62828;font-size:12px;">Semua Detail OP harus lengkap sebelum scan Barcode Dye Stuff & AUX.</span></div>';
                             }
                         }
                         if ($('#barcode-kain-progress').length) {
@@ -5462,7 +5486,7 @@
                         const $btnScanAuxLocal = $('#barcode-aux-buttons .scan-barcode-btn');
                         if ($btnScanLaLocal.length) {
                             if (!canScanLaAuxLocal || laCompleteLocal) {
-                                $btnScanLaLocal.prop('disabled', true).removeClass('btn-success').addClass('btn-secondary').css('cursor', 'not-allowed').attr('title', laCompleteLocal ? 'Barcode LA sudah lengkap sesuai kebutuhan' : 'Detail OP belum lengkap');
+                                $btnScanLaLocal.prop('disabled', true).removeClass('btn-success').addClass('btn-secondary').css('cursor', 'not-allowed').attr('title', laCompleteLocal ? 'Barcode Dye Stuff sudah lengkap sesuai kebutuhan' : 'Detail OP belum lengkap');
                             } else {
                                 $btnScanLaLocal.prop('disabled', false).removeClass('btn-secondary').addClass('btn-success').css('cursor', 'pointer').removeAttr('title');
                             }
@@ -5482,7 +5506,7 @@
                     error: function() {
                         if ($('#barcode-kain-list').length) $('#barcode-kain-list').html('<span style="color:#888;">Belum ada barcode kain.</span>');
                         if ($('#barcode-kain-progress').length) $('#barcode-kain-progress').html('');
-                        $('#barcode-la-list').html('<span style="color:#888;">Belum ada barcode LA.</span>');
+                        $('#barcode-la-list').html('<span style="color:#888;">Belum ada barcode Dye Stuff.</span>');
                         $('#barcode-aux-list').html('<span style="color:#888;">Belum ada barcode AUX.</span>');
                         $('#barcode-la-badges').html('');
                         $('#barcode-la-buttons').html('');
@@ -6998,7 +7022,7 @@
 
             // Update informasi di modal
             const typeLabel = barcodeType === 'kain' ? 'Barcode Kain' :
-                barcodeType === 'la' ? 'Barcode LA' : 'Barcode AUX';
+                barcodeType === 'la' ? 'Barcode Dye Stuff' : 'Barcode AUX';
             const barcodeText = barcode ? `<strong>${barcode}</strong>` : 'barcode ini';
             const matdokText = matdok ? `<br><small class="text-muted">Material Document: ${matdok}</small>` : '';
 
@@ -7245,7 +7269,7 @@
                                         
                                         // Tampilkan status keseluruhan (untuk validasi scan LA/AUX)
                                         if (barcodeKainOptionalRefresh) {
-                                            const hintHtmlRefresh = '<div style="padding:6px 8px;background:#e3f2fd;border-radius:4px;margin-bottom:8px;font-size:12px;color:#1565c0;"><i class="fas fa-info-circle"></i> <strong>Proses ini hanya wajib Barcode LA &amp; AUX (D &amp; A).</strong> Barcode Kain (G/F) tidak wajib.</div>';
+                                            const hintHtmlRefresh = '<div style="padding:6px 8px;background:#e3f2fd;border-radius:4px;margin-bottom:8px;font-size:12px;color:#1565c0;"><i class="fas fa-info-circle"></i> <strong>Proses ini hanya wajib Barcode Dye Stuff &amp; AUX (D &amp; A).</strong> Barcode Kain (G/F) tidak wajib.</div>';
                                             progressHtml = hintHtmlRefresh + progressHtml;
                                         } else if (allProgress.length > 0) {
                                             const totalDetails = allProgress.length;
@@ -7256,13 +7280,13 @@
                                                 progressHtml = '<div style="padding:4px 0;background:#e8f5e9;border-radius:4px;margin-bottom:8px;">' + progressHtml;
                                                 progressHtml += '<div style="padding:4px 0;background:#e8f5e9;border-radius:4px;margin-top:8px;">';
                                                 progressHtml += '<strong style="color:#2e7d32;"><i class="fas fa-check-circle"></i> Semua Detail OP Sudah Lengkap!</strong>';
-                                                progressHtml += '<br><span style="color:#43a047;font-size:12px;">Scan Barcode LA & AUX sudah diizinkan.</span>';
+                                                progressHtml += '<br><span style="color:#43a047;font-size:12px;">Scan Barcode Dye Stuff & AUX sudah diizinkan.</span>';
                                                 progressHtml += '</div>';
                                             } else {
                                                 progressHtml = '<div style="padding:4px 0;background:#ffebee;border-radius:4px;margin-bottom:8px;">' + progressHtml;
                                                 progressHtml += '<div style="padding:4px 0;background:#ffebee;border-radius:4px;margin-top:8px;">';
                                                 progressHtml += `<strong style="color:#c62828;"><i class="fas fa-exclamation-triangle"></i> ${completeCount} dari ${totalDetails} Detail OP Lengkap</strong>`;
-                                                progressHtml += '<br><span style="color:#c62828;font-size:12px;">Semua Detail OP harus lengkap sebelum scan Barcode LA & AUX.</span>';
+                                                progressHtml += '<br><span style="color:#c62828;font-size:12px;">Semua Detail OP harus lengkap sebelum scan Barcode Dye Stuff & AUX.</span>';
                                                 progressHtml += '</div>';
                                             }
                                         }

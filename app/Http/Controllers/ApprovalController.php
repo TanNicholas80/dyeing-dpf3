@@ -6,6 +6,7 @@ use App\Models\Approval;
 use App\Models\Auxl;
 use App\Models\Proses;
 use App\Models\DetailProses;
+use App\Models\Mesin;
 use App\Events\ProsesStatusUpdated;
 use App\Events\ProsesDeleted;
 use App\Events\ProsesMoved;
@@ -366,6 +367,15 @@ class ApprovalController extends Controller
                     $affectedProsesIds = $statusService->getAffectedProsesIds();
                     $statusData = $statusService->generateProsesStatus($proses, $affectedProsesIds);
                     event(new ProsesStatusUpdated($proses->id, $statusData));
+
+                    // Setelah FM+VP approve, coba jalankan antrian jika mesin ON dan tidak ada proses aktif.
+                    $started = $this->startNextProsesIfMesinOn((int) $proses->mesin_id);
+                    if ($started) {
+                        $started->load(['approvals', 'details.barcodeKains', 'details.barcodeLas', 'details.barcodeAuxs']);
+                        $affected = $statusService->getAffectedProsesIds();
+                        $startedStatus = $statusService->generateProsesStatus($started, $affected);
+                        event(new ProsesStatusUpdated($started->id, $startedStatus));
+                    }
                 } 
                 break;
 
@@ -536,5 +546,90 @@ class ApprovalController extends Controller
                 // Action tidak dikenali, tidak perlu action khusus
                 break;
         }
+    }
+
+    /**
+     * Jika mesin ON dan tidak ada proses aktif, jalankan proses berikutnya.
+     * create_reprocess pending FM/VP akan di-skip.
+     * pending edit/delete/move/swap akan di-auto-reject saat proses dipilih untuk start.
+     */
+    private function startNextProsesIfMesinOn(int $mesinId): ?Proses
+    {
+        $mesin = Mesin::find($mesinId);
+        if (!$mesin || (int) $mesin->status !== 1) {
+            return null;
+        }
+
+        $adaProsesAktif = Proses::where('mesin_id', $mesinId)
+            ->whereNotNull('mulai')
+            ->whereNull('selesai')
+            ->exists();
+        if ($adaProsesAktif) {
+            return null;
+        }
+
+        $antrian = Proses::where('mesin_id', $mesinId)
+            ->whereNull('mulai')
+            ->whereNull('selesai')
+            ->where('order', '>', 0)
+            ->orderBy('order')
+            ->orderBy('id')
+            ->get();
+        if ($antrian->isEmpty()) {
+            return null;
+        }
+
+        $prosesSelanjutnya = null;
+        foreach ($antrian as $candidate) {
+            $hasPendingCreateReprocess = Approval::where('proses_id', $candidate->id)
+                ->where('status', 'pending')
+                ->where('action', 'create_reprocess')
+                ->whereIn('type', ['FM', 'VP'])
+                ->exists();
+            if ($hasPendingCreateReprocess) {
+                continue;
+            }
+
+            $blockingPendingApprovals = Approval::where('proses_id', $candidate->id)
+                ->where('status', 'pending')
+                ->where('type', 'FM')
+                ->whereIn('action', ['edit_cycle_time', 'delete_proses', 'move_machine', 'swap_position'])
+                ->get();
+            foreach ($blockingPendingApprovals as $pending) {
+                $note = (string) ($pending->note ?? '');
+                $systemNote = 'Auto rejected by system: proses otomatis berjalan saat mesin ON.';
+                $pending->status = 'rejected';
+                $pending->note = $note !== '' ? ($note . ' | ' . $systemNote) : $systemNote;
+                $pending->approved_by = null;
+                $pending->save();
+            }
+
+            $prosesSelanjutnya = $candidate;
+            break;
+        }
+
+        if (!$prosesSelanjutnya) {
+            return null;
+        }
+
+        $prosesSelanjutnya->update([
+            'mulai' => now(),
+            'order' => 0,
+        ]);
+
+        $pending = Proses::where('mesin_id', $mesinId)
+            ->whereNull('mulai')
+            ->whereNull('selesai')
+            ->where('id', '!=', $prosesSelanjutnya->id)
+            ->orderBy('order')
+            ->orderBy('id')
+            ->get();
+
+        $order = 1;
+        foreach ($pending as $p) {
+            $p->update(['order' => $order++]);
+        }
+
+        return $prosesSelanjutnya->fresh();
     }
 }

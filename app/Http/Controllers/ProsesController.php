@@ -77,14 +77,49 @@ class ProsesController extends Controller
             return null;
         }
 
-        // Cari proses selanjutnya: belum mulai, belum selesai, order > 0, urut order lalu id
-        $prosesSelanjutnya = Proses::where('mesin_id', $mesinId)
+        // Cari antrian proses: belum mulai, belum selesai, order > 0, urut order lalu id
+        $antrian = Proses::where('mesin_id', $mesinId)
             ->whereNull('mulai')
             ->whereNull('selesai')
             ->where('order', '>', 0)
             ->orderBy('order')
             ->orderBy('id')
-            ->first();
+            ->get();
+
+        if ($antrian->isEmpty()) {
+            return null;
+        }
+
+        $prosesSelanjutnya = null;
+        foreach ($antrian as $candidate) {
+            // Khusus create_reprocess: selama masih pending FM/VP, proses di-skip dulu.
+            $hasPendingCreateReprocess = Approval::where('proses_id', $candidate->id)
+                ->where('status', 'pending')
+                ->where('action', 'create_reprocess')
+                ->whereIn('type', ['FM', 'VP'])
+                ->exists();
+            if ($hasPendingCreateReprocess) {
+                continue;
+            }
+
+            // Untuk aksi perubahan umum: jika masih pending dan proses ini akan jalan, auto reject oleh sistem.
+            $blockingPendingApprovals = Approval::where('proses_id', $candidate->id)
+                ->where('status', 'pending')
+                ->where('type', 'FM')
+                ->whereIn('action', ['edit_cycle_time', 'delete_proses', 'move_machine', 'swap_position'])
+                ->get();
+            foreach ($blockingPendingApprovals as $approval) {
+                $note = (string) ($approval->note ?? '');
+                $systemNote = 'Auto rejected by system: proses otomatis berjalan saat mesin ON.';
+                $approval->status = 'rejected';
+                $approval->note = $note !== '' ? ($note . ' | ' . $systemNote) : $systemNote;
+                $approval->approved_by = null;
+                $approval->save();
+            }
+
+            $prosesSelanjutnya = $candidate;
+            break;
+        }
 
         if (!$prosesSelanjutnya) {
             return null;
@@ -1611,6 +1646,16 @@ class ProsesController extends Controller
             ->where('action', 'topping_aux')
             ->where('status', 'pending')
             ->exists();
+        $hasToppingLa = Approval::where('proses_id', $id)
+            ->where('type', 'KEPALA_SHIFT')
+            ->where('action', 'topping_la')
+            ->whereIn('status', ['pending', 'approved'])
+            ->exists();
+        $hasToppingAux = Approval::where('proses_id', $id)
+            ->where('type', 'KEPALA_SHIFT')
+            ->where('action', 'topping_aux')
+            ->whereIn('status', ['pending', 'approved'])
+            ->exists();
 
         $approvedToppingLa = Approval::where('proses_id', $id)
             ->where('type', 'KEPALA_SHIFT')
@@ -1624,6 +1669,10 @@ class ProsesController extends Controller
             ->where('status', 'approved')
             ->whereDoesntHave('barcodeAuxs', fn ($q) => $q->where('cancel', false))
             ->first();
+        $approvedToppingLaNotScanned = !is_null($approvedToppingLa);
+        $approvedToppingAuxNotScanned = !is_null($approvedToppingAux);
+        $tdColor = $hasToppingLa ? ($pendingToppingLa ? 'yellow' : ($approvedToppingLaNotScanned ? 'red' : 'green')) : null;
+        $taColor = $hasToppingAux ? ($pendingToppingAux ? 'yellow' : ($approvedToppingAuxNotScanned ? 'red' : 'green')) : null;
 
         $canRequestToppingLa = $hasLa && $hasAux && !$pendingToppingLa;
         if ($canRequestToppingLa) {
@@ -1737,6 +1786,10 @@ class ProsesController extends Controller
             'barcode_kain_optional' => $barcodeKainOptional,
             'pending_topping_la' => $pendingToppingLa,
             'pending_topping_aux' => $pendingToppingAux,
+            'has_topping_la' => $hasToppingLa,
+            'has_topping_aux' => $hasToppingAux,
+            'td_color' => $tdColor,
+            'ta_color' => $taColor,
             'approved_topping_la' => $approvedToppingLa ? ['id' => $approvedToppingLa->id] : null,
             'approved_topping_aux' => $approvedToppingAux ? ['id' => $approvedToppingAux->id] : null,
             'can_request_topping_la' => $canRequestToppingLa,

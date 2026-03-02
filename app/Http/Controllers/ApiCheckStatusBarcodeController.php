@@ -15,6 +15,16 @@ use App\Events\MesinUpdated;
 
 class ApiCheckStatusBarcodeController extends Controller
 {
+    private function forceAlarmKey(int $mesinId): string
+    {
+        return "iot:mesin:{$mesinId}:force_alarm_off";
+    }
+
+    private function alarmStateKey(int $mesinId): string
+    {
+        return "iot:mesin:{$mesinId}:alarm_on_state";
+    }
+
     private function assertDeviceToken(Request $request): void
     {
         $expected = env('IOT_DEVICE_TOKEN');
@@ -67,6 +77,7 @@ class ApiCheckStatusBarcodeController extends Controller
 
         // Invalidate cache alarm agar polling berikutnya mendapat status terbaru
         Cache::forget("iot:mesin:{$mesin->id}:alarm_result");
+        Cache::forget($this->alarmStateKey((int) $mesin->id));
 
         // Update status mesin di database (1 = Hidup/ON, 0 = Mati/OFF)
         $mesin->status = $isOn;
@@ -115,6 +126,36 @@ class ApiCheckStatusBarcodeController extends Controller
         // Prioritas: cache (sinyal PLC real-time) -> fallback DB
         $isOn = ($cacheIsOn !== null) ? $cacheIsOn : $dbIsOn;
 
+        // Override super admin: alarm dipaksa OFF tanpa memedulikan rule lain.
+        $forceAlarmOff = (bool) Cache::get($this->forceAlarmKey((int) $mesin->id), false);
+        if ($forceAlarmOff) {
+            Cache::forget($latchKey);
+            Cache::put($this->alarmStateKey((int) $mesin->id), false, now()->addMinutes(5));
+            $minimal = ['mesin_id' => $mesin->id, 'alarm_on' => false];
+            if (!$full) {
+                Cache::put($alarmCacheKey, $minimal, now()->addSeconds(3));
+                return response()->json($minimal);
+            }
+
+            $stateSource = ($cacheIsOn !== null) ? 'cache' : 'db';
+            return response()->json([
+                'status' => 'success',
+                'mesin_id' => $mesin->id,
+                'mesin' => $mesin->jenis_mesin,
+                'alarm_on' => false,
+                'is_on' => $isOn,
+                'reason' => 'Alarm dipaksa OFF oleh Super Admin',
+                'state' => [
+                    'source' => $stateSource,
+                    'cache' => $cacheState,
+                    'db' => ['status' => $dbIsOn],
+                ],
+                'force_alarm_off' => true,
+                'proses_id' => null,
+                'proses_selesai_id' => null,
+            ]);
+        }
+
         // Optimasi: early exit saat mesin ON dan alarm latched - skip semua query DB
         if ($isOn) {
             $isLatched = (bool) Cache::get($latchKey, false);
@@ -127,21 +168,52 @@ class ApiCheckStatusBarcodeController extends Controller
             }
         }
 
-        // Pilih proses yang paling "aktif":
-        // - prioritas proses yang sudah mulai (mulai != null) tapi belum selesai
-        // - fallback ke proses antri (mulai null) yang belum selesai
-        $proses = Proses::where('mesin_id', $mesin->id)
+        // Pilih proses yang "runnable" untuk alarm:
+        // - prioritas proses aktif (mulai != null, selesai null)
+        // - fallback ke proses antri yang TIDAK terblokir pending create_reprocess (FM/VP)
+        $prosesAktif = Proses::where('mesin_id', $mesin->id)
+            ->whereNotNull('mulai')
             ->whereNull('selesai')
-            ->orderByRaw('CASE WHEN mulai IS NULL THEN 1 ELSE 0 END')
             ->orderByDesc('mulai')
-            ->orderBy('order', 'asc')
+            ->orderBy('id', 'asc')
             ->first();
+
+        $hasPendingReprocessApproval = $isOn && Approval::where('status', 'pending')
+            ->where('action', 'create_reprocess')
+            ->whereIn('type', ['FM', 'VP'])
+            ->whereHas('proses', function ($q) use ($mesin) {
+                $q->where('mesin_id', $mesin->id)
+                    ->whereNull('selesai')
+                    ->where('jenis', 'Reproses');
+            })
+            ->exists();
+        $prosesAntriRunnable = Proses::where('mesin_id', $mesin->id)
+            ->whereNull('mulai')
+            ->whereNull('selesai')
+            ->where('order', '>', 0)
+            ->whereDoesntHave('approvals', function ($q) {
+                $q->where('status', 'pending')
+                    ->where('action', 'create_reprocess')
+                    ->whereIn('type', ['FM', 'VP']);
+            })
+            ->orderBy('order', 'asc')
+            ->orderBy('id', 'asc')
+            ->first();
+
+        $proses = $prosesAktif ?: $prosesAntriRunnable;
+        $hasNextPlanning = !is_null($prosesAntriRunnable);
 
         // Proses sebelumnya yang sudah selesai (paling terakhir selesai)
         $prosesSelesai = Proses::where('mesin_id', $mesin->id)
             ->whereNotNull('selesai')
             ->orderByDesc('selesai')
             ->first();
+
+        // Alarm operasional tambahan:
+        // 1) Mesin ON tapi tidak ada plan/proses runnable sama sekali
+        // 2) Mesin ON dan Reproses masih pending FM/VP, serta tidak ada planning berikutnya yang runnable
+        $noPlanOrProses = $isOn && !$proses;
+        $pendingReprocessWithoutPlanning = $isOn && $hasPendingReprocessApproval && !$hasNextPlanning && is_null($prosesAktif);
 
         $alarmOn = false;
         $barcodeIncomplete = false;
@@ -171,14 +243,19 @@ class ApiCheckStatusBarcodeController extends Controller
             Cache::forget($latchKey);
             $alarmOn = $barcodeIncomplete;
         } else {
-            $isLatched = (bool) Cache::get($latchKey, false);
-            if ($isLatched) {
+            $operationalAlarm = $noPlanOrProses || $pendingReprocessWithoutPlanning;
+            if ($operationalAlarm) {
                 $alarmOn = true;
-            } elseif ($barcodeIncomplete) {
-                $alarmOn = true;
-                Cache::put($latchKey, true, now()->addHours(24));
             } else {
-                $alarmOn = false;
+                $isLatched = (bool) Cache::get($latchKey, false);
+                if ($isLatched) {
+                    $alarmOn = true;
+                } elseif ($barcodeIncomplete) {
+                    $alarmOn = true;
+                    Cache::put($latchKey, true, now()->addHours(24));
+                } else {
+                    $alarmOn = false;
+                }
             }
         }
 
@@ -186,6 +263,7 @@ class ApiCheckStatusBarcodeController extends Controller
             'mesin_id' => $mesin->id,
             'alarm_on' => $alarmOn,
         ];
+        Cache::put($this->alarmStateKey((int) $mesin->id), (bool) $alarmOn, now()->addMinutes(5));
 
         if (!$full) {
             Cache::put($alarmCacheKey, $minimal, now()->addSeconds(3));
@@ -203,9 +281,13 @@ class ApiCheckStatusBarcodeController extends Controller
         $reason = !$isOn
             ? ($alarmOn ? 'Mesin OFF, barcode belum lengkap' : 'Mesin OFF')
             : ($alarmOn
-                ? ($barcodeIncompleteSelesai && !$barcodeIncompleteAktif
-                    ? 'Proses sebelumnya belum lengkap barcode / alarm latched'
-                    : 'Barcode belum lengkap / alarm latched')
+                ? ($noPlanOrProses
+                    ? 'Mesin ON tetapi tidak ada plan/proses'
+                    : ($pendingReprocessWithoutPlanning
+                        ? 'Mesin ON dan Reproses masih menunggu approval FM/VP'
+                        : ($barcodeIncompleteSelesai && !$barcodeIncompleteAktif
+                            ? 'Proses sebelumnya belum lengkap barcode / alarm latched'
+                            : 'Barcode belum lengkap / alarm latched')))
                 : (!$proses ? 'Tidak ada proses aktif' : (($proses->jenis ?? null) === 'Maintenance' ? 'Maintenance' : 'Barcode lengkap')));
 
         $fullPayload = array_merge($minimal, [
@@ -216,6 +298,10 @@ class ApiCheckStatusBarcodeController extends Controller
             'state' => $state,
             'proses_id' => $proses?->id,
             'proses_selesai_id' => $prosesSelesai?->id,
+            'no_plan_or_proses' => $noPlanOrProses,
+            'has_pending_reprocess_approval' => $hasPendingReprocessApproval,
+            'has_next_planning' => $hasNextPlanning,
+            'pending_reprocess_without_planning' => $pendingReprocessWithoutPlanning,
         ]);
 
         if ($proses && ($proses->jenis ?? null) !== 'Maintenance' && isset($laComplete, $auxComplete)) {

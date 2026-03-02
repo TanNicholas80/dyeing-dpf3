@@ -64,8 +64,8 @@
                                     <option value="aux" {{ old('role') == 'aux' ? 'selected' : '' }}>Aux
                                     </option>
                                     <option value="ppic" {{ old('role') == 'ppic' ? 'selected' : '' }}>PPIC</option>
-                                    <option value="mesin" {{ old('role') == 'mesin' ? 'selected' : '' }}>Mesin</option>
-                                    <option value="ds" {{ old('role') == 'ds' ? 'selected' : '' }}>DS</option>
+                                    <option value="operator" {{ old('role') == 'operator' ? 'selected' : '' }}>Operator</option>
+                                    <option value="dashboard" {{ old('role') == 'dashboard' ? 'selected' : '' }}>Dashboard</option>
                                     <option value="fm" {{ old('role') == 'fm' ? 'selected' : '' }}>FM</option>
                                     <option value="vp" {{ old('role') == 'vp' ? 'selected' : '' }}>VP</option>
                                     <option value="kepala_ruangan" {{ old('role') == 'kepala_ruangan' ? 'selected' : '' }}>Kepala Ruangan</option>
@@ -107,7 +107,7 @@
         const mesinGroup = document.getElementById('mesin-group');
 
         function toggleMesinRequired() {
-            const isMesin = roleSelect.value === 'mesin';
+            const isMesin = roleSelect.value === 'operator';
             mesinGroup.style.display = isMesin ? 'block' : 'none';
             mesinSelect.required = isMesin;
             if (!isMesin) {
