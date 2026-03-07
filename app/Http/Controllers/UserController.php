@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
-use App\Models\Mesin;
+use App\Services\MesinCacheService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
@@ -32,9 +32,9 @@ class UserController extends Controller
     /**
      * Form tambah user.
      */
-    public function create()
+    public function create(MesinCacheService $mesinCache)
     {
-        $mesins = Mesin::all();
+        $mesins = $mesinCache->getSelectionList();
         return view('user.create', compact('mesins'));
     }
 
@@ -72,10 +72,10 @@ class UserController extends Controller
     /**
      * Form edit user.
      */
-    public function edit($id)
+    public function edit($id, MesinCacheService $mesinCache)
     {
         $user = User::findOrFail($id);
-        $mesins = Mesin::all();
+        $mesins = $mesinCache->getSelectionList();
         return view('user.edit', compact('user', 'mesins'));
     }
 

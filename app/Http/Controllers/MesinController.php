@@ -6,6 +6,7 @@ use App\Models\Mesin;
 use App\Events\MesinCreated;
 use App\Events\MesinUpdated;
 use App\Events\MesinDeleted;
+use App\Services\MesinCacheService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -33,7 +34,7 @@ class MesinController extends Controller
         return view('mesin.create');
     }
 
-    public function store(Request $request)
+    public function store(Request $request, MesinCacheService $mesinCache)
     {
         $request->validate([
             'jenis_mesin' => 'required|unique:mesins,jenis_mesin',
@@ -41,6 +42,7 @@ class MesinController extends Controller
         ]);
 
         $mesin = Mesin::create($request->only('jenis_mesin', 'status'));
+        $mesinCache->forgetAll();
 
         // Broadcast event untuk update real-time di dashboard
         event(new MesinCreated([
@@ -57,7 +59,7 @@ class MesinController extends Controller
         return view('mesin.edit', compact('mesin'));
     }
 
-    public function update(Request $request, Mesin $mesin)
+    public function update(Request $request, Mesin $mesin, MesinCacheService $mesinCache)
     {
         $request->validate([
             'jenis_mesin' => 'required|unique:mesins,jenis_mesin,' . $mesin->id,
@@ -65,6 +67,7 @@ class MesinController extends Controller
         ]);
 
         $mesin->update($request->only('jenis_mesin', 'status'));
+        $mesinCache->forgetAll();
         
         // Refresh untuk memastikan data terbaru
         $mesin->refresh();
@@ -79,10 +82,11 @@ class MesinController extends Controller
         return redirect()->route('mesin.index')->with('success', 'Mesin berhasil diperbarui.');
     }
 
-    public function destroy(Mesin $mesin)
+    public function destroy(Mesin $mesin, MesinCacheService $mesinCache)
     {
         $mesinId = $mesin->id;
         $mesin->delete();
+        $mesinCache->forgetAll();
 
         // Broadcast event untuk update real-time di dashboard
         event(new MesinDeleted($mesinId));

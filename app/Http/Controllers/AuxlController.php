@@ -8,6 +8,7 @@ use App\Models\BarcodeAux;
 use App\Models\Approval;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 class AuxlController extends Controller
@@ -183,10 +184,17 @@ class AuxlController extends Controller
      */
     public function proxyAuxiliary(Request $request)
     {
-        $q = $request->input('q', '');
+        $q = trim((string) $request->input('q', ''));
         if (strlen($q) < 3) {
             return response()->json(['results' => []]);
         }
+
+        $cacheKey = 'proxy_sap:auxiliary:' . md5($q);
+        $cached = Cache::get($cacheKey);
+        if ($cached !== null) {
+            return response()->json($cached);
+        }
+
         try {
             $client = new \GuzzleHttp\Client();
             $response = $client->request('POST', 'http://18.139.142.16:8020/sap/bc/zdyes/zterima_zchm?sap-client=100', [
@@ -200,18 +208,16 @@ class AuxlController extends Controller
             ]);
             $data = json_decode($response->getBody(), true);
             $results = collect($data)
-                ->filter(function($item) use ($q) {
-                    return isset($item['matnr']);
-                })
-                ->map(function($item) {
-                    return [
-                        'id' => $item['matnr'],
-                        'text' => $item['matnr'],
-                    ];
-                })
+                ->filter(fn ($item) => isset($item['matnr']))
+                ->map(fn ($item) => [
+                    'id' => $item['matnr'],
+                    'text' => $item['matnr'],
+                ])
                 ->values()
                 ->all();
-            return response()->json(['results' => $results]);
+            $payload = ['results' => $results];
+            Cache::put($cacheKey, $payload, now()->addMinutes(10));
+            return response()->json($payload);
         } catch (\Exception $e) {
             return response()->json(['results' => []]);
         }
@@ -223,10 +229,17 @@ class AuxlController extends Controller
      */
     public function proxyCustomerSearch(Request $request)
     {
-        $q = $request->input('q', '');
+        $q = trim((string) $request->input('q', ''));
         if (strlen($q) < 3) {
             return response()->json(['results' => []]);
         }
+
+        $cacheKey = 'proxy_sap:customer:' . md5($q);
+        $cached = Cache::get($cacheKey);
+        if ($cached !== null) {
+            return response()->json($cached);
+        }
+
         try {
             $client = new \GuzzleHttp\Client();
             $response = $client->request('POST', 'http://18.139.142.16:8020/sap/bc/zdyes/zterima_cstmr?sap-client=100', [
@@ -244,17 +257,16 @@ class AuxlController extends Controller
             }
             $results = collect($data)
                 ->filter(fn ($item) => isset($item['customer']))
-                ->map(function ($item) {
-                    $customer = $item['customer'];
-                    return [
-                        'id' => $customer,
-                        'text' => $customer,
-                    ];
-                })
+                ->map(fn ($item) => [
+                    'id' => $item['customer'],
+                    'text' => $item['customer'],
+                ])
                 ->unique('id')
                 ->values()
                 ->all();
-            return response()->json(['results' => $results]);
+            $payload = ['results' => $results];
+            Cache::put($cacheKey, $payload, now()->addMinutes(10));
+            return response()->json($payload);
         } catch (\Exception $e) {
             return response()->json(['results' => []]);
         }
@@ -262,10 +274,17 @@ class AuxlController extends Controller
 
     public function proxyMarketingSearch(Request $request)
     {
-        $q = $request->input('q', '');
+        $q = trim((string) $request->input('q', ''));
         if (strlen($q) < 3) {
             return response()->json(['results' => []]);
         }
+
+        $cacheKey = 'proxy_sap:marketing:' . md5($q);
+        $cached = Cache::get($cacheKey);
+        if ($cached !== null) {
+            return response()->json($cached);
+        }
+
         try {
             $client = new \GuzzleHttp\Client();
             $response = $client->request('POST', 'http://18.139.142.16:8020/sap/bc/zdyes/zterima_mkt?sap-client=100', [
@@ -283,17 +302,16 @@ class AuxlController extends Controller
             }
             $results = collect($data)
                 ->filter(fn ($item) => isset($item['marketing']))
-                ->map(function ($item) {
-                    $marketing = $item['marketing'];
-                    return [
-                        'id' => $marketing,
-                        'text' => $marketing,
-                    ];
-                })
+                ->map(fn ($item) => [
+                    'id' => $item['marketing'],
+                    'text' => $item['marketing'],
+                ])
                 ->unique('id')
                 ->values()
                 ->all();
-            return response()->json(['results' => $results]);
+            $payload = ['results' => $results];
+            Cache::put($cacheKey, $payload, now()->addMinutes(10));
+            return response()->json($payload);
         } catch (\Exception $e) {
             return response()->json(['results' => []]);
         }

@@ -14,6 +14,7 @@ use App\Events\ProsesCreated;
 use App\Events\ProsesStatusUpdated;
 use App\Events\BarcodeStatusUpdated;
 use App\Events\ApprovalPendingCreated;
+use App\Services\MesinCacheService;
 use App\Services\ProsesStatusService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -526,9 +527,9 @@ class ProsesController extends Controller
         }
     }
 
-    public function create()
+    public function create(MesinCacheService $mesinCache)
     {
-        $mesins = Mesin::select('id', 'jenis_mesin')->get();
+        $mesins = $mesinCache->getSelectionList();
         return response()->json([
             'mesins' => $mesins
         ]);
@@ -536,10 +537,17 @@ class ProsesController extends Controller
 
     public function proxyOpSearch(Request $request)
     {
-        $no_op = $request->input('no_op');
-        if (!$no_op) {
+        $no_op = trim((string) $request->input('no_op', ''));
+        if ($no_op === '') {
             return response()->json(['results' => []]);
         }
+
+        $cacheKey = 'proxy_sap:op:' . md5($no_op);
+        $cached = Cache::get($cacheKey);
+        if ($cached !== null) {
+            return response()->json($cached);
+        }
+
         try {
             $client = new \GuzzleHttp\Client();
             $response = $client->post(
@@ -565,10 +573,12 @@ class ProsesController extends Controller
                     'text' => $op
                 ])
                 ->values();
-            return response()->json([
+            $payload = [
                 'results' => $unique_ops,
-                'raw' => $data // ← untuk no partai
-            ]);
+                'raw' => $data,
+            ];
+            Cache::put($cacheKey, $payload, now()->addMinutes(10));
+            return response()->json($payload);
         } catch (\Exception $e) {
             return response()->json(['results' => []]);
         }

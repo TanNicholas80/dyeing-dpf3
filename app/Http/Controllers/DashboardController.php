@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Mesin;
 use App\Models\Proses;
 use App\Models\Approval;
+use App\Services\MesinCacheService;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Http;
@@ -14,24 +14,22 @@ use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
 {
-    public function dashboard(Request $request)
+    public function dashboard(Request $request, MesinCacheService $mesinCache)
     {
         $user = $request->user();
 
         // Jika user role mesin dan memiliki mesin spesifik, batasi daftar mesin
         $restrictedMesinIds = [];
-        $mesinsQuery = Mesin::select('id', 'jenis_mesin');
         if ($user && $user->role === 'mesin' && $user->mesin) {
-            $mesinsQuery->where('jenis_mesin', $user->mesin);
-            $mesinRecord = Mesin::where('jenis_mesin', $user->mesin)->first();
-            if ($mesinRecord) {
-                $restrictedMesinIds = [$mesinRecord->id];
+            $restrictedMesinId = $mesinCache->getIdByJenis($user->mesin);
+            if ($restrictedMesinId !== null) {
+                $restrictedMesinIds = [$restrictedMesinId];
             }
         }
 
-        $mesins = $mesinsQuery
-            ->orderBy('id', 'asc')
-            ->get();
+        $mesins = count($restrictedMesinIds) > 0
+            ? $mesinCache->getSelectionListForJenis($user->mesin)
+            : $mesinCache->getSelectionList();
 
         $currentPage = $request->query('page', 1);
 
@@ -113,7 +111,7 @@ class DashboardController extends Controller
      * Get status semua proses untuk real-time update
      * Return JSON dengan informasi mulai, selesai untuk update warna card
      */
-    public function prosesStatuses(Request $request)
+    public function prosesStatuses(Request $request, MesinCacheService $mesinCache)
     {
         try {
             $user = $request->user();
@@ -121,9 +119,9 @@ class DashboardController extends Controller
             // Batasi mesin jika user role mesin
             $restrictedMesinIds = [];
             if ($user && $user->role === 'mesin' && $user->mesin) {
-                $mesinRecord = Mesin::where('jenis_mesin', $user->mesin)->first();
-                if ($mesinRecord) {
-                    $restrictedMesinIds = [$mesinRecord->id];
+                $restrictedMesinId = $mesinCache->getIdByJenis($user->mesin);
+                if ($restrictedMesinId !== null) {
+                    $restrictedMesinIds = [$restrictedMesinId];
                 }
             }
 

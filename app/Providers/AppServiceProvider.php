@@ -5,10 +5,12 @@ namespace App\Providers;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\View;
 use Carbon\Carbon;
-use App\Models\Mesin;
 use App\Models\Approval;
 use App\Models\Proses;
+use App\Observers\ApprovalObserver;
 use App\Observers\ProsesObserver;
+use App\Services\ApprovalCacheService;
+use App\Services\MesinCacheService;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -34,27 +36,15 @@ class AppServiceProvider extends ServiceProvider
         // Carbon::setToStringFormat('d-m-Y H:i:s'); // HAPUS BARIS INI
 
         View::composer('layout.main', function ($view) {
-            $view->with('mesins', Mesin::all());
-            
-            // Hitung jumlah pending approvals untuk FM dan VP
-            $pendingApprovalFM = Approval::where('type', 'FM')
-                ->where('status', 'pending')
-                ->count();
-            
-            $pendingApprovalVP = Approval::where('type', 'VP')
-                ->where('status', 'pending')
-                ->count();
+            $view->with('mesins', app(MesinCacheService::class)->getSelectionList());
 
-            $pendingApprovalKepalaShift = Approval::where('type', 'KEPALA_SHIFT')
-                ->where('status', 'pending')
-                ->count();
-            
-            $view->with('pendingApprovalFM', $pendingApprovalFM);
-            $view->with('pendingApprovalVP', $pendingApprovalVP);
-            $view->with('pendingApprovalKepalaShift', $pendingApprovalKepalaShift);
+            $counts = app(ApprovalCacheService::class)->getPendingCounts();
+            $view->with('pendingApprovalFM', $counts['pendingApprovalFM']);
+            $view->with('pendingApprovalVP', $counts['pendingApprovalVP']);
+            $view->with('pendingApprovalKepalaShift', $counts['pendingApprovalKepalaShift']);
         });
 
-        // Register observer untuk Proses model
         Proses::observe(ProsesObserver::class);
+        Approval::observe(ApprovalObserver::class);
     }
 }
