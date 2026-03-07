@@ -104,7 +104,8 @@ services:
       timeout: 5s
       retries: 3
 
-  # WebSocket server (Laravel Reverb). Subdomain ws.dpf3dunia.com mem-proxy ke service ini.
+  # WebSocket server (Laravel Reverb). Subdomain ws.dpf3dunia.com mem-proxy ke service ini via Nginx.
+  # Reverb tidak perlu expose port ke host — Nginx mengarahkan ws.dpf3dunia.com ke reverb:8080 secara internal.
   reverb:
     build:
       context: .
@@ -112,8 +113,6 @@ services:
       target: production
     restart: unless-stopped
     command: php artisan reverb:start
-    ports:
-      - "${REVERB_PORT:-8080}:8080"
     volumes:
       - laravel-public-assets:/var/www/public/build
       - laravel-storage-production:/var/www/storage
