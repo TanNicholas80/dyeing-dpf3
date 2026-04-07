@@ -33,6 +33,9 @@ COPY ./docker/production/nginx/nginx.conf /etc/nginx/nginx.conf
 # -----------------------------------------------------------
 COPY --from=builder /var/www/public /var/www/public
 
+# Ensure development hot file is not shipped in production image
+RUN rm -f /var/www/public/hot
+
 # Set the working directory to the public folder
 WORKDIR /var/www/public
 

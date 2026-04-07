@@ -55,9 +55,13 @@ WORKDIR /var/www
 # -----------------------------------------------------------
 COPY . /var/www
 
+# Remove stale Laravel cache files from build context (if any)
+RUN rm -f /var/www/bootstrap/cache/*.php
+
 # Install Composer and dependencies
 RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer \
-    && composer install --no-dev --optimize-autoloader --no-interaction --no-progress --prefer-dist
+    && composer install --no-dev --optimize-autoloader --no-interaction --no-progress --prefer-dist \
+    && composer dump-autoload --no-dev --classmap-authoritative --no-interaction
 
 # Stage 3: Production environment
 FROM php:8.4-fpm AS production
@@ -101,6 +105,14 @@ COPY --from=builder /usr/local/bin/docker-php-ext-* /usr/local/bin/
 # security in a live environment.
 # -----------------------------------------------------------
 RUN mv "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini"
+
+# Use safe OPcache defaults for immutable container deploys
+RUN { \
+    echo 'opcache.enable=1'; \
+    echo 'opcache.enable_cli=0'; \
+    echo 'opcache.validate_timestamps=1'; \
+    echo 'opcache.revalidate_freq=0'; \
+} > /usr/local/etc/php/conf.d/zz-opcache.ini
 
 # Enable PHP-FPM status page for healthcheck (php-fpm-healthcheck)
 # pm.status_path must be inside [www] pool; use www.conf (zz-docker.conf may cause "unknown entry")

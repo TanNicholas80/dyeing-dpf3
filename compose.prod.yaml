@@ -45,6 +45,10 @@ services:
       dockerfile: ./docker/common/php-fpm/Dockerfile
       target: production
     restart: unless-stopped
+    command: >
+      sh -lc "composer dump-autoload --no-dev --classmap-authoritative --no-interaction
+      && php artisan optimize:clear
+      && exec php-fpm"
     volumes:
       - laravel-public-assets:/var/www/public/build  # Mount built public assets to ensure the manifest.json and hashed files match between Nginx and PHP-FPM
       - laravel-storage-production:/var/www/storage  # Mount the storage volume
