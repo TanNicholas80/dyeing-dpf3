@@ -47,7 +47,7 @@ services:
     restart: unless-stopped
     command: >
       sh -lc "php artisan optimize:clear
-      && exec php-fpm"
+      && exec /usr/local/sbin/php-fpm"
     volumes:
       - laravel-public-assets:/var/www/public/build  # Mount built public assets to ensure the manifest.json and hashed files match between Nginx and PHP-FPM
       - laravel-storage-production:/var/www/storage  # Mount the storage volume
