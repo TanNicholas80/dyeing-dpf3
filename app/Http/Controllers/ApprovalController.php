@@ -47,53 +47,251 @@ class ApprovalController extends Controller
      * Biasanya hanya menampilkan data dengan status pending,
      * tetapi bisa disesuaikan jika ingin menampilkan semua.
      */
-    public function approval_fm()
+    public function approval_fm(Request $request)
     {
-        $approvals = Approval::with(['proses.details', 'auxl', 'requester', 'approver'])
-            ->where('type', 'FM')
-            ->orderByRaw(
-                'CASE WHEN status = ? THEN 1 WHEN status = ? THEN 2 WHEN status = ? THEN 3 ELSE 4 END',
-                ['pending', 'approved', 'rejected']
-            )
-            ->orderByDesc('created_at')
-            ->get();
+        if ($request->ajax()) {
+            $approvals = Approval::with(['proses.details', 'auxl', 'requester', 'approver'])
+                ->where('type', 'FM');
 
-        return view('approval.approval_fm', compact('approvals'));
+            return datatables()->of($approvals)
+                ->addColumn('no_op_display', function ($approval) {
+                    if ($approval->action === 'create_aux_reprocess' && $approval->auxl) {
+                        return '<strong>' . ($approval->auxl->barcode ?? 'AUXL') . '</strong>';
+                    }
+                    $noOpDisplay = 'MAINTENANCE';
+                    if ($approval->proses) {
+                        $firstDetail = $approval->proses->details->first();
+                        if ($firstDetail) {
+                            $noOpDisplay = $firstDetail->no_op ?? 'MAINTENANCE';
+                            if ($approval->proses->details->count() > 1) {
+                                $noOpDisplay .= ' (+' . ($approval->proses->details->count() - 1) . ' OP)';
+                            }
+                        } elseif ($approval->history_data && isset($approval->history_data['detail_proses_snapshot']) && !empty($approval->history_data['detail_proses_snapshot'])) {
+                            $firstDetailSnapshot = $approval->history_data['detail_proses_snapshot'][0];
+                            $noOpDisplay = $firstDetailSnapshot['no_op'] ?? 'MAINTENANCE';
+                            if (count($approval->history_data['detail_proses_snapshot']) > 1) {
+                                $noOpDisplay .= ' (+' . (count($approval->history_data['detail_proses_snapshot']) - 1) . ' OP)';
+                            }
+                        }
+                    }
+                    return '<strong>' . $noOpDisplay . '</strong>';
+                })
+                ->addColumn('status_badge', function ($approval) {
+                    if ($approval->status === 'pending') {
+                        return '<span class="badge bg-warning">Pending</span>';
+                    } elseif ($approval->status === 'approved') {
+                        return '<span class="badge bg-success">Approved</span>';
+                    } else {
+                        return '<span class="badge bg-danger">Rejected</span>';
+                    }
+                })
+                ->addColumn('action_label', function ($approval) {
+                    $actionLabels = [
+                        'move_machine' => 'Pindah Mesin',
+                        'edit_cycle_time' => 'Edit Cycle Time',
+                        'delete_proses' => 'Hapus Proses',
+                        'create_reprocess' => 'Buat Reproses',
+                        'create_aux_reprocess' => 'Buat Reproses Auxl',
+                        'swap_position' => 'Tukar Posisi',
+                        'topping_la' => 'Topping LA',
+                        'topping_aux' => 'Topping Auxl'
+                    ];
+                    $label = $actionLabels[$approval->action] ?? ucfirst(str_replace('_', ' ', $approval->action));
+                    return '<span class="badge bg-secondary">' . $label . '</span>';
+                })
+                ->addColumn('history_btn', function ($approval) {
+                    if ($approval->history_data) {
+                        return '<button type="button" class="btn btn-sm btn-info" data-toggle="modal" data-target="#modalHistory' . $approval->id . '"><i class="fas fa-eye"></i> Lihat History</button>';
+                    }
+                    return '<span class="text-muted">-</span>';
+                })
+                ->addColumn('requester_info', function ($approval) {
+                    $nama = $approval->requester->nama ?? '-';
+                    $username = $approval->requester->username ?? '';
+                    return $nama . '<br><small class="text-muted">' . $username . '</small>';
+                })
+                ->addColumn('approver_info', function ($approval) {
+                    if ($approval->approver) {
+                        return $approval->approver->nama . '<br><small class="text-muted">' . $approval->approver->username . '</small>';
+                    }
+                    return '<span class="text-muted">-</span>';
+                })
+                ->addColumn('tanggal_request', function ($approval) {
+                    return $approval->created_at ? $approval->created_at->format('d-m-Y H:i:s') : '-';
+                })
+                ->addColumn('aksi', function ($approval) {
+                    return view('approval.partials.action_and_modals', compact('approval'))->render();
+                })
+                ->rawColumns(['no_op_display', 'status_badge', 'action_label', 'history_btn', 'requester_info', 'approver_info', 'aksi'])
+                ->make(true);
+        }
+
+        return view('approval.approval_fm');
     }
 
-    /**
-     * Daftar approval untuk VP (filter type = VP).
-     */
-    public function approval_vp()
+    public function approval_vp(Request $request)
     {
-        $approvals = Approval::with(['proses.details', 'auxl', 'requester', 'approver'])
-            ->where('type', 'VP')
-            ->orderByRaw(
-                'CASE WHEN status = ? THEN 1 WHEN status = ? THEN 2 WHEN status = ? THEN 3 ELSE 4 END',
-                ['pending', 'approved', 'rejected']
-            )
-            ->orderByDesc('created_at')
-            ->get();
+        if ($request->ajax()) {
+            $approvals = Approval::with(['proses.details', 'auxl', 'requester', 'approver'])
+                ->where('type', 'VP');
 
-        return view('approval.approval_vp', compact('approvals'));
+            return datatables()->of($approvals)
+                ->addColumn('no_op_display', function ($approval) {
+                    if ($approval->action === 'create_aux_reprocess' && $approval->auxl) {
+                        return '<strong>' . ($approval->auxl->barcode ?? 'AUXL') . '</strong>';
+                    }
+                    $noOpDisplay = 'MAINTENANCE';
+                    if ($approval->proses) {
+                        $firstDetail = $approval->proses->details->first();
+                        if ($firstDetail) {
+                            $noOpDisplay = $firstDetail->no_op ?? 'MAINTENANCE';
+                            if ($approval->proses->details->count() > 1) {
+                                $noOpDisplay .= ' (+' . ($approval->proses->details->count() - 1) . ' OP)';
+                            }
+                        } elseif ($approval->history_data && isset($approval->history_data['detail_proses_snapshot']) && !empty($approval->history_data['detail_proses_snapshot'])) {
+                            $firstDetailSnapshot = $approval->history_data['detail_proses_snapshot'][0];
+                            $noOpDisplay = $firstDetailSnapshot['no_op'] ?? 'MAINTENANCE';
+                            if (count($approval->history_data['detail_proses_snapshot']) > 1) {
+                                $noOpDisplay .= ' (+' . (count($approval->history_data['detail_proses_snapshot']) - 1) . ' OP)';
+                            }
+                        }
+                    }
+                    return '<strong>' . $noOpDisplay . '</strong>';
+                })
+                ->addColumn('status_badge', function ($approval) {
+                    if ($approval->status === 'pending') {
+                        return '<span class="badge bg-warning">Pending</span>';
+                    } elseif ($approval->status === 'approved') {
+                        return '<span class="badge bg-success">Approved</span>';
+                    } else {
+                        return '<span class="badge bg-danger">Rejected</span>';
+                    }
+                })
+                ->addColumn('action_label', function ($approval) {
+                    $actionLabels = [
+                        'move_machine' => 'Pindah Mesin',
+                        'edit_cycle_time' => 'Edit Cycle Time',
+                        'delete_proses' => 'Hapus Proses',
+                        'create_reprocess' => 'Buat Reproses',
+                        'create_aux_reprocess' => 'Buat Reproses Auxl',
+                        'swap_position' => 'Tukar Posisi',
+                        'topping_la' => 'Topping LA',
+                        'topping_aux' => 'Topping Auxl'
+                    ];
+                    $label = $actionLabels[$approval->action] ?? ucfirst(str_replace('_', ' ', $approval->action));
+                    return '<span class="badge bg-secondary">' . $label . '</span>';
+                })
+                ->addColumn('history_btn', function ($approval) {
+                    if ($approval->history_data) {
+                        return '<button type="button" class="btn btn-sm btn-info" data-toggle="modal" data-target="#modalHistory' . $approval->id . '"><i class="fas fa-eye"></i> Lihat History</button>';
+                    }
+                    return '<span class="text-muted">-</span>';
+                })
+                ->addColumn('requester_info', function ($approval) {
+                    $nama = $approval->requester->nama ?? '-';
+                    $username = $approval->requester->username ?? '';
+                    return $nama . '<br><small class="text-muted">' . $username . '</small>';
+                })
+                ->addColumn('approver_info', function ($approval) {
+                    if ($approval->approver) {
+                        return $approval->approver->nama . '<br><small class="text-muted">' . $approval->approver->username . '</small>';
+                    }
+                    return '<span class="text-muted">-</span>';
+                })
+                ->addColumn('tanggal_request', function ($approval) {
+                    return $approval->created_at ? $approval->created_at->format('d-m-Y H:i:s') : '-';
+                })
+                ->addColumn('aksi', function ($approval) {
+                    return view('approval.partials.action_and_modals', compact('approval'))->render();
+                })
+                ->rawColumns(['no_op_display', 'status_badge', 'action_label', 'history_btn', 'requester_info', 'approver_info', 'aksi'])
+                ->make(true);
+        }
+
+        return view('approval.approval_vp');
     }
 
-    /**
-     * Daftar approval untuk Kepala Shift (filter type = KEPALA_SHIFT, action topping_la/topping_aux).
-     */
-    public function approval_kepala_shift()
+    public function approval_kepala_shift(Request $request)
     {
-        $approvals = Approval::with(['proses.details', 'requester', 'approver'])
-            ->where('type', 'KEPALA_SHIFT')
-            ->whereIn('action', ['topping_la', 'topping_aux'])
-            ->orderByRaw(
-                'CASE WHEN status = ? THEN 1 WHEN status = ? THEN 2 WHEN status = ? THEN 3 ELSE 4 END',
-                ['pending', 'approved', 'rejected']
-            )
-            ->orderByDesc('created_at')
-            ->get();
+        if ($request->ajax()) {
+            $approvals = Approval::with(['proses.details', 'requester', 'approver'])
+                ->where('type', 'KEPALA_SHIFT')
+                ->whereIn('action', ['topping_la', 'topping_aux']);
 
-        return view('approval.approval_kepala_shift', compact('approvals'));
+            return datatables()->of($approvals)
+                ->addColumn('no_op_display', function ($approval) {
+                    if ($approval->action === 'create_aux_reprocess' && $approval->auxl) {
+                        return '<strong>' . ($approval->auxl->barcode ?? 'AUXL') . '</strong>';
+                    }
+                    $noOpDisplay = 'MAINTENANCE';
+                    if ($approval->proses) {
+                        $firstDetail = $approval->proses->details->first();
+                        if ($firstDetail) {
+                            $noOpDisplay = $firstDetail->no_op ?? 'MAINTENANCE';
+                            if ($approval->proses->details->count() > 1) {
+                                $noOpDisplay .= ' (+' . ($approval->proses->details->count() - 1) . ' OP)';
+                            }
+                        } elseif ($approval->history_data && isset($approval->history_data['detail_proses_snapshot']) && !empty($approval->history_data['detail_proses_snapshot'])) {
+                            $firstDetailSnapshot = $approval->history_data['detail_proses_snapshot'][0];
+                            $noOpDisplay = $firstDetailSnapshot['no_op'] ?? 'MAINTENANCE';
+                            if (count($approval->history_data['detail_proses_snapshot']) > 1) {
+                                $noOpDisplay .= ' (+' . (count($approval->history_data['detail_proses_snapshot']) - 1) . ' OP)';
+                            }
+                        }
+                    }
+                    return '<strong>' . $noOpDisplay . '</strong>';
+                })
+                ->addColumn('status_badge', function ($approval) {
+                    if ($approval->status === 'pending') {
+                        return '<span class="badge bg-warning">Pending</span>';
+                    } elseif ($approval->status === 'approved') {
+                        return '<span class="badge bg-success">Approved</span>';
+                    } else {
+                        return '<span class="badge bg-danger">Rejected</span>';
+                    }
+                })
+                ->addColumn('action_label', function ($approval) {
+                    $actionLabels = [
+                        'move_machine' => 'Pindah Mesin',
+                        'edit_cycle_time' => 'Edit Cycle Time',
+                        'delete_proses' => 'Hapus Proses',
+                        'create_reprocess' => 'Buat Reproses',
+                        'create_aux_reprocess' => 'Buat Reproses Auxl',
+                        'swap_position' => 'Tukar Posisi',
+                        'topping_la' => 'Topping LA',
+                        'topping_aux' => 'Topping Auxl'
+                    ];
+                    $label = $actionLabels[$approval->action] ?? ucfirst(str_replace('_', ' ', $approval->action));
+                    return '<span class="badge bg-secondary">' . $label . '</span>';
+                })
+                ->addColumn('history_btn', function ($approval) {
+                    if ($approval->history_data) {
+                        return '<button type="button" class="btn btn-sm btn-info" data-toggle="modal" data-target="#modalHistory' . $approval->id . '"><i class="fas fa-eye"></i> Lihat History</button>';
+                    }
+                    return '<span class="text-muted">-</span>';
+                })
+                ->addColumn('requester_info', function ($approval) {
+                    $nama = $approval->requester->nama ?? '-';
+                    $username = $approval->requester->username ?? '';
+                    return $nama . '<br><small class="text-muted">' . $username . '</small>';
+                })
+                ->addColumn('approver_info', function ($approval) {
+                    if ($approval->approver) {
+                        return $approval->approver->nama . '<br><small class="text-muted">' . $approval->approver->username . '</small>';
+                    }
+                    return '<span class="text-muted">-</span>';
+                })
+                ->addColumn('tanggal_request', function ($approval) {
+                    return $approval->created_at ? $approval->created_at->format('d-m-Y H:i:s') : '-';
+                })
+                ->addColumn('aksi', function ($approval) {
+                    return view('approval.partials.action_and_modals', compact('approval'))->render();
+                })
+                ->rawColumns(['no_op_display', 'status_badge', 'action_label', 'history_btn', 'requester_info', 'approver_info', 'aksi'])
+                ->make(true);
+        }
+
+        return view('approval.approval_kepala_shift');
     }
 
     /**

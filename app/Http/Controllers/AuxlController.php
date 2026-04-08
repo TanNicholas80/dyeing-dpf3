@@ -13,47 +13,61 @@ use Illuminate\Support\Facades\DB;
 
 class AuxlController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $auxls = Auxl::with('details')->orderByDesc('created_at')->get();
+        if ($request->ajax()) {
+            $auxls = Auxl::query();
 
-        // Tandai auxl yang sudah dipakai proses (ter-scan sebagai Barcode AUX aktif).
-        $usageCountsByBarcode = collect();
-        if ($auxls->isNotEmpty()) {
-            $barcodes = $auxls->pluck('barcode')->filter()->unique()->values();
-            if ($barcodes->isNotEmpty()) {
-                $usageCountsByBarcode = BarcodeAux::whereIn('barcode', $barcodes)
-                    ->where('cancel', false)
-                    ->selectRaw('barcode, COUNT(*) as total')
-                    ->groupBy('barcode')
-                    ->pluck('total', 'barcode');
-            }
+            return \Yajra\DataTables\Facades\DataTables::of($auxls)
+                ->addColumn('checkbox', function ($auxl) {
+                    return '<input type="checkbox" class="barcode-checkbox" value="' . $auxl->barcode . '" data-code="' . $auxl->code . '" data-customer="' . $auxl->customer . '" data-marketing="' . $auxl->marketing . '">';
+                })
+                ->editColumn('jenis', function ($auxl) {
+                    $options = \App\Models\Auxl::getJenisOptions();
+                    return $options[$auxl->jenis] ?? ucfirst($auxl->jenis ?? '-');
+                })
+                ->addColumn('dipakai', function ($auxl) {
+                    $usedCount = \App\Models\BarcodeAux::where('barcode', $auxl->barcode)->where('cancel', false)->count();
+                    if ($usedCount > 0) {
+                        return '<span class="badge badge-success">Sudah dipakai (' . $usedCount . ')</span>';
+                    } else {
+                        return '<span class="badge badge-secondary">Belum dipakai</span>';
+                    }
+                })
+                ->addColumn('action', function ($auxl) {
+                    $pendingApproval = \App\Models\Approval::where('auxl_id', $auxl->id)
+                        ->where('action', 'create_aux_reprocess')
+                        ->where('status', 'pending')
+                        ->orderByDesc('created_at')
+                        ->first();
+                        
+                    if ($pendingApproval) {
+                        $waitingLabel = strtoupper($pendingApproval->type);
+                        return '<span class="badge badge-warning text-dark">Menunggu approval ' . $waitingLabel . '</span>';
+                    }
+                    
+                    $userRole = strtolower(Auth::user()->role ?? '');
+                    $canManageAuxl = $userRole !== 'owner';
+                    $isSuperAdmin = $userRole === 'super_admin';
+                    
+                    $showBtn = '<a href="' . route('aux.show', $auxl->id) . '" class="btn btn-info btn-sm mr-1"><i class="fas fa-eye"></i> Detail</a>';
+                    $editBtn = $canManageAuxl ? '<a href="' . route('aux.edit', $auxl->id) . '" class="btn btn-warning btn-sm mr-1"><i class="fas fa-pen"></i> Edit</a>' : '';
+                    $deleteBtn = $isSuperAdmin ? '<button type="button" class="btn btn-danger btn-sm" onclick="showDeleteModal(\'' . route('aux.destroy', $auxl->id) . '\', \'' . $auxl->barcode . '\')"><i class="fas fa-trash-alt"></i> Hapus</button>' : '';
+
+                    return $showBtn . $editBtn . $deleteBtn;
+                })
+                ->setRowClass(function ($auxl) {
+                    $hasPending = \App\Models\Approval::where('auxl_id', $auxl->id)
+                        ->where('action', 'create_aux_reprocess')
+                        ->where('status', 'pending')
+                        ->exists();
+                    return $hasPending ? 'table-warning' : '';
+                })
+                ->rawColumns(['checkbox', 'dipakai', 'action'])
+                ->make(true);
         }
 
-        // Tandai auxl yang masih menunggu approval (FM atau VP) untuk jenis reproses
-        if ($auxls->isNotEmpty()) {
-            $pendingApprovals = Approval::whereIn('auxl_id', $auxls->pluck('id'))
-                ->where('action', 'create_aux_reprocess')
-                ->where('status', 'pending')
-                ->orderByDesc('created_at')
-                ->get()
-                ->groupBy('auxl_id');
-
-            $auxls->transform(function ($auxl) use ($pendingApprovals) {
-                $auxlCollection = $pendingApprovals->get($auxl->id);
-                $auxl->pendingApproval = $auxlCollection ? $auxlCollection->first() : null;
-                return $auxl;
-            });
-        }
-
-        $auxls->transform(function ($auxl) use ($usageCountsByBarcode) {
-            $usedCount = (int) ($usageCountsByBarcode[$auxl->barcode] ?? 0);
-            $auxl->isUsedByProses = $usedCount > 0;
-            $auxl->usedCount = $usedCount;
-            return $auxl;
-        });
-
-        return view('auxl.index', compact('auxls'));
+        return view('auxl.index');
     }
 
     public function create()

@@ -19,14 +19,60 @@ class MesinController extends Controller
         return "iot:mesin:{$mesinId}:force_alarm_off";
     }
 
-    public function index()
+    public function index(Request $request)
     {
-        $mesins = Mesin::all();
-        $forceAlarmOffMap = [];
-        foreach ($mesins as $mesin) {
-            $forceAlarmOffMap[$mesin->id] = (bool) Cache::get($this->forceAlarmKey((int) $mesin->id), false);
+        if ($request->ajax()) {
+            $mesins = Mesin::query();
+            return \Yajra\DataTables\Facades\DataTables::of($mesins)
+                ->addColumn('status_badge', function ($mesin) {
+                    $class = $mesin->status ? 'badge-success' : 'badge-secondary';
+                    $text = $mesin->status ? 'Hidup' : 'Mati';
+                    return '<span class="badge status-badge ' . $class . '" data-id="' . $mesin->id . '">' . $text . '</span>';
+                })
+                ->addColumn('force_off', function ($mesin) {
+                    $isSuperAdmin = strtolower(Auth::user()->role ?? '') === 'super_admin';
+                    if (!$isSuperAdmin) return '';
+
+                    $forceOff = (bool) Cache::get($this->forceAlarmKey((int) $mesin->id), false);
+                    $checked = $forceOff ? 'checked' : '';
+                    $label = $forceOff ? 'ON' : 'OFF';
+
+                    return '
+                        <div class="custom-control custom-switch">
+                            <input type="checkbox"
+                                class="custom-control-input force-alarm-toggle"
+                                id="forceAlarm' . $mesin->id . '"
+                                data-id="' . $mesin->id . '"
+                                data-jenis="' . htmlspecialchars($mesin->jenis_mesin, ENT_QUOTES) . '"
+                                ' . $checked . '>
+                            <label class="custom-control-label" for="forceAlarm' . $mesin->id . '">' . $label . '</label>
+                        </div>
+                    ';
+                })
+                ->addColumn('action', function ($mesin) {
+                    $userRole = Auth::user()->role ?? null;
+                    $restrictedRoles = ['fm', 'vp', 'ppic', 'owner'];
+                    $canManageMesin = !in_array(strtolower($userRole), $restrictedRoles);
+
+                    if (!$canManageMesin) return '';
+
+                    $editUrl = route('mesin.edit', $mesin->id);
+                    $deleteUrl = route('mesin.destroy', $mesin->id);
+
+                    return '
+                        <a href="' . $editUrl . '" class="btn btn-warning btn-sm mr-2">
+                            <i class="fas fa-pen"></i> Edit
+                        </a>
+                        <button type="button" class="btn btn-danger btn-sm" onclick="showDeleteModal(\'' . $deleteUrl . '\', \'' . htmlspecialchars($mesin->jenis_mesin, ENT_QUOTES) . '\')">
+                            <i class="fas fa-trash-alt"></i> Hapus
+                        </button>
+                    ';
+                })
+                ->rawColumns(['status_badge', 'force_off', 'action'])
+                ->make(true);
         }
-        return view('mesin.index', compact('mesins', 'forceAlarmOffMap'));
+
+        return view('mesin.index');
     }
 
     public function create()

@@ -13,20 +13,40 @@ class UserController extends Controller
 {
     public function index(Request $request)
     {
-        $query = User::query();
+        if ($request->ajax()) {
+            $query = User::query();
 
-        if ($request->has('search_user')) {
-            $search = $request->input('search_user');
-            $query->where(function ($q) use ($search) {
-                $q->where('nama', 'LIKE', "%$search%")
-                    ->orWhere('username', 'LIKE', "%$search%")
-                    ->orWhere('role', 'LIKE', "%$search%");
-            });
+            return \Yajra\DataTables\Facades\DataTables::of($query)
+                ->addColumn('mesin_badge', function ($u) {
+                    if (empty($u->mesin)) {
+                        return '<span class="badge bg-success">Semua Mesin</span>';
+                    }
+                    return '<span class="badge bg-info">' . $u->mesin . '</span>';
+                })
+                ->addColumn('role_formatted', function ($u) {
+                    return $u->role === 'super_admin' ? 'Super Admin' : ucfirst($u->role);
+                })
+                ->addColumn('action', function ($u) {
+                    $canManageUsers = (Auth::user()->role ?? null) !== 'owner';
+                    if (!$canManageUsers) return '';
+
+                    $editUrl = route('user.edit', ['id' => $u->id]);
+                    $deleteUrl = route('user.delete', ['id' => $u->id]);
+
+                    return '
+                        <a href="' . $editUrl . '" class="btn btn-warning btn-sm mr-2">
+                            <i class="fas fa-pen"></i> Edit
+                        </a>
+                        <button type="button" class="btn btn-danger btn-sm" onclick="showDeleteModal(\'' . $deleteUrl . '\', \'' . htmlspecialchars($u->nama, ENT_QUOTES) . '\')">
+                            <i class="fas fa-trash-alt"></i> Hapus
+                        </button>
+                    ';
+                })
+                ->rawColumns(['mesin_badge', 'action'])
+                ->make(true);
         }
 
-        $user = $query->get();
-
-        return view('user.index', compact('user', 'request'));
+        return view('user.index');
     }
 
     /**

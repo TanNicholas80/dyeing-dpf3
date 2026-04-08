@@ -484,24 +484,7 @@
             $('.select2').select2();
         });
 
-        // Inisialisasi DataTable (hanya jika ada table dengan id yang sesuai)
-        $(document).ready(function() {
-            const tableIds = ['#user', '#mesin', '#approval_fm', '#approval_vp', '#auxl', '#activity_log'];
-            tableIds.forEach(function(tableId) {
-                if ($(tableId).length) {
-                    $(tableId).DataTable({
-                        paging: true,
-                        responsive: false,
-                        lengthChange: true,
-                        autoWidth: false,
-                        scrollX: true,
-                        searching: true,
-                        ordering: true,
-                        info: true,
-                    }).buttons().container().appendTo($(tableId + '_wrapper .col-md-6:eq(0)'));
-                }
-            });
-        });
+        // Inisialisasi DataTable dihapus karena sudah di-handle masing-masing page (Server-Side)
 
         // Fullscreen global button logic
         document.addEventListener('DOMContentLoaded', function() {
