@@ -50,8 +50,9 @@ class ApprovalController extends Controller
     public function approval_fm(Request $request)
     {
         if ($request->ajax()) {
-            $approvals = Approval::with(['proses.details', 'auxl', 'requester', 'approver'])
-                ->where('type', 'FM');
+            try {
+                $approvals = Approval::with(['proses.details', 'auxl', 'requester', 'approver'])
+                    ->where('type', 'FM');
 
             return datatables()->of($approvals)
                 ->addColumn('no_op_display', function ($approval) {
@@ -124,6 +125,10 @@ class ApprovalController extends Controller
                 })
                 ->rawColumns(['no_op_display', 'status_badge', 'action_label', 'history_btn', 'requester_info', 'approver_info', 'aksi'])
                 ->make(true);
+            } catch (\Exception $e) {
+                \Log::error('Datatables Approval FM Error: ' . $e->getMessage() . ' at ' . $e->getFile() . ':' . $e->getLine());
+                return response()->json(['error' => $e->getMessage()]);
+            }
         }
 
         return view('approval.approval_fm');
@@ -132,8 +137,9 @@ class ApprovalController extends Controller
     public function approval_vp(Request $request)
     {
         if ($request->ajax()) {
-            $approvals = Approval::with(['proses.details', 'auxl', 'requester', 'approver'])
-                ->where('type', 'VP');
+            try {
+                $approvals = Approval::with(['proses.details', 'auxl', 'requester', 'approver'])
+                    ->where('type', 'VP');
 
             return datatables()->of($approvals)
                 ->addColumn('no_op_display', function ($approval) {
@@ -206,6 +212,10 @@ class ApprovalController extends Controller
                 })
                 ->rawColumns(['no_op_display', 'status_badge', 'action_label', 'history_btn', 'requester_info', 'approver_info', 'aksi'])
                 ->make(true);
+            } catch (\Exception $e) {
+                \Log::error('Datatables Approval VP Error: ' . $e->getMessage() . ' at ' . $e->getFile() . ':' . $e->getLine());
+                return response()->json(['error' => $e->getMessage()]);
+            }
         }
 
         return view('approval.approval_vp');
@@ -214,9 +224,10 @@ class ApprovalController extends Controller
     public function approval_kepala_shift(Request $request)
     {
         if ($request->ajax()) {
-            $approvals = Approval::with(['proses.details', 'requester', 'approver'])
-                ->where('type', 'KEPALA_SHIFT')
-                ->whereIn('action', ['topping_la', 'topping_aux']);
+            try {
+                $approvals = Approval::with(['proses.details', 'requester', 'approver'])
+                    ->where('type', 'KEPALA_SHIFT')
+                    ->whereIn('action', ['topping_la', 'topping_aux']);
 
             return datatables()->of($approvals)
                 ->addColumn('no_op_display', function ($approval) {
@@ -289,6 +300,10 @@ class ApprovalController extends Controller
                 })
                 ->rawColumns(['no_op_display', 'status_badge', 'action_label', 'history_btn', 'requester_info', 'approver_info', 'aksi'])
                 ->make(true);
+            } catch (\Exception $e) {
+                \Log::error('Datatables Approval Kepala Shift Error: ' . $e->getMessage() . ' at ' . $e->getFile() . ':' . $e->getLine());
+                return response()->json(['error' => $e->getMessage()]);
+            }
         }
 
         return view('approval.approval_kepala_shift');
