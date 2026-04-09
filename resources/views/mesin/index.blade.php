@@ -60,6 +60,79 @@
                                         </tr>
                                     </thead>
                                     <tbody>
+                                        @foreach ($mesins as $i => $mesin)
+                                            <tr>
+                                                <td>{{ $mesin->jenis_mesin }}</td>
+                                                <td>
+                                                    <span class="badge status-badge {{ $mesin->status ? 'badge-success' : 'badge-secondary' }}"
+                                                        data-id="{{ $mesin->id }}">
+                                                        {{ $mesin->status ? 'Hidup' : 'Mati' }}
+                                                    </span>
+                                                </td>
+                                                @if ($isSuperAdmin)
+                                                @php $forceOff = (bool) ($forceAlarmOffMap[$mesin->id] ?? false); @endphp
+                                                <td>
+                                                    <div class="custom-control custom-switch">
+                                                        <input type="checkbox"
+                                                            class="custom-control-input force-alarm-toggle"
+                                                            id="forceAlarm{{ $mesin->id }}"
+                                                            data-id="{{ $mesin->id }}"
+                                                            data-jenis="{{ $mesin->jenis_mesin }}"
+                                                            {{ $forceOff ? 'checked' : '' }}>
+                                                        <label class="custom-control-label" for="forceAlarm{{ $mesin->id }}">
+                                                            {{ $forceOff ? 'ON' : 'OFF' }}
+                                                        </label>
+                                                    </div>
+                                                </td>
+                                                @endif
+                                                @if ($canManageMesin)
+                                                <td>
+                                                    <a href="{{ route('mesin.edit', $mesin->id) }}"
+                                                        class="btn btn-warning btn-sm mr-2">
+                                                        <i class="fas fa-pen"></i> Edit
+                                                    </a>
+                                                    <a href="#" data-toggle="modal"
+                                                        data-target="#modal-hapus{{ $mesin->id }}"
+                                                        class="btn btn-danger btn-sm">
+                                                        <i class="fas fa-trash-alt"></i> Hapus
+                                                    </a>
+                                                </td>
+                                                @endif
+                                            </tr>
+
+                                            @if ($canManageMesin)
+                                            <!-- Modal Hapus -->
+                                            <div class="modal fade" id="modal-hapus{{ $mesin->id }}">
+                                                <div class="modal-dialog">
+                                                    <div class="modal-content">
+                                                        <div class="modal-header">
+                                                            <h4 class="modal-title">Konfirmasi Hapus Data</h4>
+                                                            <button type="button" class="close" data-dismiss="modal"
+                                                                aria-label="Close">
+                                                                <span aria-hidden="true">&times;</span>
+                                                            </button>
+                                                        </div>
+                                                        <div class="modal-body">
+                                                            <p>Apakah anda yakin ingin menghapus mesin
+                                                                <b>{{ $mesin->jenis_mesin }}</b>?
+                                                            </p>
+                                                        </div>
+                                                        <div class="modal-footer justify-content-between">
+                                                            <form action="{{ route('mesin.destroy', $mesin->id) }}"
+                                                                method="POST">
+                                                                @csrf
+                                                                @method('DELETE')
+                                                                <button type="button" class="btn btn-default"
+                                                                    data-dismiss="modal">Batal</button>
+                                                                <button type="submit" class="btn btn-danger">Ya,
+                                                                    Hapus</button>
+                                                            </form>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            @endif
+                                        @endforeach
                                     </tbody>
                                 </table>
                             </div>
@@ -71,33 +144,6 @@
             </div>
         </section>
     </div>
-
-    @if ($canManageMesin)
-    <!-- Modal Hapus -->
-    <div class="modal fade" id="modal-hapus-global">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h4 class="modal-title">Konfirmasi Hapus Data</h4>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
-                    </button>
-                </div>
-                <div class="modal-body">
-                    <p>Apakah anda yakin ingin menghapus mesin <b id="hapus-mesin-nama"></b>?</p>
-                </div>
-                <div class="modal-footer justify-content-between">
-                    <form id="form-hapus-global" method="POST">
-                        @csrf
-                        @method('DELETE')
-                        <button type="button" class="btn btn-default" data-dismiss="modal">Batal</button>
-                        <button type="submit" class="btn btn-danger">Ya, Hapus</button>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
-    @endif
 
     {{-- Modal konfirmasi Alarm Paksa OFF --}}
     <div class="modal fade" id="modalForceAlarmOff" tabindex="-1" role="dialog" aria-labelledby="modalForceAlarmOffLabel"
@@ -129,48 +175,14 @@
         </div>
     </div>
 
-@endsection
-
-@section('scripts')
     <script>
         document.title = "Data Mesin";
-
-        @if ($canManageMesin)
-        function showDeleteModal(url, nama) {
-            $('#hapus-mesin-nama').text(nama);
-            $('#form-hapus-global').attr('action', url);
-            $('#modal-hapus-global').modal('show');
-        }
-        @endif
 
         document.addEventListener('DOMContentLoaded', function() {
             let currentForceAlarmToggle = null;
             let currentForceAlarmLabel = null;
             let currentForceAlarmMesinId = null;
             let currentForceAlarmEnabled = null;
-
-            if ($.fn.DataTable.isDataTable('#mesin')) {
-                $('#mesin').DataTable().clear().destroy();
-                $('#mesin_wrapper').empty();
-            }
-            $('#mesin').DataTable({
-                processing: true,
-                serverSide: true,
-                ajax: "{{ route('mesin.index') }}",
-                responsive: false,
-                autoWidth: false,
-                scrollX: true,
-                columns: [
-                    { data: 'jenis_mesin', name: 'jenis_mesin' },
-                    { data: 'status_badge', name: 'status', searchable: false },
-                    @if ($isSuperAdmin)
-                    { data: 'force_off', name: 'force_off', orderable: false, searchable: false },
-                    @endif
-                    @if ($canManageMesin)
-                    { data: 'action', name: 'action', orderable: false, searchable: false }
-                    @endif
-                ]
-            }).buttons().container().appendTo('#mesin_wrapper .col-md-6:eq(0)');
 
             setInterval(function() {
                 fetch('/mesin/statuses')
@@ -200,7 +212,8 @@
                     });
             }, 1000);
 
-            $(document).on('change', '.force-alarm-toggle', function() {
+            document.querySelectorAll('.force-alarm-toggle').forEach(function(toggle) {
+                toggle.addEventListener('change', function() {
                     var mesinId = this.getAttribute('data-id');
                     var enabled = this.checked;
                     var label = document.querySelector('label[for="' + this.id + '"]');
@@ -234,6 +247,7 @@
 
                     document.getElementById('forceAlarmReason').value = '';
                     $('#modalForceAlarmOff').modal('show');
+                });
             });
 
             // Konfirmasi dari modal untuk mengubah status Alarm Paksa OFF

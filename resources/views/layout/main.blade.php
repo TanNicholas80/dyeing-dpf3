@@ -484,7 +484,24 @@
             $('.select2').select2();
         });
 
-        // Inisialisasi DataTable dihapus karena sudah di-handle masing-masing page (Server-Side)
+        // Inisialisasi DataTable (hanya jika ada table dengan id yang sesuai)
+        $(document).ready(function() {
+            const tableIds = ['#user', '#mesin', '#approval_fm', '#approval_vp', '#auxl', '#activity_log'];
+            tableIds.forEach(function(tableId) {
+                if ($(tableId).length) {
+                    $(tableId).DataTable({
+                        paging: true,
+                        responsive: false,
+                        lengthChange: true,
+                        autoWidth: false,
+                        scrollX: true,
+                        searching: true,
+                        ordering: true,
+                        info: true,
+                    }).buttons().container().appendTo($(tableId + '_wrapper .col-md-6:eq(0)'));
+                }
+            });
+        });
 
         // Fullscreen global button logic
         document.addEventListener('DOMContentLoaded', function() {
@@ -548,7 +565,9 @@
             toast: true,
             position: 'top-end',
             icon: 'success',
-            title: {!! json_encode(session('success')) !!},
+            title: {
+                !!json_encode(session('success')) !!
+            },
             showConfirmButton: false,
             timer: 8000,
             timerProgressBar: true
@@ -559,7 +578,9 @@
             toast: true,
             position: 'top-end',
             icon: 'error',
-            title: {!! json_encode(session('error')) !!},
+            title: {
+                !!json_encode(session('error')) !!
+            },
             showConfirmButton: true,
             confirmButtonText: 'Tutup',
             showCloseButton: true,
@@ -572,22 +593,30 @@
             toast: true,
             position: 'top-end',
             icon: 'info',
-            title: {!! json_encode(session('info')) !!},
+            title: {
+                !!json_encode(session('info')) !!
+            },
             showConfirmButton: false,
             timer: 8000,
             timerProgressBar: true
         });
-        @endif
-        {{-- Notifikasi error validasi(dari withErrors) --}}
+        @endif {
+            {
+                --Notifikasi error validasi(dari withErrors) --
+            }
+        }
         @if(isset($errors) && $errors->any())
         Swal.fire({
             toast: true,
             position: 'top-end',
             icon: 'error',
-            title: {!! json_encode($errors->count() > 1 ? $errors->first() . ' (dan ' . ($errors->count() - 1) . ' error lainnya)' : $errors->first()) !!},
+            title: {
+                !!json_encode($errors - > count() > 1 ? $errors->first().
+                    ' (dan '.($errors->count() - 1).
+                    ' error lainnya)' : $errors->first()) !!
+            },
             showConfirmButton: true,
             confirmButtonText: 'Tutup',
-
             showCloseButton: true,
             timer: undefined,
             timerProgressBar: false

@@ -43,6 +43,89 @@
                                         </tr>
                                     </thead>
                                     <tbody>
+                                        @foreach($activities as $index => $activity)
+                                        <tr>
+                                            <td>{{ $loop->iteration }}</td>
+                                            <td>
+                                                @if($activity->causer)
+                                                <code>{{ $activity->causer->username ?? $activity->causer->name ?? 'N/A' }}</code>
+                                                @else
+                                                <span class="text-muted">System</span>
+                                                @endif
+                                            </td>
+                                            <td>
+                                                @if($activity->log_name)
+                                                <span class="badge bg-info">{{ $activity->log_name }}</span>
+                                                @else
+                                                <span class="text-muted">-</span>
+                                                @endif
+                                            </td>
+                                            <td>{{ $activity->description ?? 'N/A' }}</td>
+                                            <td>
+                                                @php
+                                                $event = $activity->event ?? 'unknown';
+                                                $badgeClass = match($event) {
+                                                'created' => 'badge bg-success',
+                                                'updated' => 'badge bg-warning text-dark',
+                                                'deleted' => 'badge bg-danger',
+                                                default => 'badge bg-secondary'
+                                                };
+                                                @endphp
+                                                <span class="{{ $badgeClass }}">{{ ucfirst($event) }}</span>
+                                            </td>
+                                            <td>
+                                                @php
+                                                $properties = $activity->properties ?? [];
+                                                $hasBefore = isset($properties['before_update']) && !empty($properties['before_update']);
+                                                $hasAfter = isset($properties['after_update']) && !empty($properties['after_update'])
+                                                || isset($properties['created_data']) && !empty($properties['created_data'])
+                                                || isset($properties['deleted_data']) && !empty($properties['deleted_data']);
+                                                @endphp
+
+                                                <div class="d-flex">
+                                                    @if($hasBefore)
+                                                    <button type="button" class="btn btn-sm btn-outline-info mr-2"
+                                                        data-content='@json($properties['before_update'])'
+                                                        data-title="Data Sebelum Update"
+                                                        onclick="showDataModal(this)">
+                                                        <i class="fas fa-eye"></i> Before
+                                                    </button>
+                                                    @endif
+
+                                                    @if($hasAfter)
+                                                    @php
+                                                    $afterData = $properties['after_update'] ?? $properties['created_data'] ?? $properties['deleted_data'] ?? null;
+                                                    $afterTitle = isset($properties['after_update']) ? 'Data Setelah Update'
+                                                    : (isset($properties['created_data']) ? 'Data yang Dibuat'
+                                                    : 'Data yang Dihapus');
+                                                    @endphp
+                                                    <button type="button" class="btn btn-sm btn-outline-success mr-2"
+                                                        data-content='@json($afterData)'
+                                                        data-title="{{ $afterTitle }}"
+                                                        onclick="showDataModal(this)">
+                                                        <i class="fas fa-eye"></i> After
+                                                    </button>
+                                                    @endif
+
+                                                    @if(!$hasBefore && !$hasAfter && !empty($properties))
+                                                    <button type="button" class="btn btn-sm btn-outline-primary"
+                                                        data-content='@json($properties)'
+                                                        data-title="Properties"
+                                                        onclick="showDataModal(this)">
+                                                        <i class="fas fa-info-circle"></i> View
+                                                    </button>
+                                                    @endif
+
+                                                    @if(!$hasBefore && !$hasAfter && empty($properties))
+                                                    <span class="text-muted">-</span>
+                                                    @endif
+                                                </div>
+                                            </td>
+                                            <td>
+                                                {{ $activity->created_at->format('d-m-Y H:i:s') }}
+                                            </td>
+                                        </tr>
+                                        @endforeach
                                     </tbody>
                                 </table>
                             </div>
@@ -74,9 +157,7 @@
         </div>
     </div>
 </div>
-@endsection
 
-@section('scripts')
 <script>
     document.title = "Activity Log";
 
@@ -89,13 +170,16 @@
             return '-';
         }
 
+        // Khusus untuk status mesin: 0 = Mati, 1 = Nyala
         if (key === 'status' && (value === 0 || value === 1 || value === '0' || value === '1')) {
             const statusValue = parseInt(value);
             return statusValue === 1 ? 'Nyala' : 'Mati';
         }
 
         if (Array.isArray(value)) {
-            if (!value.length) return '[]';
+            if (!value.length) {
+                return '[]';
+            }
             return value.map(item => {
                 if (typeof item === 'object' && item !== null) {
                     return `\n${indent}- ${formatObject(item, indent + '  ')}`;
@@ -104,9 +188,20 @@
             }).join('');
         }
 
-        if (typeof value === 'object') return `\n${formatObject(value, indent + '  ')}`;
-        if (typeof value === 'boolean') return value ? 'Ya' : 'Tidak';
-        if (typeof value === 'number' && Math.abs(value) >= 1000) return new Intl.NumberFormat('id-ID').format(value);
+        if (typeof value === 'object') {
+            return `\n${formatObject(value, indent + '  ')}`;
+        }
+
+        if (typeof value === 'boolean') {
+            return value ? 'Ya' : 'Tidak';
+        }
+
+        if (typeof value === 'number') {
+            if (Math.abs(value) >= 1000) {
+                return new Intl.NumberFormat('id-ID').format(value);
+            }
+            return value;
+        }
 
         return value;
     }
@@ -118,6 +213,7 @@
         }).join('\n');
     }
 
+    // Fungsi untuk menampilkan modal dengan data yang sudah diformat rapi
     function showDataModal(button) {
         const content = button.getAttribute('data-content');
         const title = button.getAttribute('data-title');
@@ -134,44 +230,17 @@
             }
 
             document.getElementById('dataContent').textContent = formattedContent;
+            // Bootstrap 4 modal (AdminLTE)
             $('#dataModal').modal('show');
         } catch (e) {
             console.error('Error parsing JSON:', e);
-            Swal.fire({ icon: 'error', title: 'Error', text: 'Gagal memuat data' });
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: 'Gagal memuat data'
+            });
         }
     }
-
-    $(document).ready(function() {
-        if ($.fn.DataTable.isDataTable('#activity_log')) {
-            $('#activity_log').DataTable().clear().destroy();
-            $('#activity_log_wrapper').empty();
-        }
-        $('#activity_log').DataTable({
-            processing: true,
-            serverSide: true,
-            ajax: "{{ route('activity-log.index') }}",
-            responsive: false,
-            autoWidth: false,
-            scrollX: true,
-            order: [[6, 'desc']], // order by created_at by default
-            columns: [
-                { data: 'DT_RowIndex', name: 'DT_RowIndex', orderable: false, searchable: false },
-                { data: 'user', name: 'user', orderable: false, searchable: false },
-                { data: 'log_name', name: 'log_name' },
-                { data: 'description', name: 'description' },
-                { data: 'event', name: 'event' },
-                { data: 'properties', name: 'properties', orderable: false, searchable: false },
-                { data: 'created_at', name: 'created_at' }
-            ]
-        }).buttons().container().appendTo('#activity_log_wrapper .col-md-6:eq(0)');
-
-        // Gunakan event delegation agar tombol showDataModal pada Pagination Datatables tetap jalan
-        $(document).on('click', 'button[onclick="showDataModal(this)"]', function(e) {
-            e.preventDefault();
-            // karena button memiliki attribute onclick dari addColumn, kita biarkan onclick jalan
-            // tanpa memblokir
-        });
-    });
 </script>
 @endsection
 

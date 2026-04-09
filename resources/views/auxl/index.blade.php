@@ -61,6 +61,98 @@
                                             </tr>
                                         </thead>
                                         <tbody>
+                                            @foreach ($auxls->sortBy('barcode') as $auxl)
+                                                @php
+                                                    $pendingApproval = $auxl->pendingApproval ?? null;
+                                                    $waitingLabel = $pendingApproval
+                                                        ? strtoupper($pendingApproval->type)
+                                                        : null;
+                                                @endphp
+                                                <tr class="{{ $pendingApproval ? 'table-warning' : '' }}">
+                                                    <td><input type="checkbox" class="barcode-checkbox"
+                                                            value="{{ $auxl->barcode }}" data-code="{{ $auxl->code }}"
+                                                            data-customer="{{ $auxl->customer }}"
+                                                            data-marketing="{{ $auxl->marketing }}"></td>
+                                                    <td>{{ $auxl->barcode }}</td>
+                                                    <td>{{ \App\Models\Auxl::getJenisOptions()[$auxl->jenis] ?? ucfirst($auxl->jenis ?? '-') }}</td>
+                                                    <td>{{ $auxl->code }}</td>
+                                                    <td>{{ $auxl->konstruksi }}</td>
+                                                    <td>{{ $auxl->customer }}</td>
+                                                    <td>{{ $auxl->marketing }}</td>
+                                                    <td>{{ $auxl->date }}</td>
+                                                    <td>{{ $auxl->color }}</td>
+                                                    <td>
+                                                        @if ($auxl->isUsedByProses ?? false)
+                                                            <span class="badge badge-success">Sudah dipakai ({{ $auxl->usedCount ?? 0 }})</span>
+                                                        @else
+                                                            <span class="badge badge-secondary">Belum dipakai</span>
+                                                        @endif
+                                                    </td>
+                                                    <td>
+                                                        @if ($pendingApproval)
+                                                            <span class="badge badge-warning text-dark">
+                                                                Menunggu approval {{ $waitingLabel }}
+                                                            </span>
+                                                        @else
+                                                            <a href="{{ route('aux.show', $auxl->id) }}"
+                                                                class="btn btn-info btn-sm mr-1">
+                                                                <i class="fas fa-eye"></i> Detail
+                                                            </a>
+
+                                                            @if ($canManageAuxl)
+                                                                <a href="{{ route('aux.edit', $auxl->id) }}"
+                                                                    class="btn btn-warning btn-sm mr-1">
+                                                                    <i class="fas fa-pen"></i> Edit
+                                                                </a>
+                                                            @endif
+
+                                                            @if ($isSuperAdmin)
+                                                                <a href="#" data-toggle="modal"
+                                                                    data-target="#modal-hapus{{ $auxl->id }}"
+                                                                    class="btn btn-danger btn-sm">
+                                                                    <i class="fas fa-trash-alt"></i> Hapus
+                                                                </a>
+
+                                                                <!-- Modal Hapus -->
+                                                                <div class="modal fade"
+                                                                    id="modal-hapus{{ $auxl->id }}">
+                                                                    <div class="modal-dialog">
+                                                                        <div class="modal-content">
+                                                                            <div class="modal-header">
+                                                                                <h4 class="modal-title">Konfirmasi Hapus
+                                                                                    Data</h4>
+                                                                                <button type="button" class="close"
+                                                                                    data-dismiss="modal">
+                                                                                    <span>&times;</span>
+                                                                                </button>
+                                                                            </div>
+                                                                            <div class="modal-body">
+                                                                                <p>Yakin ingin menghapus data auxiliary
+                                                                                    <b>{{ $auxl->barcode }}</b>?
+                                                                                </p>
+                                                                            </div>
+                                                                            <div
+                                                                                class="modal-footer justify-content-between">
+                                                                                <button type="button"
+                                                                                    class="btn btn-secondary"
+                                                                                    data-dismiss="modal">Batal</button>
+                                                                                <form
+                                                                                    action="{{ route('aux.destroy', $auxl->id) }}"
+                                                                                    method="POST">
+                                                                                    @csrf
+                                                                                    @method('DELETE')
+                                                                                    <button type="submit"
+                                                                                        class="btn btn-danger">Hapus</button>
+                                                                                </form>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            @endif
+                                                        @endif
+                                                    </td>
+                                                </tr>
+                                            @endforeach
                                         </tbody>
                                     </table>
                                 </form>
@@ -73,87 +165,18 @@
         </section>
     </div>
 
-    @if ($isSuperAdmin)
-    <!-- Modal Hapus -->
-    <div class="modal fade" id="modal-hapus-global">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h4 class="modal-title">Konfirmasi Hapus Data</h4>
-                    <button type="button" class="close" data-dismiss="modal">
-                        <span>&times;</span>
-                    </button>
-                </div>
-                <div class="modal-body">
-                    <p>Yakin ingin menghapus data auxiliary <b id="hapus-aux-barcode"></b>?</p>
-                </div>
-                <div class="modal-footer justify-content-between">
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Batal</button>
-                    <form id="form-hapus-global" method="POST">
-                        @csrf
-                        @method('DELETE')
-                        <button type="submit" class="btn btn-danger">Hapus</button>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
-    @endif
-
-@endsection
-
-@section('scripts')
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/qrious@4.0.2/dist/qrious.min.js"></script>
     <script>
         document.title = "Data Auxiliary";
-        
-        @if ($isSuperAdmin)
-        function showDeleteModal(url, barcode) {
-            $('#hapus-aux-barcode').text(barcode);
-            $('#form-hapus-global').attr('action', url);
-            $('#modal-hapus-global').modal('show');
-        }
-        @endif
-
         // Select all functionality
         document.addEventListener('DOMContentLoaded', function() {
-            var selectAllEl = document.getElementById('selectAll');
-            if (selectAllEl) {
-                selectAllEl.addEventListener('change', function() {
-                    let checked = this.checked;
-                    document.querySelectorAll('.barcode-checkbox').forEach(function(cb) {
-                        cb.checked = checked;
-                    });
+            document.getElementById('selectAll').addEventListener('change', function() {
+                let checked = this.checked;
+                document.querySelectorAll('.barcode-checkbox').forEach(function(cb) {
+                    cb.checked = checked;
                 });
-            }
-
-            if ($.fn.DataTable.isDataTable('#auxl')) {
-                $('#auxl').DataTable().clear().destroy();
-                $('#auxl_wrapper').empty();
-            }
-            $('#auxl').DataTable({
-                processing: true,
-                serverSide: true,
-                ajax: "{{ route('aux.index') }}",
-                responsive: false,
-                autoWidth: false,
-                scrollX: true,
-                order: [[1, 'asc']], // Order by Barcode default
-                columns: [
-                    { data: 'checkbox', name: 'checkbox', orderable: false, searchable: false },
-                    { data: 'barcode', name: 'barcode' },
-                    { data: 'jenis', name: 'jenis' },
-                    { data: 'code', name: 'code' },
-                    { data: 'konstruksi', name: 'konstruksi' },
-                    { data: 'customer', name: 'customer' },
-                    { data: 'marketing', name: 'marketing' },
-                    { data: 'date', name: 'date' },
-                    { data: 'color', name: 'color' },
-                    { data: 'dipakai', name: 'dipakai', searchable: false },
-                    { data: 'action', name: 'action', orderable: false, searchable: false }
-                ]
-            }).buttons().container().appendTo('#auxl_wrapper .col-md-6:eq(0)');
+            });
         });
         // Bulk print barcode
         function generateInspectPDF(barcode, code, customer, marketing) {
