@@ -11,6 +11,34 @@ use App\Models\BarcodeAux;
 class ProsesStatusService
 {
     /**
+     * Satu indikator topping (TD/TA) saja yang boleh hijau pada kartu mesin.
+     * Jika keduanya "lengkap" (hijau), prioritas hijau di TD (jalur Dye Stuff); TA ditampilkan sebagai inactive.
+     *
+     * @return array{0: ?string, 1: ?string} [td_color, ta_color]
+     */
+    public static function exclusiveToppingIndicatorColors(?string $tdColor, ?string $taColor): array
+    {
+        if ($tdColor === 'green' && $taColor === 'green') {
+            return [$tdColor, 'inactive'];
+        }
+
+        return [$tdColor, $taColor];
+    }
+
+    public static function toppingIndicatorTitle(?string $color, string $side): string
+    {
+        return match ($color) {
+            'yellow' => 'Menunggu approval',
+            'red' => 'Menunggu scan barcode',
+            'green' => 'Lengkap',
+            'inactive' => $side === 'td'
+                ? 'Lengkap (hijau pada TA)'
+                : 'Lengkap (hijau pada TD)',
+            default => '',
+        };
+    }
+
+    /**
      * Generate status data untuk satu proses (mirip dengan logika di DashboardController::prosesStatuses)
      *
      * Multiple OP: 1 barcode LA/AUX dipakai untuk beberapa OP. Topping: 1 approval per proses,
@@ -198,6 +226,7 @@ class ProsesStatusService
             });
             $tdColor = $hasToppingLa ? ($pendingToppingLa ? 'yellow' : ($approvedToppingLaNotScanned ? 'red' : 'green')) : null;
             $taColor = $hasToppingAux ? ($pendingToppingAux ? 'yellow' : ($approvedToppingAuxNotScanned ? 'red' : 'green')) : null;
+            [$tdColor, $taColor] = self::exclusiveToppingIndicatorColors($tdColor, $taColor);
             $laInitialScanned = 0;
             foreach ($proses->details ?? [] as $d) {
                 if ($d->barcodeLas && $d->barcodeLas->where('cancel', false)->filter(fn ($b) => $b->approval_id === null)->count() > 0) {

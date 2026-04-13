@@ -625,6 +625,7 @@
                                                                     });
                                                                     $tdColor = $hasToppingLa ? ($pendingToppingLa ? 'yellow' : ($approvedToppingLaNotScanned ? 'red' : 'green')) : null;
                                                                     $taColor = $hasToppingAux ? ($pendingToppingAux ? 'yellow' : ($approvedToppingAuxNotScanned ? 'red' : 'green')) : null;
+                                                                    [$tdColor, $taColor] = \App\Services\ProsesStatusService::exclusiveToppingIndicatorColors($tdColor, $taColor);
                                                                     $laToppingRequired = collect($proses->approvals ?? [])->where('action', 'topping_la')->where('status', 'approved')->count();
                                                                     $auxToppingRequired = collect($proses->approvals ?? [])->where('action', 'topping_aux')->where('status', 'approved')->count();
                                                                     $laToppingScanned = 0;
@@ -792,14 +793,14 @@
                                                                         @endforeach
                                                                         @if($proses->jenis !== 'Maintenance')
                                                                             @php
-                                                                                $tdStyle = $tdColor === 'yellow' ? 'background:#fff9c4;color:#111;border:2.5px solid #f9a825' : ($tdColor === 'red' ? 'background:#ffb3b3;color:#111;border:2.5px solid #c62828' : ($tdColor === 'green' ? 'background:#d4f8e8;color:#111;border:2.5px solid #43a047' : ''));
-                                                                                $taStyle = $taColor === 'yellow' ? 'background:#fff9c4;color:#111;border:2.5px solid #f9a825' : ($taColor === 'red' ? 'background:#ffb3b3;color:#111;border:2.5px solid #c62828' : ($taColor === 'green' ? 'background:#d4f8e8;color:#111;border:2.5px solid #43a047' : ''));
+                                                                                $tdStyle = $tdColor === 'yellow' ? 'background:#fff9c4;color:#111;border:2.5px solid #f9a825' : ($tdColor === 'red' ? 'background:#ffb3b3;color:#111;border:2.5px solid #c62828' : ($tdColor === 'green' ? 'background:#d4f8e8;color:#111;border:2.5px solid #43a047' : ($tdColor === 'inactive' ? 'background:#eceff1;color:#555;border:2.5px solid #90a4ae' : '')));
+                                                                                $taStyle = $taColor === 'yellow' ? 'background:#fff9c4;color:#111;border:2.5px solid #f9a825' : ($taColor === 'red' ? 'background:#ffb3b3;color:#111;border:2.5px solid #c62828' : ($taColor === 'green' ? 'background:#d4f8e8;color:#111;border:2.5px solid #43a047' : ($taColor === 'inactive' ? 'background:#eceff1;color:#555;border:2.5px solid #90a4ae' : '')));
                                                                             @endphp
                                                                             @if($hasToppingLa ?? false)
-                                                                            <span class="topping-indicator topping-td" data-block-type="TD" title="Topping Dyes - {{ $tdColor === 'yellow' ? 'Menunggu approval' : ($tdColor === 'red' ? 'Menunggu scan barcode' : 'Lengkap') }}" style="display: inline-block; {{ $tdStyle }}; font-weight: bold; font-size: 18px; padding: 2px 8px; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.10); letter-spacing: 1px;">TD</span>
+                                                                            <span class="topping-indicator topping-td" data-block-type="TD" title="Topping Dyes - {{ \App\Services\ProsesStatusService::toppingIndicatorTitle($tdColor, 'td') }}" style="display: inline-block; {{ $tdStyle }}; font-weight: bold; font-size: 18px; padding: 2px 8px; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.10); letter-spacing: 1px;">TD</span>
                                                                             @endif
                                                                             @if($hasToppingAux ?? false)
-                                                                            <span class="topping-indicator topping-ta" data-block-type="TA" title="Topping Auxiliaries - {{ $taColor === 'yellow' ? 'Menunggu approval' : ($taColor === 'red' ? 'Menunggu scan barcode' : 'Lengkap') }}" style="display: inline-block; {{ $taStyle }}; font-weight: bold; font-size: 18px; padding: 2px 8px; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.10); letter-spacing: 1px;">TA</span>
+                                                                            <span class="topping-indicator topping-ta" data-block-type="TA" title="Topping Auxiliaries - {{ \App\Services\ProsesStatusService::toppingIndicatorTitle($taColor, 'ta') }}" style="display: inline-block; {{ $taStyle }}; font-weight: bold; font-size: 18px; padding: 2px 8px; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.10); letter-spacing: 1px;">TA</span>
                                                                             @endif
                                                                         @endif
                                                                     </div>
@@ -888,10 +889,10 @@
                                                                                         </span>
                                                                                     @endforeach
                                                                                     @if($proses->jenis !== 'Maintenance' && ($hasToppingLa ?? false))
-                                                                                    <span class="topping-indicator topping-td" data-block-type="TD" title="Topping Dyes - {{ $tdColor === 'yellow' ? 'Menunggu approval' : ($tdColor === 'red' ? 'Menunggu scan barcode' : 'Lengkap') }}" style="display: inline-block; {{ $tdStyle }}; font-weight: bold; font-size: 18px; padding: 2px 8px; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.10); letter-spacing: 1px;">TD</span>
+                                                                                    <span class="topping-indicator topping-td" data-block-type="TD" title="Topping Dyes - {{ \App\Services\ProsesStatusService::toppingIndicatorTitle($tdColor, 'td') }}" style="display: inline-block; {{ $tdStyle }}; font-weight: bold; font-size: 18px; padding: 2px 8px; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.10); letter-spacing: 1px;">TD</span>
                                                                                     @endif
                                                                                     @if($proses->jenis !== 'Maintenance' && ($hasToppingAux ?? false))
-                                                                                    <span class="topping-indicator topping-ta" data-block-type="TA" title="Topping Auxiliaries - {{ $taColor === 'yellow' ? 'Menunggu approval' : ($taColor === 'red' ? 'Menunggu scan barcode' : 'Lengkap') }}" style="display: inline-block; {{ $taStyle }}; font-weight: bold; font-size: 18px; padding: 2px 8px; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.10); letter-spacing: 1px;">TA</span>
+                                                                                    <span class="topping-indicator topping-ta" data-block-type="TA" title="Topping Auxiliaries - {{ \App\Services\ProsesStatusService::toppingIndicatorTitle($taColor, 'ta') }}" style="display: inline-block; {{ $taStyle }}; font-weight: bold; font-size: 18px; padding: 2px 8px; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.10); letter-spacing: 1px;">TA</span>
                                                                                     @endif
                                                                                 </div>
                                                                                 {{-- Detail OP (No OP + Info) --}}
@@ -1147,6 +1148,7 @@
                                                             });
                                                             $tdColor = $hasToppingLa ? ($pendingToppingLa ? 'yellow' : ($approvedToppingLaNotScanned ? 'red' : 'green')) : null;
                                                             $taColor = $hasToppingAux ? ($pendingToppingAux ? 'yellow' : ($approvedToppingAuxNotScanned ? 'red' : 'green')) : null;
+                                                            [$tdColor, $taColor] = \App\Services\ProsesStatusService::exclusiveToppingIndicatorColors($tdColor, $taColor);
                                                             $laToppingRequired = collect($proses->approvals ?? [])->where('action', 'topping_la')->where('status', 'approved')->count();
                                                             $auxToppingRequired = collect($proses->approvals ?? [])->where('action', 'topping_aux')->where('status', 'approved')->count();
                                                             $laToppingScanned = 0;
@@ -1338,14 +1340,14 @@
                                                                 @endforeach
                                                                 @if($proses->jenis !== 'Maintenance')
                                                                     @php
-                                                                        $tdStyle2 = $tdColor === 'yellow' ? 'background:#fff9c4;color:#111;border:2.5px solid #f9a825' : ($tdColor === 'red' ? 'background:#ffb3b3;color:#111;border:2.5px solid #c62828' : ($tdColor === 'green' ? 'background:#d4f8e8;color:#111;border:2.5px solid #43a047' : ''));
-                                                                        $taStyle2 = $taColor === 'yellow' ? 'background:#fff9c4;color:#111;border:2.5px solid #f9a825' : ($taColor === 'red' ? 'background:#ffb3b3;color:#111;border:2.5px solid #c62828' : ($taColor === 'green' ? 'background:#d4f8e8;color:#111;border:2.5px solid #43a047' : ''));
+                                                                        $tdStyle2 = $tdColor === 'yellow' ? 'background:#fff9c4;color:#111;border:2.5px solid #f9a825' : ($tdColor === 'red' ? 'background:#ffb3b3;color:#111;border:2.5px solid #c62828' : ($tdColor === 'green' ? 'background:#d4f8e8;color:#111;border:2.5px solid #43a047' : ($tdColor === 'inactive' ? 'background:#eceff1;color:#555;border:2.5px solid #90a4ae' : '')));
+                                                                        $taStyle2 = $taColor === 'yellow' ? 'background:#fff9c4;color:#111;border:2.5px solid #f9a825' : ($taColor === 'red' ? 'background:#ffb3b3;color:#111;border:2.5px solid #c62828' : ($taColor === 'green' ? 'background:#d4f8e8;color:#111;border:2.5px solid #43a047' : ($taColor === 'inactive' ? 'background:#eceff1;color:#555;border:2.5px solid #90a4ae' : '')));
                                                                     @endphp
                                                                     @if($hasToppingLa ?? false)
-                                                                    <span class="topping-indicator topping-td" data-block-type="TD" title="Topping Dyes - {{ $tdColor === 'yellow' ? 'Menunggu approval' : ($tdColor === 'red' ? 'Menunggu scan barcode' : 'Lengkap') }}" style="display: inline-block; {{ $tdStyle2 }}; font-weight: bold; font-size: 18px; padding: 2px 8px; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.10); letter-spacing: 1px;">TD</span>
+                                                                    <span class="topping-indicator topping-td" data-block-type="TD" title="Topping Dyes - {{ \App\Services\ProsesStatusService::toppingIndicatorTitle($tdColor, 'td') }}" style="display: inline-block; {{ $tdStyle2 }}; font-weight: bold; font-size: 18px; padding: 2px 8px; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.10); letter-spacing: 1px;">TD</span>
                                                                     @endif
                                                                     @if($hasToppingAux ?? false)
-                                                                    <span class="topping-indicator topping-ta" data-block-type="TA" title="Topping Auxiliaries - {{ $taColor === 'yellow' ? 'Menunggu approval' : ($taColor === 'red' ? 'Menunggu scan barcode' : 'Lengkap') }}" style="display: inline-block; {{ $taStyle2 }}; font-weight: bold; font-size: 18px; padding: 2px 8px; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.10); letter-spacing: 1px;">TA</span>
+                                                                    <span class="topping-indicator topping-ta" data-block-type="TA" title="Topping Auxiliaries - {{ \App\Services\ProsesStatusService::toppingIndicatorTitle($taColor, 'ta') }}" style="display: inline-block; {{ $taStyle2 }}; font-weight: bold; font-size: 18px; padding: 2px 8px; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.10); letter-spacing: 1px;">TA</span>
                                                                     @endif
                                                                 @endif
                                                             </div>
@@ -1449,10 +1451,10 @@
                                                                                 </span>
                                                                             @endforeach
                                                                             @if($proses->jenis !== 'Maintenance' && ($hasToppingLa ?? false))
-                                                                            <span class="topping-indicator topping-td" data-block-type="TD" title="Topping Dyes - {{ $tdColor === 'yellow' ? 'Menunggu approval' : ($tdColor === 'red' ? 'Menunggu scan barcode' : 'Lengkap') }}" style="display: inline-block; {{ $tdStyle2 }}; font-weight: bold; font-size: 18px; padding: 2px 8px; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.10); letter-spacing: 1px;">TD</span>
+                                                                            <span class="topping-indicator topping-td" data-block-type="TD" title="Topping Dyes - {{ \App\Services\ProsesStatusService::toppingIndicatorTitle($tdColor, 'td') }}" style="display: inline-block; {{ $tdStyle2 }}; font-weight: bold; font-size: 18px; padding: 2px 8px; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.10); letter-spacing: 1px;">TD</span>
                                                                             @endif
                                                                             @if($proses->jenis !== 'Maintenance' && ($hasToppingAux ?? false))
-                                                                            <span class="topping-indicator topping-ta" data-block-type="TA" title="Topping Auxiliaries - {{ $taColor === 'yellow' ? 'Menunggu approval' : ($taColor === 'red' ? 'Menunggu scan barcode' : 'Lengkap') }}" style="display: inline-block; {{ $taStyle2 }}; font-weight: bold; font-size: 18px; padding: 2px 8px; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.10); letter-spacing: 1px;">TA</span>
+                                                                            <span class="topping-indicator topping-ta" data-block-type="TA" title="Topping Auxiliaries - {{ \App\Services\ProsesStatusService::toppingIndicatorTitle($taColor, 'ta') }}" style="display: inline-block; {{ $taStyle2 }}; font-weight: bold; font-size: 18px; padding: 2px 8px; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.10); letter-spacing: 1px;">TA</span>
                                                                             @endif
                                                                         </div>
                                                                         {{-- Detail OP (No OP + Info) --}}
@@ -6270,10 +6272,17 @@
                     statusData.la_initial_complete !== undefined || statusData.aux_initial_complete !== undefined) {
                     const $header = $card.find('.card-header > div:nth-child(2)');
                     const $gdaContainers = $card.find('.op-list > div:has(.gda-block)');
-                    const getTdStyle = (c) => c === 'yellow' ? 'background:#fff9c4;color:#111;border:2.5px solid #f9a825' : (c === 'red' ? 'background:#ffb3b3;color:#111;border:2.5px solid #c62828' : (c === 'green' ? 'background:#d4f8e8;color:#111;border:2.5px solid #43a047' : ''));
+                    const getTdStyle = (c) => c === 'yellow' ? 'background:#fff9c4;color:#111;border:2.5px solid #f9a825' : (c === 'red' ? 'background:#ffb3b3;color:#111;border:2.5px solid #c62828' : (c === 'green' ? 'background:#d4f8e8;color:#111;border:2.5px solid #43a047' : (c === 'inactive' ? 'background:#eceff1;color:#555;border:2.5px solid #90a4ae' : '')));
+                    const getToppingTitle = (c, side) => {
+                        if (c === 'yellow') return 'Menunggu approval';
+                        if (c === 'red') return 'Menunggu scan barcode';
+                        if (c === 'green') return 'Lengkap';
+                        if (c === 'inactive') return side === 'td' ? 'Lengkap (hijau pada TA)' : 'Lengkap (hijau pada TD)';
+                        return '';
+                    };
                     if (statusData.has_topping_la && statusData.td_color) {
                         const style = getTdStyle(statusData.td_color);
-                        const title = statusData.td_color === 'yellow' ? 'Menunggu approval' : (statusData.td_color === 'red' ? 'Menunggu scan barcode' : 'Lengkap');
+                        const title = getToppingTitle(statusData.td_color, 'td');
                         const tdHtml = '<span class="topping-indicator topping-td" data-block-type="TD" title="Topping Dyes - ' + title + '" style="display: inline-block; ' + style + '; font-weight: bold; font-size: 18px; padding: 2px 8px; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.10); letter-spacing: 1px;">TD</span>';
                         let $tdAll = $card.find('.topping-td');
                         if ($tdAll.length) {
@@ -6287,7 +6296,7 @@
                     }
                     if (statusData.has_topping_aux && statusData.ta_color) {
                         const style = getTdStyle(statusData.ta_color);
-                        const title = statusData.ta_color === 'yellow' ? 'Menunggu approval' : (statusData.ta_color === 'red' ? 'Menunggu scan barcode' : 'Lengkap');
+                        const title = getToppingTitle(statusData.ta_color, 'ta');
                         const taHtml = '<span class="topping-indicator topping-ta" data-block-type="TA" title="Topping Auxiliaries - ' + title + '" style="display: inline-block; ' + style + '; font-weight: bold; font-size: 18px; padding: 2px 8px; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.10); letter-spacing: 1px;">TA</span>';
                         let $taAll = $card.find('.topping-ta');
                         if ($taAll.length) {

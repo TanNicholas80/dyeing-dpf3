@@ -16,6 +16,7 @@ use App\Events\BarcodeStatusUpdated;
 use App\Events\ApprovalPendingCreated;
 use App\Services\MesinCacheService;
 use App\Services\ProsesStatusService;
+use App\Support\SapApi;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -53,6 +54,69 @@ class ProsesController extends Controller
             ->where('type', 'FM')
             ->whereIn('action', ['edit_cycle_time', 'delete_proses', 'move_machine', 'swap_position'])
             ->first();
+    }
+
+    /**
+     * Cek apakah proses lama boleh diabaikan saat validasi reuse OP/Partai untuk Produksi.
+     * Boleh diabaikan jika:
+     * - Proses sudah soft delete
+     * - Belum memiliki end cycle time (selesai = null)
+     * - Penghapusan berasal dari approval flow:
+     *   a) create_reprocess ditolak FM/VP, atau
+     *   b) delete_proses disetujui.
+     */
+    private function isReusableDeletedByApprovalFlow(?Proses $proses): bool
+    {
+        if (!$proses) {
+            return false;
+        }
+
+        if (!method_exists($proses, 'trashed') || !$proses->trashed()) {
+            return false;
+        }
+
+        if ($proses->selesai !== null) {
+            return false;
+        }
+
+        $deletedByRejectedCreateReprocess = Approval::where('proses_id', $proses->id)
+            ->where('action', 'create_reprocess')
+            ->whereIn('type', ['FM', 'VP'])
+            ->where('status', 'rejected')
+            ->exists();
+
+        if ($deletedByRejectedCreateReprocess) {
+            return true;
+        }
+
+        $deletedByApprovedDelete = Approval::where('proses_id', $proses->id)
+            ->where('action', 'delete_proses')
+            ->where('status', 'approved')
+            ->exists();
+
+        return $deletedByApprovedDelete;
+    }
+
+    /**
+     * Ambil DetailProses yang masih memblokir reuse OP/Partai.
+     */
+    private function getBlockingDetailsForProduksiReuse($existingDetails)
+    {
+        return $existingDetails->filter(function ($detail) {
+            $proses = Proses::withTrashed()->find($detail->proses_id);
+
+            // Jika proses tidak ditemukan, perlakukan sebagai blocking untuk aman.
+            if (!$proses) {
+                return true;
+            }
+
+            // Jika memenuhi rule reuse, detail ini tidak dianggap blocking.
+            if ($this->isReusableDeletedByApprovalFlow($proses)) {
+                return false;
+            }
+
+            return true;
+        });
     }
 
     /**
@@ -382,7 +446,9 @@ class ProsesController extends Controller
                         }
                     }
                 } else {
-                    if ($existingDetails->isNotEmpty()) {
+                    $blockingDetails = $this->getBlockingDetailsForProduksiReuse($existingDetails);
+
+                    if ($blockingDetails->isNotEmpty()) {
                         return back()
                             ->withInput()
                             ->withErrors([
@@ -551,15 +617,8 @@ class ProsesController extends Controller
         try {
             $client = new \GuzzleHttp\Client();
             $response = $client->post(
-                'http://18.139.142.16:8020/sap/bc/zdyes/zterima_op?sap-client=100',
-                [
-                    'headers' => [
-                        'Authorization' => 'Basic RFRfV01TOldtczAxMTEyMDI1QA==',
-                        'Content-Type' => 'text/plain',
-                        'Accept' => 'application/json',
-                    ],
-                    'body' => json_encode($no_op),
-                ]
+                SapApi::url('zterima_op'),
+                SapApi::guzzleOptions(['body' => json_encode($no_op)])
             );
             $data = json_decode($response->getBody(), true);
             if (!is_array($data)) {
@@ -623,6 +682,12 @@ class ProsesController extends Controller
                     ]);
                 }
             }
+            return response()->json(['ok' => true]);
+        }
+
+        $blocking = $this->getBlockingDetailsForProduksiReuse($existing);
+
+        if ($blocking->isEmpty()) {
             return response()->json(['ok' => true]);
         }
 
@@ -691,15 +756,8 @@ class ProsesController extends Controller
             $client = new \GuzzleHttp\Client();
             $body = json_encode($payload);
             $response = $client->post(
-                'http://18.139.142.16:8020/sap/bc/zdyes/zterima_data?sap-client=100',
-                [
-                    'headers' => [
-                        'Authorization' => 'Basic RFRfV01TOldtczAxMTEyMDI1QA==',
-                        'Content-Type' => 'text/plain',
-                        'Accept' => 'application/json',
-                    ],
-                    'body' => $body,
-                ]
+                SapApi::url('zterima_data'),
+                SapApi::guzzleOptions(['body' => $body])
             );
             $data = json_decode($response->getBody(), true);
             Log::info('BarcodeKain: API Response', ['response' => $data]);
@@ -934,15 +992,8 @@ class ProsesController extends Controller
             Log::info('BarcodeLa: API body prepared', ['body' => $body]);
             $client = new \GuzzleHttp\Client();
             $response = $client->post(
-                'http://18.139.142.16:8020/sap/bc/zdyes/zterima_kimia?sap-client=100',
-                [
-                    'headers' => [
-                        'Authorization' => 'Basic RFRfV01TOldtczAxMTEyMDI1QA==',
-                        'Content-Type' => 'text/plain',
-                        'Accept' => 'application/json',
-                    ],
-                    'body' => $body,
-                ]
+                SapApi::url('zterima_kimia'),
+                SapApi::guzzleOptions(['body' => $body])
             );
             $rawResponse = $response->getBody()->getContents();
             Log::info('BarcodeLa: API Response', ['response' => $rawResponse]);
@@ -1214,15 +1265,8 @@ class ProsesController extends Controller
             Log::info('BarcodeAux: API body prepared', ['body' => $body]);
             $client = new \GuzzleHttp\Client();
             $response = $client->post(
-                'http://18.139.142.16:8020/sap/bc/zdyes/zterima_kimia?sap-client=100',
-                [
-                    'headers' => [
-                        'Authorization' => 'Basic RFRfV01TOldtczAxMTEyMDI1QA==',
-                        'Content-Type' => 'text/plain',
-                        'Accept' => 'application/json',
-                    ],
-                    'body' => $body,
-                ]
+                SapApi::url('zterima_kimia'),
+                SapApi::guzzleOptions(['body' => $body])
             );
             $rawResponse = $response->getBody()->getContents();
             Log::info('BarcodeAux: API Response', ['body' => $body, 'response' => $rawResponse]);
@@ -1859,25 +1903,15 @@ class ProsesController extends Controller
         try {
             $client = new \GuzzleHttp\Client();
             $body = '"' . $matdok . '"';
+            $cancelUrl = SapApi::url('zterima_cancel');
             Log::info('SAP Cancel Request', [
-                'url' => 'http://18.139.142.16:8020/sap/bc/zdyes/zterima_cancel?sap-client=100',
-                'headers' => [
-                    'Authorization' => 'Basic RFRfV01TOldtczAxMTEyMDI1QA==',
-                    'Content-Type' => 'text/plain',
-                    'Accept' => 'application/json',
-                ],
+                'url' => $cancelUrl,
+                'headers' => SapApi::defaultHeaders(),
                 'body' => $body,
             ]);
             $response = $client->post(
-                'http://18.139.142.16:8020/sap/bc/zdyes/zterima_cancel?sap-client=100',
-                [
-                    'headers' => [
-                        'Authorization' => 'Basic RFRfV01TOldtczAxMTEyMDI1QA==',
-                        'Content-Type' => 'text/plain',
-                        'Accept' => 'application/json',
-                    ],
-                    'body' => $body,
-                ]
+                $cancelUrl,
+                SapApi::guzzleOptions(['body' => $body])
             );
             $rawResponse = $response->getBody()->getContents();
             Log::info('SAP Cancel Raw Response', ['response' => $rawResponse]);

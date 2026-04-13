@@ -6,6 +6,7 @@ use App\Models\Auxl;
 use App\Models\AuxlDetail;
 use App\Models\BarcodeAux;
 use App\Models\Approval;
+use App\Support\SapApi;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
@@ -197,15 +198,11 @@ class AuxlController extends Controller
 
         try {
             $client = new \GuzzleHttp\Client();
-            $response = $client->request('POST', 'http://18.139.142.16:8020/sap/bc/zdyes/zterima_zchm?sap-client=100', [
-                'headers' => [
-                    'Authorization' => 'Basic RFRfV01TOldtczAxMTEyMDI1QA==',
-                    'Content-Type' => 'text/plain',
-                    'Accept' => 'application/json',
-                ],
-                'body' => '"' . $q . '"',
-                'timeout' => 10,
-            ]);
+            $response = $client->request(
+                'POST',
+                SapApi::url('zterima_zchm'),
+                SapApi::proxyGuzzleOptions(['body' => '"' . $q . '"'])
+            );
             $data = json_decode($response->getBody(), true);
             $results = collect($data)
                 ->filter(fn ($item) => isset($item['matnr']))
@@ -242,15 +239,11 @@ class AuxlController extends Controller
 
         try {
             $client = new \GuzzleHttp\Client();
-            $response = $client->request('POST', 'http://18.139.142.16:8020/sap/bc/zdyes/zterima_cstmr?sap-client=100', [
-                'headers' => [
-                    'Authorization' => 'Basic RFRfV01TOldtczAxMTEyMDI1QA==',
-                    'Content-Type' => 'text/plain',
-                    'Accept' => 'application/json',
-                ],
-                'body' => json_encode($q),
-                'timeout' => 10,
-            ]);
+            $response = $client->request(
+                'POST',
+                SapApi::url('zterima_cstmr'),
+                SapApi::proxyGuzzleOptions(['body' => json_encode($q)])
+            );
             $data = json_decode($response->getBody(), true);
             if (!is_array($data)) {
                 return response()->json(['results' => []]);
@@ -287,15 +280,11 @@ class AuxlController extends Controller
 
         try {
             $client = new \GuzzleHttp\Client();
-            $response = $client->request('POST', 'http://18.139.142.16:8020/sap/bc/zdyes/zterima_mkt?sap-client=100', [
-                'headers' => [
-                    'Authorization' => 'Basic RFRfV01TOldtczAxMTEyMDI1QA==',
-                    'Content-Type' => 'text/plain',
-                    'Accept' => 'application/json',
-                ],
-                'body' => json_encode($q),
-                'timeout' => 10,
-            ]);
+            $response = $client->request(
+                'POST',
+                SapApi::url('zterima_mkt'),
+                SapApi::proxyGuzzleOptions(['body' => json_encode($q)])
+            );
             $data = json_decode($response->getBody(), true);
             if (!is_array($data)) {
                 return response()->json(['results' => []]);

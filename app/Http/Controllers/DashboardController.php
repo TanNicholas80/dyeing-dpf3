@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Proses;
 use App\Models\Approval;
 use App\Services\MesinCacheService;
+use App\Services\ProsesStatusService;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Http;
@@ -321,6 +322,7 @@ class DashboardController extends Controller
                 });
                 $tdColor = $hasToppingLa ? ($pendingToppingLa ? 'yellow' : ($approvedToppingLaNotScanned ? 'red' : 'green')) : null;
                 $taColor = $hasToppingAux ? ($pendingToppingAux ? 'yellow' : ($approvedToppingAuxNotScanned ? 'red' : 'green')) : null;
+                [$tdColor, $taColor] = ProsesStatusService::exclusiveToppingIndicatorColors($tdColor, $taColor);
 
                 // Tentukan warna background (sama seperti logika di blade)
                 $bg = '#757575'; // default abu-abu

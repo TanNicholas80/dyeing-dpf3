@@ -7,12 +7,144 @@ return new class extends Migration
 {
     /**
      * Run the migrations.
+     *
+     * MySQL: trigger + renumber `order` memakai variabel sesi (@row_number), kompatibel MySQL 5.7+.
      */
     public function up(): void
     {
-        // Trigger untuk memonitor perubahan status mesin (PostgreSQL)
-        // Ketika mesin mati (status 1 -> 0): selesaikan proses aktif
-        // Ketika mesin hidup (status 0 -> 1): mulai proses berikutnya berdasarkan order
+        $driver = DB::getDriverName();
+
+        if ($driver === 'mysql') {
+            $this->upMysql();
+        } elseif ($driver === 'pgsql') {
+            $this->upPgsql();
+        }
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        $driver = DB::getDriverName();
+
+        if ($driver === 'mysql') {
+            DB::statement('DROP TRIGGER IF EXISTS mesin_after_update_status');
+        } elseif ($driver === 'pgsql') {
+            DB::unprepared('
+                DROP TRIGGER IF EXISTS mesin_after_update_status ON mesins;
+                DROP FUNCTION IF EXISTS mesin_after_update_status_func();
+            ');
+        }
+    }
+
+    private function upMysql(): void
+    {
+        DB::statement('DROP TRIGGER IF EXISTS mesin_after_update_status');
+
+        DB::statement(<<<'SQL'
+CREATE TRIGGER mesin_after_update_status
+AFTER UPDATE ON mesins
+FOR EACH ROW
+BEGIN
+    DECLARE proses_aktif_id BIGINT UNSIGNED DEFAULT NULL;
+    DECLARE proses_aktif_mulai DATETIME DEFAULT NULL;
+    DECLARE proses_selanjutnya_id BIGINT UNSIGNED DEFAULT NULL;
+    DECLARE cycle_time_calc BIGINT UNSIGNED DEFAULT NULL;
+
+    IF OLD.status != NEW.status THEN
+
+        IF OLD.status = 1 AND NEW.status = 0 THEN
+            SELECT id, mulai INTO proses_aktif_id, proses_aktif_mulai
+            FROM proses
+            WHERE mesin_id = NEW.id
+              AND mulai IS NOT NULL
+              AND selesai IS NULL
+            ORDER BY `order` ASC, id ASC
+            LIMIT 1;
+
+            IF proses_aktif_id IS NOT NULL THEN
+                SET cycle_time_calc = TIMESTAMPDIFF(SECOND, proses_aktif_mulai, NOW());
+
+                IF cycle_time_calc < 0 THEN
+                    SET cycle_time_calc = 0;
+                END IF;
+
+                UPDATE proses
+                SET selesai = NOW(),
+                    cycle_time_actual = cycle_time_calc,
+                    `order` = 0,
+                    updated_at = NOW()
+                WHERE id = proses_aktif_id;
+
+                SET @row_number = 0;
+                UPDATE proses
+                SET `order` = (@row_number := @row_number + 1),
+                    updated_at = NOW()
+                WHERE mesin_id = NEW.id
+                  AND mulai IS NULL
+                  AND selesai IS NULL
+                ORDER BY `order` ASC, id ASC;
+            END IF;
+        END IF;
+
+        IF OLD.status = 0 AND NEW.status = 1 THEN
+            SELECT id INTO proses_selanjutnya_id
+            FROM proses
+            WHERE mesin_id = NEW.id
+              AND mulai IS NULL
+              AND selesai IS NULL
+              AND `order` > 0
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM approvals a
+                  WHERE a.proses_id = proses.id
+                    AND a.status = 'pending'
+                    AND a.action = 'create_reprocess'
+                    AND a.type IN ('FM', 'VP')
+              )
+            ORDER BY `order` ASC, id ASC
+            LIMIT 1;
+
+            IF proses_selanjutnya_id IS NOT NULL THEN
+                UPDATE approvals
+                SET status = 'rejected',
+                    note = CASE
+                        WHEN note IS NULL OR note = '' THEN 'Auto rejected by system: proses otomatis berjalan saat mesin ON.'
+                        ELSE CONCAT(note, ' | Auto rejected by system: proses otomatis berjalan saat mesin ON.')
+                    END,
+                    approved_by = NULL,
+                    updated_at = NOW()
+                WHERE proses_id = proses_selanjutnya_id
+                  AND status = 'pending'
+                  AND type = 'FM'
+                  AND action IN ('edit_cycle_time', 'delete_proses', 'move_machine', 'swap_position');
+
+                UPDATE proses
+                SET mulai = NOW(),
+                    `order` = 0,
+                    updated_at = NOW()
+                WHERE id = proses_selanjutnya_id;
+
+                SET @row_number = 0;
+                UPDATE proses
+                SET `order` = (@row_number := @row_number + 1),
+                    updated_at = NOW()
+                WHERE mesin_id = NEW.id
+                  AND mulai IS NULL
+                  AND selesai IS NULL
+                  AND id != proses_selanjutnya_id
+                ORDER BY `order` ASC, id ASC;
+            END IF;
+        END IF;
+
+    END IF;
+END;
+SQL);
+    }
+
+    private function upPgsql(): void
+    {
         DB::unprepared('
             CREATE OR REPLACE FUNCTION mesin_after_update_status_func()
             RETURNS TRIGGER AS $$
@@ -135,17 +267,6 @@ return new class extends Migration
                 AFTER UPDATE ON mesins
                 FOR EACH ROW
                 EXECUTE FUNCTION mesin_after_update_status_func();
-        ');
-    }
-
-    /**
-     * Reverse the migrations.
-     */
-    public function down(): void
-    {
-        DB::unprepared('
-            DROP TRIGGER IF EXISTS mesin_after_update_status ON mesins;
-            DROP FUNCTION IF EXISTS mesin_after_update_status_func();
         ');
     }
 };
