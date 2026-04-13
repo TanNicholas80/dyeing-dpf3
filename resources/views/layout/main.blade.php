@@ -565,9 +565,7 @@
             toast: true,
             position: 'top-end',
             icon: 'success',
-            title: {
-                !!json_encode(session('success')) !!
-            },
+            title: {!! json_encode(session('success')) !!},
             showConfirmButton: false,
             timer: 8000,
             timerProgressBar: true
@@ -578,9 +576,7 @@
             toast: true,
             position: 'top-end',
             icon: 'error',
-            title: {
-                !!json_encode(session('error')) !!
-            },
+            title: {!! json_encode(session('error')) !!},
             showConfirmButton: true,
             confirmButtonText: 'Tutup',
             showCloseButton: true,
@@ -593,28 +589,20 @@
             toast: true,
             position: 'top-end',
             icon: 'info',
-            title: {
-                !!json_encode(session('info')) !!
-            },
+            title: {!! json_encode(session('info')) !!},
             showConfirmButton: false,
             timer: 8000,
             timerProgressBar: true
         });
-        @endif {
-            {
-                --Notifikasi error validasi(dari withErrors) --
-            }
-        }
+        @endif
+
+        {{-- Notifikasi error validasi (dari withErrors) --}}
         @if(isset($errors) && $errors->any())
         Swal.fire({
             toast: true,
             position: 'top-end',
             icon: 'error',
-            title: {
-                !!json_encode($errors - > count() > 1 ? $errors->first().
-                    ' (dan '.($errors->count() - 1).
-                    ' error lainnya)' : $errors->first()) !!
-            },
+            title: {!! json_encode($errors->count() > 1 ? $errors->first() . ' (dan ' . ($errors->count() - 1) . ' error lainnya)' : $errors->first()) !!},
             showConfirmButton: true,
             confirmButtonText: 'Tutup',
             showCloseButton: true,
