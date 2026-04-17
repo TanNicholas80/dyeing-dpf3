@@ -139,13 +139,38 @@ class MesinController extends Controller
     public function statuses()
     {
         try {
-            $mesins = Mesin::all(['id', 'status']);
+            $mesins = Mesin::all();
             $result = [];
             foreach ($mesins as $mesin) {
+                // Logic Auto-Offline: jika tidak ada sinyal > 5 detik
+                $isTimeout = true;
+                if ($mesin->last_seen_at) {
+                    // Gunakan timestamp untuk perbandingan agar aman dari masalah timezone Laravel vs DB
+                    $lastSeenTs = $mesin->last_seen_at->getTimestamp();
+                    $nowTs = now()->getTimestamp();
+                    $isTimeout = ($nowTs - $lastSeenTs) > 5;
+                }
+
+                // Paksa status ke Mati (false) jika timeout dan saat ini masih Hidup
+                if ($isTimeout && $mesin->status) {
+                    $mesin->status = false;
+                    $mesin->save();
+
+                    // Broadcast ke dashboard pusher untuk update real-time
+                    event(new \App\Events\MesinUpdated([
+                        'id' => $mesin->id,
+                        'jenis_mesin' => $mesin->jenis_mesin,
+                        'status' => false,
+                        'auto_offline' => true
+                    ]));
+                }
+
                 $result[$mesin->id] = [
                     'status' => (bool) $mesin->status,
                     'label' => $mesin->status ? 'Hidup' : 'Mati',
                     'force_alarm_off' => (bool) Cache::get($this->forceAlarmKey((int) $mesin->id), false),
+                    'iot_signal' => !$isTimeout,
+                    'iot_label' => !$isTimeout ? 'Terhubung' : 'Terputus',
                 ];
             }
             return response()->json($result);

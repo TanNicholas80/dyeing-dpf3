@@ -123,6 +123,14 @@ return [
             'handler' => NullHandler::class,
         ],
 
+        'iot' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/iot.log'),
+            'level' => 'info',
+            'days' => 7,
+            'replace_placeholders' => true,
+        ],
+
         'emergency' => [
             'path' => storage_path('logs/laravel.log'),
         ],

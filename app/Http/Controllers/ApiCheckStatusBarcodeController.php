@@ -58,6 +58,15 @@ class ApiCheckStatusBarcodeController extends Controller
             'ts' => 'nullable|string|max:50',
         ]);
 
+        // 1. Log detail ke file (storage/logs/iot.log) untuk monitoring tiap 4 detik
+        \Illuminate\Support\Facades\Log::channel('iot')->info("Heartbeat Mesin ID: {$mesin->id} ({$mesin->jenis_mesin})", [
+            'payload' => $validated,
+            'ip' => $request->ip()
+        ]);
+
+        // 2. Deteksi jika sinyal baru masuk setelah sempat terputus (> 5 detik)
+        // Note: Tidak mencatat ke activity log sesuai permintaan (hanya ke file log saja)
+        
         $cacheKey = "iot:mesin:{$mesin->id}:state";
         $isOn = (bool) $validated['is_on'];
         $payload = [
@@ -81,6 +90,7 @@ class ApiCheckStatusBarcodeController extends Controller
 
         // Update status mesin di database (1 = Hidup/ON, 0 = Mati/OFF)
         $mesin->status = $isOn;
+        $mesin->last_seen_at = now();
         $mesin->save();
 
         event(new \App\Events\MesinUpdated($mesin));

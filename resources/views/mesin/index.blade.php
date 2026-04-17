@@ -51,6 +51,7 @@
                                         <tr>
                                             <th>Jenis Mesin</th>
                                             <th>Status</th>
+                                            <th>Sinyal IoT</th>
                                             @if ($isSuperAdmin)
                                             <th>Alarm Paksa OFF</th>
                                             @endif
@@ -69,6 +70,12 @@
                                                     <span class="badge status-badge {{ $mesin->status ? 'badge-success' : 'badge-secondary' }}"
                                                         data-id="{{ $mesin->id }}">
                                                         {{ $mesin->status ? 'Hidup' : 'Mati' }}
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <span class="badge signal-badge badge-secondary"
+                                                        data-id="{{ $mesin->id }}">
+                                                        Mengecek...
                                                     </span>
                                                 </td>
                                                 @if ($isSuperAdmin)
@@ -198,6 +205,14 @@
                                 badge.textContent = data[mesinId].label;
                                 badge.classList.remove('badge-success', 'badge-secondary');
                                 badge.classList.add(data[mesinId].status ? 'badge-success' : 'badge-secondary');
+                            }
+                        });
+                        document.querySelectorAll('.signal-badge').forEach(function(badge) {
+                            var mesinId = badge.getAttribute('data-id');
+                            if (data[mesinId]) {
+                                badge.textContent = data[mesinId].iot_label;
+                                badge.classList.remove('badge-success', 'badge-danger', 'badge-secondary');
+                                badge.classList.add(data[mesinId].iot_signal ? 'badge-success' : 'badge-danger');
                             }
                         });
                         document.querySelectorAll('.force-alarm-toggle').forEach(function(toggle) {

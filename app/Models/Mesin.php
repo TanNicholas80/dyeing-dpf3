@@ -16,6 +16,12 @@ class Mesin extends Model
     protected $fillable = [
         'jenis_mesin',
         'status',
+        'last_seen_at',
+    ];
+
+    protected $casts = [
+        'status' => 'boolean',
+        'last_seen_at' => 'datetime',
     ];
 
     public function proses()
