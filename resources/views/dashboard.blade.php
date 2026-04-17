@@ -3897,43 +3897,6 @@
                     success: function(data) {
                         const barcodeKainOptional = data.barcode_kain_optional === true;
                         // Helper untuk update warna blok G, D, A di card utama setelah perubahan barcode
-                        function updateGDAIndicators(prosesId, detailId, hasKain, hasLa, hasAux) {
-                            let $targets = $(`.status-card[data-proses-id="${prosesId}"] .op-row[data-detail-id="${detailId}"]`);
-                            if (!$targets.length) {
-                                $targets = $(`.status-card[data-proses-id="${prosesId}"]`);
-                            }
-                            const $cards = $targets;
-                            if (!$cards.length) return;
-
-                            $cards.each(function() {
-                                const $card = $(this);
-                                const prosesData = $card.data('proses');
-                                if (!prosesData || prosesData.jenis === 'Maintenance') {
-                                    return; // Tidak ada G/D/A atau F/D/A untuk Maintenance
-                                }
-                                // Update warna blok berdasarkan status barcode
-                                function setBlockColor(blockType, ok) {
-                                    const $block = $card.find(
-                                        `.gda-block[data-block-type="${blockType}"]`);
-                                    if (!$block.length) return;
-
-                                    const blockBg = ok ? '#d4f8e8' : '#ffb3b3';
-                                    const blockBorder = ok ? '#43a047' : '#c62828';
-                                    $block.css({
-                                        background: blockBg,
-                                        borderColor: blockBorder
-                                    });
-                                }
-
-                                const barcodeKainOpt = prosesData.barcode_kain_optional === true;
-                                if (!barcodeKainOpt) {
-                                    const firstBlock = (prosesData.mode === 'finish') ? 'F' : 'G';
-                                    setBlockColor(firstBlock, !!hasKain);
-                                }
-                                setBlockColor('D', !!hasLa);
-                                setBlockColor('A', !!hasAux);
-                            });
-                        }
 
                         function renderBarcodeGrid(barcodes, barcodeType, prosesId) {
                             // Filter barcode yang belum cancel
@@ -4170,7 +4133,11 @@
                         const hasKainActive = data.can_scan_la_aux === true;
                         const hasLaActive = (data.barcode_la || []).some(bk => !bk.cancel);
                         const hasAuxActive = (data.barcode_aux || []).some(bk => !bk.cancel);
-                        updateGDAIndicators(proses.id, selectedDetailId, hasKainActive, hasLaActive, hasAuxActive);
+                        // Update G/D/A indicators
+                        const hasKainActiveGlobal = data.can_scan_la_aux === true;
+                        const hasLaActiveGlobal = (data.barcode_la || []).some(bk => !bk.cancel);
+                        const hasAuxActiveGlobal = (data.barcode_aux || []).some(bk => !bk.cancel);
+                        window.updateGDAIndicators(proses.id, selectedDetailId, hasKainActiveGlobal, hasLaActiveGlobal, hasAuxActiveGlobal);
                     },
                     error: function() {
                         $('#barcode-kain-list').html(
@@ -5244,69 +5211,25 @@
                                     const proses = $('#modalDetailProses').data('proses') || {};
                                     const barcodeKainOptionalScan = data.barcode_kain_optional === true;
                                     // Helper untuk update warna blok G, D, A di card utama setelah perubahan barcode
-                                    function updateGDAIndicators(prosesId, detailId, hasKain, hasLa, hasAux) {
-                                        let $targets = $(`.status-card[data-proses-id="${prosesId}"] .op-row[data-detail-id="${detailId}"]`);
-                                        if (!$targets.length) {
-                                            $targets = $(`.status-card[data-proses-id="${prosesId}"]`);
-                                        }
-                                        const $cards = $targets;
-                                        if (!$cards.length) return;
-
-                                        $cards.each(function() {
-                                            const $card = $(this);
-                                            const prosesData = $card.data('proses');
-                                            if (!prosesData || prosesData.jenis === 'Maintenance') {
-                                                return;
-                                            }
-
-                                            function setBlockColor(blockType, ok) {
-                                                const $block = $card.find(
-                                                    `.gda-block[data-block-type="${blockType}"]`);
-                                                if (!$block.length) return;
-
-                                                const blockBg = ok ? '#d4f8e8' : '#ffb3b3';
-                                                const blockBorder = ok ? '#43a047' : '#c62828';
-                                                $block.css({
-                                                    background: blockBg,
-                                                    borderColor: blockBorder
-                                                });
-                                            }
-
-                                            if (!(prosesData.barcode_kain_optional === true)) {
-                                                const firstBlock = (prosesData.mode === 'finish') ? 'F' : 'G';
-                                                setBlockColor(firstBlock, !!hasKain);
-                                            }
-                                            setBlockColor('D', !!hasLa);
-                                            setBlockColor('A', !!hasAux);
-                                        });
-                                    }
-
                                     const renderBarcodeGrid = window.renderBarcodeGrid;
-                                        // Render ulang list barcode di modal
-                                        if (!barcodeKainOptionalScan && $('#barcode-kain-list').length) {
-                                            $('#barcode-kain-list').html(renderBarcodeGrid(data.barcode_kain, 'kain', currentProsesId));
-                                        }
-                                        $('#barcode-la-list').html(renderBarcodeGrid(data.barcode_la, 'la', currentProsesId));
-                                        $('#barcode-aux-list').html(renderBarcodeGrid(data.barcode_aux, 'aux', currentProsesId));
+                                    // Render ulang list barcode di modal
+                                    if (!barcodeKainOptionalScan && $('#barcode-kain-list').length) {
+                                        $('#barcode-kain-list').html(renderBarcodeGrid(data.barcode_kain, 'kain', currentProsesId));
+                                    }
+                                    $('#barcode-la-list').html(renderBarcodeGrid(data.barcode_la, 'la', currentProsesId));
+                                    $('#barcode-aux-list').html(renderBarcodeGrid(data.barcode_aux, 'aux', currentProsesId));
 
                                     // Tampilkan progress barcode kain
-                                    // Gunakan barcode_kain_progress untuk detail yang dipilih (untuk display)
-                                    // dan all_barcode_kain_progress untuk validasi can_scan_la_aux (semua detail)
                                     const selectedProgress = data.barcode_kain_progress || [];
                                     const allProgress = data.all_barcode_kain_progress || [];
                                     const incompleteDetails = data.incomplete_details || [];
                                     let progressHtml = '';
                                     
-                                    // Tampilkan progress untuk detail yang dipilih
                                     if (selectedProgress.length > 0) {
                                         progressHtml += '<div style="padding:4px 0;"><strong>Progress Barcode Kain (Detail yang Dipilih):</strong><br>';
                                         selectedProgress.forEach(function(p) {
-                                            const statusIcon = p.is_complete ? 
-                                                '<span style="color:#43a047;"><i class="fas fa-check"></i></span>' : 
-                                                '<span style="color:#c62828;"><i class="fas fa-times"></i></span>';
-                                            const statusText = p.is_complete ? 
-                                                '<span style="color:#43a047;">Lengkap</span>' : 
-                                                '<span style="color:#c62828;">Kurang ' + (p.roll - p.scanned) + ' roll</span>';
+                                            const statusIcon = p.is_complete ? '<span style="color:#43a047;"><i class="fas fa-check"></i></span>' : '<span style="color:#c62828;"><i class="fas fa-times"></i></span>';
+                                            const statusText = p.is_complete ? '<span style="color:#43a047;">Lengkap</span>' : '<span style="color:#c62828;">Kurang ' + (p.roll - p.scanned) + ' roll</span>';
                                             const bgColor = p.is_complete ? '#e8f5e9' : '#ffebee';
                                             progressHtml += `<div style="background:${bgColor};padding:4px 8px;margin:2px 0;border-radius:4px;">`;
                                             progressHtml += `${statusIcon} <strong>OP ${p.no_op || 'N/A'}:</strong> ${p.scanned}/${p.roll} roll - ${statusText}`;
@@ -5315,9 +5238,8 @@
                                         progressHtml += '</div>';
                                     }
                                     
-                                    // Tampilkan status keseluruhan (untuk validasi scan LA/AUX)
                                     if (barcodeKainOptionalScan) {
-                                        const hintHtmlScan = '<div style="padding:6px 8px;background:#e3f2fd;border-radius:4px;margin-bottom:8px;font-size:12px;color:#1565c0;"><i class="fas fa-info-circle"></i> <strong>Proses ini hanya wajib Barcode Dye Stuff &amp; AUX (D &amp; A).</strong> Barcode Kain (G/F) tidak wajib.</div>';
+                                        const hintHtmlScan = '<div style="padding:6px 8px;background:#e3f2fd;border-radius:4px;margin-bottom:8px;font-size:12px;color:#1565c0;"><i class="fas fa-info-circle"></i> <strong>Proses ini hanya wajib Barcode Dye Stuff & AUX (D & A).</strong> Barcode Kain (G/F) tidak wajib.</div>';
                                         progressHtml = hintHtmlScan + progressHtml;
                                     } else if (allProgress.length > 0) {
                                         const totalDetails = allProgress.length;
@@ -5326,23 +5248,16 @@
                                         
                                         if (allComplete) {
                                             progressHtml = '<div style="padding:4px 0;background:#e8f5e9;border-radius:4px;margin-bottom:8px;">' + progressHtml;
-                                            progressHtml += '<div style="padding:4px 0;background:#e8f5e9;border-radius:4px;margin-top:8px;">';
-                                            progressHtml += '<strong style="color:#2e7d32;"><i class="fas fa-check-circle"></i> Semua Detail OP Sudah Lengkap!</strong>';
-                                            progressHtml += '<br><span style="color:#43a047;font-size:12px;">Scan Barcode Dye Stuff & AUX sudah diizinkan.</span>';
-                                            progressHtml += '</div>';
+                                            progressHtml += '<div style="padding:4px 0;background:#e8f5e9;border-radius:4px;margin-top:8px;"><strong style="color:#2e7d32;"><i class="fas fa-check-circle"></i> Semua Detail OP Sudah Lengkap!</strong><br><span style="color:#43a047;font-size:12px;">Scan Barcode Dye Stuff & AUX sudah diizinkan.</span></div>';
                                         } else {
                                             progressHtml = '<div style="padding:4px 0;background:#ffebee;border-radius:4px;margin-bottom:8px;">' + progressHtml;
-                                            progressHtml += '<div style="padding:4px 0;background:#ffebee;border-radius:4px;margin-top:8px;">';
-                                            progressHtml += `<strong style="color:#c62828;"><i class="fas fa-exclamation-triangle"></i> ${completeCount} dari ${totalDetails} Detail OP Lengkap</strong>`;
-                                            progressHtml += '<br><span style="color:#c62828;font-size:12px;">Semua Detail OP harus lengkap sebelum scan Barcode Dye Stuff & AUX.</span>';
-                                            progressHtml += '</div>';
+                                            progressHtml += '<div style="padding:4px 0;background:#ffebee;border-radius:4px;margin-top:8px;"><strong style="color:#c62828;"><i class="fas fa-exclamation-triangle"></i> ${completeCount} dari ${totalDetails} Detail OP Lengkap</strong><br><span style="color:#c62828;font-size:12px;">Semua Detail OP harus lengkap sebelum scan Barcode Dye Stuff & AUX.</span></div>';
                                         }
                                     }
                                     if ($('#barcode-kain-progress').length) {
                                         $('#barcode-kain-progress').html(progressHtml);
                                     }
 
-                                    // Barcode dapat ditambahkan kapanpun; LA/AUX memerlukan barcode kain lengkap
                                     const canScanLaAux = data.can_scan_la_aux !== false;
                                     const $btnScanKain = $('#btn-scan-kain');
                                     const $btnScanLa = $('#barcode-la-buttons .scan-barcode-btn');
@@ -5365,37 +5280,18 @@
                                         } else {
                                             tooltipMsg += 'Pastikan semua barcode kain sudah memenuhi jumlah roll terlebih dahulu.';
                                         }
-                                        
-                                        $btnScanLa.prop('disabled', true)
-                                            .removeClass('btn-success')
-                                            .addClass('btn-secondary')
-                                            .css('cursor', 'not-allowed')
-                                            .attr('title', tooltipMsg);
-                                        
-                                        $btnScanAux.prop('disabled', true)
-                                            .removeClass('btn-success')
-                                            .addClass('btn-secondary')
-                                            .css('cursor', 'not-allowed')
-                                            .attr('title', tooltipMsg);
+                                        $btnScanLa.prop('disabled', true).removeClass('btn-success').addClass('btn-secondary').css('cursor', 'not-allowed').attr('title', tooltipMsg);
+                                        $btnScanAux.prop('disabled', true).removeClass('btn-success').addClass('btn-secondary').css('cursor', 'not-allowed').attr('title', tooltipMsg);
                                     } else {
-                                        $btnScanLa.prop('disabled', false)
-                                            .removeClass('btn-secondary')
-                                            .addClass('btn-success')
-                                            .css('cursor', 'pointer')
-                                            .removeAttr('title');
-                                        
-                                        $btnScanAux.prop('disabled', false)
-                                            .removeClass('btn-secondary')
-                                            .addClass('btn-success')
-                                            .css('cursor', 'pointer')
-                                            .removeAttr('title');
+                                        $btnScanLa.prop('disabled', false).removeClass('btn-secondary').addClass('btn-success').css('cursor', 'pointer').removeAttr('title');
+                                        $btnScanAux.prop('disabled', false).removeClass('btn-secondary').addClass('btn-success').css('cursor', 'pointer').removeAttr('title');
                                     }
 
                                     // Update G/D/A indicators
                                     const hasKainActive = data.can_scan_la_aux === true;
                                     const hasLaActive = (data.barcode_la || []).some(bk => !bk.cancel);
                                     const hasAuxActive = (data.barcode_aux || []).some(bk => !bk.cancel);
-                                    updateGDAIndicators(currentProsesId, selectedDetailId, hasKainActive, hasLaActive, hasAuxActive);
+                                    window.updateGDAIndicators(currentProsesId, selectedDetailId, hasKainActive, hasLaActive, hasAuxActive);
                                 },
                                 error: function() {
                                     // Silent fail untuk refresh, tidak perlu notifikasi error
@@ -5726,26 +5622,6 @@
                         // Ambil proses dari modal atau card agar renderBarcodeGrid tidak error (realtime via WebSocket)
                         const proses = $('#modalDetailProses').data('proses') || $('.status-card[data-proses-id="' + prosesId + '"]').data('proses') || {};
                         const barcodeKainOptionalLoad = data.barcode_kain_optional === true;
-                        function updateGDAIndicatorsLocal(pid, detailId, hasKain, hasLa, hasAux) {
-                            let $targets = $(`.status-card[data-proses-id="${pid}"] .op-row[data-detail-id="${detailId}"]`);
-                            if (!$targets.length) $targets = $(`.status-card[data-proses-id="${pid}"]`);
-                            $targets.each(function() {
-                                const $card = $(this);
-                                const pData = $card.data('proses');
-                                if (!pData || pData.jenis === 'Maintenance') return;
-                                function setBlockColor(blockType, ok) {
-                                    const $block = $card.find('.gda-block[data-block-type="' + blockType + '"]');
-                                    if (!$block.length) return;
-                                    $block.css({ background: ok ? '#d4f8e8' : '#ffb3b3', borderColor: ok ? '#43a047' : '#c62828' });
-                                }
-                                if (!(pData.barcode_kain_optional === true)) {
-                                    const firstBlock = (pData.mode === 'finish') ? 'F' : 'G';
-                                    setBlockColor(firstBlock, !!hasKain);
-                                }
-                                setBlockColor('D', !!hasLa);
-                                setBlockColor('A', !!hasAux);
-                            });
-                        }
                         function renderBarcodeGrid(barcodes, barcodeType, pid) {
                             const activeBarcodes = (barcodes || []).filter(function(bk) { return !bk.cancel; });
                             if (!activeBarcodes.length) return '<span style="color:#888;">Belum ada barcode.</span>';
@@ -5876,10 +5752,11 @@
                                 $btnScanAuxLocal.prop('disabled', false).removeClass('btn-secondary').addClass('btn-success').css('cursor', 'pointer').removeAttr('title');
                             }
                         }
-                        const hasKainActive = data.can_scan_la_aux === true;
-                        const hasLaActive = (data.barcode_la || []).some(function(bk) { return !bk.cancel; });
-                        const hasAuxActive = (data.barcode_aux || []).some(function(bk) { return !bk.cancel; });
-                        updateGDAIndicatorsLocal(prosesId, selectedDetailId, hasKainActive, hasLaActive, hasAuxActive);
+                        // Update G/D/A indicators
+                        const hasKainActiveGlobal = data.can_scan_la_aux === true;
+                        const hasLaActiveGlobal = (data.barcode_la || []).some(function(bk) { return !bk.cancel; });
+                        const hasAuxActiveGlobal = (data.barcode_aux || []).some(function(bk) { return !bk.cancel; });
+                        window.updateGDAIndicators(prosesId, selectedDetailId, hasKainActiveGlobal, hasLaActiveGlobal, hasAuxActiveGlobal);
                     },
                     error: function() {
                         if ($('#barcode-kain-list').length) $('#barcode-kain-list').html('<span style="color:#888;">Belum ada barcode kain.</span>');
@@ -6078,7 +5955,7 @@
 
             // Fungsi global untuk update warna GDA per detail proses
             // Bisa digunakan untuk update real-time dari API atau setelah scan barcode
-            function updateGDAIndicatorsGlobal(prosesId, detailId, hasKain, hasLa, hasAux) {
+            window.updateGDAIndicators = function(prosesId, detailId, hasKain, hasLa, hasAux) {
                 const $card = $(`.status-card[data-proses-id="${prosesId}"]`);
                 if (!$card.length) {
                     console.warn('Card not found for prosesId:', prosesId);
@@ -7550,40 +7427,6 @@
                                         const renderBarcodeGrid = window.renderBarcodeGrid;
                                         const barcodeKainOptionalRefresh = data.barcode_kain_optional === true;
                                         // Helper untuk update warna blok G, D, A di card utama setelah perubahan barcode
-                                        function updateGDAIndicators(prosesId, detailId, hasKain, hasLa, hasAux) {
-                                            let $targets = $(`.status-card[data-proses-id="${prosesId}"] .op-row[data-detail-id="${detailId}"]`);
-                                            if (!$targets.length) {
-                                                $targets = $(`.status-card[data-proses-id="${prosesId}"]`);
-                                            }
-                                            if (!$targets.length) return;
-
-                                            $targets.each(function() {
-                                                const $card = $(this);
-                                                const prosesData = $card.data('proses');
-                                                if (!prosesData || prosesData.jenis === 'Maintenance') return;
-
-                                                function setBlockColor(blockType, ok) {
-                                                    const $block = $card.find(
-                                                        `.gda-block[data-block-type="${blockType}"]`
-                                                    );
-                                                    if (!$block.length) return;
-
-                                                    const blockBg = ok ? '#d4f8e8' : '#ffb3b3';
-                                                    const blockBorder = ok ? '#43a047' : '#c62828';
-                                                    $block.css({
-                                                        background: blockBg,
-                                                        borderColor: blockBorder
-                                                    });
-                                                }
-
-                                                if (!(prosesData.barcode_kain_optional === true)) {
-                                                    const firstBlock = (prosesData && prosesData.mode === 'finish') ? 'F' : 'G';
-                                                    setBlockColor(firstBlock, !!hasKain);
-                                                }
-                                                setBlockColor('D', !!hasLa);
-                                                setBlockColor('A', !!hasAux);
-                                            });
-                                        }
 
                                             // Render ulang list barcode di modal
                                             if (!barcodeKainOptionalRefresh && $('#barcode-kain-list').length) {
@@ -7708,7 +7551,7 @@
                                             bk => !bk.cancel);
                                         const hasAuxActive = (data.barcode_aux || []).some(
                                             bk => !bk.cancel);
-                                        updateGDAIndicators(
+                                        window.updateGDAIndicators(
                                             currentProsesForRefresh,
                                             currentDetailForRefresh,
                                             hasKainActive,
