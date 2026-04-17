@@ -3943,7 +3943,11 @@
                             }
                             // Cek apakah user bisa cancel barcode
                             const canCancel = window.canCancelBarcode !== false;
-                            const canCancelByProses = !proses.mulai || !proses.selesai;
+                            
+                            // Ambil data proses dari card atau modal
+                            const $card = $(`.status-card[data-proses-id="${prosesId}"]`);
+                            const prosesData = $card.length ? $card.data('proses') : $('#modalDetailProses').data('proses');
+                            const canCancelByProses = !prosesData || (!prosesData.mulai || !prosesData.selesai);
 
                             const allowCancel = canCancel && canCancelByProses;
                             let html = '<div style="display:flex;flex-wrap:wrap;gap:6px;">';
@@ -3960,6 +3964,7 @@
                             html += '</div>';
                             return html;
                         }
+                        window.renderBarcodeGrid = renderBarcodeGrid;
 
                         // Render ulang list barcode di modal
                         if (!barcodeKainOptional && $('#barcode-kain-list').length) {
@@ -4609,6 +4614,53 @@
             $('#btnSubmitKainBatch').hide();
         }
 
+        function updateBarcodeScanUI() {
+            const s = window.kainScanState;
+            if (!s.active) return;
+
+            const isComplete = s.remaining <= 0 || s.pending.length >= s.remaining;
+            
+            if (isComplete) {
+                // Disable manual inputs
+                $('#inputBarcodeManual').prop('disabled', true).val('').attr('placeholder', 'Barcode sudah lengkap');
+                $('#btnSubmitManualBarcode').prop('disabled', true);
+                
+                // Disable batch submit if pending fulfills or already full
+                if (s.remaining <= 0) {
+                     $('#btnSubmitKainBatch').prop('disabled', true).addClass('btn-secondary').removeClass('btn-success');
+                }
+
+                // Protect Scan tab
+                if ($('#mode-scan-pane').hasClass('active')) {
+                     const isBatchFull = s.remaining > 0 && s.pending.length >= s.remaining;
+                     if (isBatchFull || s.remaining <= 0) {
+                        $('#barcode-scanner-container').html(
+                            '<div class="d-flex align-items-center justify-content-center" style="height:320px; background:#fff;">' +
+                            '<div class="text-center"><i class="fas fa-check-circle fa-4x mb-3" style="color:#28a745;"></i>' +
+                            '<p class="mb-0 font-weight-bold" style="color:#28a745; font-size:18px;">Barcode sudah terpenuhi.</p></div>' +
+                            '</div>'
+                        );
+                     }
+                }
+
+                // Stop scanner if running
+                if (window.html5QrcodeScanner) {
+                    try { window.html5QrcodeScanner.stop().catch(() => {}); } catch(e) {}
+                }
+            } else {
+                // Enable manual inputs
+                // Jika butuh lebih dari 0 dan pending belum penuh
+                $('#inputBarcodeManual').prop('disabled', false).attr('placeholder', 'Masukkan barcode');
+                $('#btnSubmitManualBarcode').prop('disabled', false);
+                $('#btnSubmitKainBatch').prop('disabled', false).addClass('btn-success').removeClass('btn-secondary');
+                
+                // Jika scanner container sedang menampilkan pesan "Lengkap", bersihkan agar bisa dirender ulang/start scanner
+                if ($('#barcode-scanner-container .alert-success').length || $('#barcode-scanner-container div:contains("lengkap")').length) {
+                    $('#barcode-scanner-container').html('');
+                }
+            }
+        }
+
         function renderKainPendingList() {
             const s = window.kainScanState;
             const $list = $('#kain-pending-list');
@@ -4637,8 +4689,8 @@
                 $list.html(html);
             }
 
-            // Tampilkan tombol Simpan Barcode batch bila jumlah pending SAMA dengan remaining
-            if (s.remaining > 0 && s.pending.length === s.remaining) {
+            // Tampilkan tombol Simpan Barcode batch bila ada barcode pending (tidak harus lengkap)
+            if (s.pending.length > 0) {
                 $btnCount.text(s.pending.length);
                 $btn.show();
             } else {
@@ -4673,8 +4725,59 @@
                 return false;
             }
 
-            s.pending.push({ barcode: bc, container: container, raw: raw });
-            renderKainPendingList();
+            // REAL-TIME VALIDASI KE SERVER
+            // Tampilkan loading saat mengecek
+            const $btnManual = $('#btnSubmitManualBarcode');
+            const $inputManual = $('#inputBarcodeManual');
+            const originalBtnHtml = $btnManual.html();
+            
+            $btnManual.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Cek...');
+            $inputManual.prop('disabled', true);
+            
+            // Bila scanner jalan, hentikan sementara agar tidak scan double saat delay network
+            const scannerWasRunning = window.html5QrcodeScanner && window.html5QrcodeScanner.isScanning;
+            if (scannerWasRunning) {
+                try { window.html5QrcodeScanner.pause(); } catch(e) {}
+            }
+
+            $.ajax({
+                url: '/api/check-barcode-active',
+                method: 'POST',
+                data: {
+                    barcode: bc,
+                    _token: $('meta[name="csrf-token"]').attr('content')
+                },
+                success: function(r) {
+                    if (r && r.active) {
+                        showToastNotification('error', `Barcode ${bc} sudah pernah digunakan dan aktif.`);
+                        if (scannerWasRunning) {
+                            try { window.html5QrcodeScanner.resume(); } catch(e) {}
+                        }
+                    } else {
+                        // Semua aman, masukkan ke list
+                        s.pending.push({ barcode: bc, container: container, raw: raw });
+                        renderKainPendingList();
+                        updateBarcodeScanUI();
+                        
+                        // Bila sudah lengkap, scanner dihentikan permanen oleh updateBarcodeScanUI
+                        if (s.pending.length < s.remaining && scannerWasRunning) {
+                            try { window.html5QrcodeScanner.resume(); } catch(e) {}
+                        }
+                    }
+                },
+                error: function() {
+                    showToastNotification('error', 'Gagal memvalidasi barcode ke server.');
+                    if (scannerWasRunning) {
+                        try { window.html5QrcodeScanner.resume(); } catch(e) {}
+                    }
+                },
+                complete: function() {
+                    $btnManual.prop('disabled', false).html(originalBtnHtml);
+                    $inputManual.prop('disabled', false).focus();
+                    updateBarcodeScanUI(); // Refresh state tombol simpan batch dsb
+                }
+            });
+
             return true;
         }
 
@@ -4685,6 +4788,13 @@
             if (!s.active || isNaN(idx)) return;
             s.pending.splice(idx, 1);
             renderKainPendingList();
+            // PENTING: Update UI agar input/kamera kembali aktif jika daftar jadi tidak lengkap
+            updateBarcodeScanUI();
+            
+            // Restart scanner jika di mode Scan
+            if ($('#mode-scan-pane').hasClass('active')) {
+                startBarcodeScannerInModal();
+            }
         });
 
         // Handler klik tombol scan barcode (hanya set data, scanner diinisialisasi saat modal tampil)
@@ -4741,10 +4851,9 @@
                         $('#kain-pending-section').show();
                         renderKainPendingList();
 
-                        if (remaining <= 0) {
-                            showToastNotification('error', 'Barcode kain untuk OP ini sudah lengkap.');
-                            return;
-                        }
+                        // Cek ketersediaan kuota dan disable UI jika perlu
+                        updateBarcodeScanUI();
+
                         $('#modalScanBarcode').modal('show');
                     },
                     error: function() {
@@ -4857,6 +4966,23 @@
         // Fungsi start scanner (hanya dipanggil saat mode Scan aktif)
         function startBarcodeScannerInModal() {
             if (!$('#mode-scan-pane').hasClass('active')) return;
+            
+            // CEK: Jangan jalankan kamera jika barcode sudah lengkap (baik di DB maupun di pending list)
+            if (window.kainScanState && window.kainScanState.active) {
+                const s = window.kainScanState;
+                const isComplete = s.remaining <= 0 || (s.remaining > 0 && s.pending.length >= s.remaining);
+                
+                if (isComplete) {
+                    $('#barcode-scanner-container').html(
+                        '<div class="d-flex align-items-center justify-content-center" style="height:320px; background:#fff;">' +
+                        '<div class="text-center"><i class="fas fa-check-circle fa-4x mb-3" style="color:#28a745;"></i>' +
+                        '<p class="mb-0 font-weight-bold" style="color:#28a745; font-size:18px;">Barcode sudah terpenuhi.</p></div>' +
+                        '</div>'
+                    );
+                    return;
+                }
+            }
+
             $('#barcode-scanner-container').html(
                 '<div id="reader" style="width:100%;max-width:400px;margin:auto;"></div>');
             window.html5QrcodeScanner = new Html5Qrcode("reader");
@@ -4942,11 +5068,6 @@
                 showToastNotification('error', 'Tidak ada barcode untuk disimpan.');
                 return;
             }
-            if (s.pending.length !== s.remaining) {
-                showToastNotification('error', `Jumlah barcode (${s.pending.length}) belum sesuai kebutuhan roll (${s.remaining}).`);
-                return;
-            }
-
             const $btn = $(this);
             const originalHtml = $btn.html();
             $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Menyimpan...');
@@ -5160,28 +5281,7 @@
                                         });
                                     }
 
-                                    function renderBarcodeGrid(barcodes, barcodeType, prosesId) {
-                                        const activeBarcodes = (barcodes || []).filter(bk => !bk.cancel);
-                                        if (!activeBarcodes.length) {
-                                            return '<span style="color:#888;">Belum ada barcode.</span>';
-                                        }
-                                        const canCancel = window.canCancelBarcode !== false;
-                                        const canCancelByProses = !proses.mulai || !proses.selesai;
-
-                                        const allowCancel = canCancel && canCancelByProses;
-                                        let html = '<div style="display:flex;flex-wrap:wrap;gap:6px;">';
-                                        activeBarcodes.forEach(function(bk, idx) {
-                                            const cancelButton = allowCancel ?
-                                                `<span style='position:absolute;top:2px;right:6px;cursor:pointer;font-weight:bold;color:#b00;font-size:16px;z-index:2;' class='cancel-barcode-btn' data-type='${barcodeType}' data-proses='${prosesId}' data-id='${bk.id}' data-matdok='${bk.matdok}' title='Cancel barcode'>&times;</span>` :
-                                                '';
-                                            html += `<div style="position:relative;flex:1 0 30%;max-width:32%;background:#f3f3f3;border-radius:6px;padding:6px 4px;margin-bottom:6px;text-align:center;font-weight:bold;font-size:13px;color:#222;box-shadow:0 1px 2px #0001;">
-                                                ${cancelButton}
-                                                ${bk.barcode} ${(bk.matdok ? '<br><span style=\'font-size:11px;color:#888;\'>' + bk.matdok + '</span>' : '')}
-                                            </div>`;
-                                        });
-                                        html += '</div>';
-                                        return html;
-                                    }
+                                    const renderBarcodeGrid = window.renderBarcodeGrid;
                                         // Render ulang list barcode di modal
                                         if (!barcodeKainOptionalScan && $('#barcode-kain-list').length) {
                                             $('#barcode-kain-list').html(renderBarcodeGrid(data.barcode_kain, 'kain', currentProsesId));
@@ -7447,34 +7547,7 @@
                                             ''),
                                     method: 'GET',
                                     success: function(data) {
-                                        function renderBarcodeGrid(barcodes, barcodeType,
-                                            prosesId) {
-                                            // Filter barcode yang belum cancel
-                                            const activeBarcodes = (barcodes || []).filter(
-                                                bk => !bk.cancel);
-                                            if (!activeBarcodes.length) {
-                                                return '<span style="color:#888;">Belum ada barcode.</span>';
-                                            }
-                                            // Cek apakah user bisa cancel barcode
-                                            const canCancel = window.canCancelBarcode !== false;
-                                            const canCancelByProses = !proses.mulai || !proses.selesai;
-
-                                            const allowCancel = canCancel && canCancelByProses;
-                                            let html =
-                                                '<div style="display:flex;flex-wrap:wrap;gap:6px;">';
-                                            activeBarcodes.forEach(function(bk, idx) {
-                                                // Hanya tampilkan button cancel jika user memiliki akses
-                                                const cancelButton = allowCancel ?
-                                                    `<span style='position:absolute;top:2px;right:6px;cursor:pointer;font-weight:bold;color:#b00;font-size:16px;z-index:2;' class='cancel-barcode-btn' data-type='${barcodeType}' data-proses='${prosesId}' data-id='${bk.id}' data-matdok='${bk.matdok}' title='Cancel barcode'>&times;</span>` :
-                                                    '';
-                                                html += `<div style="position:relative;flex:1 0 30%;max-width:32%;background:#f3f3f3;border-radius:6px;padding:6px 4px;margin-bottom:6px;text-align:center;font-weight:bold;font-size:13px;color:#222;box-shadow:0 1px 2px #0001;">
-                                                    ${cancelButton}
-                                                    ${bk.barcode} ${(bk.matdok ? '<br><span style=\'font-size:11px;color:#888;\'>' + bk.matdok + '</span>' : '')}
-                                                </div>`;
-                                            });
-                                            html += '</div>';
-                                            return html;
-                                        }
+                                        const renderBarcodeGrid = window.renderBarcodeGrid;
                                         const barcodeKainOptionalRefresh = data.barcode_kain_optional === true;
                                         // Helper untuk update warna blok G, D, A di card utama setelah perubahan barcode
                                         function updateGDAIndicators(prosesId, detailId, hasKain, hasLa, hasAux) {

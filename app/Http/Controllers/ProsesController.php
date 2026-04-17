@@ -697,6 +697,26 @@ class ProsesController extends Controller
         ]);
     }
 
+    public function checkBarcodeActive(Request $request)
+    {
+        $barcode = $request->input('barcode');
+        if (!$barcode) {
+            return response()->json(['active' => false]);
+        }
+
+        // Trim ke 10 karakter seperti standar sistem
+        $trimmed = substr(trim($barcode), 0, 10);
+
+        $exists = BarcodeKain::where('barcode', $trimmed)
+            ->where('cancel', false)
+            ->exists();
+
+        return response()->json([
+            'active' => $exists,
+            'barcode' => $trimmed
+        ]);
+    }
+
     // Simpan barcode kain (mendukung multi-barcode dalam 1 request)
     public function barcodeKain(Request $request, $id)
     {
@@ -760,17 +780,22 @@ class ProsesController extends Controller
                 return redirect()->route('dashboard')->with('error', $msg);
             }
 
-            // Cek duplikat: barcode sudah ada di DB
-            $alreadyExists = BarcodeKain::whereIn('barcode', $trimmedBarcodes)
-                ->pluck('barcode')
-                ->all();
-            if (!empty($alreadyExists)) {
-                $msg = 'Barcode sudah pernah digunakan: ' . implode(', ', $alreadyExists);
+            // Cek barcode di DB (termasuk yang di-cancel)
+            $existingBarcodes = BarcodeKain::whereIn('barcode', $trimmedBarcodes)->get();
+            $realDuplicates = $existingBarcodes->where('cancel', false)->pluck('barcode')->all();
+
+            if (!empty($realDuplicates)) {
+                $msg = 'Barcode sudah pernah digunakan dan aktif: ' . implode(', ', $realDuplicates);
                 if ($request->ajax() || $request->wantsJson()) {
                     return response()->json(['status' => 'error', 'message' => $msg], 400);
                 }
                 return redirect()->route('dashboard')->with('error', $msg);
             }
+
+            // Identifikasi mana yang bisa diaktifkan kembali dan mana yang baru (perlu ke SAP)
+            $reactivatable = $existingBarcodes->where('cancel', true);
+            $reactivatedBarcodes = $reactivatable->pluck('barcode')->all();
+            $barcodesToSap = array_diff($trimmedBarcodes, $existingBarcodes->pluck('barcode')->all());
 
             // Cek kapasitas roll
             $roll = (int) ($detailProses->roll ?? 0);
@@ -792,64 +817,78 @@ class ProsesController extends Controller
             $mesin_id = $proses->mesin_id;
             $item_op = $detailProses->item_op;
 
-            // Bangun payload SAP: {no_op}-{item_op}|{barcode};{barcode};{barcode}
-            $payload = $no_op . '-' . $item_op . '|' . implode(';', $trimmedBarcodes);
-            Log::info('BarcodeKain: Payload prepared (multi)', ['payload' => $payload]);
-
-            $client = new \GuzzleHttp\Client();
-            $body = json_encode($payload);
-            $response = $client->post(
-                SapApi::url('zterima_data'),
-                SapApi::guzzleOptions(['body' => $body])
-            );
-            $data = json_decode($response->getBody(), true);
-            Log::info('BarcodeKain: API Response (multi)', ['response' => $data]);
-
-            if (!is_array($data) || empty($data)) {
-                $errorMsg = 'Gagal validasi barcode: response SAP tidak valid';
-                Log::error('BarcodeKain: Invalid response', ['data' => $data]);
-                if ($request->ajax() || $request->wantsJson()) {
-                    return response()->json(['status' => 'error', 'message' => $errorMsg], 400);
-                }
-                return back()->withInput()->with('error', $errorMsg);
-            }
-
-            // Petakan response ke tiap barcode.
-            // Jika SAP kembalikan 1 entry per barcode (berurutan) gunakan per-index,
-            // jika hanya 1 entry ringkasan (semua berhasil/gagal sekaligus) pakai entry itu untuk semua.
             $results = [];
-            if (count($data) === count($trimmedBarcodes)) {
-                foreach ($trimmedBarcodes as $idx => $bc) {
-                    $results[$bc] = $data[$idx] ?? [];
+            
+            // 1. Proses Barcode Baru via SAP
+            if (!empty($barcodesToSap)) {
+                // Bangun payload SAP: {no_op}-{item_op}|{barcode};{barcode};{barcode}
+                $payload = $no_op . '-' . $item_op . '|' . implode(';', $barcodesToSap);
+                Log::info('BarcodeKain: Payload prepared (multi) for SAP', ['payload' => $payload]);
+
+                $client = new \GuzzleHttp\Client();
+                $body = json_encode($payload);
+                $response = $client->post(
+                    SapApi::url('zterima_data'),
+                    SapApi::guzzleOptions(['body' => $body])
+                );
+                $data = json_decode($response->getBody(), true);
+                Log::info('BarcodeKain: SAP API Response', ['response' => $data]);
+
+                if (!is_array($data) || empty($data)) {
+                    $errorMsg = 'Gagal validasi barcode baru: response SAP tidak valid';
+                    Log::error('BarcodeKain: Invalid response', ['data' => $data]);
+                    if ($request->ajax() || $request->wantsJson()) {
+                        return response()->json(['status' => 'error', 'message' => $errorMsg], 400);
+                    }
+                    return back()->withInput()->with('error', $errorMsg);
                 }
-            } else {
-                $agg = $data[0];
-                foreach ($trimmedBarcodes as $bc) {
-                    $results[$bc] = $agg;
+
+                // Petakan response SAP
+                if (count($data) === count($barcodesToSap)) {
+                    $barcodesToSapArray = array_values($barcodesToSap);
+                    foreach ($barcodesToSapArray as $idx => $bc) {
+                        $results[$bc] = $data[$idx] ?? [];
+                    }
+                } else {
+                    $agg = $data[0];
+                    foreach ($barcodesToSap as $bc) {
+                        $results[$bc] = $agg;
+                    }
+                }
+
+                // Periksa status tiap barcode SAP
+                $sapErrors = [];
+                foreach ($results as $bc => $r) {
+                    $stats = is_array($r) ? ($r['stats'] ?? null) : null;
+                    if ($stats !== 'success') {
+                        $sapErrors[] = $bc . ': ' . ($stats ?: 'tidak dikenali');
+                    }
+                }
+                if (!empty($sapErrors)) {
+                    $errorMsg = 'Beberapa barcode baru ditolak SAP: ' . implode('; ', $sapErrors);
+                    if ($request->ajax() || $request->wantsJson()) {
+                        return response()->json(['status' => 'error', 'message' => $errorMsg], 400);
+                    }
+                    return redirect()->route('dashboard')->with('error', $errorMsg);
                 }
             }
 
-            // Periksa status tiap barcode
-            $errors = [];
-            foreach ($results as $bc => $r) {
-                $stats = is_array($r) ? ($r['stats'] ?? null) : null;
-                if ($stats !== 'success') {
-                    $errors[] = $bc . ': ' . ($stats ?: 'tidak dikenali');
-                }
-            }
-            if (!empty($errors)) {
-                $errorMsg = 'Beberapa barcode tidak dapat digunakan: ' . implode('; ', $errors);
-                Log::error('BarcodeKain: Some barcodes failed', ['errors' => $errors]);
-                if ($request->ajax() || $request->wantsJson()) {
-                    return response()->json(['status' => 'error', 'message' => $errorMsg], 400);
-                }
-                return redirect()->route('dashboard')->with('error', $errorMsg);
-            }
-
-            // Semua sukses: simpan ke DB dalam transaksi
+            // Semua sukses (baik reaktivasi maupun SAP): simpan ke DB dalam transaksi
             DB::beginTransaction();
             try {
-                foreach ($trimmedBarcodes as $bc) {
+                // A. Reaktivasi Barcode Lama
+                foreach ($reactivatable as $bcObj) {
+                    $bcObj->update([
+                        'detail_proses_id' => $detailProses->id,
+                        'no_op' => $no_op,
+                        'no_partai' => $no_partai,
+                        'mesin_id' => $mesin_id,
+                        'cancel' => false,
+                    ]);
+                }
+
+                // B. Simpan Barcode Baru dari SAP
+                foreach ($barcodesToSap as $bc) {
                     $r = $results[$bc];
                     BarcodeKain::create([
                         'detail_proses_id' => $detailProses->id,
@@ -857,6 +896,7 @@ class ProsesController extends Controller
                         'no_partai' => $no_partai,
                         'barcode' => $bc,
                         'matdok' => $r['mblnr'] ?? null,
+                        'item_document' => $r['zeile'] ?? null,
                         'qty_gi' => isset($r['menge']) ? (float)$r['menge'] : null,
                         'mesin_id' => $mesin_id,
                         'cancel' => false,
@@ -1992,12 +2032,18 @@ class ProsesController extends Controller
     
         try {
             $client = new \GuzzleHttp\Client();
-            $body = '"' . $matdok . '"';
+            $bodyValue = $matdok;
+            if ($type === 'kain' && $barcodeObj instanceof \App\Models\BarcodeKain && $barcodeObj->item_document) {
+                $bodyValue = $matdok . ';' . $barcodeObj->item_document;
+            }
+            $body = '"' . $bodyValue . '"';
+
             $cancelUrl = SapApi::url('zterima_cancel');
             Log::info('SAP Cancel Request', [
                 'url' => $cancelUrl,
                 'headers' => SapApi::defaultHeaders(),
                 'body' => $body,
+                'type' => $type,
             ]);
             $response = $client->post(
                 $cancelUrl,

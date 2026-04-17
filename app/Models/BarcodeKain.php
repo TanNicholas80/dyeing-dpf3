@@ -15,7 +15,7 @@ class BarcodeKain extends Model
     protected $table = 'barcode_kain';
 
     protected $fillable = [
-        'detail_proses_id', 'no_op', 'no_partai', 'barcode', 'matdok', 'qty_gi', 'mesin_id', 'cancel'
+        'detail_proses_id', 'no_op', 'no_partai', 'barcode', 'matdok', 'item_document', 'qty_gi', 'mesin_id', 'cancel'
     ];
 
     public function mesin()
@@ -34,7 +34,7 @@ class BarcodeKain extends Model
      */
     public function getActivitylogOptions(): LogOptions
     {
-        $logFields = ['detail_proses_id', 'no_op', 'no_partai', 'barcode', 'matdok', 'mesin_id', 'cancel'];
+        $logFields = ['detail_proses_id', 'no_op', 'no_partai', 'barcode', 'matdok', 'item_document', 'mesin_id', 'cancel'];
 
         return LogOptions::defaults()
             ->useLogName('Manajemen BarcodeKain')
@@ -79,6 +79,7 @@ class BarcodeKain extends Model
             'no_partai' => $this->no_partai,
             'barcode' => $this->barcode,
             'matdok' => $this->matdok,
+            'item_document' => $this->item_document,
             'mesin_id' => $this->mesin->jenis_mesin,
             'cancel' => $this->cancel,
         ];
