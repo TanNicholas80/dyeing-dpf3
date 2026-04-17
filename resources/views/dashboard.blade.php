@@ -4556,9 +4556,23 @@
                                         </div>
                                     </div>
                                 </div>
+                                {{-- Section pending list barcode kain (hanya tampil saat barcode_kain) --}}
+                                <div id="kain-pending-section" class="mt-3" style="display:none;">
+                                    <hr class="my-2">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <strong class="text-left">Daftar Barcode Kain</strong>
+                                        <span id="kain-pending-counter" class="badge badge-secondary" style="font-size:12px;">0/0</span>
+                                    </div>
+                                    <div id="kain-pending-list" style="max-height:220px;overflow-y:auto;padding:4px 2px;">
+                                        <span style="color:#888;font-size:12px;">Belum ada barcode. Scan atau ketik manual untuk menambah.</span>
+                                    </div>
+                                </div>
                             </div>
-                            <div class="modal-footer d-flex justify-content-end px-4">
-                                <button type="button" class="btn btn-secondary" data-dismiss="modal">Tutup</button>
+                            <div class="modal-footer d-flex justify-content-between px-4">
+                                <button type="button" class="btn btn-success" id="btnSubmitKainBatch" style="display:none;">
+                                    <i class="fas fa-save"></i> Simpan Barcode (<span id="kain-pending-submit-count">0</span>)
+                                </button>
+                                <button type="button" class="btn btn-secondary ml-auto" data-dismiss="modal">Tutup</button>
                             </div>
                         </form>
                     </div>
@@ -4566,6 +4580,112 @@
             </div>
             `);
         }
+
+        // ========================================================
+        // STATE & HELPER untuk multi-barcode KAIN (batch scan)
+        // ========================================================
+        window.kainScanState = {
+            active: false,
+            prosesId: null,
+            detailId: null,
+            roll: 0,
+            alreadySaved: 0,
+            remaining: 0,
+            pending: [] // [{barcode, container, raw}]
+        };
+
+        function resetKainScanState() {
+            window.kainScanState = {
+                active: false,
+                prosesId: null,
+                detailId: null,
+                roll: 0,
+                alreadySaved: 0,
+                remaining: 0,
+                pending: []
+            };
+            renderKainPendingList();
+            $('#kain-pending-section').hide();
+            $('#btnSubmitKainBatch').hide();
+        }
+
+        function renderKainPendingList() {
+            const s = window.kainScanState;
+            const $list = $('#kain-pending-list');
+            const $counter = $('#kain-pending-counter');
+            const $btn = $('#btnSubmitKainBatch');
+            const $btnCount = $('#kain-pending-submit-count');
+
+            if (!s.active) {
+                return;
+            }
+
+            $counter.text(`${s.pending.length}/${s.remaining}`);
+
+            if (!s.pending.length) {
+                $list.html('<span style="color:#888;font-size:12px;">Belum ada barcode. Scan atau ketik manual untuk menambah.</span>');
+            } else {
+                let html = '<div style="display:flex;flex-wrap:wrap;gap:6px;">';
+                s.pending.forEach(function(item, idx) {
+                    const cont = item.container ? `<br><span style='font-size:11px;color:#888;'>${item.container}</span>` : '';
+                    html += `<div style="position:relative;flex:1 0 30%;max-width:32%;background:#f3f3f3;border-radius:6px;padding:8px 4px;text-align:center;font-weight:bold;font-size:13px;color:#222;box-shadow:0 1px 2px #0001;">
+                        <span class="remove-pending-kain" data-idx="${idx}" style="position:absolute;top:2px;right:6px;cursor:pointer;font-weight:bold;color:#b00;font-size:16px;z-index:2;" title="Hapus">&times;</span>
+                        ${item.barcode}${cont}
+                    </div>`;
+                });
+                html += '</div>';
+                $list.html(html);
+            }
+
+            // Tampilkan tombol Simpan Barcode batch bila jumlah pending SAMA dengan remaining
+            if (s.remaining > 0 && s.pending.length === s.remaining) {
+                $btnCount.text(s.pending.length);
+                $btn.show();
+            } else {
+                $btn.hide();
+            }
+        }
+
+        // Tambah 1 barcode ke pending list (dipanggil dari scanner & input manual)
+        function addPendingKainBarcode(rawInput) {
+            const s = window.kainScanState;
+            if (!s.active) return false;
+            const raw = (rawInput || '').trim();
+            if (!raw) return false;
+
+            const bc = raw.substring(0, 10);
+            const container = raw.length > 10 ? raw.substring(10, 20) : '';
+
+            if (bc.length < 3) {
+                showToastNotification('error', 'Barcode terlalu pendek.');
+                return false;
+            }
+
+            // Cek duplikat di pending list
+            if (s.pending.some(p => p.barcode === bc)) {
+                showToastNotification('error', `Barcode ${bc} sudah ada di daftar.`);
+                return false;
+            }
+
+            // Cek kapasitas
+            if (s.pending.length >= s.remaining) {
+                showToastNotification('error', `Jumlah barcode sudah mencapai kebutuhan (${s.remaining}). Klik Simpan Barcode untuk menyimpan.`);
+                return false;
+            }
+
+            s.pending.push({ barcode: bc, container: container, raw: raw });
+            renderKainPendingList();
+            return true;
+        }
+
+        // Hapus item dari pending list
+        $(document).on('click', '.remove-pending-kain', function() {
+            const idx = parseInt($(this).data('idx'), 10);
+            const s = window.kainScanState;
+            if (!s.active || isNaN(idx)) return;
+            s.pending.splice(idx, 1);
+            renderKainPendingList();
+        });
 
         // Handler klik tombol scan barcode (hanya set data, scanner diinisialisasi saat modal tampil)
         $(document).on('click', '.scan-barcode-btn', function() {
@@ -4592,7 +4712,60 @@
             $('#inputBarcodeValue').val('');
             $('#inputDetailProsesId').val(detailId);
             $('#inputApprovalId').val(approvalId);
-            $('#modalScanBarcode').modal('show');
+
+            // Reset state kain
+            resetKainScanState();
+
+            if (barcodeType === 'barcode_kain') {
+                // Fetch progress roll saat ini untuk detail OP terpilih
+                const progressUrl = `/proses/${prosesId}/barcodes${detailId ? '?detail_proses_id=' + encodeURIComponent(detailId) : ''}`;
+                $.ajax({
+                    url: progressUrl,
+                    method: 'GET',
+                    success: function(data) {
+                        const progressList = data.barcode_kain_progress || [];
+                        const progress = progressList.find(p => String(p.detail_id) === String(detailId)) || progressList[0] || {};
+                        const roll = parseInt(progress.roll || 0, 10);
+                        const scanned = parseInt(progress.scanned || 0, 10);
+                        const remaining = Math.max(0, roll - scanned);
+
+                        window.kainScanState = {
+                            active: true,
+                            prosesId: prosesId,
+                            detailId: detailId,
+                            roll: roll,
+                            alreadySaved: scanned,
+                            remaining: remaining,
+                            pending: []
+                        };
+                        $('#kain-pending-section').show();
+                        renderKainPendingList();
+
+                        if (remaining <= 0) {
+                            showToastNotification('error', 'Barcode kain untuk OP ini sudah lengkap.');
+                            return;
+                        }
+                        $('#modalScanBarcode').modal('show');
+                    },
+                    error: function() {
+                        // Fallback: buka modal dengan state minimal, izinkan tanpa counter ketat
+                        window.kainScanState = {
+                            active: true,
+                            prosesId: prosesId,
+                            detailId: detailId,
+                            roll: 0,
+                            alreadySaved: 0,
+                            remaining: 9999,
+                            pending: []
+                        };
+                        $('#kain-pending-section').show();
+                        renderKainPendingList();
+                        $('#modalScanBarcode').modal('show');
+                    }
+                });
+            } else {
+                $('#modalScanBarcode').modal('show');
+            }
         });
 
         // Handler klik tombol Request Topping LA/AUX
@@ -4697,6 +4870,17 @@
             },
             (decodedText, decodedResult) => {
                 beepSound.play().catch(e => { console.log("Tidak dapat memainkan suara beep:", e); });
+                const barcodeType = $('#formScanBarcode').data('barcode-type');
+                if (barcodeType === 'barcode_kain' && window.kainScanState && window.kainScanState.active) {
+                    // Multi-scan: tambah ke pending list, scanner tetap jalan
+                    const ok = addPendingKainBarcode(decodedText);
+                    // Bila pending sudah mencapai kebutuhan, hentikan scanner agar user klik Simpan Barcode
+                    if (ok && window.kainScanState.pending.length >= window.kainScanState.remaining) {
+                        window.html5QrcodeScanner.stop().catch(() => {});
+                    }
+                    return;
+                }
+                // Flow LA/AUX (single): submit langsung seperti semula
                 $('#inputBarcodeValue').val(decodedText);
                 window.html5QrcodeScanner.stop().catch(() => {});
                 $('#formScanBarcode').trigger('submit');
@@ -4727,6 +4911,18 @@
                 $('#inputBarcodeManual').focus();
                 return;
             }
+
+            const barcodeType = $('#formScanBarcode').data('barcode-type');
+            // Untuk barcode_kain: masukkan ke pending list, jangan submit langsung
+            if (barcodeType === 'barcode_kain' && window.kainScanState && window.kainScanState.active) {
+                const ok = addPendingKainBarcode(manualVal.trim());
+                if (ok) {
+                    $('#inputBarcodeManual').val('').focus();
+                }
+                return;
+            }
+
+            // Flow LA/AUX: submit langsung seperti semula
             $('#inputBarcodeValue').val(manualVal.trim());
             $('#formScanBarcode').trigger('submit');
         });
@@ -4735,6 +4931,86 @@
                 e.preventDefault();
                 $('#btnSubmitManualBarcode').click();
             }
+        });
+
+        // ========================================================
+        // Handler submit batch barcode kain (semua pending -> backend)
+        // ========================================================
+        $('#modalScanBarcode').on('click', '#btnSubmitKainBatch', function() {
+            const s = window.kainScanState;
+            if (!s.active || !s.pending.length) {
+                showToastNotification('error', 'Tidak ada barcode untuk disimpan.');
+                return;
+            }
+            if (s.pending.length !== s.remaining) {
+                showToastNotification('error', `Jumlah barcode (${s.pending.length}) belum sesuai kebutuhan roll (${s.remaining}).`);
+                return;
+            }
+
+            const $btn = $(this);
+            const originalHtml = $btn.html();
+            $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Menyimpan...');
+            $('#modalScanBarcode .btn-secondary').prop('disabled', true);
+            $('#btnSubmitManualBarcode').prop('disabled', true);
+            $('#barcode-submit-loading').css('display', 'flex');
+
+            // Hentikan scanner bila masih aktif
+            try { if (window.html5QrcodeScanner) window.html5QrcodeScanner.stop().catch(() => {}); } catch(e) {}
+
+            const actionUrl = `/proses/${s.prosesId}/barcode/kain`;
+            const barcodes = s.pending.map(p => p.raw); // kirim raw, backend akan trim ke 10
+
+            $.ajax({
+                url: actionUrl,
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json'
+                },
+                data: {
+                    'barcodes[]': barcodes,
+                    detail_proses_id: s.detailId || '',
+                    _token: $('meta[name="csrf-token"]').attr('content')
+                },
+                success: function(response) {
+                    const msg = (response && response.message) ? response.message : 'Barcode kain berhasil disimpan!';
+                    showToastNotification('success', msg);
+
+                    // Refresh list barcode di modal detail proses (bila terbuka)
+                    if ($('#modalDetailProses').hasClass('show') || $('#modalDetailProses').is(':visible')) {
+                        const currentProsesId = $('#modalDetailProses').data('proses')?.id || s.prosesId;
+                        const selectedDetailId = $('#modalDetailProses').data('detailProsesId') || s.detailId || '';
+                        if (currentProsesId && window.loadBarcodesIntoDetailModal) {
+                            window.loadBarcodesIntoDetailModal(currentProsesId, selectedDetailId);
+                        } else if (currentProsesId) {
+                            // Fallback: reload halaman
+                            location.reload();
+                        }
+                    }
+
+                    // Reset & tutup modal
+                    resetKainScanState();
+                    $('#modalScanBarcode').modal('hide');
+                },
+                error: function(xhr) {
+                    let errMsg = 'Gagal menyimpan barcode kain.';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        errMsg = xhr.responseJSON.message;
+                    }
+                    showToastNotification('error', errMsg);
+                },
+                complete: function() {
+                    $btn.prop('disabled', false).html(originalHtml);
+                    $('#modalScanBarcode .btn-secondary').prop('disabled', false);
+                    $('#btnSubmitManualBarcode').prop('disabled', false);
+                    $('#barcode-submit-loading').css('display', 'none');
+                }
+            });
+        });
+
+        // Reset state kain saat modal scan ditutup
+        $('#modalScanBarcode').on('hidden.bs.modal', function() {
+            resetKainScanState();
         });
 
         // Inisialisasi saat modal tampil: mode Scan = start scanner; mode Manual = focus input

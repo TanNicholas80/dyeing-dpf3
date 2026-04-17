@@ -158,7 +158,7 @@ SQL);
                 IF OLD.status IS DISTINCT FROM NEW.status THEN
 
                     -- Kasus 1: Status berubah dari AKTIF (1) menjadi MATI (0)
-                    IF OLD.status = 1 AND NEW.status = 0 THEN
+                    IF OLD.status IS TRUE AND NEW.status IS FALSE THEN
                         -- Cari proses yang sedang aktif (sudah mulai tapi belum selesai)
                         SELECT id, mulai INTO proses_aktif_id, proses_aktif_mulai
                         FROM proses
@@ -197,7 +197,7 @@ SQL);
                     END IF;
 
                     -- Kasus 2: Status berubah dari MATI (0) menjadi AKTIF (1)
-                    IF OLD.status = 0 AND NEW.status = 1 THEN
+                    IF OLD.status IS FALSE AND NEW.status IS TRUE THEN
                         -- Cari proses selanjutnya yang belum dimulai untuk mesin ini
                         -- SKIP proses Reproses jika masih pending approval create_reprocess (FM/VP)
                         SELECT id INTO proses_selanjutnya_id

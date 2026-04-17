@@ -51,11 +51,6 @@ class UserController extends Controller
             'mesin' => 'nullable|string|max:255',
         ];
 
-        // Jika role = 'mesin', mesin wajib diisi
-        if ($request->role === 'mesin') {
-            $rules['mesin'] = 'required|string|max:255';
-        }
-
         $request->validate($rules);
 
         User::create([
@@ -93,11 +88,6 @@ class UserController extends Controller
             'password' => 'nullable|string|min:6',
             'mesin' => 'nullable|string|max:255',
         ];
-
-        // Jika role = 'mesin', mesin wajib diisi
-        if ($request->role === 'mesin') {
-            $rules['mesin'] = 'required|string|max:255';
-        }
 
         $request->validate($rules);
 

@@ -82,7 +82,7 @@
                             </div>
 
                             <div class="form-group" id="mesin-group" style="display: none;">
-                                <label>Mesin <small class="text-muted">(kosongkan jika akses semua mesin)</small></label>
+                                <label>Mesin <small class="text-muted">(opsional — kosongkan jika akses semua mesin)</small></label>
                                 <select name="mesin" class="form-control" id="mesin-select">
                                     <option value="">-- Pilih Mesin --</option>
                                     @foreach($mesins as $mesin)
@@ -109,17 +109,17 @@
         const mesinSelect = document.getElementById('mesin-select');
         const mesinGroup = document.getElementById('mesin-group');
 
-        function toggleMesinRequired() {
-            const isMesin = roleSelect.value === 'operator';
-            mesinGroup.style.display = isMesin ? 'block' : 'none';
-            mesinSelect.required = isMesin;
-            if (!isMesin) {
+        function toggleMesinGroup() {
+            const isOperator = roleSelect.value === 'operator';
+            mesinGroup.style.display = isOperator ? 'block' : 'none';
+            mesinSelect.removeAttribute('required');
+            if (!isOperator) {
                 mesinSelect.value = '';
             }
         }
 
-        roleSelect.addEventListener('change', toggleMesinRequired);
-        toggleMesinRequired();
+        roleSelect.addEventListener('change', toggleMesinGroup);
+        toggleMesinGroup();
 
         document.title = "Edit User";
     </script>

@@ -697,50 +697,90 @@ class ProsesController extends Controller
         ]);
     }
 
-    // Simpan barcode kain
+    // Simpan barcode kain (mendukung multi-barcode dalam 1 request)
     public function barcodeKain(Request $request, $id)
     {
+        // Terima 'barcodes' (array) atau 'barcode' (single string) untuk backward-compat
+        $rawBarcodes = $request->input('barcodes');
+        if (!is_array($rawBarcodes) || empty($rawBarcodes)) {
+            if ($request->filled('barcode')) {
+                $rawBarcodes = [$request->input('barcode')];
+            } else {
+                $rawBarcodes = [];
+            }
+        }
+        $request->merge(['barcodes' => $rawBarcodes]);
+
         $request->validate([
-            'barcode' => 'required|string|max:255|unique:barcode_kain,barcode',
+            'barcodes' => 'required|array|min:1',
+            'barcodes.*' => 'required|string|max:255',
             'detail_proses_id' => 'nullable|exists:detail_proses,id',
         ]);
+
         try {
             $proses = Proses::findOrFail($id);
-            $barcode = $request->barcode;
-            $barcode = substr($barcode, 0, 10);
-            Log::info('BarcodeKain: Barcode received and trimmed', ['original' => $request->barcode, 'trimmed' => $barcode, 'proses_id' => $id]);
 
-            // Barcode kain dapat ditambahkan kapanpun (belum mulai, sedang berjalan, atau sudah selesai)
+            // Trim tiap barcode ke 10 karakter dan dedupe di dalam batch
+            $trimmedBarcodes = collect($rawBarcodes)
+                ->map(fn($b) => substr(trim((string)$b), 0, 10))
+                ->filter(fn($b) => $b !== '')
+                ->unique()
+                ->values()
+                ->all();
+
+            if (empty($trimmedBarcodes)) {
+                $msg = 'Tidak ada barcode valid untuk disimpan.';
+                if ($request->ajax() || $request->wantsJson()) {
+                    return response()->json(['status' => 'error', 'message' => $msg], 400);
+                }
+                return redirect()->route('dashboard')->with('error', $msg);
+            }
+
+            Log::info('BarcodeKain: Barcodes received', [
+                'original' => $rawBarcodes,
+                'trimmed' => $trimmedBarcodes,
+                'count' => count($trimmedBarcodes),
+                'proses_id' => $id,
+            ]);
+
+            // Resolve detail proses
             $detailProses = null;
-            if ($request->has('detail_proses_id') && $request->detail_proses_id) {
+            if ($request->filled('detail_proses_id')) {
                 $detailProses = DetailProses::where('id', $request->detail_proses_id)
                     ->where('proses_id', $id)
                     ->first();
-                if (!$detailProses) {
-                    $msg = 'Detail proses tidak ditemukan. Pastikan proses memiliki detail OP terlebih dahulu.';
-                    if ($request->ajax() || $request->wantsJson()) {
-                        return response()->json(['status' => 'error', 'message' => $msg], 400);
-                    }
-                    return redirect()->route('dashboard')->with('error', $msg);
-                }
             } else {
                 $detailProses = DetailProses::where('proses_id', $id)->first();
-                if (!$detailProses) {
-                    $msg = 'Detail proses tidak ditemukan. Pastikan proses memiliki detail OP terlebih dahulu.';
-                    if ($request->ajax() || $request->wantsJson()) {
-                        return response()->json(['status' => 'error', 'message' => $msg], 400);
-                    }
-                    return redirect()->route('dashboard')->with('error', $msg);
+            }
+            if (!$detailProses) {
+                $msg = 'Detail proses tidak ditemukan. Pastikan proses memiliki detail OP terlebih dahulu.';
+                if ($request->ajax() || $request->wantsJson()) {
+                    return response()->json(['status' => 'error', 'message' => $msg], 400);
                 }
+                return redirect()->route('dashboard')->with('error', $msg);
             }
 
-            // Cek apakah detail ini sudah memenuhi roll (scanned >= roll) - tidak boleh tambah lagi
+            // Cek duplikat: barcode sudah ada di DB
+            $alreadyExists = BarcodeKain::whereIn('barcode', $trimmedBarcodes)
+                ->pluck('barcode')
+                ->all();
+            if (!empty($alreadyExists)) {
+                $msg = 'Barcode sudah pernah digunakan: ' . implode(', ', $alreadyExists);
+                if ($request->ajax() || $request->wantsJson()) {
+                    return response()->json(['status' => 'error', 'message' => $msg], 400);
+                }
+                return redirect()->route('dashboard')->with('error', $msg);
+            }
+
+            // Cek kapasitas roll
             $roll = (int) ($detailProses->roll ?? 0);
-            $barcodeKainCount = BarcodeKain::where('detail_proses_id', $detailProses->id)
+            $existingCount = BarcodeKain::where('detail_proses_id', $detailProses->id)
                 ->where('cancel', false)
                 ->count();
-            if ($roll > 0 && $barcodeKainCount >= $roll) {
-                $msg = "Barcode kain untuk OP {$detailProses->no_op} sudah lengkap ({$barcodeKainCount}/{$roll} roll). Tidak dapat menambahkan lagi.";
+            $newCount = count($trimmedBarcodes);
+            if ($roll > 0 && ($existingCount + $newCount) > $roll) {
+                $msg = "Jumlah barcode melebihi kebutuhan roll untuk OP {$detailProses->no_op} "
+                    . "({$existingCount} sudah tersimpan + {$newCount} baru > {$roll} roll).";
                 if ($request->ajax() || $request->wantsJson()) {
                     return response()->json(['status' => 'error', 'message' => $msg], 400);
                 }
@@ -751,8 +791,11 @@ class ProsesController extends Controller
             $no_partai = $detailProses->no_partai;
             $mesin_id = $proses->mesin_id;
             $item_op = $detailProses->item_op;
-            $payload = $barcode . '-' . $item_op . ';' . $no_op;
-            Log::info('BarcodeKain: Payload prepared', ['payload' => $payload]);
+
+            // Bangun payload SAP: {no_op}-{item_op}|{barcode};{barcode};{barcode}
+            $payload = $no_op . '-' . $item_op . '|' . implode(';', $trimmedBarcodes);
+            Log::info('BarcodeKain: Payload prepared (multi)', ['payload' => $payload]);
+
             $client = new \GuzzleHttp\Client();
             $body = json_encode($payload);
             $response = $client->post(
@@ -760,36 +803,76 @@ class ProsesController extends Controller
                 SapApi::guzzleOptions(['body' => $body])
             );
             $data = json_decode($response->getBody(), true);
-            Log::info('BarcodeKain: API Response', ['response' => $data]);
-            if (!is_array($data) || !isset($data[0]['stats'])) {
-                $errorMsg = 'Gagal validasi barcode: response tidak valid';
+            Log::info('BarcodeKain: API Response (multi)', ['response' => $data]);
+
+            if (!is_array($data) || empty($data)) {
+                $errorMsg = 'Gagal validasi barcode: response SAP tidak valid';
                 Log::error('BarcodeKain: Invalid response', ['data' => $data]);
                 if ($request->ajax() || $request->wantsJson()) {
                     return response()->json(['status' => 'error', 'message' => $errorMsg], 400);
                 }
                 return back()->withInput()->with('error', $errorMsg);
             }
-            if ($data[0]['stats'] !== 'success') {
-                $errorMsg = $data[0]['stats'] ?: 'Barcode tidak dapat digunakan';
-                Log::error('BarcodeKain: API stats not success', ['stats' => $data[0]['stats']]);
+
+            // Petakan response ke tiap barcode.
+            // Jika SAP kembalikan 1 entry per barcode (berurutan) gunakan per-index,
+            // jika hanya 1 entry ringkasan (semua berhasil/gagal sekaligus) pakai entry itu untuk semua.
+            $results = [];
+            if (count($data) === count($trimmedBarcodes)) {
+                foreach ($trimmedBarcodes as $idx => $bc) {
+                    $results[$bc] = $data[$idx] ?? [];
+                }
+            } else {
+                $agg = $data[0];
+                foreach ($trimmedBarcodes as $bc) {
+                    $results[$bc] = $agg;
+                }
+            }
+
+            // Periksa status tiap barcode
+            $errors = [];
+            foreach ($results as $bc => $r) {
+                $stats = is_array($r) ? ($r['stats'] ?? null) : null;
+                if ($stats !== 'success') {
+                    $errors[] = $bc . ': ' . ($stats ?: 'tidak dikenali');
+                }
+            }
+            if (!empty($errors)) {
+                $errorMsg = 'Beberapa barcode tidak dapat digunakan: ' . implode('; ', $errors);
+                Log::error('BarcodeKain: Some barcodes failed', ['errors' => $errors]);
                 if ($request->ajax() || $request->wantsJson()) {
                     return response()->json(['status' => 'error', 'message' => $errorMsg], 400);
                 }
                 return redirect()->route('dashboard')->with('error', $errorMsg);
             }
-            // Sukses, simpan ke tabel barcode_kain
-            \App\Models\BarcodeKain::create([
-                'detail_proses_id' => $detailProses->id,
-                'no_op' => $no_op,
-                'no_partai' => $no_partai,
-                'barcode' => $barcode,
-                'matdok' => $data[0]['mblnr'] ?? null,
-                'qty_gi' => isset($data[0]['menge']) ? (float)$data[0]['menge'] : null,
-                'mesin_id' => $mesin_id,
-                'cancel' => false,
+
+            // Semua sukses: simpan ke DB dalam transaksi
+            DB::beginTransaction();
+            try {
+                foreach ($trimmedBarcodes as $bc) {
+                    $r = $results[$bc];
+                    BarcodeKain::create([
+                        'detail_proses_id' => $detailProses->id,
+                        'no_op' => $no_op,
+                        'no_partai' => $no_partai,
+                        'barcode' => $bc,
+                        'matdok' => $r['mblnr'] ?? null,
+                        'qty_gi' => isset($r['menge']) ? (float)$r['menge'] : null,
+                        'mesin_id' => $mesin_id,
+                        'cancel' => false,
+                    ]);
+                }
+                DB::commit();
+            } catch (\Exception $e) {
+                DB::rollBack();
+                throw $e;
+            }
+
+            Log::info('BarcodeKain: Successfully saved (multi)', [
+                'count' => $newCount,
+                'proses_id' => $proses->id,
             ]);
-            Log::info('BarcodeKain: Successfully saved to database', ['barcode' => $barcode, 'proses_id' => $proses->id]);
-            
+
             // Broadcast event untuk update real-time
             $proses->refresh();
             $proses->load(['approvals', 'details.barcodeKains', 'details.barcodeLas', 'details.barcodeAuxs']);
@@ -799,10 +882,17 @@ class ProsesController extends Controller
             event(new BarcodeStatusUpdated($proses->id, $statusData));
             Cache::forget("iot:mesin:{$proses->mesin_id}:alarm_result");
 
+            $msg = $newCount > 1
+                ? "{$newCount} barcode kain berhasil disimpan!"
+                : 'Barcode kain berhasil disimpan!';
             if ($request->ajax() || $request->wantsJson()) {
-                return response()->json(['status' => 'success', 'message' => 'Barcode kain berhasil disimpan!']);
+                return response()->json([
+                    'status' => 'success',
+                    'message' => $msg,
+                    'saved_count' => $newCount,
+                ]);
             }
-            return redirect()->route('dashboard')->with('success', 'Barcode kain berhasil disimpan!');
+            return redirect()->route('dashboard')->with('success', $msg);
         } catch (\Exception $e) {
             Log::error('BarcodeKain: Exception occurred', ['error' => $e->getMessage(), 'proses_id' => $id]);
             $errorMsg = 'Gagal menyimpan barcode kain: ' . $e->getMessage();

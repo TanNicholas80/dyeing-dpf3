@@ -471,3 +471,7 @@ class ApiCheckStatusBarcodeController extends Controller
         return [$laRequired, $laScanned, $laComplete, $auxRequired, $auxScanned, $auxComplete];
     }
 }
+
+// Trigger Mesin ON itu dari Pompa Air menyala, Relay akan mengirimkan Sinyal API ke ESP32 untuk mematikan Alarm
+
+// Trigger Finish Roller kain nyala dan mengeluarkan kain 
