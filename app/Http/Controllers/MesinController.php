@@ -23,10 +23,52 @@ class MesinController extends Controller
     {
         $mesins = Mesin::all();
         $forceAlarmOffMap = [];
+        $lastStatusMap = [];
+
+        // Ambil semua aktivitas update status untuk semua mesin guna efisiensi (sekali query)
+        $machineIds = $mesins->pluck('id')->toArray();
+        $activities = \Spatie\Activitylog\Models\Activity::where('subject_type', Mesin::class)
+            ->whereIn('subject_id', $machineIds)
+            ->where('log_name', 'Manajemen Mesin')
+            ->where('properties->event_type', 'updated')
+            ->orderByDesc('created_at')
+            ->get();
+
         foreach ($mesins as $mesin) {
             $forceAlarmOffMap[$mesin->id] = (bool) Cache::get($this->forceAlarmKey((int) $mesin->id), false);
+
+            $onTime = '-';
+            $offTime = '-';
+
+            // Temukan aktivitas terakhir di mana status berubah menjadi 1 (Hidup)
+            $onActivity = $activities->where('subject_id', $mesin->id)
+                ->filter(function($act) {
+                    $props = $act->properties;
+                    return isset($props['after_update']['status']) && ($props['after_update']['status'] == 1 || $props['after_update']['status'] === true);
+                })->first();
+            
+            if ($onActivity) {
+                $onTime = $onActivity->created_at->translatedFormat('d-m-Y H:i:s');
+            }
+
+            // Temukan aktivitas terakhir di mana status berubah menjadi 0 (Mati)
+            $offActivity = $activities->where('subject_id', $mesin->id)
+                ->filter(function($act) {
+                    $props = $act->properties;
+                    return isset($props['after_update']['status']) && ($props['after_update']['status'] == 0 || $props['after_update']['status'] === false);
+                })->first();
+
+            if ($offActivity) {
+                $offTime = $offActivity->created_at->translatedFormat('d-m-Y H:i:s');
+            }
+
+            $lastStatusMap[$mesin->id] = [
+                'nyala' => $onTime,
+                'mati' => $offTime,
+            ];
         }
-        return view('mesin.index', compact('mesins', 'forceAlarmOffMap'));
+
+        return view('mesin.index', compact('mesins', 'forceAlarmOffMap', 'lastStatusMap'));
     }
 
     public function create()

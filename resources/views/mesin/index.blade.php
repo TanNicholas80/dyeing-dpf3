@@ -54,9 +54,11 @@
                                             @if ($isSuperAdmin)
                                             <th>Alarm Paksa OFF</th>
                                             @endif
+                                            <th>Terakhir Nyala</th>
+                                            <th>Terakhir Mati</th>
                                             @if ($canManageMesin)
                                             <th>Aksi</th>
-                                            @endif
+                                             @endif
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -85,6 +87,8 @@
                                                     </div>
                                                 </td>
                                                 @endif
+                                                <td>{{ $lastStatusMap[$mesin->id]['nyala'] }}</td>
+                                                <td>{{ $lastStatusMap[$mesin->id]['mati'] }}</td>
                                                 @if ($canManageMesin)
                                                 <td>
                                                     <a href="{{ route('mesin.edit', $mesin->id) }}"
