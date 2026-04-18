@@ -85,7 +85,7 @@ class MesinController extends Controller
 
         $mesin->update($request->only('jenis_mesin', 'status'));
         $mesinCache->forgetAll();
-        
+
         // Refresh untuk memastikan data terbaru
         $mesin->refresh();
 
@@ -123,7 +123,7 @@ class MesinController extends Controller
                     // Gunakan timestamp untuk perbandingan agar aman dari masalah timezone Laravel vs DB
                     $lastSeenTs = $mesin->last_seen_at->getTimestamp();
                     $nowTs = now()->getTimestamp();
-                    $isTimeout = ($nowTs - $lastSeenTs) > 5;
+                    $isTimeout = ($nowTs - $lastSeenTs) > 10;
                 }
 
                 // Paksa status ke Mati (false) jika timeout dan saat ini masih Hidup
