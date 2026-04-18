@@ -17,12 +17,31 @@ class Mesin extends Model
         'jenis_mesin',
         'status',
         'last_seen_at',
+        'last_on_at',
+        'last_off_at',
     ];
 
     protected $casts = [
         'status' => 'boolean',
         'last_seen_at' => 'datetime',
+        'last_on_at' => 'datetime',
+        'last_off_at' => 'datetime',
     ];
+
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::saving(function ($mesin) {
+            if ($mesin->isDirty('status')) {
+                if ($mesin->status) {
+                    $mesin->last_on_at = now();
+                } else {
+                    $mesin->last_off_at = now();
+                }
+            }
+        });
+    }
 
     public function proses()
     {

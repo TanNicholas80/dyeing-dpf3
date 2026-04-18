@@ -37,34 +37,9 @@ class MesinController extends Controller
         foreach ($mesins as $mesin) {
             $forceAlarmOffMap[$mesin->id] = (bool) Cache::get($this->forceAlarmKey((int) $mesin->id), false);
 
-            $onTime = '-';
-            $offTime = '-';
-
-            // Temukan aktivitas terakhir di mana status berubah menjadi 1 (Hidup)
-            $onActivity = $activities->where('subject_id', $mesin->id)
-                ->filter(function($act) {
-                    $props = $act->properties;
-                    return isset($props['after_update']['status']) && ($props['after_update']['status'] == 1 || $props['after_update']['status'] === true);
-                })->first();
-            
-            if ($onActivity) {
-                $onTime = $onActivity->created_at->translatedFormat('d-m-Y H:i:s');
-            }
-
-            // Temukan aktivitas terakhir di mana status berubah menjadi 0 (Mati)
-            $offActivity = $activities->where('subject_id', $mesin->id)
-                ->filter(function($act) {
-                    $props = $act->properties;
-                    return isset($props['after_update']['status']) && ($props['after_update']['status'] == 0 || $props['after_update']['status'] === false);
-                })->first();
-
-            if ($offActivity) {
-                $offTime = $offActivity->created_at->translatedFormat('d-m-Y H:i:s');
-            }
-
             $lastStatusMap[$mesin->id] = [
-                'nyala' => $onTime,
-                'mati' => $offTime,
+                'nyala' => $mesin->last_on_at ? $mesin->last_on_at->translatedFormat('d-m-Y H:i:s') : '-',
+                'mati' => $mesin->last_off_at ? $mesin->last_off_at->translatedFormat('d-m-Y H:i:s') : '-',
             ];
         }
 
@@ -171,6 +146,8 @@ class MesinController extends Controller
                     'force_alarm_off' => (bool) Cache::get($this->forceAlarmKey((int) $mesin->id), false),
                     'iot_signal' => !$isTimeout,
                     'iot_label' => !$isTimeout ? 'Terhubung' : 'Terputus',
+                    'last_on' => $mesin->last_on_at ? $mesin->last_on_at->translatedFormat('d-m-Y H:i:s') : '-',
+                    'last_off' => $mesin->last_off_at ? $mesin->last_off_at->translatedFormat('d-m-Y H:i:s') : '-',
                 ];
             }
             return response()->json($result);

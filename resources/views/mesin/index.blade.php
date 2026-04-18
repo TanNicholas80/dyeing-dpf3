@@ -51,7 +51,9 @@
                                         <tr>
                                             <th>Jenis Mesin</th>
                                             <th>Status</th>
+                                            @if ($isSuperAdmin)
                                             <th>Sinyal IoT</th>
+                                            @endif
                                             @if ($isSuperAdmin)
                                             <th>Alarm Paksa OFF</th>
                                             @endif
@@ -72,12 +74,14 @@
                                                         {{ $mesin->status ? 'Hidup' : 'Mati' }}
                                                     </span>
                                                 </td>
+                                                @if ($isSuperAdmin)
                                                 <td>
                                                     <span class="badge signal-badge badge-secondary"
                                                         data-id="{{ $mesin->id }}">
                                                         Mengecek...
                                                     </span>
                                                 </td>
+                                                @endif
                                                 @if ($isSuperAdmin)
                                                 @php $forceOff = (bool) ($forceAlarmOffMap[$mesin->id] ?? false); @endphp
                                                 <td>
@@ -94,8 +98,8 @@
                                                     </div>
                                                 </td>
                                                 @endif
-                                                <td>{{ $lastStatusMap[$mesin->id]['nyala'] }}</td>
-                                                <td>{{ $lastStatusMap[$mesin->id]['mati'] }}</td>
+                                                <td class="nyala-time" data-id="{{ $mesin->id }}">{{ $lastStatusMap[$mesin->id]['nyala'] }}</td>
+                                                <td class="mati-time" data-id="{{ $mesin->id }}">{{ $lastStatusMap[$mesin->id]['mati'] }}</td>
                                                 @if ($canManageMesin)
                                                 <td>
                                                     <a href="{{ route('mesin.edit', $mesin->id) }}"
@@ -205,6 +209,18 @@
                                 badge.textContent = data[mesinId].label;
                                 badge.classList.remove('badge-success', 'badge-secondary');
                                 badge.classList.add(data[mesinId].status ? 'badge-success' : 'badge-secondary');
+                            }
+                        });
+                        document.querySelectorAll('.nyala-time').forEach(function(el) {
+                            var mesinId = el.getAttribute('data-id');
+                            if (data[mesinId] && data[mesinId].last_on) {
+                                el.textContent = data[mesinId].last_on;
+                            }
+                        });
+                        document.querySelectorAll('.mati-time').forEach(function(el) {
+                            var mesinId = el.getAttribute('data-id');
+                            if (data[mesinId] && data[mesinId].last_off) {
+                                el.textContent = data[mesinId].last_off;
                             }
                         });
                         document.querySelectorAll('.signal-badge').forEach(function(badge) {
