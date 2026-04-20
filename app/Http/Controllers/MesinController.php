@@ -123,7 +123,7 @@ class MesinController extends Controller
                     // Gunakan timestamp untuk perbandingan agar aman dari masalah timezone Laravel vs DB
                     $lastSeenTs = $mesin->last_seen_at->getTimestamp();
                     $nowTs = now()->getTimestamp();
-                    $isTimeout = ($nowTs - $lastSeenTs) > 10;
+                    $isTimeout = ($nowTs - $lastSeenTs) > 30;
                 }
 
                 // Paksa status ke Mati (false) jika timeout dan saat ini masih Hidup
