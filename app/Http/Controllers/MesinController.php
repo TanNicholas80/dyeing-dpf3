@@ -117,7 +117,7 @@ class MesinController extends Controller
             $mesins = Mesin::all();
             $result = [];
             foreach ($mesins as $mesin) {
-                // Logic Auto-Offline: jika tidak ada sinyal > 5 detik
+                // Logic Auto-Offline: jika tidak ada sinyal > 30 detik
                 $isTimeout = true;
                 if ($mesin->last_seen_at) {
                     // Gunakan timestamp untuk perbandingan agar aman dari masalah timezone Laravel vs DB
@@ -126,8 +126,19 @@ class MesinController extends Controller
                     $isTimeout = ($nowTs - $lastSeenTs) > 30;
                 }
 
-                // Update: Jangan auto-offline meskipun sinyal terputus (sesuai permintaan user)
-                // Sinyal IoT akan tetap menunjukkan 'Terputus' setelah 30 detik, tapi status mesin dibiarkan sesuai data terakhir.
+                // Paksa status ke Mati (false) jika timeout dan saat ini masih Hidup
+                if ($isTimeout && $mesin->status) {
+                    $mesin->status = false;
+                    $mesin->save();
+
+                    // Broadcast ke dashboard pusher untuk update real-time
+                    event(new MesinUpdated([
+                        'id' => $mesin->id,
+                        'jenis_mesin' => $mesin->jenis_mesin,
+                        'status' => false,
+                        'auto_offline' => true
+                    ]));
+                }
 
                 $result[$mesin->id] = [
                     'status' => (bool) $mesin->status,
