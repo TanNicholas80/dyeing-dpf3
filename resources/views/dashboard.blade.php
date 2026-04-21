@@ -173,8 +173,32 @@
         }
 
         .machine-column {
-            flex: 0 0 calc((100% - 32px) / 5) !important;
-            min-width: 250px;
+            flex: 0 0 calc((100% - 32px) / 5) !important; /* Default 5 */
+            min-width: 0;
+        }
+
+        @media (max-width: 1500px) {
+            .machine-column {
+                flex: 0 0 calc((100% - 24px) / 4) !important; /* 4 columns */
+            }
+        }
+
+        @media (max-width: 1200px) {
+            .machine-column {
+                flex: 0 0 calc((100% - 16px) / 3) !important; /* 3 columns */
+            }
+        }
+
+        @media (max-width: 900px) {
+            .machine-column {
+                flex: 0 0 calc((100% - 8px) / 2) !important; /* 2 columns */
+            }
+        }
+
+        @media (max-width: 600px) {
+            .machine-column {
+                flex: 0 0 100% !important; /* 1 column */
+            }
         }
 
         #machines-container::-webkit-scrollbar-thumb {
@@ -546,7 +570,7 @@
                     <div class="row" id="machines-container" style="margin-left:0;margin-right:0;">
                         @foreach ($mesinList as $mesin)
                             <div class="machine-column">
-                                <div class="col-lg col-md-2 col-sm-4 col-6" style="padding: 2px;">
+                                <div style="padding: 2px; width: 100%;">
                                     <div class="machine-column-wrapper"
                                         style="border-radius: 0; box-shadow: none; display: flex; flex-direction: column; height: 100%;">
                                         <div class="machine-header"
@@ -1733,16 +1757,17 @@
                             </div>
                         @endforeach
 
-                        {{-- Placeholder columns for "Airport Board" feel (clean groups of 5) --}}
+                        {{-- Placeholder columns for "Airport Board" feel (clean groups across all sizes) --}}
                         @php
                             $totalMesin = count($mesinList);
-                            $modulo = $totalMesin % 5;
-                            $placeholders = $modulo > 0 ? (5 - $modulo) : 0;
+                            $multiple = 5; // Fill to multiple of 5 is enough for most desktops
+                            $modulo = $totalMesin % $multiple;
+                            $placeholders = $modulo > 0 ? ($multiple - $modulo) : 0;
                         @endphp
                         @if ($placeholders > 0)
-                            @for ($i = 0; $i < $placeholders; $i++)
+                              @for ($i = 0; $i < $placeholders; $i++)
                                 <div class="machine-column placeholder-column">
-                                    <div class="col-lg col-md-2 col-sm-4 col-6" style="padding: 2px;">
+                                    <div style="padding: 2px; width: 100%;">
                                         <div style="height: 100%; border-radius: 0; background: transparent;">
                                             {{-- Empty white space as requested --}}
                                         </div>
@@ -7954,6 +7979,7 @@
                 let isPaused = false;
                 let isModalOpen = false; // Separate flag for modal state
                 let isTransitioning = false; // Lock to prevent overlapping transitions
+                let currentPageIndex = 0; // State to track current group of 5 machines
 
                 // Listen for any Bootstrap modal opening
                 $(document).on('show.bs.modal', '.modal', function() {
@@ -7968,43 +7994,60 @@
                         handleInteraction(); // Resume after a brief delay
                     }
                 });
+                function getMachinesPerPage() {
+                    const width = window.innerWidth;
+                    if (width > 1500) return 5;
+                    if (width > 1200) return 4;
+                    if (width > 900) return 3;
+                    if (width > 600) return 2;
+                    return 1;
+                }
+
+                function syncScrollToIndex() {
+                    const columns = container.querySelectorAll('.machine-column');
+                    const machinesPerPage = getMachinesPerPage();
+                    const targetIndex = currentPageIndex * machinesPerPage;
+                    if (columns[targetIndex]) {
+                        container.scrollLeft = columns[targetIndex].offsetLeft;
+                    }
+                }
 
                 function changePage(direction) {
                     if (isTransitioning) return;
                     // Don't auto-slide if paused or modal is open
                     if ((isPaused || isModalOpen) && direction === 1 && !arguments[1]) return; 
 
-                    const scrollWidth = container.scrollWidth;
-                    const clientWidth = container.clientWidth;
-                    const maxScroll = Math.floor(scrollWidth - clientWidth);
-                    const currentScroll = Math.ceil(container.scrollLeft);
+                    const allColumns = container.querySelectorAll('.machine-column');
+                    const realColumns = container.querySelectorAll('.machine-column:not(.placeholder-column)');
                     
-                    let nextPos;
+                    const totalMachines = allColumns.length;
+                    const realMachines = realColumns.length;
+                    const machinesPerPage = getMachinesPerPage();
+                    
+                    // Determine max pages based on REAL machines
+                    const totalPages = Math.ceil(realMachines / machinesPerPage);
+                    const maxPages = totalPages - 1;
 
                     if (direction === 1) {
                         // GO FORWARD
-                        if (currentScroll >= maxScroll - 10) {
-                            nextPos = 0;
-                        } else {
-                            nextPos = currentScroll + clientWidth + 8;
-                            if (nextPos > maxScroll) nextPos = maxScroll;
+                        currentPageIndex++;
+                        if (currentPageIndex > maxPages) {
+                            currentPageIndex = 0;
                         }
-                    } else {
+                    } else if (direction === -1) {
                         // GO BACKWARD
-                        if (currentScroll <= 10) {
-                            nextPos = maxScroll;
-                        } else {
-                            nextPos = currentScroll - (clientWidth + 8);
-                            if (nextPos < 0) nextPos = 0;
+                        currentPageIndex--;
+                        if (currentPageIndex < 0) {
+                            currentPageIndex = maxPages;
                         }
                     }
-
+                    
                     // START TRANSITION
                     isTransitioning = true;
                     $container.addClass('fade-out');
 
                     setTimeout(() => {
-                        container.scrollLeft = nextPos;
+                        syncScrollToIndex();
 
                         setTimeout(() => {
                             $container.removeClass('fade-out');
@@ -8069,15 +8112,25 @@
                 });
 
                 // Resize check
-                window.addEventListener('resize', () => {
+                function handleResize() {
                     if (!checkScroll()) {
                         isPaused = true;
+                        container.scrollLeft = 0;
+                        currentPageIndex = 0;
                     } else {
-                        // Note: the animation loop (rAF) is always running or pending, 
-                        // we just control its execution via isPaused.
+                        // Use rAF to ensure layout has settled before snapping
+                        requestAnimationFrame(() => {
+                            syncScrollToIndex();
+                        });
                         handleInteraction();
                     }
-                });
+                }
+
+                window.addEventListener('resize', handleResize);
+                document.addEventListener('fullscreenchange', handleResize);
+                document.addEventListener('webkitfullscreenchange', handleResize);
+                document.addEventListener('mozfullscreenchange', handleResize);
+                document.addEventListener('MSFullscreenChange', handleResize);
             }, 1500);
         });
     </script>
