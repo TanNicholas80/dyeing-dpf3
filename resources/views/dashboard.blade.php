@@ -148,7 +148,8 @@
             display: flex;
             flex-direction: row;
             flex-wrap: nowrap;
-            overflow-x: hidden; /* BLOCK physical sliding */
+            overflow-x: hidden;
+            /* BLOCK physical sliding */
             gap: 8px;
             padding-bottom: 8px;
             /* Hint to browser for smoother scrolling */
@@ -173,32 +174,9 @@
         }
 
         .machine-column {
-            flex: 0 0 calc((100% - 32px) / 5) !important; /* Default 5 */
+            /* Now driven by JS variable --cols-per-page for a truly fluid layout */
+            flex: 0 0 calc((100% - (var(--cols-per-page, 5) - 1) * 8px) / var(--cols-per-page, 5)) !important;
             min-width: 0;
-        }
-
-        @media (max-width: 1500px) {
-            .machine-column {
-                flex: 0 0 calc((100% - 24px) / 4) !important; /* 4 columns */
-            }
-        }
-
-        @media (max-width: 1200px) {
-            .machine-column {
-                flex: 0 0 calc((100% - 16px) / 3) !important; /* 3 columns */
-            }
-        }
-
-        @media (max-width: 900px) {
-            .machine-column {
-                flex: 0 0 calc((100% - 8px) / 2) !important; /* 2 columns */
-            }
-        }
-
-        @media (max-width: 600px) {
-            .machine-column {
-                flex: 0 0 100% !important; /* 1 column */
-            }
         }
 
         #machines-container::-webkit-scrollbar-thumb {
@@ -378,7 +356,8 @@
             right: 30px;
             display: flex;
             gap: 15px;
-            z-index: 1060; /* Above modals backdrop if needed, but usually 1050 is modal */
+            z-index: 1060;
+            /* Above modals backdrop if needed, but usually 1050 is modal */
         }
 
         .nav-btn {
@@ -1758,14 +1737,14 @@
                         @endforeach
 
                         {{-- Placeholder columns for "Airport Board" feel (clean groups across all sizes) --}}
-                        @php
+                         @php
                             $totalMesin = count($mesinList);
-                            $multiple = 5; // Fill to multiple of 5 is enough for most desktops
+                            $multiple = 120; // Highly divisible multiple for flexible layouts
                             $modulo = $totalMesin % $multiple;
                             $placeholders = $modulo > 0 ? ($multiple - $modulo) : 0;
                         @endphp
                         @if ($placeholders > 0)
-                              @for ($i = 0; $i < $placeholders; $i++)
+                            @for ($i = 0; $i < $placeholders; $i++)
                                 <div class="machine-column placeholder-column">
                                     <div style="padding: 2px; width: 100%;">
                                         <div style="height: 100%; border-radius: 0; background: transparent;">
@@ -4147,9 +4126,9 @@
                                     `<span style='position:absolute;top:2px;right:6px;cursor:pointer;font-weight:bold;color:#b00;font-size:16px;z-index:2;' class='cancel-barcode-btn' data-type='${barcodeType}' data-proses='${prosesId}' data-id='${bk.id}' data-matdok='${bk.matdok}' title='Cancel barcode'>&times;</span>` :
                                     '';
                                 html += `<div style="position:relative;flex:1 0 30%;max-width:32%;background:#f3f3f3;border-radius:6px;padding:6px 4px;margin-bottom:6px;text-align:center;font-weight:bold;font-size:13px;color:#222;box-shadow:0 1px 2px #0001;">
-                                                                                            ${cancelButton}
-                                                                                            ${bk.barcode} ${(bk.matdok ? '<br><span style=\'font-size:11px;color:#888;\'>' + bk.matdok + '</span>' : '')}
-                                                                                        </div>`;
+                                                                                                ${cancelButton}
+                                                                                                ${bk.barcode} ${(bk.matdok ? '<br><span style=\'font-size:11px;color:#888;\'>' + bk.matdok + '</span>' : '')}
+                                                                                            </div>`;
                             });
                             html += '</div>';
                             return html;
@@ -4715,69 +4694,69 @@
         // 2 mode: Scan (kamera) dan Input Manual (ketik barcode)
         if (!document.getElementById('modalScanBarcode')) {
             $(document.body).append(`
-                                                                    <div class="modal fade" id="modalScanBarcode" tabindex="-1" aria-labelledby="modalScanBarcodeLabel" aria-hidden="true">
-                                                                        <div class="modal-dialog modal-dialog-centered" style="max-width:480px;">
-                                                                            <div class="modal-content shadow-lg border-0 rounded-3">
-                                                                                <form id="formScanBarcode" method="POST" action="">
-                                                                                    @csrf
-                                                                                    <input type="hidden" name="barcode" id="inputBarcodeValue">
-                                                                                    <input type="hidden" name="detail_proses_id" id="inputDetailProsesId">
-                                                                                    <input type="hidden" name="approval_id" id="inputApprovalId">
-                                                                                    <div class="modal-header bg-success text-white">
-                                                                                        <h5 class="modal-title fw-bold" id="modalScanBarcodeLabel">Input Barcode</h5>
-                                                                                        <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
-                                                                                            <span aria-hidden="true">&times;</span>
-                                                                                        </button>
-                                                                                    </div>
-                                                                                    <div class="modal-body py-3 px-4 text-center">
-                                                                                        <ul class="nav nav-pills nav-fill mb-3" id="barcodeModeTabs" role="tablist">
-                                                                                            <li class="nav-item" role="presentation">
-                                                                                                <a class="nav-link active" id="mode-scan-tab" data-toggle="pill" href="#mode-scan-pane" role="tab" aria-controls="mode-scan-pane" aria-selected="true"><i class="fas fa-barcode"></i> Scan Barcode</a>
-                                                                                            </li>
-                                                                                            <li class="nav-item" role="presentation">
-                                                                                                <a class="nav-link" id="mode-manual-tab" data-toggle="pill" href="#mode-manual-pane" role="tab" aria-controls="mode-manual-pane" aria-selected="false"><i class="fas fa-keyboard"></i> Input Manual</a>
-                                                                                            </li>
-                                                                                        </ul>
-                                                                                        <div class="tab-content position-relative" id="barcodeModeContent" style="min-height:320px;">
-                                                                                            <div id="barcode-submit-loading" style="display:none;position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(255,255,255,0.9);align-items:center;justify-content:center;z-index:10;flex-direction:column;">
-                                                                                                <div class="spinner-border text-success mb-2" style="width:3rem;height:3rem;"></div>
-                                                                                                <p class="text-dark mb-0">Memproses barcode...</p>
+                                                                        <div class="modal fade" id="modalScanBarcode" tabindex="-1" aria-labelledby="modalScanBarcodeLabel" aria-hidden="true">
+                                                                            <div class="modal-dialog modal-dialog-centered" style="max-width:480px;">
+                                                                                <div class="modal-content shadow-lg border-0 rounded-3">
+                                                                                    <form id="formScanBarcode" method="POST" action="">
+                                                                                        @csrf
+                                                                                        <input type="hidden" name="barcode" id="inputBarcodeValue">
+                                                                                        <input type="hidden" name="detail_proses_id" id="inputDetailProsesId">
+                                                                                        <input type="hidden" name="approval_id" id="inputApprovalId">
+                                                                                        <div class="modal-header bg-success text-white">
+                                                                                            <h5 class="modal-title fw-bold" id="modalScanBarcodeLabel">Input Barcode</h5>
+                                                                                            <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                                                                                                <span aria-hidden="true">&times;</span>
+                                                                                            </button>
+                                                                                        </div>
+                                                                                        <div class="modal-body py-3 px-4 text-center">
+                                                                                            <ul class="nav nav-pills nav-fill mb-3" id="barcodeModeTabs" role="tablist">
+                                                                                                <li class="nav-item" role="presentation">
+                                                                                                    <a class="nav-link active" id="mode-scan-tab" data-toggle="pill" href="#mode-scan-pane" role="tab" aria-controls="mode-scan-pane" aria-selected="true"><i class="fas fa-barcode"></i> Scan Barcode</a>
+                                                                                                </li>
+                                                                                                <li class="nav-item" role="presentation">
+                                                                                                    <a class="nav-link" id="mode-manual-tab" data-toggle="pill" href="#mode-manual-pane" role="tab" aria-controls="mode-manual-pane" aria-selected="false"><i class="fas fa-keyboard"></i> Input Manual</a>
+                                                                                                </li>
+                                                                                            </ul>
+                                                                                            <div class="tab-content position-relative" id="barcodeModeContent" style="min-height:320px;">
+                                                                                                <div id="barcode-submit-loading" style="display:none;position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(255,255,255,0.9);align-items:center;justify-content:center;z-index:10;flex-direction:column;">
+                                                                                                    <div class="spinner-border text-success mb-2" style="width:3rem;height:3rem;"></div>
+                                                                                                    <p class="text-dark mb-0">Memproses barcode...</p>
+                                                                                                </div>
+                                                                                                <div class="tab-pane fade show active" id="mode-scan-pane" role="tabpanel">
+                                                                                                    <div id="barcode-scanner-container" style="width:100%;min-height:320px;display:flex;align-items:center;justify-content:center;"></div>
+                                                                                                </div>
+                                                                                                <div class="tab-pane fade" id="mode-manual-pane" role="tabpanel">
+                                                                                                    <div id="barcode-manual-container" class="py-3">
+                                                                                                        <label for="inputBarcodeManual" class="d-block text-left mb-2 font-weight-bold">Ketik kode barcode:</label>
+                                                                                                        <input type="text" class="form-control form-control-lg text-center" id="inputBarcodeManual" placeholder="Masukkan barcode" maxlength="255" autocomplete="off">
+                                                                                                        <small class="text-muted d-block mt-2">Tekan Enter atau klik Simpan setelah mengisi barcode.</small>
+                                                                                                        <button type="button" class="btn btn-success mt-3" id="btnSubmitManualBarcode"><i class="fas fa-check"></i> Simpan Barcode</button>
+                                                                                                    </div>
+                                                                                                </div>
                                                                                             </div>
-                                                                                            <div class="tab-pane fade show active" id="mode-scan-pane" role="tabpanel">
-                                                                                                <div id="barcode-scanner-container" style="width:100%;min-height:320px;display:flex;align-items:center;justify-content:center;"></div>
-                                                                                            </div>
-                                                                                            <div class="tab-pane fade" id="mode-manual-pane" role="tabpanel">
-                                                                                                <div id="barcode-manual-container" class="py-3">
-                                                                                                    <label for="inputBarcodeManual" class="d-block text-left mb-2 font-weight-bold">Ketik kode barcode:</label>
-                                                                                                    <input type="text" class="form-control form-control-lg text-center" id="inputBarcodeManual" placeholder="Masukkan barcode" maxlength="255" autocomplete="off">
-                                                                                                    <small class="text-muted d-block mt-2">Tekan Enter atau klik Simpan setelah mengisi barcode.</small>
-                                                                                                    <button type="button" class="btn btn-success mt-3" id="btnSubmitManualBarcode"><i class="fas fa-check"></i> Simpan Barcode</button>
+                                                                                            {{-- Section pending list barcode kain (hanya tampil saat barcode_kain) --}}
+                                                                                            <div id="kain-pending-section" class="mt-3" style="display:none;">
+                                                                                                <hr class="my-2">
+                                                                                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                                                                                    <strong class="text-left">Daftar Barcode Kain</strong>
+                                                                                                    <span id="kain-pending-counter" class="badge badge-secondary" style="font-size:12px;">0/0</span>
+                                                                                                </div>
+                                                                                                <div id="kain-pending-list" style="max-height:220px;overflow-y:auto;padding:4px 2px;">
+                                                                                                    <span style="color:#888;font-size:12px;">Belum ada barcode. Scan atau ketik manual untuk menambah.</span>
                                                                                                 </div>
                                                                                             </div>
                                                                                         </div>
-                                                                                        {{-- Section pending list barcode kain (hanya tampil saat barcode_kain) --}}
-                                                                                        <div id="kain-pending-section" class="mt-3" style="display:none;">
-                                                                                            <hr class="my-2">
-                                                                                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                                                                                <strong class="text-left">Daftar Barcode Kain</strong>
-                                                                                                <span id="kain-pending-counter" class="badge badge-secondary" style="font-size:12px;">0/0</span>
-                                                                                            </div>
-                                                                                            <div id="kain-pending-list" style="max-height:220px;overflow-y:auto;padding:4px 2px;">
-                                                                                                <span style="color:#888;font-size:12px;">Belum ada barcode. Scan atau ketik manual untuk menambah.</span>
-                                                                                            </div>
+                                                                                        <div class="modal-footer d-flex justify-content-between px-4">
+                                                                                            <button type="button" class="btn btn-success" id="btnSubmitKainBatch" style="display:none;">
+                                                                                                <i class="fas fa-save"></i> Simpan Barcode (<span id="kain-pending-submit-count">0</span>)
+                                                                                            </button>
+                                                                                            <button type="button" class="btn btn-secondary ml-auto" data-dismiss="modal">Tutup</button>
                                                                                         </div>
-                                                                                    </div>
-                                                                                    <div class="modal-footer d-flex justify-content-between px-4">
-                                                                                        <button type="button" class="btn btn-success" id="btnSubmitKainBatch" style="display:none;">
-                                                                                            <i class="fas fa-save"></i> Simpan Barcode (<span id="kain-pending-submit-count">0</span>)
-                                                                                        </button>
-                                                                                        <button type="button" class="btn btn-secondary ml-auto" data-dismiss="modal">Tutup</button>
-                                                                                    </div>
-                                                                                </form>
+                                                                                    </form>
+                                                                                </div>
                                                                             </div>
                                                                         </div>
-                                                                    </div>
-                                                                    `);
+                                                                        `);
         }
 
         // ========================================================
@@ -4875,9 +4854,9 @@
                 s.pending.forEach(function (item, idx) {
                     const cont = item.container ? `<br><span style='font-size:11px;color:#888;'>${item.container}</span>` : '';
                     html += `<div style="position:relative;flex:1 0 30%;max-width:32%;background:#f3f3f3;border-radius:6px;padding:8px 4px;text-align:center;font-weight:bold;font-size:13px;color:#222;box-shadow:0 1px 2px #0001;">
-                                                                                <span class="remove-pending-kain" data-idx="${idx}" style="position:absolute;top:2px;right:6px;cursor:pointer;font-weight:bold;color:#b00;font-size:16px;z-index:2;" title="Hapus">&times;</span>
-                                                                                ${item.barcode}${cont}
-                                                                            </div>`;
+                                                                                    <span class="remove-pending-kain" data-idx="${idx}" style="position:absolute;top:2px;right:6px;cursor:pointer;font-weight:bold;color:#b00;font-size:16px;z-index:2;" title="Hapus">&times;</span>
+                                                                                    ${item.barcode}${cont}
+                                                                                </div>`;
                 });
                 html += '</div>';
                 $list.html(html);
@@ -6092,15 +6071,15 @@
                 if (historyContainer.length === 0) {
                     const $prosesAktifContainer = $dropzone.find('.proses-aktif-container').first();
                     const newHistoryWrapper = $(`
-                                                                            <div class="proses-history-wrapper" data-section="history" data-mesin-id="${mesinId}" style="margin-bottom: 8px;">
-                                                                                <button class="btn-toggle-history btn btn-sm btn-secondary" 
-                                                                                        data-mesin-id="${mesinId}" type="button">
-                                                                                    <i class="fas fa-history"></i> Tampilkan History
-                                                                                </button>
-                                                                                <div class="proses-history-container" id="history-${mesinId}" style="display: none;">
+                                                                                <div class="proses-history-wrapper" data-section="history" data-mesin-id="${mesinId}" style="margin-bottom: 8px;">
+                                                                                    <button class="btn-toggle-history btn btn-sm btn-secondary" 
+                                                                                            data-mesin-id="${mesinId}" type="button">
+                                                                                        <i class="fas fa-history"></i> Tampilkan History
+                                                                                    </button>
+                                                                                    <div class="proses-history-container" id="history-${mesinId}" style="display: none;">
+                                                                                    </div>
                                                                                 </div>
-                                                                            </div>
-                                                                        `);
+                                                                            `);
                     // Insert sebelum proses aktif container
                     if ($prosesAktifContainer.length > 0) {
                         $prosesAktifContainer.before(newHistoryWrapper);
@@ -7543,40 +7522,40 @@
         // Modal konfirmasi cancel barcode
         if (!document.getElementById('modalConfirmCancelBarcode')) {
             $(document.body).append(`
-                                                                    <div class="modal fade" id="modalConfirmCancelBarcode" tabindex="-1" aria-labelledby="modalConfirmCancelBarcodeLabel" aria-hidden="true">
-                                                                        <div class="modal-dialog modal-dialog-centered" style="max-width:500px;">
-                                                                            <div class="modal-content shadow-lg border-0 rounded-3">
-                                                                                <div class="modal-header bg-danger text-white">
-                                                                                    <h5 class="modal-title fw-bold" id="modalConfirmCancelBarcodeLabel">
-                                                                                        <i class="fas fa-exclamation-triangle mr-2"></i>Konfirmasi Cancel Barcode
-                                                                                    </h5>
-                                                                                    <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
-                                                                                        <span aria-hidden="true">&times;</span>
-                                                                                    </button>
-                                                                                </div>
-                                                                                <div class="modal-body py-4 px-4 text-center">
-                                                                                    <div id="confirmCancelBarcodeText" style="font-size:15px;line-height:1.6;">
-                                                                                        Apakah Anda yakin ingin mengcancel barcode ini?
+                                                                        <div class="modal fade" id="modalConfirmCancelBarcode" tabindex="-1" aria-labelledby="modalConfirmCancelBarcodeLabel" aria-hidden="true">
+                                                                            <div class="modal-dialog modal-dialog-centered" style="max-width:500px;">
+                                                                                <div class="modal-content shadow-lg border-0 rounded-3">
+                                                                                    <div class="modal-header bg-danger text-white">
+                                                                                        <h5 class="modal-title fw-bold" id="modalConfirmCancelBarcodeLabel">
+                                                                                            <i class="fas fa-exclamation-triangle mr-2"></i>Konfirmasi Cancel Barcode
+                                                                                        </h5>
+                                                                                        <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                                                                                            <span aria-hidden="true">&times;</span>
+                                                                                        </button>
                                                                                     </div>
-                                                                                    <div id="cancelBarcodeLoading" style="display:none;margin-top:15px;">
-                                                                                        <div class="spinner-border text-danger" role="status">
-                                                                                            <span class="sr-only">Loading...</span>
+                                                                                    <div class="modal-body py-4 px-4 text-center">
+                                                                                        <div id="confirmCancelBarcodeText" style="font-size:15px;line-height:1.6;">
+                                                                                            Apakah Anda yakin ingin mengcancel barcode ini?
                                                                                         </div>
-                                                                                        <p class="mt-2 text-muted">Memproses cancel barcode...</p>
+                                                                                        <div id="cancelBarcodeLoading" style="display:none;margin-top:15px;">
+                                                                                            <div class="spinner-border text-danger" role="status">
+                                                                                                <span class="sr-only">Loading...</span>
+                                                                                            </div>
+                                                                                            <p class="mt-2 text-muted">Memproses cancel barcode...</p>
+                                                                                        </div>
                                                                                     </div>
-                                                                                </div>
-                                                                                <div class="modal-footer d-flex justify-content-end px-4">
-                                                                                    <button type="button" class="btn btn-secondary" data-dismiss="modal" id="btnCancelCancelBarcode">
-                                                                                        <i class="fas fa-times mr-1"></i>Batal
-                                                                                    </button>
-                                                                                    <button type="button" class="btn btn-danger" id="btnConfirmCancelBarcode">
-                                                                                        <i class="fas fa-check mr-1"></i>Ya, Cancel
-                                                                                    </button>
+                                                                                    <div class="modal-footer d-flex justify-content-end px-4">
+                                                                                        <button type="button" class="btn btn-secondary" data-dismiss="modal" id="btnCancelCancelBarcode">
+                                                                                            <i class="fas fa-times mr-1"></i>Batal
+                                                                                        </button>
+                                                                                        <button type="button" class="btn btn-danger" id="btnConfirmCancelBarcode">
+                                                                                            <i class="fas fa-check mr-1"></i>Ya, Cancel
+                                                                                        </button>
+                                                                                    </div>
                                                                                 </div>
                                                                             </div>
                                                                         </div>
-                                                                    </div>
-                                                                    `);
+                                                                        `);
         }
 
         let cancelBarcodeData = null;
@@ -7958,8 +7937,21 @@
             const container = document.getElementById('machines-container');
             if (!container || container.dataset.autoscrollInit) return;
             container.dataset.autoscrollInit = "true";
+            function getMachinesPerPage() {
+                if (!container) return 5;
+                const containerWidth = container.clientWidth;
+                const GAP = 8;
+                const TARGET_CARD_WIDTH = 280; 
+                let count = Math.floor((containerWidth + GAP) / (TARGET_CARD_WIDTH + GAP));
+                count = Math.max(1, Math.min(count, 15));
+                container.style.setProperty('--cols-per-page', count);
+                return count;
+            }
 
-            // Use setTimeout to ensure machines have been rendered and sized
+            // INSTANT Layout Sync: Set columns BEFORE any timers to avoid "flash of 5 machines"
+            getMachinesPerPage();
+
+            // Use setTimeout to ensure machines have been rendered and sized for secondary logic (scrolling)
             setTimeout(function () {
                 const $container = $(container);
 
@@ -7974,34 +7966,30 @@
                     // Don't RETURN here, so event listeners for manual wheel/interaction still attach
                 }
 
-                let slideTimer = null;
-                const SLIDE_DELAY = 30000; // 30 seconds per slide
+                let currentPageIndex = 0; // State to track current group of machines
                 let isPaused = false;
-                let isModalOpen = false; // Separate flag for modal state
-                let isTransitioning = false; // Lock to prevent overlapping transitions
-                let currentPageIndex = 0; // State to track current group of 5 machines
+                let isModalOpen = false;
+                let isTransitioning = false;
+                const SLIDE_DELAY = 30000; // 30 seconds per slide
+
+                // Sync scroll position early
+                syncScrollToIndex();
 
                 // Listen for any Bootstrap modal opening
-                $(document).on('show.bs.modal', '.modal', function() {
+                $(document).on('show.bs.modal', '.modal', function () {
                     isModalOpen = true;
                     stopAutoSlide();
                 });
 
-                $(document).on('hidden.bs.modal', '.modal', function() {
+                $(document).on('hidden.bs.modal', '.modal', function () {
                     // Check if there are ANY modals still open
                     if ($('.modal.show').length === 0) {
                         isModalOpen = false;
                         handleInteraction(); // Resume after a brief delay
                     }
                 });
-                function getMachinesPerPage() {
-                    const width = window.innerWidth;
-                    if (width > 1500) return 5;
-                    if (width > 1200) return 4;
-                    if (width > 900) return 3;
-                    if (width > 600) return 2;
-                    return 1;
-                }
+                // getMachinesPerPage is now defined outside to be available immediately
+                
 
                 function syncScrollToIndex() {
                     const columns = container.querySelectorAll('.machine-column');
@@ -8015,15 +8003,15 @@
                 function changePage(direction) {
                     if (isTransitioning) return;
                     // Don't auto-slide if paused or modal is open
-                    if ((isPaused || isModalOpen) && direction === 1 && !arguments[1]) return; 
+                    if ((isPaused || isModalOpen) && direction === 1 && !arguments[1]) return;
 
                     const allColumns = container.querySelectorAll('.machine-column');
                     const realColumns = container.querySelectorAll('.machine-column:not(.placeholder-column)');
-                    
+
                     const totalMachines = allColumns.length;
                     const realMachines = realColumns.length;
                     const machinesPerPage = getMachinesPerPage();
-                    
+
                     // Determine max pages based on REAL machines
                     const totalPages = Math.ceil(realMachines / machinesPerPage);
                     const maxPages = totalPages - 1;
@@ -8041,7 +8029,7 @@
                             currentPageIndex = maxPages;
                         }
                     }
-                    
+
                     // START TRANSITION
                     isTransitioning = true;
                     $container.addClass('fade-out');
@@ -8072,6 +8060,7 @@
                 }
 
                 // Initial start
+                let slideTimer = null; // Defined here to avoid immediate errors
                 startAutoSlide();
 
                 function handleInteraction() {
