@@ -126,19 +126,8 @@ class MesinController extends Controller
                     $isTimeout = ($nowTs - $lastSeenTs) > 30;
                 }
 
-                // Paksa status ke Mati (false) jika timeout dan saat ini masih Hidup
-                if ($isTimeout && $mesin->status) {
-                    $mesin->status = false;
-                    $mesin->save();
-
-                    // Broadcast ke dashboard pusher untuk update real-time
-                    event(new MesinUpdated([
-                        'id' => $mesin->id,
-                        'jenis_mesin' => $mesin->jenis_mesin,
-                        'status' => false,
-                        'auto_offline' => true
-                    ]));
-                }
+                // Update: Jangan auto-offline meskipun sinyal terputus (sesuai permintaan user)
+                // Sinyal IoT akan tetap menunjukkan 'Terputus' setelah 30 detik, tapi status mesin dibiarkan sesuai data terakhir.
 
                 $result[$mesin->id] = [
                     'status' => (bool) $mesin->status,
