@@ -132,7 +132,7 @@ class MesinController extends Controller
                     $mesin->save();
 
                     // Broadcast ke dashboard pusher untuk update real-time
-                    event(new \App\Events\MesinUpdated([
+                    event(new MesinUpdated([
                         'id' => $mesin->id,
                         'jenis_mesin' => $mesin->jenis_mesin,
                         'status' => false,

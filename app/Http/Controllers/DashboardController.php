@@ -8,10 +8,7 @@ use App\Services\MesinCacheService;
 use App\Services\ProsesStatusService;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
 {
@@ -32,7 +29,6 @@ class DashboardController extends Controller
             ? $mesinCache->getSelectionListForJenis($user->mesin)
             : $mesinCache->getSelectionList();
 
-        $currentPage = $request->query('page', 1);
 
         // Ambil parameter mesin dari query string, support multi-mesin (mesin=1,2,3)
         $selectedMesin = $request->query('mesin');
@@ -61,11 +57,11 @@ class DashboardController extends Controller
         $prosesList = $prosesQuery->get()->map(function ($proses) {
             $proses->barcode_kain_optional = $proses->isBarcodeKainOptionalForLaAux();
             return $proses;
-        })->sort(function($a, $b) {
+        })->sort(function ($a, $b) {
             // Proses pending (belum mulai) diurutkan berdasarkan order
             if (!$a->mulai && !$b->mulai) {
-                $orderA = (int)($a->order ?? 0);
-                $orderB = (int)($b->order ?? 0);
+                $orderA = (int) ($a->order ?? 0);
+                $orderB = (int) ($b->order ?? 0);
                 if ($orderA !== $orderB) {
                     return $orderA <=> $orderB;
                 }
@@ -82,19 +78,18 @@ class DashboardController extends Controller
         $canCancelBarcode = !in_array($userRole, ['ds', 'mesin', 'vp', 'fm', 'owner']);
 
         $cantModifyStructure = in_array($userRole, ['fm', 'vp', 'ds', 'mesin', 'owner']);
-        
-        $cantScan = in_array($userRole, ['fm', 'vp', 'ds', 'owner']);
-        $canAddProses    = !$cantModifyStructure;
-        $canEditProses   = !$cantModifyStructure;
-        $canDeleteProses = !$cantModifyStructure;
-        $canMoveProses   = !$cantModifyStructure;
-        $canSwapProses   = !$cantModifyStructure;
 
-        $canScanBarcode  = !$cantScan;
+        $cantScan = in_array($userRole, ['fm', 'vp', 'ds', 'owner']);
+        $canAddProses = !$cantModifyStructure;
+        $canEditProses = !$cantModifyStructure;
+        $canDeleteProses = !$cantModifyStructure;
+        $canMoveProses = !$cantModifyStructure;
+        $canSwapProses = !$cantModifyStructure;
+
+        $canScanBarcode = !$cantScan;
 
         return view('dashboard', [
             'mesins' => $mesins,
-            'currentPage' => $currentPage,
             'prosesList' => $prosesList,
             'selectedMesinArr' => $selectedMesinArr,
             'userRole' => $userRole,
@@ -149,11 +144,11 @@ class DashboardController extends Controller
             }
 
             $prosesList = $prosesQuery->get()
-                ->sort(function($a, $b) {
+                ->sort(function ($a, $b) {
                     // Proses pending (belum mulai) diurutkan berdasarkan order
                     if (!$a->mulai && !$b->mulai) {
-                        $orderA = (int)($a->order ?? 0);
-                        $orderB = (int)($b->order ?? 0);
+                        $orderA = (int) ($a->order ?? 0);
+                        $orderB = (int) ($b->order ?? 0);
                         if ($orderA !== $orderB) {
                             return $orderA <=> $orderB;
                         }
@@ -175,7 +170,7 @@ class DashboardController extends Controller
                     ->where('type', 'FM')
                     ->where('action', 'swap_position')
                     ->get();
-                
+
                 foreach ($swapApprovals as $appr) {
                     $historyData = $appr->history_data;
                     if (is_string($historyData)) {
@@ -184,12 +179,12 @@ class DashboardController extends Controller
                     if (is_array($historyData)) {
                         // Tambahkan swapped_proses_id (untuk backward compatibility)
                         if (isset($historyData['swapped_proses_id'])) {
-                            $affectedProsesIds[] = (int)$historyData['swapped_proses_id'];
+                            $affectedProsesIds[] = (int) $historyData['swapped_proses_id'];
                         }
                         // Tambahkan semua affected_proses_ids (proses yang akan bergeser)
                         if (isset($historyData['affected_proses_ids']) && is_array($historyData['affected_proses_ids'])) {
                             foreach ($historyData['affected_proses_ids'] as $id) {
-                                $affectedProsesIds[] = (int)$id;
+                                $affectedProsesIds[] = (int) $id;
                             }
                         }
                     }
@@ -229,16 +224,16 @@ class DashboardController extends Controller
                 $hasBarcodeKain = false;
                 $hasBarcodeLa = false;
                 $hasBarcodeAux = false;
-                
+
                 // Array untuk menyimpan status GDA per detail proses
                 $gdaDetails = [];
-                
+
                 if ($proses->details) {
                     foreach ($proses->details as $detail) {
                         // Cek status barcode per detail
                         $detailHasLa = false;
                         $detailHasAux = false;
-                        
+
                         // Untuk indikator G (Kain): cek apakah jumlah barcode kain sudah sesuai dengan roll
                         $roll = $detail->roll ?? 0;
                         $barcodeKainCount = 0;
@@ -248,7 +243,7 @@ class DashboardController extends Controller
                         // Indikator G hijau hanya jika jumlah barcode kain >= jumlah roll
                         $detailHasKain = ($barcodeKainCount >= $roll && $roll > 0);
                         $hasBarcodeKain = $hasBarcodeKain || $detailHasKain;
-                        
+
                         if ($detail->barcodeLas) {
                             $detailHasLa = $detail->barcodeLas->where('cancel', false)->count() > 0;
                             $hasBarcodeLa = $hasBarcodeLa || $detailHasLa;
@@ -257,7 +252,7 @@ class DashboardController extends Controller
                             $detailHasAux = $detail->barcodeAuxs->where('cancel', false)->count() > 0;
                             $hasBarcodeAux = $hasBarcodeAux || $detailHasAux;
                         }
-                        
+
                         // Simpan status GDA per detail untuk update real-time
                         $gdaDetails[] = [
                             'detail_id' => $detail->id,
@@ -275,13 +270,13 @@ class DashboardController extends Controller
                 $laInitialScanned = 0;
                 $auxInitialScanned = 0;
                 foreach ($proses->details ?? [] as $d) {
-                    if ($d->barcodeLas && $d->barcodeLas->where('cancel', false)->filter(fn ($b) => $b->approval_id === null)->count() > 0) {
+                    if ($d->barcodeLas && $d->barcodeLas->where('cancel', false)->filter(fn($b) => $b->approval_id === null)->count() > 0) {
                         $laInitialScanned = 1;
                         break;
                     }
                 }
                 foreach ($proses->details ?? [] as $d) {
-                    if ($d->barcodeAuxs && $d->barcodeAuxs->where('cancel', false)->filter(fn ($b) => $b->approval_id === null)->count() > 0) {
+                    if ($d->barcodeAuxs && $d->barcodeAuxs->where('cancel', false)->filter(fn($b) => $b->approval_id === null)->count() > 0) {
                         $auxInitialScanned = 1;
                         break;
                     }
@@ -308,16 +303,18 @@ class DashboardController extends Controller
                 $auxComplete = ($auxInitialScanned + $auxToppingScanned) >= $auxRequired;
                 $laInitialComplete = $laInitialScanned >= 1;
                 $auxInitialComplete = $auxInitialScanned >= 1;
-                $hasToppingLa = collect($proses->approvals ?? [])->contains(fn ($a) => ($a->action ?? '') === 'topping_la');
-                $hasToppingAux = collect($proses->approvals ?? [])->contains(fn ($a) => ($a->action ?? '') === 'topping_aux');
-                $pendingToppingLa = collect($proses->approvals ?? [])->contains(fn ($a) => ($a->action ?? '') === 'topping_la' && ($a->status ?? '') === 'pending');
-                $pendingToppingAux = collect($proses->approvals ?? [])->contains(fn ($a) => ($a->action ?? '') === 'topping_aux' && ($a->status ?? '') === 'pending');
+                $hasToppingLa = collect($proses->approvals ?? [])->contains(fn($a) => ($a->action ?? '') === 'topping_la');
+                $hasToppingAux = collect($proses->approvals ?? [])->contains(fn($a) => ($a->action ?? '') === 'topping_aux');
+                $pendingToppingLa = collect($proses->approvals ?? [])->contains(fn($a) => ($a->action ?? '') === 'topping_la' && ($a->status ?? '') === 'pending');
+                $pendingToppingAux = collect($proses->approvals ?? [])->contains(fn($a) => ($a->action ?? '') === 'topping_aux' && ($a->status ?? '') === 'pending');
                 $approvedToppingLaNotScanned = collect($proses->approvals ?? [])->contains(function ($a) {
-                    if (($a->action ?? '') !== 'topping_la' || ($a->status ?? '') !== 'approved') return false;
+                    if (($a->action ?? '') !== 'topping_la' || ($a->status ?? '') !== 'approved')
+                        return false;
                     return !($a->barcodeLas && $a->barcodeLas->where('cancel', false)->count() > 0);
                 });
                 $approvedToppingAuxNotScanned = collect($proses->approvals ?? [])->contains(function ($a) {
-                    if (($a->action ?? '') !== 'topping_aux' || ($a->status ?? '') !== 'approved') return false;
+                    if (($a->action ?? '') !== 'topping_aux' || ($a->status ?? '') !== 'approved')
+                        return false;
                     return !($a->barcodeAuxs && $a->barcodeAuxs->where('cancel', false)->count() > 0);
                 });
                 $tdColor = $hasToppingLa ? ($pendingToppingLa ? 'yellow' : ($approvedToppingLaNotScanned ? 'red' : 'green')) : null;
@@ -340,8 +337,8 @@ class DashboardController extends Controller
                         $selesai = \Carbon\Carbon::parse($proses->selesai);
                         $cycle_time_actual = max(0, $mulai->diffInSeconds($selesai, false));
                     }
-                    $cycle_time = $proses->cycle_time ? (int)$proses->cycle_time : 0;
-                    $cycle_time_actual = $cycle_time_actual ? (int)$cycle_time_actual : 0;
+                    $cycle_time = $proses->cycle_time ? (int) $proses->cycle_time : 0;
+                    $cycle_time_actual = $cycle_time_actual ? (int) $cycle_time_actual : 0;
                     // Merah: durasi sangat singkat (< 1 jam). Hijau: sudah lebih dari 1 jam berjalan dan berhenti.
                     if ($cycle_time_actual < 3600) {
                         $bg = '#e53935'; // merah (durasi terlalu singkat, belum 1 jam)
@@ -380,7 +377,7 @@ class DashboardController extends Controller
                     'selesai' => $proses->selesai,
                     'bg_color' => $bg,
                     'jenis' => $proses->jenis,
-                    'order' => (int)($proses->order ?? 0),
+                    'order' => (int) ($proses->order ?? 0),
                     'gda_details' => $gdaDetails,
                     'cycle_time' => $proses->cycle_time !== null ? (int) $proses->cycle_time : null,
                     'cycle_time_actual' => $proses->cycle_time_actual !== null ? (int) $proses->cycle_time_actual : null,
