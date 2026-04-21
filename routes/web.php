@@ -10,10 +10,12 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\ApprovalController;
 use App\Http\Controllers\ActivityLogController;
 
-Route::get('/', [AuthController::class, 'login'])->name('login');
-Route::post('/login-proses', [AuthController::class, 'login_proses'])->name('login-proses');
+Route::middleware(['guest', 'prevent-back-history'])->group(function () {
+    Route::get('/', [AuthController::class, 'login'])->name('login');
+    Route::post('/login-proses', [AuthController::class, 'login_proses'])->name('login-proses');
+});
 
-Route::middleware(['auth'])->group(function () {
+Route::middleware(['auth', 'prevent-back-history'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
     // Dashboard: semua role yang perlu lihat dashboard kecuali aux (dashboard & operator ada di enum users)
