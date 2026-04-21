@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Middleware\SetLongSessionForDashboardRoutes;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -18,6 +19,7 @@ class AuthController extends Controller
             if ($user->role === 'aux') {
                 return redirect()->route('aux.index');
             }
+
             return redirect()->route('dashboard');
         }
 
@@ -41,17 +43,21 @@ class AuthController extends Controller
             $request->session()->regenerate();
             // Pastikan tidak ada URL intended tersisa yang bisa mengarahkan ke route yang tidak diizinkan
             $request->session()->forget('url.intended');
-            
+
             // Redirect berdasarkan role
             $user = Auth::user();
+            // Monitoring Smart TV (role dashboard): session panjang agar tidak logout berulang
+            if ($user->role === 'dashboard') {
+                config(['session.lifetime' => SetLongSessionForDashboardRoutes::LIFETIME_MINUTES]);
+            }
             $redirectRoute = 'dashboard';
             if ($user->role === 'aux') {
                 $redirectRoute = 'aux.index';
             }
-            
+
             return redirect()
                 ->route($redirectRoute)
-                ->with('success', 'Login berhasil. Selamat datang, ' . $user->nama . '!');
+                ->with('success', 'Login berhasil. Selamat datang, '.$user->nama.'!');
         }
 
         return back()
