@@ -426,7 +426,7 @@ class ProsesController extends Controller
                                 ->withInput()
                                 ->withErrors([
                                     "details.$index.no_partai" =>
-                                    "Kombinasi No OP '$noOp' + No Partai '$noPartai' tidak dapat digunakan untuk Reproses karena masih ada proses yang berjalan / belum selesai.",
+                                        "Kombinasi No OP '$noOp' + No Partai '$noPartai' tidak dapat digunakan untuk Reproses karena masih ada proses yang berjalan / belum selesai.",
                                 ]);
                         }
                     }
@@ -440,8 +440,8 @@ class ProsesController extends Controller
                                 ->withInput()
                                 ->withErrors([
                                     "details.$index.no_partai" =>
-                                    "Kombinasi No OP \"{$noOp}\" + No Partai \"{$noPartai}\" belum pernah dipakai pada jenis proses Produksi. " .
-                                    "Reproses hanya dapat dibuat untuk Detail OP yang pernah dipakai di Produksi.",
+                                        "Kombinasi No OP \"{$noOp}\" + No Partai \"{$noPartai}\" belum pernah dipakai pada jenis proses Produksi. " .
+                                        "Reproses hanya dapat dibuat untuk Detail OP yang pernah dipakai di Produksi.",
                                 ]);
                         }
                     }
@@ -453,7 +453,7 @@ class ProsesController extends Controller
                             ->withInput()
                             ->withErrors([
                                 "details.$index.no_partai" =>
-                                "Kombinasi No OP '$noOp' + No Partai '$noPartai' sudah pernah digunakan. " .
+                                    "Kombinasi No OP '$noOp' + No Partai '$noPartai' sudah pernah digunakan. " .
                                     "Gunakan 'Reproses' jika ingin memproses ulang (dengan syarat proses sebelumnya sudah selesai).",
                             ]);
                     }
@@ -465,11 +465,11 @@ class ProsesController extends Controller
         if (!empty($validated['cycle_time'])) {
             $parts = explode(':', $validated['cycle_time']);
             if (count($parts) === 3) {
-                $validated['cycle_time'] = ((int)$parts[0]) * 3600 + ((int)$parts[1]) * 60 + ((int)$parts[2]);
+                $validated['cycle_time'] = ((int) $parts[0]) * 3600 + ((int) $parts[1]) * 60 + ((int) $parts[2]);
             } elseif (count($parts) === 2) {
-                $validated['cycle_time'] = ((int)$parts[0]) * 3600 + ((int)$parts[1]) * 60;
+                $validated['cycle_time'] = ((int) $parts[0]) * 3600 + ((int) $parts[1]) * 60;
             } else {
-                $validated['cycle_time'] = (int)$validated['cycle_time'];
+                $validated['cycle_time'] = (int) $validated['cycle_time'];
             }
         } else {
             $validated['cycle_time'] = null;
@@ -483,7 +483,7 @@ class ProsesController extends Controller
             if (isset($parsed['query'])) {
                 parse_str($parsed['query'], $queryArr);
                 if (isset($queryArr['page']) && is_numeric($queryArr['page'])) {
-                    $page = (int)$queryArr['page'];
+                    $page = (int) $queryArr['page'];
                 }
             }
         }
@@ -542,17 +542,17 @@ class ProsesController extends Controller
                 })->toArray();
 
                 Approval::create([
-                    'proses_id'    => $proses->id,
-                    'status'       => 'pending',
-                    'type'         => 'FM',
-                    'action'       => 'create_reprocess',
+                    'proses_id' => $proses->id,
+                    'status' => 'pending',
+                    'type' => 'FM',
+                    'action' => 'create_reprocess',
                     'history_data' => [
                         'proses_snapshot' => $proses->toArray(),
                         'detail_proses_snapshot' => $detailProsesSnapshots, // Snapshot DetailProses untuk history lengkap
                     ],
-                    'note'         => null,
+                    'note' => null,
                     'requested_by' => Auth::id(),
-                    'approved_by'  => null, // Akan diisi saat FM approve/reject
+                    'approved_by' => null, // Akan diisi saat FM approve/reject
                 ]);
 
                 // Broadcast agar semua browser langsung menampilkan blok kuning (menunggu approval FM)
@@ -742,7 +742,7 @@ class ProsesController extends Controller
 
             // Trim tiap barcode ke 10 karakter dan dedupe di dalam batch
             $trimmedBarcodes = collect($rawBarcodes)
-                ->map(fn($b) => substr(trim((string)$b), 0, 10))
+                ->map(fn($b) => substr(trim((string) $b), 0, 10))
                 ->filter(fn($b) => $b !== '')
                 ->unique()
                 ->values()
@@ -818,7 +818,7 @@ class ProsesController extends Controller
             $item_op = $detailProses->item_op;
 
             $results = [];
-            
+
             // 1. Proses Barcode Baru via SAP
             if (!empty($barcodesToSap)) {
                 // Bangun payload SAP: {no_op}-{item_op}|{barcode};{barcode};{barcode}
@@ -897,7 +897,7 @@ class ProsesController extends Controller
                         'barcode' => $bc,
                         'matdok' => $r['mblnr'] ?? null,
                         'item_document' => $r['zeile'] ?? null,
-                        'qty_gi' => isset($r['menge']) ? (float)$r['menge'] : null,
+                        'qty_gi' => isset($r['menge']) ? (float) $r['menge'] : null,
                         'mesin_id' => $mesin_id,
                         'cancel' => false,
                     ]);
@@ -958,7 +958,7 @@ class ProsesController extends Controller
             if (isset($parsed['query'])) {
                 parse_str($parsed['query'], $queryArr);
                 if (isset($queryArr['page']) && is_numeric($queryArr['page'])) {
-                    $page = (int)$queryArr['page'];
+                    $page = (int) $queryArr['page'];
                 }
             }
         }
@@ -1021,13 +1021,13 @@ class ProsesController extends Controller
             }
 
             // Validasi: tolak scan LA jika kebutuhan awal + topping sudah terpenuhi
-            $laInitialScanned = BarcodeLa::whereHas('detailProses', fn ($q) => $q->where('proses_id', $id))
+            $laInitialScanned = BarcodeLa::whereHas('detailProses', fn($q) => $q->where('proses_id', $id))
                 ->whereNull('approval_id')->where('cancel', false)->exists() ? 1 : 0;
             $laToppingReq = Approval::where('proses_id', $id)->where('type', 'KEPALA_SHIFT')
                 ->where('action', 'topping_la')->where('status', 'approved')->count();
             $laToppingScn = Approval::where('proses_id', $id)->where('type', 'KEPALA_SHIFT')
                 ->where('action', 'topping_la')->where('status', 'approved')
-                ->whereHas('barcodeLas', fn ($q) => $q->where('cancel', false))->count();
+                ->whereHas('barcodeLas', fn($q) => $q->where('cancel', false))->count();
             $laIsComplete = ($laInitialScanned + $laToppingScn) >= (1 + $laToppingReq);
             if ($laIsComplete) {
                 $msg = 'Kebutuhan barcode LA (awal + topping) sudah terpenuhi. Tidak dapat menambah scan.';
@@ -1093,7 +1093,7 @@ class ProsesController extends Controller
                 $totalQtyGi = BarcodeKain::where('detail_proses_id', $detail->id)
                     ->where('cancel', false)
                     ->sum('qty_gi') ?? 0;
-                return $detail->no_op . '/' . (int)$totalQtyGi;
+                return $detail->no_op . '/' . (int) $totalQtyGi;
             })->implode('|');
 
             $tickets = DB::connection('sqlsrv')
@@ -1224,7 +1224,7 @@ class ProsesController extends Controller
             if (isset($parsed['query'])) {
                 parse_str($parsed['query'], $queryArr);
                 if (isset($queryArr['page']) && is_numeric($queryArr['page'])) {
-                    $page = (int)$queryArr['page'];
+                    $page = (int) $queryArr['page'];
                 }
             }
         }
@@ -1289,13 +1289,13 @@ class ProsesController extends Controller
             }
 
             // Validasi: tolak scan AUX jika kebutuhan awal + topping sudah terpenuhi
-            $auxInitialScanned = BarcodeAux::whereHas('detailProses', fn ($q) => $q->where('proses_id', $id))
+            $auxInitialScanned = BarcodeAux::whereHas('detailProses', fn($q) => $q->where('proses_id', $id))
                 ->whereNull('approval_id')->where('cancel', false)->exists() ? 1 : 0;
             $auxToppingReq = Approval::where('proses_id', $id)->where('type', 'KEPALA_SHIFT')
                 ->where('action', 'topping_aux')->where('status', 'approved')->count();
             $auxToppingScn = Approval::where('proses_id', $id)->where('type', 'KEPALA_SHIFT')
                 ->where('action', 'topping_aux')->where('status', 'approved')
-                ->whereHas('barcodeAuxs', fn ($q) => $q->where('cancel', false))->count();
+                ->whereHas('barcodeAuxs', fn($q) => $q->where('cancel', false))->count();
             $auxIsComplete = ($auxInitialScanned + $auxToppingScn) >= (1 + $auxToppingReq);
             if ($auxIsComplete) {
                 $msg = 'Kebutuhan barcode AUX (awal + topping) sudah terpenuhi. Tidak dapat menambah scan.';
@@ -1383,13 +1383,13 @@ class ProsesController extends Controller
                 $totalQtyGi = BarcodeKain::where('detail_proses_id', $detail->id)
                     ->where('cancel', false)
                     ->sum('qty_gi') ?? 0;
-                return $detail->no_op . '/' . (int)$totalQtyGi;
+                return $detail->no_op . '/' . (int) $totalQtyGi;
             })->implode('|');
 
             $detailStr = $details->map(function ($d) {
                 $aux = $d->auxiliary;
-                $kons = (float)$d->konsentrasi * 1000;
-                return $aux . '/' . (int)$kons;
+                $kons = (float) $d->konsentrasi * 1000;
+                return $aux . '/' . (int) $kons;
             })->implode('|');
             $body = '"' . $allNoOps . ';' . $detailStr . '"';
             Log::info('BarcodeAux: API body prepared', ['body' => $body]);
@@ -1511,7 +1511,7 @@ class ProsesController extends Controller
             return redirect()->route('dashboard', ['page' => $page])->with('error', $errorMsg);
         }
     }
-    
+
     // Endpoint untuk ambil barcode berdasarkan proses_id
 
     /**
@@ -1665,13 +1665,13 @@ class ProsesController extends Controller
         ]);
 
         if ($auxJenis === 'reproses') {
-            if (!str_starts_with((string)$noOp, '010')) {
+            if (!str_starts_with((string) $noOp, '010')) {
                 return 'AUX jenis Reproses hanya dapat dipakai pada No OP 010.';
             }
         }
 
         if ($auxJenis === 'perbaikan') {
-            if (!str_starts_with((string)$noOp, '066')) {
+            if (!str_starts_with((string) $noOp, '066')) {
                 return 'AUX jenis Perbaikan hanya dapat dipakai pada No OP 066.';
             }
             // Aturan baru:
@@ -1687,7 +1687,7 @@ class ProsesController extends Controller
         }
 
         if ($auxJenis === 'normal') {
-            if (!str_starts_with((string)$noOp, '066')) {
+            if (!str_starts_with((string) $noOp, '066')) {
                 return 'AUX jenis Normal hanya dapat dipakai pada No OP 066 dengan jenis proses Produksi.';
             }
             if ($prosesJenis !== 'Produksi') {
@@ -1845,13 +1845,13 @@ class ProsesController extends Controller
             ->where('type', 'KEPALA_SHIFT')
             ->where('action', 'topping_la')
             ->where('status', 'approved')
-            ->whereDoesntHave('barcodeLas', fn ($q) => $q->where('cancel', false))
+            ->whereDoesntHave('barcodeLas', fn($q) => $q->where('cancel', false))
             ->first();
         $approvedToppingAux = Approval::where('proses_id', $id)
             ->where('type', 'KEPALA_SHIFT')
             ->where('action', 'topping_aux')
             ->where('status', 'approved')
-            ->whereDoesntHave('barcodeAuxs', fn ($q) => $q->where('cancel', false))
+            ->whereDoesntHave('barcodeAuxs', fn($q) => $q->where('cancel', false))
             ->first();
         $approvedToppingLaNotScanned = !is_null($approvedToppingLa);
         $approvedToppingAuxNotScanned = !is_null($approvedToppingAux);
@@ -1891,7 +1891,7 @@ class ProsesController extends Controller
         }
 
         // Hitung progress LA: 1 awal + topping yang di-approve
-        $laInitialScanned = BarcodeLa::whereHas('detailProses', fn ($q) => $q->where('proses_id', $id))
+        $laInitialScanned = BarcodeLa::whereHas('detailProses', fn($q) => $q->where('proses_id', $id))
             ->whereNull('approval_id')
             ->where('cancel', false)
             ->exists() ? 1 : 0;
@@ -1904,7 +1904,7 @@ class ProsesController extends Controller
             ->where('type', 'KEPALA_SHIFT')
             ->where('action', 'topping_la')
             ->where('status', 'approved')
-            ->whereHas('barcodeLas', fn ($q) => $q->where('cancel', false))
+            ->whereHas('barcodeLas', fn($q) => $q->where('cancel', false))
             ->count();
         $laRequired = 1 + $laToppingRequired;
         $laScanned = $laInitialScanned + $laToppingScanned;
@@ -1920,7 +1920,7 @@ class ProsesController extends Controller
         ];
 
         // Hitung progress AUX: 1 awal + topping yang di-approve
-        $auxInitialScanned = BarcodeAux::whereHas('detailProses', fn ($q) => $q->where('proses_id', $id))
+        $auxInitialScanned = BarcodeAux::whereHas('detailProses', fn($q) => $q->where('proses_id', $id))
             ->whereNull('approval_id')
             ->where('cancel', false)
             ->exists() ? 1 : 0;
@@ -1933,7 +1933,7 @@ class ProsesController extends Controller
             ->where('type', 'KEPALA_SHIFT')
             ->where('action', 'topping_aux')
             ->where('status', 'approved')
-            ->whereHas('barcodeAuxs', fn ($q) => $q->where('cancel', false))
+            ->whereHas('barcodeAuxs', fn($q) => $q->where('cancel', false))
             ->count();
         $auxRequired = 1 + $auxToppingRequired;
         $auxScanned = $auxInitialScanned + $auxToppingScanned;
@@ -1950,11 +1950,11 @@ class ProsesController extends Controller
 
         $userRole = Auth::user()->role ?? null;
         $canScanLa = (in_array($userRole, ['super_admin', 'ppic'])
-            || ($userRole === 'kepala_ruangan' && $approvedToppingLa && $allComplete))
-            && $allComplete && !$laIsComplete;
+            || ($userRole === 'kepala_ruangan' && ($approvedToppingLa || $laIsComplete) && $allComplete))
+            && $allComplete;
         $canScanAux = (in_array($userRole, ['super_admin', 'ppic'])
-            || ($userRole === 'kepala_ruangan' && $approvedToppingAux && $allComplete))
-            && $allComplete && !$auxIsComplete;
+            || ($userRole === 'kepala_ruangan' && ($approvedToppingAux || $auxIsComplete) && $allComplete))
+            && $allComplete;
 
         $jenisOp = $proses->jenis_op ?? 'Single';
         $isMultipleOp = $jenisOp === 'Multiple' && $detailListForTopping->count() > 1;
@@ -1992,7 +1992,7 @@ class ProsesController extends Controller
         $matdok = $request->input('matdok');
 
         if ($type === 'kain') {
-        $barcodeObj = \App\Models\BarcodeKain::find($barcode);
+            $barcodeObj = \App\Models\BarcodeKain::find($barcode);
         } elseif ($type === 'la') {
             $barcodeObj = \App\Models\BarcodeLa::find($barcode);
         } elseif ($type === 'aux') {
@@ -2014,13 +2014,13 @@ class ProsesController extends Controller
         }
 
         if ($type === 'kain') {
-            $barcodeObj = \App\Models\BarcodeKain::find($barcode);  
+            $barcodeObj = \App\Models\BarcodeKain::find($barcode);
             $prosesId = DetailProses::select('proses_id')
-            ->where('id', $barcodeObj->detail_proses_id)
-            ->first();
+                ->where('id', $barcodeObj->detail_proses_id)
+                ->first();
             $opberjalan = Proses::select('mulai', 'selesai')
-            ->where('id', $prosesId->proses_id)
-            ->first();
+                ->where('id', $prosesId->proses_id)
+                ->first();
 
             if (!empty($opberjalan->mulai) && empty($opberjalan->selesai)) {
                 return response()->json(['status' => 'error', 'message' => 'Cancel barcode tidak dapat dilakukan saat mesin berjalan'], 400);
@@ -2029,7 +2029,7 @@ class ProsesController extends Controller
         if (!empty($opberjalan->mulai) && !empty($opberjalan->selesai)) {
             return response()->json(['status' => 'error', 'message' => 'Cancel barcode tidak dapat dilakukan saat proses telah selesai'], 400);
         }
-    
+
         try {
             $client = new \GuzzleHttp\Client();
             $bodyValue = $matdok;
@@ -2086,13 +2086,13 @@ class ProsesController extends Controller
                         $detailProsesId = $barcodeObj->detail_proses_id;
                         $prosesId = $barcodeObj->detailProses->proses_id ?? null;
                     }
-                    
+
                     $barcodeObj->cancel = true;
                     $barcodeObj->save();
-                    
+
                     // Refresh model untuk memastikan perubahan tersimpan
                     $barcodeObj->refresh();
-                    
+
                     // Broadcast event untuk update real-time
                     if ($prosesId) {
                         // Refresh proses dengan relasi yang fresh - gunakan fresh() untuk bypass cache
@@ -2100,28 +2100,28 @@ class ProsesController extends Controller
                         if ($proses) {
                             // Refresh semua relasi untuk memastikan data terbaru (termasuk yang sudah di-cancel)
                             $proses->load(['approvals', 'details.barcodeKains', 'details.barcodeLas', 'details.barcodeAuxs']);
-                            
+
                             // Pastikan setiap detail juga di-refresh
                             foreach ($proses->details as $detail) {
                                 $detail->load(['barcodeKains', 'barcodeLas', 'barcodeAuxs']);
                             }
-                            
+
                             $statusService = new ProsesStatusService();
                             $affectedProsesIds = $statusService->getAffectedProsesIds();
                             $statusData = $statusService->generateProsesStatus($proses, $affectedProsesIds);
-                            
+
                             Log::info('Broadcasting BarcodeStatusUpdated after cancel', [
                                 'proses_id' => $prosesId,
                                 'detail_id' => $detailProsesId,
                                 'barcode_type' => $type,
                                 'status_data' => $statusData
                             ]);
-                            
+
                             event(new BarcodeStatusUpdated($prosesId, $statusData));
                             Cache::forget("iot:mesin:{$proses->mesin_id}:alarm_result");
                         }
                     }
-                    
+
                     return response()->json([
                         'status' => 'success',
                         'message' => $alreadyCanceled
@@ -2212,18 +2212,18 @@ class ProsesController extends Controller
 
         // Buat record approval untuk FM (edit cycle time)
         Approval::create([
-            'proses_id'    => $proses->id,
-            'status'       => 'pending',
-            'type'         => 'FM',
-            'action'       => 'edit_cycle_time',
+            'proses_id' => $proses->id,
+            'status' => 'pending',
+            'type' => 'FM',
+            'action' => 'edit_cycle_time',
             'history_data' => [
                 'old_cycle_time' => $proses->cycle_time,
                 'new_cycle_time' => $newCycleTime,
-                'input_format'   => $inputCycleTime,
+                'input_format' => $inputCycleTime,
             ],
-            'note'         => null,
+            'note' => null,
             'requested_by' => Auth::id(),
-            'approved_by'  => null, // Akan diisi saat FM approve/reject
+            'approved_by' => null, // Akan diisi saat FM approve/reject
         ]);
 
         // Broadcast agar semua browser langsung menampilkan blok kuning (menunggu approval)
@@ -2309,17 +2309,17 @@ class ProsesController extends Controller
 
         // Buat record approval untuk FM (move machine)
         Approval::create([
-            'proses_id'    => $proses->id,
-            'status'       => 'pending',
-            'type'         => 'FM',
-            'action'       => 'move_machine',
+            'proses_id' => $proses->id,
+            'status' => 'pending',
+            'type' => 'FM',
+            'action' => 'move_machine',
             'history_data' => [
                 'old_mesin_id' => $proses->mesin_id,
                 'new_mesin_id' => $newMesinId,
             ],
-            'note'         => null,
+            'note' => null,
             'requested_by' => Auth::id(),
-            'approved_by'  => null, // Akan diisi saat FM approve/reject
+            'approved_by' => null, // Akan diisi saat FM approve/reject
         ]);
 
         // Broadcast agar semua browser langsung menampilkan blok kuning (menunggu approval)
@@ -2553,10 +2553,10 @@ class ProsesController extends Controller
         // Buat record approval untuk FM (swap position) - hanya 1 approval untuk proses pertama
         // Approval ini akan menukar posisi kedua proses saat di-approve
         Approval::create([
-            'proses_id'    => $proses1->id,
-            'status'       => 'pending',
-            'type'         => 'FM',
-            'action'       => 'swap_position',
+            'proses_id' => $proses1->id,
+            'status' => 'pending',
+            'type' => 'FM',
+            'action' => 'swap_position',
             'history_data' => [
                 'proses1_id' => $proses1->id,
                 'proses2_id' => $proses2Id,
@@ -2565,9 +2565,9 @@ class ProsesController extends Controller
                 'swapped_proses_id' => $proses2Id, // Untuk tracking di dashboard
                 'affected_proses_ids' => $affectedProsesIds, // Semua proses yang terpengaruh (akan bergeser)
             ],
-            'note'         => null,
+            'note' => null,
             'requested_by' => Auth::id(),
-            'approved_by'  => null, // Akan diisi saat FM approve/reject
+            'approved_by' => null, // Akan diisi saat FM approve/reject
         ]);
 
         // Broadcast agar semua browser langsung menampilkan blok kuning untuk proses yang terpengaruh
@@ -2665,17 +2665,17 @@ class ProsesController extends Controller
 
         // Buat record approval untuk FM (delete proses), belum menghapus data
         Approval::create([
-            'proses_id'    => $proses->id,
-            'status'       => 'pending',
-            'type'         => 'FM',
-            'action'       => 'delete_proses',
+            'proses_id' => $proses->id,
+            'status' => 'pending',
+            'type' => 'FM',
+            'action' => 'delete_proses',
             'history_data' => [
                 'proses_snapshot' => $proses->toArray(),
                 'detail_proses_snapshot' => $detailProsesSnapshots, // Snapshot DetailProses untuk audit trail lengkap
             ],
-            'note'         => null,
+            'note' => null,
             'requested_by' => Auth::id(),
-            'approved_by'  => null, // Akan diisi saat FM approve/reject
+            'approved_by' => null, // Akan diisi saat FM approve/reject
         ]);
 
         // Broadcast agar semua browser langsung menampilkan blok kuning (menunggu approval)

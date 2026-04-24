@@ -1737,7 +1737,7 @@
                         @endforeach
 
                         {{-- Placeholder columns for "Airport Board" feel (clean groups across all sizes) --}}
-                         @php
+                        @php
                             $totalMesin = count($mesinList);
                             $multiple = 120; // Highly divisible multiple for flexible layouts
                             $modulo = $totalMesin % $multiple;
@@ -4126,9 +4126,9 @@
                                     `<span style='position:absolute;top:2px;right:6px;cursor:pointer;font-weight:bold;color:#b00;font-size:16px;z-index:2;' class='cancel-barcode-btn' data-type='${barcodeType}' data-proses='${prosesId}' data-id='${bk.id}' data-matdok='${bk.matdok}' title='Cancel barcode'>&times;</span>` :
                                     '';
                                 html += `<div style="position:relative;flex:1 0 30%;max-width:32%;background:#f3f3f3;border-radius:6px;padding:6px 4px;margin-bottom:6px;text-align:center;font-weight:bold;font-size:13px;color:#222;box-shadow:0 1px 2px #0001;">
-                                                                                                ${cancelButton}
-                                                                                                ${bk.barcode} ${(bk.matdok ? '<br><span style=\'font-size:11px;color:#888;\'>' + bk.matdok + '</span>' : '')}
-                                                                                            </div>`;
+                                                                                                    ${cancelButton}
+                                                                                                    ${bk.barcode} ${(bk.matdok ? '<br><span style=\'font-size:11px;color:#888;\'>' + bk.matdok + '</span>' : '')}
+                                                                                                </div>`;
                             });
                             html += '</div>';
                             return html;
@@ -4694,69 +4694,69 @@
         // 2 mode: Scan (kamera) dan Input Manual (ketik barcode)
         if (!document.getElementById('modalScanBarcode')) {
             $(document.body).append(`
-                                                                        <div class="modal fade" id="modalScanBarcode" tabindex="-1" aria-labelledby="modalScanBarcodeLabel" aria-hidden="true">
-                                                                            <div class="modal-dialog modal-dialog-centered" style="max-width:480px;">
-                                                                                <div class="modal-content shadow-lg border-0 rounded-3">
-                                                                                    <form id="formScanBarcode" method="POST" action="">
-                                                                                        @csrf
-                                                                                        <input type="hidden" name="barcode" id="inputBarcodeValue">
-                                                                                        <input type="hidden" name="detail_proses_id" id="inputDetailProsesId">
-                                                                                        <input type="hidden" name="approval_id" id="inputApprovalId">
-                                                                                        <div class="modal-header bg-success text-white">
-                                                                                            <h5 class="modal-title fw-bold" id="modalScanBarcodeLabel">Input Barcode</h5>
-                                                                                            <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
-                                                                                                <span aria-hidden="true">&times;</span>
-                                                                                            </button>
-                                                                                        </div>
-                                                                                        <div class="modal-body py-3 px-4 text-center">
-                                                                                            <ul class="nav nav-pills nav-fill mb-3" id="barcodeModeTabs" role="tablist">
-                                                                                                <li class="nav-item" role="presentation">
-                                                                                                    <a class="nav-link active" id="mode-scan-tab" data-toggle="pill" href="#mode-scan-pane" role="tab" aria-controls="mode-scan-pane" aria-selected="true"><i class="fas fa-barcode"></i> Scan Barcode</a>
-                                                                                                </li>
-                                                                                                <li class="nav-item" role="presentation">
-                                                                                                    <a class="nav-link" id="mode-manual-tab" data-toggle="pill" href="#mode-manual-pane" role="tab" aria-controls="mode-manual-pane" aria-selected="false"><i class="fas fa-keyboard"></i> Input Manual</a>
-                                                                                                </li>
-                                                                                            </ul>
-                                                                                            <div class="tab-content position-relative" id="barcodeModeContent" style="min-height:320px;">
-                                                                                                <div id="barcode-submit-loading" style="display:none;position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(255,255,255,0.9);align-items:center;justify-content:center;z-index:10;flex-direction:column;">
-                                                                                                    <div class="spinner-border text-success mb-2" style="width:3rem;height:3rem;"></div>
-                                                                                                    <p class="text-dark mb-0">Memproses barcode...</p>
+                                                                            <div class="modal fade" id="modalScanBarcode" tabindex="-1" aria-labelledby="modalScanBarcodeLabel" aria-hidden="true">
+                                                                                <div class="modal-dialog modal-dialog-centered" style="max-width:480px;">
+                                                                                    <div class="modal-content shadow-lg border-0 rounded-3">
+                                                                                        <form id="formScanBarcode" method="POST" action="">
+                                                                                            @csrf
+                                                                                            <input type="hidden" name="barcode" id="inputBarcodeValue">
+                                                                                            <input type="hidden" name="detail_proses_id" id="inputDetailProsesId">
+                                                                                            <input type="hidden" name="approval_id" id="inputApprovalId">
+                                                                                            <div class="modal-header bg-success text-white">
+                                                                                                <h5 class="modal-title fw-bold" id="modalScanBarcodeLabel">Input Barcode</h5>
+                                                                                                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                                                                                                    <span aria-hidden="true">&times;</span>
+                                                                                                </button>
+                                                                                            </div>
+                                                                                            <div class="modal-body py-3 px-4 text-center">
+                                                                                                <ul class="nav nav-pills nav-fill mb-3" id="barcodeModeTabs" role="tablist">
+                                                                                                    <li class="nav-item" role="presentation">
+                                                                                                        <a class="nav-link active" id="mode-scan-tab" data-toggle="pill" href="#mode-scan-pane" role="tab" aria-controls="mode-scan-pane" aria-selected="true"><i class="fas fa-barcode"></i> Scan Barcode</a>
+                                                                                                    </li>
+                                                                                                    <li class="nav-item" role="presentation">
+                                                                                                        <a class="nav-link" id="mode-manual-tab" data-toggle="pill" href="#mode-manual-pane" role="tab" aria-controls="mode-manual-pane" aria-selected="false"><i class="fas fa-keyboard"></i> Input Manual</a>
+                                                                                                    </li>
+                                                                                                </ul>
+                                                                                                <div class="tab-content position-relative" id="barcodeModeContent" style="min-height:320px;">
+                                                                                                    <div id="barcode-submit-loading" style="display:none;position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(255,255,255,0.9);align-items:center;justify-content:center;z-index:10;flex-direction:column;">
+                                                                                                        <div class="spinner-border text-success mb-2" style="width:3rem;height:3rem;"></div>
+                                                                                                        <p class="text-dark mb-0">Memproses barcode...</p>
+                                                                                                    </div>
+                                                                                                    <div class="tab-pane fade show active" id="mode-scan-pane" role="tabpanel">
+                                                                                                        <div id="barcode-scanner-container" style="width:100%;min-height:320px;display:flex;align-items:center;justify-content:center;"></div>
+                                                                                                    </div>
+                                                                                                    <div class="tab-pane fade" id="mode-manual-pane" role="tabpanel">
+                                                                                                        <div id="barcode-manual-container" class="py-3">
+                                                                                                            <label for="inputBarcodeManual" class="d-block text-left mb-2 font-weight-bold">Ketik kode barcode:</label>
+                                                                                                            <input type="text" class="form-control form-control-lg text-center" id="inputBarcodeManual" placeholder="Masukkan barcode" maxlength="255" autocomplete="off">
+                                                                                                            <small class="text-muted d-block mt-2">Tekan Enter atau klik Simpan setelah mengisi barcode.</small>
+                                                                                                            <button type="button" class="btn btn-success mt-3" id="btnSubmitManualBarcode"><i class="fas fa-check"></i> Simpan Barcode</button>
+                                                                                                        </div>
+                                                                                                    </div>
                                                                                                 </div>
-                                                                                                <div class="tab-pane fade show active" id="mode-scan-pane" role="tabpanel">
-                                                                                                    <div id="barcode-scanner-container" style="width:100%;min-height:320px;display:flex;align-items:center;justify-content:center;"></div>
-                                                                                                </div>
-                                                                                                <div class="tab-pane fade" id="mode-manual-pane" role="tabpanel">
-                                                                                                    <div id="barcode-manual-container" class="py-3">
-                                                                                                        <label for="inputBarcodeManual" class="d-block text-left mb-2 font-weight-bold">Ketik kode barcode:</label>
-                                                                                                        <input type="text" class="form-control form-control-lg text-center" id="inputBarcodeManual" placeholder="Masukkan barcode" maxlength="255" autocomplete="off">
-                                                                                                        <small class="text-muted d-block mt-2">Tekan Enter atau klik Simpan setelah mengisi barcode.</small>
-                                                                                                        <button type="button" class="btn btn-success mt-3" id="btnSubmitManualBarcode"><i class="fas fa-check"></i> Simpan Barcode</button>
+                                                                                                {{-- Section pending list barcode kain (hanya tampil saat barcode_kain) --}}
+                                                                                                <div id="kain-pending-section" class="mt-3" style="display:none;">
+                                                                                                    <hr class="my-2">
+                                                                                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                                                                                        <strong class="text-left">Daftar Barcode Kain</strong>
+                                                                                                        <span id="kain-pending-counter" class="badge badge-secondary" style="font-size:12px;">0/0</span>
+                                                                                                    </div>
+                                                                                                    <div id="kain-pending-list" style="max-height:220px;overflow-y:auto;padding:4px 2px;">
+                                                                                                        <span style="color:#888;font-size:12px;">Belum ada barcode. Scan atau ketik manual untuk menambah.</span>
                                                                                                     </div>
                                                                                                 </div>
                                                                                             </div>
-                                                                                            {{-- Section pending list barcode kain (hanya tampil saat barcode_kain) --}}
-                                                                                            <div id="kain-pending-section" class="mt-3" style="display:none;">
-                                                                                                <hr class="my-2">
-                                                                                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                                                                                    <strong class="text-left">Daftar Barcode Kain</strong>
-                                                                                                    <span id="kain-pending-counter" class="badge badge-secondary" style="font-size:12px;">0/0</span>
-                                                                                                </div>
-                                                                                                <div id="kain-pending-list" style="max-height:220px;overflow-y:auto;padding:4px 2px;">
-                                                                                                    <span style="color:#888;font-size:12px;">Belum ada barcode. Scan atau ketik manual untuk menambah.</span>
-                                                                                                </div>
+                                                                                            <div class="modal-footer d-flex justify-content-between px-4">
+                                                                                                <button type="button" class="btn btn-success" id="btnSubmitKainBatch" style="display:none;">
+                                                                                                    <i class="fas fa-save"></i> Simpan Barcode (<span id="kain-pending-submit-count">0</span>)
+                                                                                                </button>
+                                                                                                <button type="button" class="btn btn-secondary ml-auto" data-dismiss="modal">Tutup</button>
                                                                                             </div>
-                                                                                        </div>
-                                                                                        <div class="modal-footer d-flex justify-content-between px-4">
-                                                                                            <button type="button" class="btn btn-success" id="btnSubmitKainBatch" style="display:none;">
-                                                                                                <i class="fas fa-save"></i> Simpan Barcode (<span id="kain-pending-submit-count">0</span>)
-                                                                                            </button>
-                                                                                            <button type="button" class="btn btn-secondary ml-auto" data-dismiss="modal">Tutup</button>
-                                                                                        </div>
-                                                                                    </form>
+                                                                                        </form>
+                                                                                    </div>
                                                                                 </div>
                                                                             </div>
-                                                                        </div>
-                                                                        `);
+                                                                            `);
         }
 
         // ========================================================
@@ -4863,9 +4863,9 @@
                 s.pending.forEach(function (item, idx) {
                     const cont = item.container ? `<br><span style='font-size:11px;color:#888;'>${item.container}</span>` : '';
                     html += `<div style="position:relative;flex:1 0 30%;max-width:32%;background:#f3f3f3;border-radius:6px;padding:8px 4px;text-align:center;font-weight:bold;font-size:13px;color:#222;box-shadow:0 1px 2px #0001;">
-                                                                                    <span class="remove-pending-kain" data-idx="${idx}" style="position:absolute;top:2px;right:6px;cursor:pointer;font-weight:bold;color:#b00;font-size:16px;z-index:2;" title="Hapus">&times;</span>
-                                                                                    ${item.barcode}${cont}
-                                                                                </div>`;
+                                                                                        <span class="remove-pending-kain" data-idx="${idx}" style="position:absolute;top:2px;right:6px;cursor:pointer;font-weight:bold;color:#b00;font-size:16px;z-index:2;" title="Hapus">&times;</span>
+                                                                                        ${item.barcode}${cont}
+                                                                                    </div>`;
                 });
                 html += '</div>';
                 $list.html(html);
@@ -5491,6 +5491,31 @@
                                             $btnScanKain.prop('disabled', false).removeClass('btn-secondary').addClass('btn-success').css('cursor', 'pointer').removeAttr('title');
                                         }
                                     }
+                                    // Progress LA & AUX update
+                                    const laProg = data.la_progress || {};
+                                    if ($('#barcode-la-progress').length && laProg.required) {
+                                        const laComplete = laProg.is_complete === true;
+                                        const laReq = laProg.required;
+                                        const laScn = laProg.scanned;
+                                        const laToppingReq = laProg.topping_required || 0;
+                                        let laProgHtml = laToppingReq > 0 ?
+                                            'Kebutuhan: 1 awal + ' + laToppingReq + ' topping (TD) = ' + laReq + ' total | Sudah: ' + laScn + ' | ' + (laComplete ? '<span style="color:#43a047;"><i class="fas fa-check"></i> Lengkap</span>' : '<span style="color:#c62828;">Kurang: ' + (laReq - laScn) + '</span>') :
+                                            'Kebutuhan: 1 awal | Sudah: ' + laScn + ' | ' + (laComplete ? '<span style="color:#43a047;"><i class="fas fa-check"></i> Lengkap</span>' : '<span style="color:#c62828;">Kurang: ' + (1 - laScn) + '</span>');
+                                        $('#barcode-la-progress').html('<div style="padding:4px 8px;background:' + (laComplete ? '#e8f5e9' : '#fff3e0') + ';border-radius:4px;">' + laProgHtml + '</div>').show();
+                                    }
+
+                                    const auxProg = data.aux_progress || {};
+                                    if ($('#barcode-aux-progress').length && auxProg.required) {
+                                        const auxComplete = auxProg.is_complete === true;
+                                        const auxReq = auxProg.required;
+                                        const auxScn = auxProg.scanned;
+                                        const auxToppingReq = auxProg.topping_required || 0;
+                                        let auxProgHtml = auxToppingReq > 0 ?
+                                            'Kebutuhan: 1 awal + ' + auxToppingReq + ' topping (TA) = ' + auxReq + ' total | Sudah: ' + auxScn + ' | ' + (auxComplete ? '<span style="color:#43a047;"><i class="fas fa-check"></i> Lengkap</span>' : '<span style="color:#c62828;">Kurang: ' + (auxReq - auxScn) + '</span>') :
+                                            'Kebutuhan: 1 awal | Sudah: ' + auxScn + ' | ' + (auxComplete ? '<span style="color:#43a047;"><i class="fas fa-check"></i> Lengkap</span>' : '<span style="color:#c62828;">Kurang: ' + (1 - auxScn) + '</span>');
+                                        $('#barcode-aux-progress').html('<div style="padding:4px 8px;background:' + (auxComplete ? '#e8f5e9' : '#fff3e0') + ';border-radius:4px;">' + auxProgHtml + '</div>').show();
+                                    }
+
                                     if (!canScanLaAux) {
                                         let tooltipMsg = 'Tidak dapat scan. ';
                                         if (incompleteDetails.length > 0) {
@@ -5503,14 +5528,24 @@
                                         $btnScanLa.prop('disabled', true).removeClass('btn-success').addClass('btn-secondary').css('cursor', 'not-allowed').attr('title', tooltipMsg);
                                         $btnScanAux.prop('disabled', true).removeClass('btn-success').addClass('btn-secondary').css('cursor', 'not-allowed').attr('title', tooltipMsg);
                                     } else {
-                                        $btnScanLa.prop('disabled', false).removeClass('btn-secondary').addClass('btn-success').css('cursor', 'pointer').removeAttr('title');
-                                        $btnScanAux.prop('disabled', false).removeClass('btn-secondary').addClass('btn-success').css('cursor', 'pointer').removeAttr('title');
+                                        // Update button states based on completion
+                                        if (laProg.is_complete) {
+                                            $btnScanLa.prop('disabled', true).removeClass('btn-success').addClass('btn-secondary').css('cursor', 'not-allowed').attr('title', 'Barcode Dye Stuff sudah lengkap sesuai kebutuhan');
+                                        } else {
+                                            $btnScanLa.prop('disabled', false).removeClass('btn-secondary').addClass('btn-success').css('cursor', 'pointer').removeAttr('title');
+                                        }
+
+                                        if (auxProg.is_complete) {
+                                            $btnScanAux.prop('disabled', true).removeClass('btn-success').addClass('btn-secondary').css('cursor', 'not-allowed').attr('title', 'Barcode AUX sudah lengkap sesuai kebutuhan');
+                                        } else {
+                                            $btnScanAux.prop('disabled', false).removeClass('btn-secondary').addClass('btn-success').css('cursor', 'pointer').removeAttr('title');
+                                        }
                                     }
 
-                                    // Update G/D/A indicators
+                                    // Update G/D/A indicators based on completion status
                                     const hasKainActive = data.can_scan_la_aux === true;
-                                    const hasLaActive = (data.barcode_la || []).some(bk => !bk.cancel);
-                                    const hasAuxActive = (data.barcode_aux || []).some(bk => !bk.cancel);
+                                    const hasLaActive = data.la_progress ? data.la_progress.is_complete : false;
+                                    const hasAuxActive = data.aux_progress ? data.aux_progress.is_complete : false;
                                     window.updateGDAIndicators(currentProsesId, selectedDetailId, hasKainActive, hasLaActive, hasAuxActive);
                                 },
                                 error: function () {
@@ -5874,42 +5909,60 @@
                         const isMultipleOpLocal = data.is_multiple_op === true;
                         const detailIdAttrLocal = selectedDetailId ? (selectedDetailId + '') : '';
                         const reqToppingTitleLocal = isMultipleOpLocal ? 'Request Topping untuk semua OP. Kepala Shift hanya perlu approve sekali.' : '';
-                        let laBadgesLocal = '';
-                        if (data.pending_topping_la) laBadgesLocal += ' <span class="badge badge-warning" title="Topping Dyes - Menunggu approval">TD</span>';
-                        let laBtnsLocal = '';
-                        if (canRequestLa) laBtnsLocal += ' <button type="button" class="btn btn-sm btn-info request-topping-btn mr-1" data-type="la" data-id="' + prosesId + '" title="' + reqToppingTitleLocal + '"><i class="fas fa-plus"></i> Request Topping' + (isMultipleOpLocal ? ' (semua OP)' : '') + '</button>';
-                        if (canScanLa) {
-                            const approvalAttrLocal = approvedToppingLaLocal ? ' data-approval-id="' + approvedToppingLaLocal.id + '"' : '';
-                            laBtnsLocal += ' <button type="button" class="btn btn-sm btn-success scan-barcode-btn" data-barcode="barcode_la" data-id="' + prosesId + '" data-detail-id="' + detailIdAttrLocal + '"' + approvalAttrLocal + '><i class="fas fa-barcode"></i> ' + (approvedToppingLaLocal ? 'Scan (Topping)' : 'Scan') + '</button>';
-                        }
-                        $('#barcode-la-badges').html(laBadgesLocal);
-                        $('#barcode-la-buttons').html(laBtnsLocal);
-                        let auxBadgesLocal = '';
-                        if (data.pending_topping_aux) auxBadgesLocal += ' <span class="badge badge-warning" title="Topping Auxiliaries - Menunggu approval">TA</span>';
-                        let auxBtnsLocal = '';
-                        if (canRequestAux) auxBtnsLocal += ' <button type="button" class="btn btn-sm btn-info request-topping-btn mr-1" data-type="aux" data-id="' + prosesId + '" title="' + reqToppingTitleLocal + '"><i class="fas fa-plus"></i> Request Topping' + (isMultipleOpLocal ? ' (semua OP)' : '') + '</button>';
-                        if (canScanAux) {
-                            const approvalAttrAuxLocal = approvedToppingAuxLocal ? ' data-approval-id="' + approvedToppingAuxLocal.id + '"' : '';
-                            auxBtnsLocal += ' <button type="button" class="btn btn-sm btn-success scan-barcode-btn" data-barcode="barcode_aux" data-id="' + prosesId + '" data-detail-id="' + detailIdAttrLocal + '"' + approvalAttrAuxLocal + '><i class="fas fa-barcode"></i> ' + (approvedToppingAuxLocal ? 'Scan (Topping)' : 'Scan') + '</button>';
-                        }
-                        $('#barcode-aux-badges').html(auxBadgesLocal);
-                        $('#barcode-aux-buttons').html(auxBtnsLocal);
 
-                        // Progress LA & AUX
+                        // Progress LA & AUX (Pindahkan ke atas agar bisa dipakai saat render button)
                         const laProgressLocal = data.la_progress || {};
                         const laReqLocal = laProgressLocal.required ?? 1;
                         const laScnLocal = laProgressLocal.scanned ?? 0;
                         const laCompleteLocal = laProgressLocal.is_complete === true;
                         const laToppingReqLocal = laProgressLocal.topping_required ?? 0;
-                        let laProgressHtmlLocal = laToppingReqLocal > 0 ?
-                            'Kebutuhan: 1 awal + ' + laToppingReqLocal + ' topping (TD) = ' + laReqLocal + ' total | Sudah: ' + laScnLocal + ' | ' + (laCompleteLocal ? '<span style="color:#43a047;"><i class="fas fa-check"></i> Lengkap</span>' : '<span style="color:#c62828;">Kurang: ' + (laReqLocal - laScnLocal) + '</span>') :
-                            'Kebutuhan: 1 awal | Sudah: ' + laScnLocal + ' | ' + (laCompleteLocal ? '<span style="color:#43a047;"><i class="fas fa-check"></i> Lengkap</span>' : '<span style="color:#c62828;">Kurang: ' + (1 - laScnLocal) + '</span>');
-                        $('#barcode-la-progress').html('<div style="padding:4px 8px;background:' + (laCompleteLocal ? '#e8f5e9' : '#fff3e0') + ';border-radius:4px;">' + laProgressHtmlLocal + '</div>').show();
+
                         const auxProgressLocal = data.aux_progress || {};
                         const auxReqLocal = auxProgressLocal.required ?? 1;
                         const auxScnLocal = auxProgressLocal.scanned ?? 0;
                         const auxCompleteLocal = auxProgressLocal.is_complete === true;
                         const auxToppingReqLocal = auxProgressLocal.topping_required ?? 0;
+
+                        const canScanLaAuxLocal = data.can_scan_la_aux !== false;
+
+                        let laBadgesLocal = '';
+                        if (data.pending_topping_la) laBadgesLocal += ' <span class="badge badge-warning" title="Topping Dyes - Menunggu approval">TD</span>';
+                        let laBtnsLocal = '';
+                        if (canRequestLa) laBtnsLocal += ' <button type="button" class="btn btn-sm btn-info request-topping-btn mr-1" data-type="la" data-id="' + prosesId + '" title="' + reqToppingTitleLocal + '"><i class="fas fa-plus"></i> Request Topping' + (isMultipleOpLocal ? ' (semua OP)' : '') + '</button>';
+                        if (canScanLa) {
+                            const isLaDone = !canScanLaAuxLocal || laCompleteLocal;
+                            const laBtnClass = isLaDone ? 'btn-secondary' : 'btn-success';
+                            const laBtnDisabled = isLaDone ? ' disabled style="cursor:not-allowed;"' : '';
+                            const laBtnTitle = laCompleteLocal ? 'Barcode Dye Stuff sudah lengkap sesuai kebutuhan' : (!canScanLaAuxLocal ? 'Detail OP belum lengkap' : '');
+                            const approvalAttrLocal = approvedToppingLaLocal ? ' data-approval-id="' + approvedToppingLaLocal.id + '"' : '';
+
+                            laBtnsLocal += ' <button type="button" class="btn btn-sm ' + laBtnClass + ' scan-barcode-btn" ' + laBtnDisabled + ' data-barcode="barcode_la" data-id="' + prosesId + '" data-detail-id="' + detailIdAttrLocal + '"' + approvalAttrLocal + ' title="' + laBtnTitle + '"><i class="fas fa-barcode"></i> ' + (approvedToppingLaLocal ? 'Scan (Topping)' : 'Scan') + '</button>';
+                        }
+                        $('#barcode-la-badges').html(laBadgesLocal);
+                        $('#barcode-la-buttons').html(laBtnsLocal);
+
+                        let auxBadgesLocal = '';
+                        if (data.pending_topping_aux) auxBadgesLocal += ' <span class="badge badge-warning" title="Topping Auxiliaries - Menunggu approval">TA</span>';
+                        let auxBtnsLocal = '';
+                        if (canRequestAux) auxBtnsLocal += ' <button type="button" class="btn btn-sm btn-info request-topping-btn mr-1" data-type="aux" data-id="' + prosesId + '" title="' + reqToppingTitleLocal + '"><i class="fas fa-plus"></i> Request Topping' + (isMultipleOpLocal ? ' (semua OP)' : '') + '</button>';
+                        if (canScanAux) {
+                            const isAuxDone = !canScanLaAuxLocal || auxCompleteLocal;
+                            const auxBtnClass = isAuxDone ? 'btn-secondary' : 'btn-success';
+                            const auxBtnDisabled = isAuxDone ? ' disabled style="cursor:not-allowed;"' : '';
+                            const auxBtnTitle = auxCompleteLocal ? 'Barcode AUX sudah lengkap sesuai kebutuhan' : (!canScanLaAuxLocal ? 'Detail OP belum lengkap' : '');
+                            const approvalAttrAuxLocal = approvedToppingAuxLocal ? ' data-approval-id="' + approvedToppingAuxLocal.id + '"' : '';
+
+                            auxBtnsLocal += ' <button type="button" class="btn btn-sm ' + auxBtnClass + ' scan-barcode-btn" ' + auxBtnDisabled + ' data-barcode="barcode_aux" data-id="' + prosesId + '" data-detail-id="' + detailIdAttrLocal + '"' + approvalAttrAuxLocal + ' title="' + auxBtnTitle + '"><i class="fas fa-barcode"></i> ' + (approvedToppingAuxLocal ? 'Scan (Topping)' : 'Scan') + '</button>';
+                        }
+                        $('#barcode-aux-badges').html(auxBadgesLocal);
+                        $('#barcode-aux-buttons').html(auxBtnsLocal);
+
+                        // Progress LA & AUX rendering
+                        let laProgressHtmlLocal = laToppingReqLocal > 0 ?
+                            'Kebutuhan: 1 awal + ' + laToppingReqLocal + ' topping (TD) = ' + laReqLocal + ' total | Sudah: ' + laScnLocal + ' | ' + (laCompleteLocal ? '<span style="color:#43a047;"><i class="fas fa-check"></i> Lengkap</span>' : '<span style="color:#c62828;">Kurang: ' + (laReqLocal - laScnLocal) + '</span>') :
+                            'Kebutuhan: 1 awal | Sudah: ' + laScnLocal + ' | ' + (laCompleteLocal ? '<span style="color:#43a047;"><i class="fas fa-check"></i> Lengkap</span>' : '<span style="color:#c62828;">Kurang: ' + (1 - laScnLocal) + '</span>');
+                        $('#barcode-la-progress').html('<div style="padding:4px 8px;background:' + (laCompleteLocal ? '#e8f5e9' : '#fff3e0') + ';border-radius:4px;">' + laProgressHtmlLocal + '</div>').show();
+
                         let auxProgressHtmlLocal = auxToppingReqLocal > 0 ?
                             'Kebutuhan: 1 awal + ' + auxToppingReqLocal + ' topping (TA) = ' + auxReqLocal + ' total | Sudah: ' + auxScnLocal + ' | ' + (auxCompleteLocal ? '<span style="color:#43a047;"><i class="fas fa-check"></i> Lengkap</span>' : '<span style="color:#c62828;">Kurang: ' + (auxReqLocal - auxScnLocal) + '</span>') :
                             'Kebutuhan: 1 awal | Sudah: ' + auxScnLocal + ' | ' + (auxCompleteLocal ? '<span style="color:#43a047;"><i class="fas fa-check"></i> Lengkap</span>' : '<span style="color:#c62828;">Kurang: ' + (1 - auxScnLocal) + '</span>');
@@ -5955,27 +6008,12 @@
                                 $btnScanKainLocal.prop('disabled', false).removeClass('btn-secondary').addClass('btn-success').css('cursor', 'pointer').removeAttr('title');
                             }
                         }
-                        const canScanLaAuxLocal = data.can_scan_la_aux !== false;
-                        const $btnScanLaLocal = $('#barcode-la-buttons .scan-barcode-btn');
-                        const $btnScanAuxLocal = $('#barcode-aux-buttons .scan-barcode-btn');
-                        if ($btnScanLaLocal.length) {
-                            if (!canScanLaAuxLocal || laCompleteLocal) {
-                                $btnScanLaLocal.prop('disabled', true).removeClass('btn-success').addClass('btn-secondary').css('cursor', 'not-allowed').attr('title', laCompleteLocal ? 'Barcode Dye Stuff sudah lengkap sesuai kebutuhan' : 'Detail OP belum lengkap');
-                            } else {
-                                $btnScanLaLocal.prop('disabled', false).removeClass('btn-secondary').addClass('btn-success').css('cursor', 'pointer').removeAttr('title');
-                            }
-                        }
-                        if ($btnScanAuxLocal.length) {
-                            if (!canScanLaAuxLocal || auxCompleteLocal) {
-                                $btnScanAuxLocal.prop('disabled', true).removeClass('btn-success').addClass('btn-secondary').css('cursor', 'not-allowed').attr('title', auxCompleteLocal ? 'Barcode AUX sudah lengkap sesuai kebutuhan' : 'Detail OP belum lengkap');
-                            } else {
-                                $btnScanAuxLocal.prop('disabled', false).removeClass('btn-secondary').addClass('btn-success').css('cursor', 'pointer').removeAttr('title');
-                            }
-                        }
-                        // Update G/D/A indicators
+                        // Update G/D/A indicators based on completion status
                         const hasKainActiveGlobal = data.can_scan_la_aux === true;
-                        const hasLaActiveGlobal = (data.barcode_la || []).some(function (bk) { return !bk.cancel; });
-                        const hasAuxActiveGlobal = (data.barcode_aux || []).some(function (bk) { return !bk.cancel; });
+                        const laProgGlobal = data.la_progress || {};
+                        const auxProgGlobal = data.aux_progress || {};
+                        const hasLaActiveGlobal = laProgGlobal.is_complete === true;
+                        const hasAuxActiveGlobal = auxProgGlobal.is_complete === true;
                         window.updateGDAIndicators(prosesId, selectedDetailId, hasKainActiveGlobal, hasLaActiveGlobal, hasAuxActiveGlobal);
                     },
                     error: function () {
@@ -6085,15 +6123,15 @@
                 if (historyContainer.length === 0) {
                     const $prosesAktifContainer = $dropzone.find('.proses-aktif-container').first();
                     const newHistoryWrapper = $(`
-                                                                                <div class="proses-history-wrapper" data-section="history" data-mesin-id="${mesinId}" style="margin-bottom: 8px;">
-                                                                                    <button class="btn-toggle-history btn btn-sm btn-secondary" 
-                                                                                            data-mesin-id="${mesinId}" type="button">
-                                                                                        <i class="fas fa-history"></i> Tampilkan History
-                                                                                    </button>
-                                                                                    <div class="proses-history-container" id="history-${mesinId}" style="display: none;">
+                                                                                    <div class="proses-history-wrapper" data-section="history" data-mesin-id="${mesinId}" style="margin-bottom: 8px;">
+                                                                                        <button class="btn-toggle-history btn btn-sm btn-secondary" 
+                                                                                                data-mesin-id="${mesinId}" type="button">
+                                                                                            <i class="fas fa-history"></i> Tampilkan History
+                                                                                        </button>
+                                                                                        <div class="proses-history-container" id="history-${mesinId}" style="display: none;">
+                                                                                        </div>
                                                                                     </div>
-                                                                                </div>
-                                                                            `);
+                                                                                `);
                     // Insert sebelum proses aktif container
                     if ($prosesAktifContainer.length > 0) {
                         $prosesAktifContainer.before(newHistoryWrapper);
@@ -7536,40 +7574,40 @@
         // Modal konfirmasi cancel barcode
         if (!document.getElementById('modalConfirmCancelBarcode')) {
             $(document.body).append(`
-                                                                        <div class="modal fade" id="modalConfirmCancelBarcode" tabindex="-1" aria-labelledby="modalConfirmCancelBarcodeLabel" aria-hidden="true">
-                                                                            <div class="modal-dialog modal-dialog-centered" style="max-width:500px;">
-                                                                                <div class="modal-content shadow-lg border-0 rounded-3">
-                                                                                    <div class="modal-header bg-danger text-white">
-                                                                                        <h5 class="modal-title fw-bold" id="modalConfirmCancelBarcodeLabel">
-                                                                                            <i class="fas fa-exclamation-triangle mr-2"></i>Konfirmasi Cancel Barcode
-                                                                                        </h5>
-                                                                                        <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
-                                                                                            <span aria-hidden="true">&times;</span>
-                                                                                        </button>
-                                                                                    </div>
-                                                                                    <div class="modal-body py-4 px-4 text-center">
-                                                                                        <div id="confirmCancelBarcodeText" style="font-size:15px;line-height:1.6;">
-                                                                                            Apakah Anda yakin ingin mengcancel barcode ini?
+                                                                            <div class="modal fade" id="modalConfirmCancelBarcode" tabindex="-1" aria-labelledby="modalConfirmCancelBarcodeLabel" aria-hidden="true">
+                                                                                <div class="modal-dialog modal-dialog-centered" style="max-width:500px;">
+                                                                                    <div class="modal-content shadow-lg border-0 rounded-3">
+                                                                                        <div class="modal-header bg-danger text-white">
+                                                                                            <h5 class="modal-title fw-bold" id="modalConfirmCancelBarcodeLabel">
+                                                                                                <i class="fas fa-exclamation-triangle mr-2"></i>Konfirmasi Cancel Barcode
+                                                                                            </h5>
+                                                                                            <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                                                                                                <span aria-hidden="true">&times;</span>
+                                                                                            </button>
                                                                                         </div>
-                                                                                        <div id="cancelBarcodeLoading" style="display:none;margin-top:15px;">
-                                                                                            <div class="spinner-border text-danger" role="status">
-                                                                                                <span class="sr-only">Loading...</span>
+                                                                                        <div class="modal-body py-4 px-4 text-center">
+                                                                                            <div id="confirmCancelBarcodeText" style="font-size:15px;line-height:1.6;">
+                                                                                                Apakah Anda yakin ingin mengcancel barcode ini?
                                                                                             </div>
-                                                                                            <p class="mt-2 text-muted">Memproses cancel barcode...</p>
+                                                                                            <div id="cancelBarcodeLoading" style="display:none;margin-top:15px;">
+                                                                                                <div class="spinner-border text-danger" role="status">
+                                                                                                    <span class="sr-only">Loading...</span>
+                                                                                                </div>
+                                                                                                <p class="mt-2 text-muted">Memproses cancel barcode...</p>
+                                                                                            </div>
                                                                                         </div>
-                                                                                    </div>
-                                                                                    <div class="modal-footer d-flex justify-content-end px-4">
-                                                                                        <button type="button" class="btn btn-secondary" data-dismiss="modal" id="btnCancelCancelBarcode">
-                                                                                            <i class="fas fa-times mr-1"></i>Batal
-                                                                                        </button>
-                                                                                        <button type="button" class="btn btn-danger" id="btnConfirmCancelBarcode">
-                                                                                            <i class="fas fa-check mr-1"></i>Ya, Cancel
-                                                                                        </button>
+                                                                                        <div class="modal-footer d-flex justify-content-end px-4">
+                                                                                            <button type="button" class="btn btn-secondary" data-dismiss="modal" id="btnCancelCancelBarcode">
+                                                                                                <i class="fas fa-times mr-1"></i>Batal
+                                                                                            </button>
+                                                                                            <button type="button" class="btn btn-danger" id="btnConfirmCancelBarcode">
+                                                                                                <i class="fas fa-check mr-1"></i>Ya, Cancel
+                                                                                            </button>
+                                                                                        </div>
                                                                                     </div>
                                                                                 </div>
                                                                             </div>
-                                                                        </div>
-                                                                        `);
+                                                                            `);
         }
 
         let cancelBarcodeData = null;
@@ -7751,17 +7789,18 @@
                                                 .css('cursor', 'not-allowed')
                                                 .attr('title', tooltipMsg);
                                         } else {
-                                            $btnScanLa.prop('disabled', false)
-                                                .removeClass('btn-secondary')
-                                                .addClass('btn-success')
-                                                .css('cursor', 'pointer')
-                                                .removeAttr('title');
+                                            // Update button states based on completion
+                                            if (laProg.is_complete) {
+                                                $btnScanLa.prop('disabled', true).removeClass('btn-success').addClass('btn-secondary').css('cursor', 'not-allowed').attr('title', 'Barcode Dye Stuff sudah lengkap sesuai kebutuhan');
+                                            } else {
+                                                $btnScanLa.prop('disabled', false).removeClass('btn-secondary').addClass('btn-success').css('cursor', 'pointer').removeAttr('title');
+                                            }
 
-                                            $btnScanAux.prop('disabled', false)
-                                                .removeClass('btn-secondary')
-                                                .addClass('btn-success')
-                                                .css('cursor', 'pointer')
-                                                .removeAttr('title');
+                                            if (auxProg.is_complete) {
+                                                $btnScanAux.prop('disabled', true).removeClass('btn-success').addClass('btn-secondary').css('cursor', 'not-allowed').attr('title', 'Barcode AUX sudah lengkap sesuai kebutuhan');
+                                            } else {
+                                                $btnScanAux.prop('disabled', false).removeClass('btn-secondary').addClass('btn-success').css('cursor', 'pointer').removeAttr('title');
+                                            }
                                         }
 
                                         // Hitung status barcode aktif per jenis untuk update G/D/A di card utama
@@ -7955,7 +7994,7 @@
                 if (!container) return 5;
                 const containerWidth = container.clientWidth;
                 const GAP = 8;
-                const TARGET_CARD_WIDTH = 280; 
+                const TARGET_CARD_WIDTH = 280;
                 let count = Math.floor((containerWidth + GAP) / (TARGET_CARD_WIDTH + GAP));
                 count = Math.max(1, Math.min(count, 15));
                 container.style.setProperty('--cols-per-page', count);
@@ -8003,7 +8042,7 @@
                     }
                 });
                 // getMachinesPerPage is now defined outside to be available immediately
-                
+
 
                 function syncScrollToIndex() {
                     const columns = container.querySelectorAll('.machine-column');
