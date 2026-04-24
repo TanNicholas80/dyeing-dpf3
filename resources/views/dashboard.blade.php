@@ -4785,11 +4785,20 @@
             renderKainPendingList();
             $('#kain-pending-section').hide();
             $('#btnSubmitKainBatch').hide();
+
+            // Reset manual input state agar tidak terbawa dari scan sebelumnya (misal Kain yang sudah lengkap)
+            $('#inputBarcodeManual').prop('disabled', false).attr('placeholder', 'Masukkan barcode');
+            $('#btnSubmitManualBarcode').prop('disabled', false);
         }
 
         function updateBarcodeScanUI() {
             const s = window.kainScanState;
-            if (!s.active) return;
+            if (!s.active) {
+                // Jika tidak sedang scan kain (misal LA/AUX), pastikan UI input aktif
+                $('#inputBarcodeManual').prop('disabled', false).attr('placeholder', 'Masukkan barcode');
+                $('#btnSubmitManualBarcode').prop('disabled', false);
+                return;
+            }
 
             const isComplete = s.remaining <= 0 || s.pending.length >= s.remaining;
 
@@ -4995,6 +5004,11 @@
             $('#inputBarcodeValue').val('');
             $('#inputDetailProsesId').val(detailId);
             $('#inputApprovalId').val(approvalId);
+
+            // Update judul modal agar lebih jelas
+            const title = barcodeType === 'barcode_kain' ? 'Input Barcode Kain' :
+                (barcodeType === 'barcode_la' ? 'Input Barcode Dye Stuff' : 'Input Barcode AUX');
+            $('#modalScanBarcodeLabel').text(title);
 
             // Reset state kain
             resetKainScanState();
