@@ -1161,6 +1161,7 @@ class ProsesController extends Controller
                 'no_partai' => null,
                 'barcode' => $barcode,
                 'matdok' => $matdok,
+                'item_document' => $data[0]['zeile'] ?? null,
                 'mesin_id' => $mesin_id,
                 'cancel' => false,
                 'approval_id' => $approvalId,
@@ -1467,6 +1468,7 @@ class ProsesController extends Controller
                     'no_partai' => $detail->no_partai,
                     'barcode' => $barcode,
                     'matdok' => $matdok,
+                    'item_document' => $data[0]['zeile'] ?? null,
                     'mesin_id' => $proses->mesin_id,
                     'cancel' => false,
                     'approval_id' => $approvalId,
@@ -2014,7 +2016,7 @@ class ProsesController extends Controller
         }
 
         if ($type === 'kain') {
-            $barcodeObj = \App\Models\BarcodeKain::find($barcode);
+            $barcodeObj = BarcodeKain::find($barcode);
             $prosesId = DetailProses::select('proses_id')
                 ->where('id', $barcodeObj->detail_proses_id)
                 ->first();
@@ -2033,7 +2035,7 @@ class ProsesController extends Controller
         try {
             $client = new \GuzzleHttp\Client();
             $bodyValue = $matdok;
-            if ($type === 'kain' && $barcodeObj instanceof \App\Models\BarcodeKain && $barcodeObj->item_document) {
+            if (in_array($type, ['kain', 'la', 'aux']) && !empty($barcodeObj->item_document)) {
                 $bodyValue = $matdok . ';' . $barcodeObj->item_document;
             }
             $body = '"' . $bodyValue . '"';
