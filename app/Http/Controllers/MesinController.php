@@ -117,13 +117,13 @@ class MesinController extends Controller
             $mesins = Mesin::all();
             $result = [];
             foreach ($mesins as $mesin) {
-                // Logic Auto-Offline: jika tidak ada sinyal > 30 detik
+                // Logic Auto-Offline: jika tidak ada sinyal > 90 detik
                 $isTimeout = true;
                 if ($mesin->last_seen_at) {
                     // Gunakan timestamp untuk perbandingan agar aman dari masalah timezone Laravel vs DB
                     $lastSeenTs = $mesin->last_seen_at->getTimestamp();
                     $nowTs = now()->getTimestamp();
-                    $isTimeout = ($nowTs - $lastSeenTs) > 60;
+                    $isTimeout = ($nowTs - $lastSeenTs) > 90;
                 }
 
                 // Paksa status ke Mati (false) jika timeout dan saat ini masih Hidup
