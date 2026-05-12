@@ -331,6 +331,55 @@ class ApiCheckStatusBarcodeController extends Controller
     }
 
     /**
+     * Arduino/ESP polling status maintenance untuk mesin.
+     * GET /api/iot/mesin/{mesin}/maintenance-status
+     * Header: X-DEVICE-TOKEN: <token>
+     *
+     * Response: { "mesin_id": 1, "is_maintenance": 1 }
+     * is_maintenance = 1 jika proses aktif berjenis Maintenance
+     * is_maintenance = 0 jika produksi, reproses, atau tidak ada proses aktif
+     */
+    public function getMaintenanceStatus(Request $request, Mesin $mesin)
+    {
+        $this->assertDeviceToken($request);
+        $full = filter_var($request->query('full'), FILTER_VALIDATE_BOOLEAN);
+        $cacheKey = "iot:mesin:{$mesin->id}:maintenance_status";
+
+        if (!$full) {
+            $cached = Cache::get($cacheKey);
+            if ($cached !== null) {
+                return response()->json($cached);
+            }
+        }
+
+        $prosesAktif = Proses::where('mesin_id', $mesin->id)
+            ->whereNotNull('mulai')
+            ->whereNull('selesai')
+            ->orderByDesc('mulai')
+            ->orderBy('id', 'asc')
+            ->first();
+
+        $isMaintenance = ($prosesAktif && ($prosesAktif->jenis ?? null) === 'Maintenance') ? 1 : 0;
+
+        $minimal = [
+            'mesin_id' => $mesin->id,
+            'is_maintenance' => $isMaintenance,
+        ];
+
+        if (!$full) {
+            Cache::put($cacheKey, $minimal, now()->addSeconds(5));
+            return response()->json($minimal);
+        }
+
+        return response()->json(array_merge($minimal, [
+            'status' => 'success',
+            'mesin' => $mesin->jenis_mesin,
+            'proses_id' => $prosesAktif?->id,
+            'jenis_proses' => $prosesAktif?->jenis,
+        ]));
+    }
+
+    /**
      * Cek apakah barcode proses belum lengkap (GDA/FDA + TD/TA).
      * Kecuali Maintenance: selalu false (tidak perlu barcode).
      *

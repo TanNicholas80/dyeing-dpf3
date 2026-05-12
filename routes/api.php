@@ -38,4 +38,7 @@ Route::prefix('iot')->group(function () {
 
     // Arduino polling status alarm (ON/OFF) berdasarkan kelengkapan barcode
     Route::get('/mesin/{mesin}/alarm', [ApiCheckStatusBarcodeController::class, 'getAlarmStatus']);
+
+    // Arduino polling status maintenance (Maintenance=1, Produksi/Reproses=0)
+    Route::get('/mesin/{mesin}/maintenance-status', [ApiCheckStatusBarcodeController::class, 'getMaintenanceStatus']);
 });
