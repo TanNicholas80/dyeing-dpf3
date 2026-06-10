@@ -2095,6 +2095,9 @@
                                 </button>
                             @endif
                             @if ($canDeleteProses ?? true)
+                                <button type="button" class="btn btn-warning btn-pause-proses d-none text-dark mr-2">
+                                    <i class="fas fa-pause mr-1"></i>Pause
+                                </button>
                                 <button type="button" class="btn btn-danger btn-delete-proses">
                                     <i class="fas fa-trash mr-1"></i>Hapus
                                 </button>
@@ -2275,6 +2278,44 @@
                             </button>
                             <button type="submit" class="btn btn-danger">
                                 <i class="fas fa-paper-plane mr-1"></i>Kirim Permintaan Hapus
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal Konfirmasi Pause Proses -->
+        <div class="modal fade" id="modalPauseProses" tabindex="-1" aria-labelledby="modalPauseProsesLabel"
+            aria-hidden="true">
+            <div class="modal-dialog modal-md modal-dialog-centered">
+                <div class="modal-content shadow-lg border-0 rounded-3">
+                    <form id="formPauseProses" method="POST" action="">
+                        @csrf
+                        <input type="hidden" name="proses_id" id="pauseProsesId">
+                        <div class="modal-header bg-warning text-dark">
+                            <h5 class="modal-title fw-bold" id="modalPauseProsesLabel">
+                                Konfirmasi Pause Proses
+                            </h5>
+                            <button type="button" class="close text-dark" data-dismiss="modal" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>
+                        <div class="modal-body py-3 px-4">
+                            <div class="alert alert-warning py-2 mb-3 text-dark" style="font-size: 13px;">
+                                Proses akan <strong>di-pause</strong> karena mesin tidak mengirimkan sinyal > 90 detik. Permintaan pause ini akan
+                                <strong>menunggu persetujuan FM</strong>.
+                            </div>
+                            <p id="pauseProsesInfo" style="font-size: 14px; margin-bottom: 0;">
+                                Apakah Anda yakin ingin mengajukan pause proses ini?
+                            </p>
+                        </div>
+                        <div class="modal-footer d-flex justify-content-between px-4">
+                            <button type="button" class="btn btn-secondary" data-dismiss="modal">
+                                <i class="fas fa-times mr-1"></i>Batal
+                            </button>
+                            <button type="submit" class="btn btn-warning text-dark">
+                                <i class="fas fa-pause mr-1"></i>Kirim Permintaan Pause
                             </button>
                         </div>
                     </form>
@@ -3590,7 +3631,7 @@
         // PRIORITAS: pending_approvals dari event ProsesStatusUpdated (real-time lintas browser)
         function hasPendingApprovalFM(proses) {
             if (!proses) return false;
-            const fmActions = ['edit_cycle_time', 'delete_proses', 'move_machine', 'swap_position'];
+            const fmActions = ['edit_cycle_time', 'delete_proses', 'move_machine', 'swap_position', 'pause_proses'];
             if (proses.pending_approvals && Array.isArray(proses.pending_approvals)) {
                 return proses.pending_approvals.some(function (a) {
                     const typeVal = (a && a.type != null) ? String(a.type) : '';
@@ -3629,12 +3670,13 @@
         // PRIORITAS: pending_approvals dari event ProsesStatusUpdated (real-time lintas browser)
         function getPendingApprovalInfo(proses) {
             if (!proses) return null;
-            const fmActions = ['edit_cycle_time', 'delete_proses', 'move_machine', 'swap_position'];
+            const fmActions = ['edit_cycle_time', 'delete_proses', 'move_machine', 'swap_position', 'pause_proses'];
             const actionLabels = {
                 'edit_cycle_time': 'perubahan cycle time',
                 'delete_proses': 'penghapusan proses',
                 'move_machine': 'pemindahan mesin',
-                'swap_position': 'tukar posisi'
+                'swap_position': 'tukar posisi',
+                'pause_proses': 'pause proses'
             };
             if (proses.pending_approvals && Array.isArray(proses.pending_approvals)) {
                 const fmPending = proses.pending_approvals.find(function (a) {
@@ -3669,7 +3711,8 @@
                 'delete_proses': 'Hapus Proses',
                 'move_machine': 'Pindah Mesin',
                 'swap_position': 'Tukar Posisi',
-                'create_reprocess': 'Buat Reproses'
+                'create_reprocess': 'Buat Reproses',
+                'pause_proses': 'Pause Proses'
             };
 
             const typeLabels = {
@@ -3718,7 +3761,7 @@
         // Map pending_approvals dari API/WebSocket (array of {type, action}) ke format tampilan
         function mapPendingApprovalsFromStatus(pendingApprovals) {
             if (!Array.isArray(pendingApprovals) || pendingApprovals.length === 0) return [];
-            const actionLabels = { 'edit_cycle_time': 'Edit Cycle Time', 'delete_proses': 'Hapus Proses', 'move_machine': 'Pindah Mesin', 'swap_position': 'Tukar Posisi', 'create_reprocess': 'Buat Reproses' };
+            const actionLabels = { 'edit_cycle_time': 'Edit Cycle Time', 'delete_proses': 'Hapus Proses', 'move_machine': 'Pindah Mesin', 'swap_position': 'Tukar Posisi', 'create_reprocess': 'Buat Reproses', 'pause_proses': 'Pause Proses' };
             const typeLabels = { 'FM': 'Factory Manager (FM)', 'VP': 'Vice President (VP)' };
             function toStr(v) { return (v != null && typeof v === 'string') ? v : ''; }
             return pendingApprovals.map(function (a) {
@@ -3950,16 +3993,35 @@
             const $btnEdit = $('.btn-edit-proses');
             const $btnMove = $('.btn-move-proses');
             const $btnDelete = $('.btn-delete-proses');
+            const $btnPause = $('.btn-pause-proses');
+
+            // Logic untuk tombol Pause
+            $btnPause.addClass('d-none');
+            // Hanya tampilkan jika proses berjalan, belum selesai, dan belum di-pause
+            if (window.userRole && window.userRole.toLowerCase() === 'ppic' && isStarted && !proses.selesai && !proses.is_paused) {
+                if (proses.mesin && proses.mesin.last_seen_at) {
+                    const lastSeen = new Date(proses.mesin.last_seen_at.replace(' ', 'T'));
+                    const diffSeconds = (new Date() - lastSeen) / 1000;
+                    if (diffSeconds > 90) {
+                        $btnPause.removeClass('d-none');
+                    }
+                }
+            }
 
             // Disable jika role restricted (FM/VP) ATAU ada pending approval ATAU proses sudah dimulai
             const isRoleRestricted = window.canEditProses === false || window.canDeleteProses === false || window
                 .canMoveProses === false;
             if (isRoleRestricted || hasPending || hasPendingReprocess || isStarted) {
-                // Disable tombol
+                // Disable tombol (kecuali Pause yang hanya muncul saat started)
                 $btnEdit.prop('disabled', true).addClass('disabled').css('cursor', 'not-allowed');
                 $btnMove.prop('disabled', true).addClass('disabled').css('cursor', 'not-allowed');
                 $btnDelete.prop('disabled', true).addClass('disabled').css('cursor', 'not-allowed');
 
+                if (hasPending || hasPendingReprocess) {
+                    $btnPause.prop('disabled', true).addClass('disabled').css('cursor', 'not-allowed').css('opacity', '0.65');
+                } else {
+                    $btnPause.prop('disabled', false).removeClass('disabled').css('cursor', 'pointer').css('opacity', '1');
+                }
 
                 // Tentukan pesan tooltip berdasarkan kondisi
                 let tooltipText = '';
@@ -3979,23 +4041,31 @@
                 $btnEdit.attr('title', tooltipText).attr('data-toggle', 'tooltip');
                 $btnMove.attr('title', tooltipText).attr('data-toggle', 'tooltip');
                 $btnDelete.attr('title', tooltipText).attr('data-toggle', 'tooltip');
+                if (hasPending || hasPendingReprocess) {
+                    $btnPause.attr('title', tooltipText).attr('data-toggle', 'tooltip');
+                } else {
+                    $btnPause.removeAttr('title').removeAttr('data-toggle');
+                }
 
                 // Re-initialize tooltip jika sudah ada
                 if (typeof $.fn.tooltip === 'function') {
                     $btnEdit.tooltip('dispose').tooltip();
                     $btnMove.tooltip('dispose').tooltip();
                     $btnDelete.tooltip('dispose').tooltip();
+                    $btnPause.tooltip('dispose').tooltip();
                 }
             } else {
                 // Enable tombol
                 $btnEdit.prop('disabled', false).removeClass('disabled').css('cursor', 'pointer');
                 $btnMove.prop('disabled', false).removeClass('disabled').css('cursor', 'pointer');
                 $btnDelete.prop('disabled', false).removeClass('disabled').css('cursor', 'pointer');
+                $btnPause.prop('disabled', false).removeClass('disabled').css('cursor', 'pointer');
 
                 // Hapus tooltip
                 $btnEdit.removeAttr('title').removeAttr('data-toggle');
                 $btnMove.removeAttr('title').removeAttr('data-toggle');
                 $btnDelete.removeAttr('title').removeAttr('data-toggle');
+                $btnPause.removeAttr('title').removeAttr('data-toggle');
 
                 // Dispose tooltip
                 if (typeof $.fn.tooltip === 'function') {
@@ -4688,6 +4758,38 @@
                 // Tambahkan class modal-open secara manual jika scroll masih hilang
                 $('body').addClass('modal-open');
             });
+        });
+
+        // Handler tombol Pause Proses (kirim permintaan pause ke approval FM)
+        $(document).on('click', '.btn-pause-proses', function (e) {
+            e.preventDefault();
+            if ($(this).prop('disabled') || $(this).hasClass('disabled')) {
+                return false;
+            }
+            const proses = $('#modalDetailProses').data('proses');
+            if (!proses) return;
+
+            const id = proses.id;
+            const pauseUrl = "{{ url('proses') }}/" + id + "/pause";
+
+            $('#formPauseProses').attr('action', pauseUrl);
+            $('#pauseProsesId').val(id);
+
+            // Tutup modal detail, lalu buka modal pause SETELAH detail tertutup sempurna
+            $('#modalDetailProses').modal('hide').one('hidden.bs.modal', function () {
+                $('#modalPauseProses').modal('show');
+                $('body').addClass('modal-open');
+            });
+        });
+
+        // Submit handler untuk mencegah double click pada modal Pause
+        $('#formPauseProses').on('submit', function (e) {
+            const $btn = $(this).find('button[type="submit"]');
+            if ($btn.prop('disabled') || $btn.hasClass('disabled')) {
+                e.preventDefault();
+                return false;
+            }
+            $btn.prop('disabled', true).addClass('disabled').html('<i class="fas fa-spinner fa-spin mr-1"></i>Memproses...');
         });
 
         // Modal scan barcode (HTML, append ke body jika belum ada)

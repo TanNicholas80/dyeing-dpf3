@@ -102,6 +102,7 @@
                                                 'move_machine' => 'Pindah Mesin',
                                                 'edit_cycle_time' => 'Edit Cycle Time',
                                                 'delete_proses' => 'Hapus Proses',
+                                                'pause_proses' => 'Pause Proses',
                                                 'create_reprocess' => 'Buat Reproses',
                                                 'create_aux_reprocess' => 'Buat Reproses Auxl',
                                                 'swap_position' => 'Tukar Posisi'
@@ -109,6 +110,11 @@
                                             $actionLabel = $actionLabels[$approval->action] ?? ucfirst(str_replace('_', ' ', $approval->action));
                                             @endphp
                                             <span class="badge bg-secondary">{{ $actionLabel }}</span>
+                                            @if($approval->action === 'pause_proses' && $approval->status === 'pending')
+                                            <div class="pause-countdown text-danger small mt-1 fw-bold" data-created-at="{{ $approval->created_at->toIso8601String() }}">
+                                                Sisa: <span class="time-left">Hitung...</span>
+                                            </div>
+                                            @endif
                                         </td>
                                         <td>
                                             @if($approval->history_data)
@@ -428,6 +434,41 @@
                                                                         @endif
                                                                     </div>
                                                                     @endif
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    @elseif($approval->action === 'pause_proses')
+                                                    <!-- Tampilan khusus untuk Pause Proses -->
+                                                    <div class="row">
+                                                        <div class="col-md-12">
+                                                            <div class="alert alert-warning">
+                                                                <i class="fas fa-pause-circle mr-2"></i>
+                                                                <strong>Informasi:</strong> Proses ini diajukan untuk di-pause karena mesin tidak mengirimkan sinyal > 90 detik.
+                                                            </div>
+                                                            <div class="card border-warning mb-3">
+                                                                <div class="card-header bg-warning text-dark">
+                                                                    <h6 class="mb-0"><i class="fas fa-info-circle mr-2"></i>Detail Sinyal Mesin</h6>
+                                                                </div>
+                                                                <div class="card-body">
+                                                                    <div class="row">
+                                                                        <div class="col-md-6 mb-3">
+                                                                            <strong class="text-muted d-block">ID Mesin</strong>
+                                                                            <span>{{ $history['mesin_id'] ?? '-' }}</span>
+                                                                        </div>
+                                                                        <div class="col-md-6 mb-3">
+                                                                            <strong class="text-muted d-block">Last Seen At</strong>
+                                                                            <span class="badge badge-secondary">{{ $history['last_seen_at'] ?? '-' }}</span>
+                                                                        </div>
+                                                                        <div class="col-md-6 mb-3">
+                                                                            <strong class="text-muted d-block">Delay Time</strong>
+                                                                            <span class="badge badge-danger">{{ number_format($history['delay_seconds'] ?? 0) }} detik</span>
+                                                                        </div>
+                                                                        <div class="col-md-6 mb-3">
+                                                                            <strong class="text-muted d-block">Alasan</strong>
+                                                                            <span>{{ $history['reason'] ?? '-' }}</span>
+                                                                        </div>
+                                                                    </div>
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -1237,7 +1278,38 @@
     </section>
 </div>
 
+@endsection
+
+@section('scripts')
 <script>
     document.title = "Approval FM";
+</script>
+<script>
+    $(document).ready(function() {
+        if ($('.pause-countdown').length > 0) {
+            let isReloading = false;
+            setInterval(function() {
+                if (isReloading) return;
+                
+                $('.pause-countdown').each(function() {
+                    let createdAt = new Date($(this).data('created-at'));
+                    // Batas waktu 10 menit
+                    let expireTime = new Date(createdAt.getTime() + 10 * 60000);
+                    let now = new Date();
+                    let diffMs = expireTime - now;
+
+                    if (diffMs <= 0) {
+                        isReloading = true;
+                        window.location.reload();
+                    } else {
+                        let diffMins = Math.floor(diffMs / 60000);
+                        let diffSecs = Math.floor((diffMs % 60000) / 1000);
+                        let formattedTime = (diffMins < 10 ? '0' : '') + diffMins + ':' + (diffSecs < 10 ? '0' : '') + diffSecs;
+                        $(this).find('.time-left').text(formattedTime);
+                    }
+                });
+            }, 1000);
+        }
+    });
 </script>
 @endsection

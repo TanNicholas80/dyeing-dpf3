@@ -24,6 +24,7 @@ class Proses extends Model
         'selesai',
         'mesin_id',
         'order',
+        'is_paused',
     ];
 
     protected $casts = [
@@ -32,6 +33,7 @@ class Proses extends Model
         'cycle_time' => 'integer',
         'cycle_time_actual' => 'integer',
         'order' => 'integer',
+        'is_paused' => 'boolean',
     ];
 
     public function mesin()

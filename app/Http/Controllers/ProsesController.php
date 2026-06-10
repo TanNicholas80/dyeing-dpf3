@@ -2686,4 +2686,103 @@ class ProsesController extends Controller
         return redirect()->route('dashboard', ['page' => $page])
             ->with('success', 'Permintaan penghapusan proses telah dikirim dan menunggu persetujuan FM.');
     }
+
+    // Pause Proses (oleh PPIC)
+    public function pause(Request $request, $id)
+    {
+        $proses = Proses::with('mesin')->findOrFail($id);
+
+        // Validasi: Hanya PPIC yang bisa melakukan pause
+        $userRole = Auth::user()->role ?? '';
+        if (strtolower($userRole) !== 'ppic') {
+            $errorMessage = 'Akses ditolak. Hanya PPIC yang dapat melakukan Pause Proses.';
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json(['status' => 'error', 'message' => $errorMessage], 403);
+            }
+            return back()->with('error', $errorMessage);
+        }
+
+        // Validasi: Hanya bisa pause jika proses sudah mulai dan belum selesai
+        if ($proses->mulai === null || $proses->selesai !== null) {
+            $errorMessage = 'Proses tidak sedang berjalan, sehingga tidak dapat dipause.';
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json(['status' => 'error', 'message' => $errorMessage], 400);
+            }
+            return back()->with('error', $errorMessage);
+        }
+
+        // Validasi: Cek apakah mesin belum mengirim sinyal > 90 detik
+        $mesin = $proses->mesin;
+        if ($mesin && $mesin->last_seen_at) {
+            $diffInSeconds = abs(now()->diffInSeconds($mesin->last_seen_at));
+            if ($diffInSeconds <= 90) {
+                $errorMessage = 'Mesin masih aktif (terakhir terlihat ' . number_format($diffInSeconds) . ' detik yang lalu). Tombol Pause hanya tersedia jika tidak ada sinyal lebih dari 90 detik.';
+                if ($request->ajax() || $request->wantsJson()) {
+                    return response()->json(['status' => 'error', 'message' => $errorMessage], 400);
+                }
+                return back()->with('error', $errorMessage);
+            }
+        }
+
+        // Cek apakah sudah ada pending approval untuk proses ini
+        if ($this->hasPendingApproval($proses->id)) {
+            $pendingApproval = $this->getPendingApproval($proses->id);
+            $actionLabels = [
+                'edit_cycle_time' => 'perubahan cycle time',
+                'delete_proses' => 'penghapusan proses',
+                'move_machine' => 'pemindahan mesin',
+                'swap_position' => 'penukaran posisi',
+                'pause_proses' => 'pause proses',
+            ];
+            $actionLabel = $actionLabels[$pendingApproval->action] ?? 'perubahan';
+
+            $errorMessage = "Tidak dapat mengajukan permintaan baru. Masih ada permintaan {$actionLabel} yang menunggu persetujuan FM.";
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json(['status' => 'error', 'message' => $errorMessage], 400);
+            }
+            return back()->with('error', $errorMessage);
+        }
+
+        // Ambil halaman asal dari referer jika ada
+        $referer = $request->headers->get('referer');
+        $page = 1;
+        if ($referer) {
+            $parsed = parse_url($referer);
+            if (isset($parsed['query'])) {
+                parse_str($parsed['query'], $queryArr);
+                if (isset($queryArr['page']) && is_numeric($queryArr['page'])) {
+                    $page = (int) $queryArr['page'];
+                }
+            }
+        }
+
+        // Buat record approval untuk FM (pause proses)
+        Approval::create([
+            'proses_id' => $proses->id,
+            'status' => 'pending',
+            'type' => 'FM',
+            'action' => 'pause_proses',
+            'history_data' => [
+                'proses_snapshot' => $proses->toArray(),
+                'alasan' => 'Mesin kehilangan sinyal lebih dari 90 detik.'
+            ],
+            'note' => null,
+            'requested_by' => Auth::id(),
+            'approved_by' => null,
+        ]);
+
+        // Broadcast agar semua browser langsung menampilkan blok kuning (menunggu approval)
+        event(new ApprovalPendingCreated([$proses->id]));
+
+        $successMessage = 'Permintaan Pause Proses telah dikirim dan menunggu persetujuan FM.';
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json([
+                'status' => 'success',
+                'message' => $successMessage,
+                'redirect' => route('dashboard', ['page' => $page])
+            ]);
+        }
+        return redirect()->route('dashboard', ['page' => $page])
+            ->with('success', $successMessage);
+    }
 }

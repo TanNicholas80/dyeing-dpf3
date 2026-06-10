@@ -49,6 +49,8 @@ class ApprovalController extends Controller
      */
     public function approval_fm()
     {
+        self::autoRejectExpiredPauseApprovals();
+
         $approvals = Approval::with(['proses.details', 'auxl', 'requester', 'approver'])
             ->where('type', 'FM')
             ->orderByRaw(
@@ -490,6 +492,20 @@ class ApprovalController extends Controller
                 }
                 break;
 
+            case 'pause_proses':
+                // Set proses menjadi is_paused = true
+                $proses->is_paused = true;
+                $proses->save();
+                
+                // Broadcast event untuk update real-time
+                $proses->refresh();
+                $proses->load(['approvals', 'details.barcodeKains', 'details.barcodeLas', 'details.barcodeAuxs']);
+                $statusService = new ProsesStatusService();
+                $affectedProsesIds = $statusService->getAffectedProsesIds();
+                $statusData = $statusService->generateProsesStatus($proses, $affectedProsesIds);
+                event(new ProsesStatusUpdated($proses->id, $statusData));
+                break;
+
             default:
                 // Action tidak dikenali, throw exception
                 throw new \Exception("Action '{$approval->action}' tidak dikenali.");
@@ -540,6 +556,32 @@ class ApprovalController extends Controller
                     $affectedProsesIds = $statusService->getAffectedProsesIds();
                     $statusData = $statusService->generateProsesStatus($proses, $affectedProsesIds);
                     event(new ProsesStatusUpdated($proses->id, $statusData));
+                }
+                break;
+
+            case 'pause_proses':
+                // Tolak pause = selesai proses
+                $proses = $approval->proses;
+                if ($proses && $proses->mulai !== null && $proses->selesai === null) {
+                    $proses->selesai = now();
+                    $proses->is_paused = false;
+                    $proses->save();
+                    
+                    // Broadcast event
+                    $proses->refresh();
+                    $proses->load(['approvals', 'details.barcodeKains', 'details.barcodeLas', 'details.barcodeAuxs']);
+                    $statusService = new ProsesStatusService();
+                    $affectedProsesIds = $statusService->getAffectedProsesIds();
+                    $statusData = $statusService->generateProsesStatus($proses, $affectedProsesIds);
+                    event(new ProsesStatusUpdated($proses->id, $statusData));
+
+                    // Mulai antrian berikutnya
+                    $started = $this->startNextProsesIfMesinOn((int) $proses->mesin_id);
+                    if ($started) {
+                        $started->load(['approvals', 'details.barcodeKains', 'details.barcodeLas', 'details.barcodeAuxs']);
+                        $startedStatus = $statusService->generateProsesStatus($started, $affectedProsesIds);
+                        event(new ProsesStatusUpdated($started->id, $startedStatus));
+                    }
                 }
                 break;
 
@@ -640,5 +682,29 @@ class ApprovalController extends Controller
         }
 
         return $prosesSelanjutnya->fresh();
+    }
+
+    /**
+     * Auto reject pengajuan pause_proses yang sudah melebihi 10 menit.
+     */
+    public static function autoRejectExpiredPauseApprovals()
+    {
+        $expiredApprovals = Approval::where('action', 'pause_proses')
+            ->where('status', 'pending')
+            ->where('created_at', '<=', now()->subMinutes(10))
+            ->get();
+
+        if ($expiredApprovals->isEmpty()) {
+            return;
+        }
+
+        $controller = new self();
+        foreach ($expiredApprovals as $approval) {
+            $approval->status = 'rejected';
+            $approval->note = 'Auto-rejected: Waktu persetujuan lebih dari 10 menit.';
+            $approval->save();
+            
+            $controller->executeRejectedAction($approval);
+        }
     }
 }

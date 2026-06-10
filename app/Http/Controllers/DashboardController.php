@@ -14,6 +14,8 @@ class DashboardController extends Controller
 {
     public function dashboard(Request $request, MesinCacheService $mesinCache)
     {
+        \App\Http\Controllers\ApprovalController::autoRejectExpiredPauseApprovals();
+
         $user = $request->user();
 
         // Jika user role mesin dan memiliki mesin spesifik, batasi daftar mesin
@@ -109,6 +111,8 @@ class DashboardController extends Controller
      */
     public function prosesStatuses(Request $request, MesinCacheService $mesinCache)
     {
+        \App\Http\Controllers\ApprovalController::autoRejectExpiredPauseApprovals();
+
         try {
             $user = $request->user();
 

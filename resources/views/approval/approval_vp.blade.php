@@ -102,8 +102,10 @@
                                                 'move_machine' => 'Pindah Mesin',
                                                 'edit_cycle_time' => 'Edit Cycle Time',
                                                 'delete_proses' => 'Hapus Proses',
+                                                'pause_proses' => 'Pause Proses',
                                                 'create_reprocess' => 'Buat Reproses',
-                                                'create_aux_reprocess' => 'Buat Reproses Auxl'
+                                                'create_aux_reprocess' => 'Buat Reproses Auxl',
+                                                'swap_position' => 'Tukar Posisi'
                                             ];
                                             $actionLabel = $actionLabels[$approval->action] ?? ucfirst(str_replace('_', ' ', $approval->action));
                                             @endphp

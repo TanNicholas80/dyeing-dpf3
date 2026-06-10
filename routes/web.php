@@ -69,6 +69,7 @@ Route::middleware(['auth', 'prevent-back-history'])->group(function () {
         Route::post('/proses/{id}/update', [ProsesController::class, 'update'])->name('proses.update');
         Route::post('/proses/{id}/move', [ProsesController::class, 'move'])->name('proses.move');
         Route::post('/proses/{id}/swap', [ProsesController::class, 'swap'])->name('proses.swap');
+        Route::post('/proses/{id}/pause', [ProsesController::class, 'pause'])->name('proses.pause');
         Route::delete('/proses/{id}/delete', [ProsesController::class, 'destroy'])->name('proses.delete');
     });
 
