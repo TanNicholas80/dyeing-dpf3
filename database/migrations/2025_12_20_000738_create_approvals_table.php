@@ -17,7 +17,7 @@ return new class extends Migration
             $table->unsignedBigInteger('auxl_id')->nullable();
             $table->enum('status', ['pending', 'rejected', 'approved'])->default('pending');
             $table->enum('type', ['FM', 'VP', 'KEPALA_SHIFT'])->nullable();
-            $table->enum('action', ['move_machine', 'edit_cycle_time', 'delete_proses', 'create_reprocess', 'create_aux_reprocess', 'swap_position', 'topping_la', 'topping_aux'])->nullable();
+            $table->enum('action', ['move_machine', 'edit_cycle_time', 'delete_proses', 'create_reprocess', 'create_aux_reprocess', 'swap_position', 'topping_la', 'topping_aux', 'pause_proses'])->nullable();
             $table->json('history_data')->nullable();
             $table->text('note')->nullable();
             $table->foreignId('requested_by')->nullable()->constrained('users')->restrictOnDelete();
