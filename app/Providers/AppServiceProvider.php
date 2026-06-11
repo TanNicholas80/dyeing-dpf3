@@ -31,6 +31,10 @@ class AppServiceProvider extends ServiceProvider
         config(['app.timezone' => 'Asia/Jakarta']);
         date_default_timezone_set('Asia/Jakarta');
 
+        if (config('app.env') === 'production') {
+            \Illuminate\Support\Facades\URL::forceScheme('https');
+        }
+
         // Set Carbon locale (tanpa setToStringFormat karena deprecated)
         Carbon::setLocale('id');
         // Carbon::setToStringFormat('d-m-Y H:i:s'); // HAPUS BARIS INI
