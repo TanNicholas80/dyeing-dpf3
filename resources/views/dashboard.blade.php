@@ -5707,7 +5707,12 @@
                             // Jika parsing gagal, coba dengan replace untuk format lama
                             if (isNaN(mulai.getTime())) {
                                 mulai = new Date(proses.mulai.replace(/-/g, '/'));
-                        const mulai = new Date(proses.mulai.replace(' ', 'T'));
+                            }
+                        } else {
+                            mulai = new Date(proses.mulai);
+                        }
+
+                        // Validasi: pastikan tanggal valid sebelum menghitung
                         if (isNaN(mulai.getTime())) {
                             console.warn('Invalid date format:', proses.mulai);
                             return; // Skip jika tanggal tidak valid
