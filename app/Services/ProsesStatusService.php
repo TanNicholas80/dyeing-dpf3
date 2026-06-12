@@ -145,47 +145,51 @@ class ProsesStatusService
             }
         } else {
             // Proses sedang berjalan (mulai ada, selesai belum)
-            // Hitung la/aux complete termasuk topping
-            $laComplete = $hasBarcodeLa;
-            $auxComplete = $hasBarcodeAux;
-            if ($proses->approvals && $proses->approvals->isNotEmpty()) {
-                $laInitialScanned = 0;
-                foreach ($proses->details ?? [] as $d) {
-                    if ($d->barcodeLas && $d->barcodeLas->where('cancel', false)->filter(fn ($b) => $b->approval_id === null)->count() > 0) {
-                        $laInitialScanned = 1;
-                        break;
-                    }
-                }
-                $auxInitialScanned = 0;
-                foreach ($proses->details ?? [] as $d) {
-                    if ($d->barcodeAuxs && $d->barcodeAuxs->where('cancel', false)->filter(fn ($b) => $b->approval_id === null)->count() > 0) {
-                        $auxInitialScanned = 1;
-                        break;
-                    }
-                }
-                $laToppingRequired = collect($proses->approvals)->where('action', 'topping_la')->where('status', 'approved')->count();
-                $auxToppingRequired = collect($proses->approvals)->where('action', 'topping_aux')->where('status', 'approved')->count();
-                $laToppingScanned = 0;
-                $auxToppingScanned = 0;
-                foreach ($proses->approvals as $a) {
-                    if (($a->action ?? '') === 'topping_la' && ($a->status ?? '') === 'approved') {
-                        $bl = $a->barcodeLas;
-                        if ($bl && $bl->where('cancel', false)->count() > 0) $laToppingScanned++;
-                    }
-                    if (($a->action ?? '') === 'topping_aux' && ($a->status ?? '') === 'approved') {
-                        $ba = $a->barcodeAuxs;
-                        if ($ba && $ba->where('cancel', false)->count() > 0) $auxToppingScanned++;
-                    }
-                }
-                $laComplete = ($laInitialScanned + $laToppingScanned) >= (1 + $laToppingRequired);
-                $auxComplete = ($auxInitialScanned + $auxToppingScanned) >= (1 + $auxToppingRequired);
-            }
-            $barcodeKainOptional = $proses->isBarcodeKainOptionalForLaAux();
-            if ($proses->jenis !== 'Maintenance') {
-                $incomplete = (!$barcodeKainOptional && !$hasBarcodeKain) || !$laComplete || !$auxComplete;
-                $bg = $incomplete ? '#ef9a9a' : '#002b80';
+            if ($proses->is_paused) {
+                $bg = '#757575'; // abu-abu
             } else {
-                $bg = '#002b80';
+                // Hitung la/aux complete termasuk topping
+                $laComplete = $hasBarcodeLa;
+                $auxComplete = $hasBarcodeAux;
+                if ($proses->approvals && $proses->approvals->isNotEmpty()) {
+                    $laInitialScanned = 0;
+                    foreach ($proses->details ?? [] as $d) {
+                        if ($d->barcodeLas && $d->barcodeLas->where('cancel', false)->filter(fn ($b) => $b->approval_id === null)->count() > 0) {
+                            $laInitialScanned = 1;
+                            break;
+                        }
+                    }
+                    $auxInitialScanned = 0;
+                    foreach ($proses->details ?? [] as $d) {
+                        if ($d->barcodeAuxs && $d->barcodeAuxs->where('cancel', false)->filter(fn ($b) => $b->approval_id === null)->count() > 0) {
+                            $auxInitialScanned = 1;
+                            break;
+                        }
+                    }
+                    $laToppingRequired = collect($proses->approvals)->where('action', 'topping_la')->where('status', 'approved')->count();
+                    $auxToppingRequired = collect($proses->approvals)->where('action', 'topping_aux')->where('status', 'approved')->count();
+                    $laToppingScanned = 0;
+                    $auxToppingScanned = 0;
+                    foreach ($proses->approvals as $a) {
+                        if (($a->action ?? '') === 'topping_la' && ($a->status ?? '') === 'approved') {
+                            $bl = $a->barcodeLas;
+                            if ($bl && $bl->where('cancel', false)->count() > 0) $laToppingScanned++;
+                        }
+                        if (($a->action ?? '') === 'topping_aux' && ($a->status ?? '') === 'approved') {
+                            $ba = $a->barcodeAuxs;
+                            if ($ba && $ba->where('cancel', false)->count() > 0) $auxToppingScanned++;
+                        }
+                    }
+                    $laComplete = ($laInitialScanned + $laToppingScanned) >= (1 + $laToppingRequired);
+                    $auxComplete = ($auxInitialScanned + $auxToppingScanned) >= (1 + $auxToppingRequired);
+                }
+                $barcodeKainOptional = $proses->isBarcodeKainOptionalForLaAux();
+                if ($proses->jenis !== 'Maintenance') {
+                    $incomplete = (!$barcodeKainOptional && !$hasBarcodeKain) || !$laComplete || !$auxComplete;
+                    $bg = $incomplete ? '#ef9a9a' : '#002b80';
+                } else {
+                    $bg = '#002b80';
+                }
             }
         }
 

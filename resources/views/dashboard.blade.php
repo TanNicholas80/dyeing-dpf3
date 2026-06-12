@@ -1221,10 +1221,14 @@
                                                         } else {
                                                             $blocks = (($proses->mode ?? 'greige') === 'finish') ? ['F', 'D', 'A'] : ['G', 'D', 'A'];
                                                         }
-                                                        // Lampu indikator: hijau jika mulai ada dan selesai null, merah jika mulai dan selesai ada, atau mulai null
+                                                        // Lampu indikator: merah jika is_paused, hijau jika mulai ada dan selesai null, merah jika mulai dan selesai ada, atau mulai null
                                                         $alarmOnState = \Illuminate\Support\Facades\Cache::get("iot:mesin:{$proses->mesin_id}:alarm_on_state", null);
                                                         if ($proses->mulai && !$proses->selesai) {
-                                                            $light = $alarmOnState ? 'yellow' : 'green';
+                                                            if ($proses->is_paused) {
+                                                                $light = 'red';
+                                                            } else {
+                                                                $light = $alarmOnState ? 'yellow' : 'green';
+                                                            }
                                                         } else {
                                                             $light = 'red';
                                                         }
@@ -1370,35 +1374,39 @@
                                                             }
                                                         } else {
                                                             // Proses sedang berjalan (mulai ada, selesai belum)
-                                                            // Cek barcode menggunakan relasi yang sama seperti DashboardController
-                                                            $hasBarcodeKain = false;
-                                                            $hasBarcodeLa = false;
-                                                            $hasBarcodeAux = false;
-                                                            if (isset($proses->details) && is_iterable($proses->details)) {
-                                                                foreach ($proses->details as $d) {
-                                                                    if (isset($d->barcodeKains)) {
-                                                                        $hasBarcodeKain =
-                                                                            $hasBarcodeKain ||
-                                                                            $d->barcodeKains->where('cancel', false)->count() > 0;
-                                                                    }
-                                                                    if (isset($d->barcodeLas)) {
-                                                                        $hasBarcodeLa =
-                                                                            $hasBarcodeLa ||
-                                                                            $d->barcodeLas->where('cancel', false)->count() > 0;
-                                                                    }
-                                                                    if (isset($d->barcodeAuxs)) {
-                                                                        $hasBarcodeAux =
-                                                                            $hasBarcodeAux ||
-                                                                            $d->barcodeAuxs->where('cancel', false)->count() > 0;
+                                                            if ($proses->is_paused) {
+                                                                $bg = '#757575'; // abu-abu
+                                                            } else {
+                                                                // Cek barcode menggunakan relasi yang sama seperti DashboardController
+                                                                $hasBarcodeKain = false;
+                                                                $hasBarcodeLa = false;
+                                                                $hasBarcodeAux = false;
+                                                                if (isset($proses->details) && is_iterable($proses->details)) {
+                                                                    foreach ($proses->details as $d) {
+                                                                        if (isset($d->barcodeKains)) {
+                                                                            $hasBarcodeKain =
+                                                                                $hasBarcodeKain ||
+                                                                                $d->barcodeKains->where('cancel', false)->count() > 0;
+                                                                        }
+                                                                        if (isset($d->barcodeLas)) {
+                                                                            $hasBarcodeLa =
+                                                                                $hasBarcodeLa ||
+                                                                                $d->barcodeLas->where('cancel', false)->count() > 0;
+                                                                        }
+                                                                        if (isset($d->barcodeAuxs)) {
+                                                                            $hasBarcodeAux =
+                                                                                $hasBarcodeAux ||
+                                                                                $d->barcodeAuxs->where('cancel', false)->count() > 0;
+                                                                        }
                                                                     }
                                                                 }
-                                                            }
-                                                            $barcodeKainOpt = $barcodeKainOptional ?? false;
-                                                            if ($proses->jenis !== 'Maintenance') {
-                                                                $incomplete = (!$barcodeKainOpt && !$hasBarcodeKain) || !$laComplete || !$auxComplete;
-                                                                $bg = $incomplete ? '#ef9a9a' : '#002b80';
-                                                            } else {
-                                                                $bg = '#002b80';
+                                                                $barcodeKainOpt = $barcodeKainOptional ?? false;
+                                                                if ($proses->jenis !== 'Maintenance') {
+                                                                    $incomplete = (!$barcodeKainOpt && !$hasBarcodeKain) || !$laComplete || !$auxComplete;
+                                                                    $bg = $incomplete ? '#ef9a9a' : '#002b80';
+                                                                } else {
+                                                                    $bg = '#002b80';
+                                                                }
                                                             }
                                                         }
                                                         $gradient = getGradient($bg);
@@ -1686,13 +1694,21 @@
                                                                                 ),
                                                                             );
                                                                         } elseif ($proses->mulai && !$proses->selesai) {
-                                                                            $now = \Carbon\Carbon::now();
-                                                                            $mulai = \Carbon\Carbon::parse(
-                                                                                $proses->mulai,
-                                                                            );
-                                                                            $showTime = detikKeWaktu(
-                                                                                max(0, $mulai->diffInSeconds($now)),
-                                                                            );
+                                                                            if ($proses->is_paused) {
+                                                                                $pausedAt = \Carbon\Carbon::parse($proses->updated_at);
+                                                                                $mulai = \Carbon\Carbon::parse($proses->mulai);
+                                                                                $showTime = detikKeWaktu(
+                                                                                    max(0, $mulai->diffInSeconds($pausedAt))
+                                                                                );
+                                                                            } else {
+                                                                                $now = \Carbon\Carbon::now();
+                                                                                $mulai = \Carbon\Carbon::parse(
+                                                                                    $proses->mulai,
+                                                                                );
+                                                                                $showTime = detikKeWaktu(
+                                                                                    max(0, $mulai->diffInSeconds($now)),
+                                                                                );
+                                                                            }
                                                                         }
                                                                     @endphp
                                                                     {{ $showTime }}
@@ -5691,19 +5707,20 @@
                             // Jika parsing gagal, coba dengan replace untuk format lama
                             if (isNaN(mulai.getTime())) {
                                 mulai = new Date(proses.mulai.replace(/-/g, '/'));
-                            }
-                        } else {
-                            mulai = new Date(proses.mulai);
-                        }
-
-                        // Validasi: pastikan tanggal valid sebelum menghitung
+                        const mulai = new Date(proses.mulai.replace(' ', 'T'));
                         if (isNaN(mulai.getTime())) {
                             console.warn('Invalid date format:', proses.mulai);
                             return; // Skip jika tanggal tidak valid
                         }
 
-                        const now = new Date();
-                        let diff = Math.floor((now - mulai) / 1000);
+                        let diff = 0;
+                        if (proses.is_paused) {
+                            const pausedAt = new Date(proses.updated_at.replace(' ', 'T'));
+                            diff = Math.floor((pausedAt - mulai) / 1000);
+                        } else {
+                            const now = new Date();
+                            diff = Math.floor((now - mulai) / 1000);
+                        }
                         if (diff < 0) diff = 0;
 
                         // Format ke HH:MM:SS
