@@ -3995,14 +3995,14 @@
             const $btnDelete = $('.btn-delete-proses');
             const $btnPause = $('.btn-pause-proses');
 
-            // Logic untuk tombol Pause
+            // Logic untuk tombol Pause Proses
             $btnPause.addClass('d-none');
-            // Hanya tampilkan jika proses berjalan, belum selesai, dan belum di-pause
-            if (window.userRole && window.userRole.toLowerCase() === 'ppic' && isStarted && !proses.selesai && !proses.is_paused) {
-                if (proses.mesin && proses.mesin.last_seen_at) {
-                    const lastSeen = new Date(proses.mesin.last_seen_at.replace(' ', 'T'));
-                    const diffSeconds = (new Date() - lastSeen) / 1000;
-                    if (diffSeconds > 90) {
+            // Hanya tampilkan Pause Proses jika mesin sedang OFF (status == 0) dan belum ada pending approval
+            if (window.userRole && window.userRole.toLowerCase() === 'ppic' && isStarted && !proses.selesai) {
+                if (proses.mesin && (proses.mesin.status == 0 || proses.mesin.status === false)) {
+                    // Cek apakah belum ada pending approval pause_proses
+                    const hasPendingPause = proses.approvals && proses.approvals.some(a => a.action === 'pause_proses' && a.status === 'pending');
+                    if (!hasPendingPause) {
                         $btnPause.removeClass('d-none');
                     }
                 }
