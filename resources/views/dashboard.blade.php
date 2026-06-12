@@ -4016,9 +4016,18 @@
             // Hanya tampilkan Pause Proses jika mesin sedang OFF (status == 0) dan belum ada pending approval
             if (window.userRole && window.userRole.toLowerCase() === 'ppic' && isStarted && !proses.selesai) {
                 if (proses.mesin && (proses.mesin.status == 0 || proses.mesin.status === false)) {
-                    // Cek apakah belum ada pending approval pause_proses
+                    // Cek apakah belum ada pending/approved approval pause_proses untuk pause incident saat ini
+                    let pauseTime = 0;
+                    if (proses.mesin && proses.mesin.last_off_at) {
+                        pauseTime = new Date(proses.mesin.last_off_at.replace(' ', 'T')).getTime();
+                    }
                     const hasPendingPause = proses.approvals && proses.approvals.some(a => a.action === 'pause_proses' && a.status === 'pending');
-                    if (!hasPendingPause) {
+                    const hasApprovedPause = proses.approvals && proses.approvals.some(a => {
+                        if (a.action !== 'pause_proses' || a.status !== 'approved') return false;
+                        const approvalTime = new Date(a.created_at.replace(' ', 'T')).getTime();
+                        return approvalTime >= pauseTime;
+                    });
+                    if (!hasPendingPause && !hasApprovedPause) {
                         $btnPause.removeClass('d-none');
                     }
                 }
