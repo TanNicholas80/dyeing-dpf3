@@ -10,7 +10,12 @@ return new class extends Migration
      */
     public function up(): void
     {
-        DB::unprepared("DROP TRIGGER IF EXISTS mesin_after_update_status");
+        if (DB::connection()->getDriverName() === 'pgsql') {
+            DB::unprepared("DROP TRIGGER IF EXISTS mesin_after_update_status ON mesins");
+            DB::unprepared("DROP FUNCTION IF EXISTS mesin_after_update_status_func()");
+        } else {
+            DB::unprepared("DROP TRIGGER IF EXISTS mesin_after_update_status");
+        }
     }
 
     /**
