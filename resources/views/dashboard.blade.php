@@ -6727,6 +6727,17 @@
                 proses.mulai = statusData.mulai;
                 proses.selesai = statusData.selesai;
                 proses.order = statusData.order || 0;
+                if (statusData.is_paused !== undefined) {
+                    proses.is_paused = statusData.is_paused;
+                }
+                if (statusData.mesin_status !== undefined && statusData.mesin_status !== null) {
+                    if (!proses.mesin) proses.mesin = {};
+                    proses.mesin.status = statusData.mesin_status;
+                }
+                if (statusData.mesin_last_off_at !== undefined && statusData.mesin_last_off_at !== null) {
+                    if (!proses.mesin) proses.mesin = {};
+                    proses.mesin.last_off_at = statusData.mesin_last_off_at;
+                }
                 if (statusData.cycle_time !== undefined && statusData.cycle_time !== null) {
                     proses.cycle_time = statusData.cycle_time;
                 }

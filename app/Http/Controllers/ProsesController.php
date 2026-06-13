@@ -2692,10 +2692,10 @@ class ProsesController extends Controller
     {
         $proses = Proses::with('mesin')->findOrFail($id);
 
-        // Validasi: Hanya PPIC yang bisa melakukan pause
+        // Validasi: Hanya PPIC dan Super Admin yang bisa melakukan pause
         $userRole = Auth::user()->role ?? '';
-        if (strtolower($userRole) !== 'ppic') {
-            $errorMessage = 'Akses ditolak. Hanya PPIC yang dapat melakukan Pause Proses.';
+        if (!in_array(strtolower($userRole), ['ppic', 'super_admin'])) {
+            $errorMessage = 'Akses ditolak. Hanya PPIC dan Super Admin yang dapat melakukan Pause Proses.';
             if ($request->ajax() || $request->wantsJson()) {
                 return response()->json(['status' => 'error', 'message' => $errorMessage], 403);
             }
