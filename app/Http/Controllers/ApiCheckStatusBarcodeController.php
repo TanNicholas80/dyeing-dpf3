@@ -89,6 +89,30 @@ class ApiCheckStatusBarcodeController extends Controller
         Cache::forget($this->alarmStateKey((int) $mesin->id));
 
         // Update status mesin di database (1 = Hidup/ON, 0 = Mati/OFF)
+        // Jika sengaja OFF, selesaikan proses aktif terlebih dahulu sebelum merubah status mesin
+        if (!$isOn) {
+            $prosesAktif = $mesin->proses()
+                ->whereNotNull('mulai')
+                ->whereNull('selesai')
+                ->orderBy('order', 'asc')
+                ->orderBy('id', 'asc')
+                ->first();
+
+            if ($prosesAktif) {
+                $prosesAktif->selesai = now();
+                $prosesAktif->is_paused = false;
+                $prosesAktif->save();
+
+                // Broadcast ProsesStatusUpdated agar UI langsung hilang / update ke history
+                $prosesAktif->refresh();
+                $prosesAktif->load(['approvals', 'details.barcodeKains', 'details.barcodeLas', 'details.barcodeAuxs']);
+                $statusService = new \App\Services\ProsesStatusService();
+                $affectedProsesIds = $statusService->getAffectedProsesIds();
+                $statusData = $statusService->generateProsesStatus($prosesAktif, $affectedProsesIds);
+                event(new \App\Events\ProsesStatusUpdated($prosesAktif->id, $statusData));
+            }
+        }
+
         $mesin->status = $isOn;
         $mesin->last_seen_at = now();
         $mesin->save();

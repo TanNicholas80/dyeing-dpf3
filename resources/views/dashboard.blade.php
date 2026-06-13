@@ -4014,7 +4014,7 @@
             // Logic untuk tombol Pause Proses
             $btnPause.addClass('d-none');
             // Hanya tampilkan Pause Proses jika mesin sedang OFF (status == 0) dan belum ada pending approval
-            if (window.userRole && window.userRole.toLowerCase() === 'ppic' && isStarted && !proses.selesai) {
+            if (window.userRole && (window.userRole.toLowerCase() === 'ppic' || window.userRole.toLowerCase() === 'super admin') && isStarted && !proses.selesai) {
                 if (proses.mesin && (proses.mesin.status == 0 || proses.mesin.status === false)) {
                     // Cek apakah belum ada pending/approved approval pause_proses untuk pause incident saat ini
                     let pauseTime = 0;
