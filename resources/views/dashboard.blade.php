@@ -4014,7 +4014,7 @@
             // Logic untuk tombol Pause Proses
             $btnPause.addClass('d-none');
             // Hanya tampilkan Pause Proses jika mesin sedang OFF (status == 0) dan belum ada pending approval
-            if (window.userRole && (window.userRole.toLowerCase() === 'ppic' || window.userRole.toLowerCase() === 'super admin') && isStarted && !proses.selesai) {
+            if (window.userRole && (window.userRole.toLowerCase() === 'ppic' || window.userRole.toLowerCase() === 'super_admin') && isStarted && !proses.selesai) {
                 if (proses.mesin && (proses.mesin.status == 0 || proses.mesin.status === false)) {
                     // Cek apakah belum ada pending/approved approval pause_proses untuk pause incident saat ini
                     let pauseTime = 0;
@@ -6415,6 +6415,19 @@
                         console.log('MesinUpdated event received:', e);
                         if (e.mesin && e.mesin.id) {
                             updateMesinDropdown(e.mesin);
+                            
+                            // UPDATE: sinkronisasikan properti proses.mesin.status pada semua proses (cards) di mesin ini
+                            $('.status-card').each(function() {
+                                let proses = $(this).data('proses');
+                                if (proses && proses.mesin_id == e.mesin.id && proses.mesin) {
+                                    proses.mesin.status = e.mesin.status;
+                                    if (e.mesin.status === false && e.mesin.auto_offline) {
+                                        // Update last_off_at secara real-time jika mesin auto-offline
+                                        proses.mesin.last_off_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
+                                    }
+                                    $(this).data('proses', proses);
+                                }
+                            });
                         }
                     })
                     .listen('.mesin.deleted', (e) => {
