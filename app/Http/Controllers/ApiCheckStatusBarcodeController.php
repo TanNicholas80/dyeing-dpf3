@@ -133,6 +133,8 @@ class ApiCheckStatusBarcodeController extends Controller
                         $p->is_paused = false;
                         $p->save();
 
+                        Log::info("Mesin {$mesin->id} ON: Mengaktifkan kembali proses {$p->id} (is_paused = false)");
+
                         // Refresh dan load relasi untuk broadcast
                         $p->refresh();
                         $p->load(['approvals', 'details.barcodeKains', 'details.barcodeLas', 'details.barcodeAuxs']);
@@ -175,6 +177,8 @@ class ApiCheckStatusBarcodeController extends Controller
                     $prosesSelanjutnya->mulai = now();
                     $prosesSelanjutnya->order = 0;
                     $prosesSelanjutnya->save();
+
+                    \Illuminate\Support\Facades\Log::info("Mesin {$mesin->id} ON: Auto-Start menjalankan otomatis proses antrean 1 (ID: {$prosesSelanjutnya->id})");
 
                     // Renumber sisa antrean
                     $sisaPending = $mesin->proses()

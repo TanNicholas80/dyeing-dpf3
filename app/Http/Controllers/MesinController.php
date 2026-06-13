@@ -143,6 +143,8 @@ class MesinController extends Controller
                         $p->is_paused = true;
                         $p->save();
 
+                        \Illuminate\Support\Facades\Log::warning("Mesin {$mesin->id} TIMEOUT (>90s): Menghentikan otomatis proses {$p->id} (is_paused = true)");
+
                         // Refresh dan load relasi untuk broadcast
                         $p->refresh();
                         $p->load(['approvals', 'details.barcodeKains', 'details.barcodeLas', 'details.barcodeAuxs']);
