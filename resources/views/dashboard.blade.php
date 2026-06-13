@@ -6719,7 +6719,7 @@
                 if (wasNotFinished && isNowFinished && !$card.hasClass('history-card')) {
                     // Proses baru selesai, pindahkan ke history container
                     moveToHistory($card, statusData);
-                    return; // Skip update warna karena sudah dipindahkan
+                    // JANGAN RETURN DI SINI! Kita harus tetap meng-update warna, cycle time, dll.
                 }
 
                 // Update data proses untuk mulai, selesai, order, dan cycle_time

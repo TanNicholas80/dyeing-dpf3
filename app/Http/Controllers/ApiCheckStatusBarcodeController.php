@@ -111,6 +111,95 @@ class ApiCheckStatusBarcodeController extends Controller
                 $statusData = $statusService->generateProsesStatus($prosesAktif, $affectedProsesIds);
                 event(new \App\Events\ProsesStatusUpdated($prosesAktif->id, $statusData));
             }
+        } elseif ($isOn && !$mesin->status) {
+            // Mesin baru saja menyala (0 -> 1)
+            $prosesAktif = $mesin->proses()
+                ->whereNotNull('mulai')
+                ->whereNull('selesai')
+                ->orderBy('order', 'asc')
+                ->orderBy('id', 'asc')
+                ->get();
+
+            if ($prosesAktif->isNotEmpty()) {
+                foreach ($prosesAktif as $p) {
+                    // Cek persetujuan PPIC yang aktif
+                    $hasManualPause = $p->approvals()
+                        ->where('action', 'pause_proses')
+                        ->where('status', 'approved')
+                        ->where('created_at', '>=', $mesin->last_off_at ?? '1970-01-01')
+                        ->exists();
+
+                    if (!$hasManualPause) {
+                        $p->is_paused = false;
+                        $p->save();
+
+                        // Refresh dan load relasi untuk broadcast
+                        $p->refresh();
+                        $p->load(['approvals', 'details.barcodeKains', 'details.barcodeLas', 'details.barcodeAuxs']);
+                        $statusService = new \App\Services\ProsesStatusService();
+                        $affectedProsesIds = $statusService->getAffectedProsesIds();
+                        $statusData = $statusService->generateProsesStatus($p, $affectedProsesIds);
+                        event(new \App\Events\ProsesStatusUpdated($p->id, $statusData));
+                    }
+                }
+            } else {
+                // TAPI JIKA TIDAK ADA PROSES AKTIF (Mesin idle dan menyala kembali)
+                // Maka jalankan proses selanjutnya otomatis
+                $prosesSelanjutnya = $mesin->proses()
+                    ->whereNull('mulai')
+                    ->whereNull('selesai')
+                    ->where('order', '>', 0)
+                    ->whereDoesntHave('approvals', function ($query) {
+                        $query->where('status', 'pending')
+                              ->where('action', 'create_reprocess')
+                              ->whereIn('type', ['FM', 'VP']);
+                    })
+                    ->orderBy('order', 'asc')
+                    ->orderBy('id', 'asc')
+                    ->first();
+
+                if ($prosesSelanjutnya) {
+                    // Auto reject pending approvals lama
+                    \App\Models\Approval::where('proses_id', $prosesSelanjutnya->id)
+                        ->where('status', 'pending')
+                        ->where('type', 'FM')
+                        ->whereIn('action', ['edit_cycle_time', 'delete_proses', 'move_machine', 'swap_position'])
+                        ->update([
+                            'status' => 'rejected',
+                            'note' => DB::raw("CASE WHEN note IS NULL OR note = '' THEN 'Auto rejected by system: proses otomatis berjalan saat mesin ON.' ELSE CONCAT(note, ' | Auto rejected by system: proses otomatis berjalan saat mesin ON.') END"),
+                            'approved_by' => null,
+                            'updated_at' => now()
+                        ]);
+
+                    // Jalankan proses
+                    $prosesSelanjutnya->mulai = now();
+                    $prosesSelanjutnya->order = 0;
+                    $prosesSelanjutnya->save();
+
+                    // Renumber sisa antrean
+                    $sisaPending = $mesin->proses()
+                        ->whereNull('mulai')
+                        ->whereNull('selesai')
+                        ->where('id', '!=', $prosesSelanjutnya->id)
+                        ->orderBy('order', 'asc')
+                        ->orderBy('id', 'asc')
+                        ->get();
+
+                    $order = 1;
+                    foreach ($sisaPending as $pending) {
+                        $pending->order = $order++;
+                        $pending->save();
+                    }
+
+                    // Broadcast untuk proses yang baru mulai
+                    $prosesSelanjutnya->refresh();
+                    $prosesSelanjutnya->load(['approvals', 'details.barcodeKains', 'details.barcodeLas', 'details.barcodeAuxs']);
+                    $statusService = new \App\Services\ProsesStatusService();
+                    $affectedProsesIds = $statusService->getAffectedProsesIds();
+                    $statusData = $statusService->generateProsesStatus($prosesSelanjutnya, $affectedProsesIds);
+                    event(new \App\Events\ProsesStatusUpdated($prosesSelanjutnya->id, $statusData));
+                }
+            }
         }
 
         $mesin->status = $isOn;

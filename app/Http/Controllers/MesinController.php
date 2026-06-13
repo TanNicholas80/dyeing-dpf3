@@ -131,21 +131,25 @@ class MesinController extends Controller
                     $mesin->status = false;
                     $mesin->save();
 
-                    // Cek apakah ada proses yang terdampak (menjadi ter-pause oleh trigger DB)
+                    // Cek apakah ada proses yang terdampak (menggantikan fungsi trigger mesin_after_update_status)
                     $prosesAktif = $mesin->proses()
                         ->whereNotNull('mulai')
                         ->whereNull('selesai')
                         ->orderBy('order', 'asc')
                         ->orderBy('id', 'asc')
-                        ->first();
+                        ->get();
 
-                    if ($prosesAktif) {
-                        $prosesAktif->refresh();
-                        $prosesAktif->load(['approvals', 'details.barcodeKains', 'details.barcodeLas', 'details.barcodeAuxs']);
+                    foreach ($prosesAktif as $p) {
+                        $p->is_paused = true;
+                        $p->save();
+
+                        // Refresh dan load relasi untuk broadcast
+                        $p->refresh();
+                        $p->load(['approvals', 'details.barcodeKains', 'details.barcodeLas', 'details.barcodeAuxs']);
                         $statusService = new \App\Services\ProsesStatusService();
                         $affectedProsesIds = $statusService->getAffectedProsesIds();
-                        $statusData = $statusService->generateProsesStatus($prosesAktif, $affectedProsesIds);
-                        event(new \App\Events\ProsesStatusUpdated($prosesAktif->id, $statusData));
+                        $statusData = $statusService->generateProsesStatus($p, $affectedProsesIds);
+                        event(new \App\Events\ProsesStatusUpdated($p->id, $statusData));
                     }
 
                     // Broadcast ke dashboard pusher untuk update real-time
