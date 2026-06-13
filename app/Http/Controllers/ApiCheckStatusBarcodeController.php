@@ -99,6 +99,7 @@ class ApiCheckStatusBarcodeController extends Controller
                 ->first();
 
             if ($prosesAktif) {
+                // KEMBALIKAN KE ASAL: Jika OFF disengaja dari IoT, berarti SELESAI (Masuk History)
                 $prosesAktif->selesai = now();
                 $prosesAktif->is_paused = false;
                 $prosesAktif->save();
@@ -109,6 +110,8 @@ class ApiCheckStatusBarcodeController extends Controller
                 $statusService = new \App\Services\ProsesStatusService();
                 $affectedProsesIds = $statusService->getAffectedProsesIds();
                 $statusData = $statusService->generateProsesStatus($prosesAktif, $affectedProsesIds);
+                
+                // KEMBALIKAN KE ASAL: Karena ini selesai/masuk history, gunakan event standar
                 event(new \App\Events\ProsesStatusUpdated($prosesAktif->id, $statusData));
             }
         } elseif ($isOn && !$mesin->status) {
@@ -132,8 +135,6 @@ class ApiCheckStatusBarcodeController extends Controller
                     if (!$hasManualPause) {
                         $p->is_paused = false;
                         $p->save();
-
-                        Log::info("Mesin {$mesin->id} ON: Mengaktifkan kembali proses {$p->id} (is_paused = false)");
 
                         // Refresh dan load relasi untuk broadcast
                         $p->refresh();
@@ -177,8 +178,6 @@ class ApiCheckStatusBarcodeController extends Controller
                     $prosesSelanjutnya->mulai = now();
                     $prosesSelanjutnya->order = 0;
                     $prosesSelanjutnya->save();
-
-                    \Illuminate\Support\Facades\Log::info("Mesin {$mesin->id} ON: Auto-Start menjalankan otomatis proses antrean 1 (ID: {$prosesSelanjutnya->id})");
 
                     // Renumber sisa antrean
                     $sisaPending = $mesin->proses()

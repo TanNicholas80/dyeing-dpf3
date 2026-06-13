@@ -6328,6 +6328,10 @@
                     .listen('.proses.status.updated', (e) => {
                         handleProsesStatusUpdate(e.proses_id, e.status);
                     })
+                    .listen('.proses.paused', (e) => {
+                        // TANGKAP EVENT EKSKLUSIF PAUSE
+                        handleProsesStatusUpdate(e.proses_id, e.status);
+                    })
                     .listen('.barcode.status.updated', (e) => {
                         handleProsesStatusUpdate(e.proses_id, e.status);
 

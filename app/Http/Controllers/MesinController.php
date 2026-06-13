@@ -143,15 +143,15 @@ class MesinController extends Controller
                         $p->is_paused = true;
                         $p->save();
 
-                        \Illuminate\Support\Facades\Log::warning("Mesin {$mesin->id} TIMEOUT (>90s): Menghentikan otomatis proses {$p->id} (is_paused = true)");
-
                         // Refresh dan load relasi untuk broadcast
                         $p->refresh();
                         $p->load(['approvals', 'details.barcodeKains', 'details.barcodeLas', 'details.barcodeAuxs']);
                         $statusService = new \App\Services\ProsesStatusService();
                         $affectedProsesIds = $statusService->getAffectedProsesIds();
                         $statusData = $statusService->generateProsesStatus($p, $affectedProsesIds);
-                        event(new \App\Events\ProsesStatusUpdated($p->id, $statusData));
+                        
+                        // UBAH: Pancarkan EVENT EKSKLUSIF PAUSE agar mencolok di terminal Queue
+                        event(new \App\Events\ProsesPaused($p->id, $statusData));
                     }
 
                     // Broadcast ke dashboard pusher untuk update real-time
