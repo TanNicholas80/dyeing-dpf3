@@ -558,6 +558,12 @@ class ProsesController extends Controller
                 // Broadcast agar semua browser langsung menampilkan blok kuning (menunggu approval FM)
                 event(new ApprovalPendingCreated([$proses->id]));
 
+                if ($request->ajax() || $request->wantsJson()) {
+                    return response()->json([
+                        'status' => 'success',
+                        'message' => 'Proses Reproses berhasil ditambahkan. Proses akan tampil dengan warna kuning dan menunggu persetujuan FM terlebih dahulu, kemudian VP.'
+                    ]);
+                }
                 return redirect()->route('dashboard', ['page' => $page])
                     ->with('success', 'Proses Reproses berhasil ditambahkan. Proses akan tampil dengan warna kuning dan menunggu persetujuan FM terlebih dahulu, kemudian VP.');
             }
@@ -582,11 +588,31 @@ class ProsesController extends Controller
             $statusService = new ProsesStatusService();
             $affectedProsesIds = $statusService->getAffectedProsesIds();
             $statusData = $statusService->generateProsesStatus($proses, $affectedProsesIds);
-            event(new ProsesCreated($proses->id, $statusData));
+            event(new ProsesCreated($proses->id, $statusData, $proses->mesin_id));
 
+            if ($request->ajax() || $request->wantsJson()) {
+                // Return rendered card directly for instant UI update
+                $htmlResponse = app('App\Http\Controllers\DashboardController')->getProsesCardHtml(request(), $proses->id)->getContent();
+                $html = json_decode($htmlResponse, true)['html'] ?? null;
+                
+                return response()->json([
+                    'status' => 'success',
+                    'message' => 'Proses berhasil ditambahkan',
+                    'html' => $html,
+                    'proses_id' => $proses->id,
+                    'mesin_id' => $proses->mesin_id
+                ]);
+            }
             return redirect()->route('dashboard', ['page' => $page])
                 ->with('success', 'Proses berhasil ditambahkan');
         } catch (\Exception $e) {
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Gagal menambahkan proses: ' . $e->getMessage(),
+                    'trace' => $e->getTraceAsString()
+                ], 500);
+            }
             return back()
                 ->withInput()
                 ->with('error', 'Gagal menambahkan proses: ' . $e->getMessage());

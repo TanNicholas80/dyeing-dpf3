@@ -163,13 +163,13 @@ class ApiCheckStatusBarcodeController extends Controller
 
                 if ($prosesSelanjutnya) {
                     // Auto reject pending approvals lama
-                    \App\Models\Approval::where('proses_id', $prosesSelanjutnya->id)
+                    Approval::where('proses_id', $prosesSelanjutnya->id)
                         ->where('status', 'pending')
                         ->where('type', 'FM')
                         ->whereIn('action', ['edit_cycle_time', 'delete_proses', 'move_machine', 'swap_position'])
                         ->update([
                             'status' => 'rejected',
-                            'note' => DB::raw("CASE WHEN note IS NULL OR note = '' THEN 'Auto rejected by system: proses otomatis berjalan saat mesin ON.' ELSE CONCAT(note, ' | Auto rejected by system: proses otomatis berjalan saat mesin ON.') END"),
+                            'note' => \DB::raw("CASE WHEN note IS NULL OR note = '' THEN 'Auto rejected by system: proses otomatis berjalan saat mesin ON.' ELSE CONCAT(note, ' | Auto rejected by system: proses otomatis berjalan saat mesin ON.') END"),
                             'approved_by' => null,
                             'updated_at' => now()
                         ]);

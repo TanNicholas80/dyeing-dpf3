@@ -14,14 +14,16 @@ class ProsesCreated implements ShouldBroadcast
 
     public $prosesId;
     public $statusData;
+    public $mesinId;
 
     /**
      * Create a new event instance.
      */
-    public function __construct($prosesId, $statusData)
+    public function __construct($prosesId, $statusData, $mesinId = null)
     {
         $this->prosesId = $prosesId;
         $this->statusData = $statusData;
+        $this->mesinId = $mesinId;
     }
 
     /**
@@ -50,6 +52,7 @@ class ProsesCreated implements ShouldBroadcast
         return [
             'proses_id' => $this->prosesId,
             'status' => $this->statusData,
+            'mesin_id' => $this->mesinId,
         ];
     }
 }

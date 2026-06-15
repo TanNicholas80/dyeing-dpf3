@@ -403,4 +403,46 @@ class DashboardController extends Controller
             return response()->json(['error' => $e->getMessage()], 500);
         }
     }
+    public function getProsesCardHtml(Request $request, $id)
+    {
+        $proses = \App\Models\Proses::with([
+            'mesin', 
+            'details.barcodeKains', 
+            'details.barcodeLas', 
+            'details.barcodeAuxs', 
+            'approvals'
+        ])->findOrFail($id);
+
+        $statusService = new \App\Services\ProsesStatusService();
+        $affectedProsesIds = $statusService->getAffectedProsesIds();
+
+        $user = $request->user();
+        $userRole = $user ? $user->role : null;
+        $cantModifyStructure = in_array($userRole, ['operator', 'mesin']);
+        $cantScan = in_array($userRole, ['dashboard']);
+
+        $canCancelBarcode = in_array($userRole, ['super_admin', 'kepala_shift']);
+        $canAddProses = !$cantModifyStructure;
+        $canEditProses = !$cantModifyStructure;
+        $canDeleteProses = !$cantModifyStructure;
+        $canMoveProses = !$cantModifyStructure;
+        $canSwapProses = !$cantModifyStructure;
+        $canScanBarcode = !$cantScan;
+
+        $html = view('partials.dashboard.status_card', [
+            'proses' => $proses,
+            'affectedProsesIds' => $affectedProsesIds,
+            'userRole' => $userRole,
+            'canCancelBarcode' => $canCancelBarcode,
+            'canAddProses' => $canAddProses,
+            'canEditProses' => $canEditProses,
+            'canDeleteProses' => $canDeleteProses,
+            'canMoveProses' => $canMoveProses,
+            'canSwapProses' => $canSwapProses,
+            'canScanBarcode' => $canScanBarcode,
+        ])->render();
+
+        return response()->json(['html' => $html]);
+    }
 }
+
