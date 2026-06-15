@@ -66,7 +66,7 @@ class ApiCheckStatusBarcodeController extends Controller
 
         // 2. Deteksi jika sinyal baru masuk setelah sempat terputus (> 5 detik)
         // Note: Tidak mencatat ke activity log sesuai permintaan (hanya ke file log saja)
-        
+
         $cacheKey = "iot:mesin:{$mesin->id}:state";
         $isOn = (bool) $validated['is_on'];
         $payload = [
@@ -110,7 +110,7 @@ class ApiCheckStatusBarcodeController extends Controller
                 $statusService = new \App\Services\ProsesStatusService();
                 $affectedProsesIds = $statusService->getAffectedProsesIds();
                 $statusData = $statusService->generateProsesStatus($prosesAktif, $affectedProsesIds);
-                
+
                 // KEMBALIKAN KE ASAL: Karena ini selesai/masuk history, gunakan event standar
                 event(new \App\Events\ProsesStatusUpdated($prosesAktif->id, $statusData));
             }
@@ -154,8 +154,8 @@ class ApiCheckStatusBarcodeController extends Controller
                     ->where('order', '>', 0)
                     ->whereDoesntHave('approvals', function ($query) {
                         $query->where('status', 'pending')
-                              ->where('action', 'create_reprocess')
-                              ->whereIn('type', ['FM', 'VP']);
+                            ->where('action', 'create_reprocess')
+                            ->whereIn('type', ['FM', 'VP']);
                     })
                     ->orderBy('order', 'asc')
                     ->orderBy('id', 'asc')
@@ -205,11 +205,16 @@ class ApiCheckStatusBarcodeController extends Controller
             }
         }
 
+        $oldStatus = $mesin->status;
         $mesin->status = $isOn;
         $mesin->last_seen_at = now();
         $mesin->save();
 
-        event(new \App\Events\MesinUpdated($mesin));
+        // OPTIMASI CPU: Hanya tembak Event WebSocket JIKA statusnya benar-benar berubah!
+        // Jangan spam Queue/Reverb setiap 4 detik.
+        if ($oldStatus != $isOn) {
+            event(new MesinUpdated($mesin));
+        }
 
         return response()->json([
             'status' => 'success',
@@ -512,7 +517,7 @@ class ApiCheckStatusBarcodeController extends Controller
         }
 
         // Validasi LA & AUX: kebutuhan awal (1) + topping yang sudah di-approve (TD/TA)
-        $laInitialScanned = BarcodeLa::whereHas('detailProses', fn ($q) => $q->where('proses_id', $proses->id))
+        $laInitialScanned = BarcodeLa::whereHas('detailProses', fn($q) => $q->where('proses_id', $proses->id))
             ->whereNull('approval_id')
             ->where('cancel', false)
             ->exists() ? 1 : 0;
@@ -525,11 +530,11 @@ class ApiCheckStatusBarcodeController extends Controller
             ->where('type', 'KEPALA_SHIFT')
             ->where('action', 'topping_la')
             ->where('status', 'approved')
-            ->whereHas('barcodeLas', fn ($q) => $q->where('cancel', false))
+            ->whereHas('barcodeLas', fn($q) => $q->where('cancel', false))
             ->count();
         $laComplete = ($laInitialScanned + $laToppingScanned) >= (1 + $laToppingRequired);
 
-        $auxInitialScanned = BarcodeAux::whereHas('detailProses', fn ($q) => $q->where('proses_id', $proses->id))
+        $auxInitialScanned = BarcodeAux::whereHas('detailProses', fn($q) => $q->where('proses_id', $proses->id))
             ->whereNull('approval_id')
             ->where('cancel', false)
             ->exists() ? 1 : 0;
@@ -542,7 +547,7 @@ class ApiCheckStatusBarcodeController extends Controller
             ->where('type', 'KEPALA_SHIFT')
             ->where('action', 'topping_aux')
             ->where('status', 'approved')
-            ->whereHas('barcodeAuxs', fn ($q) => $q->where('cancel', false))
+            ->whereHas('barcodeAuxs', fn($q) => $q->where('cancel', false))
             ->count();
         $auxComplete = ($auxInitialScanned + $auxToppingScanned) >= (1 + $auxToppingRequired);
 
@@ -556,7 +561,7 @@ class ApiCheckStatusBarcodeController extends Controller
      */
     private function getProsesBarcodeProgress(Proses $proses): array
     {
-        $laInitialScanned = BarcodeLa::whereHas('detailProses', fn ($q) => $q->where('proses_id', $proses->id))
+        $laInitialScanned = BarcodeLa::whereHas('detailProses', fn($q) => $q->where('proses_id', $proses->id))
             ->whereNull('approval_id')
             ->where('cancel', false)
             ->exists() ? 1 : 0;
@@ -569,13 +574,13 @@ class ApiCheckStatusBarcodeController extends Controller
             ->where('type', 'KEPALA_SHIFT')
             ->where('action', 'topping_la')
             ->where('status', 'approved')
-            ->whereHas('barcodeLas', fn ($q) => $q->where('cancel', false))
+            ->whereHas('barcodeLas', fn($q) => $q->where('cancel', false))
             ->count();
         $laRequired = 1 + $laToppingRequired;
         $laScanned = $laInitialScanned + $laToppingScanned;
         $laComplete = $laScanned >= $laRequired;
 
-        $auxInitialScanned = BarcodeAux::whereHas('detailProses', fn ($q) => $q->where('proses_id', $proses->id))
+        $auxInitialScanned = BarcodeAux::whereHas('detailProses', fn($q) => $q->where('proses_id', $proses->id))
             ->whereNull('approval_id')
             ->where('cancel', false)
             ->exists() ? 1 : 0;
@@ -588,7 +593,7 @@ class ApiCheckStatusBarcodeController extends Controller
             ->where('type', 'KEPALA_SHIFT')
             ->where('action', 'topping_aux')
             ->where('status', 'approved')
-            ->whereHas('barcodeAuxs', fn ($q) => $q->where('cancel', false))
+            ->whereHas('barcodeAuxs', fn($q) => $q->where('cancel', false))
             ->count();
         $auxRequired = 1 + $auxToppingRequired;
         $auxScanned = $auxInitialScanned + $auxToppingScanned;
