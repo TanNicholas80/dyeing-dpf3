@@ -116,6 +116,8 @@ services:
       target: production
     restart: unless-stopped
     command: php artisan reverb:start
+    ports:
+      - "8080:8080"
     volumes:
       - laravel-public-assets:/var/www/public/build
       - laravel-storage-production:/var/www/storage
