@@ -134,6 +134,16 @@ class ApiCheckStatusBarcodeController extends Controller
 
                     if (!$hasPendingPause) {
                         // Proses otomatis lanjut ketika mesin hidup kembali, KECUALI jika masih ada pengajuan pause yang menggantung (pending)
+                        
+                        // Geser 'mulai' maju sebesar durasi pause agar perhitungan elapsed time akurat
+                        if ($p->is_paused && $p->mulai) {
+                            // Waktu mulai pause tepat saat proses diset is_paused = true (yaitu pada $p->updated_at)
+                            $pauseDuration = now()->diffInSeconds($p->updated_at);
+                            if ($pauseDuration > 0) {
+                                $p->mulai = \Carbon\Carbon::parse($p->mulai)->addSeconds($pauseDuration);
+                            }
+                        }
+
                         $p->is_paused = false;
                         $p->save();
 
