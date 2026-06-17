@@ -139,11 +139,12 @@ class ApiCheckStatusBarcodeController extends Controller
 
                         // Refresh dan load relasi untuk broadcast
                         $p->refresh();
-                    $p->load(['approvals', 'details.barcodeKains', 'details.barcodeLas', 'details.barcodeAuxs']);
-                    $statusService = new \App\Services\ProsesStatusService();
-                    $affectedProsesIds = $statusService->getAffectedProsesIds();
-                    $statusData = $statusService->generateProsesStatus($p, $affectedProsesIds);
-                    event(new \App\Events\ProsesStatusUpdated($p->id, $statusData));
+                        $p->load(['approvals', 'details.barcodeKains', 'details.barcodeLas', 'details.barcodeAuxs']);
+                        $statusService = new \App\Services\ProsesStatusService();
+                        $affectedProsesIds = $statusService->getAffectedProsesIds();
+                        $statusData = $statusService->generateProsesStatus($p, $affectedProsesIds);
+                        event(new \App\Events\ProsesStatusUpdated($p->id, $statusData));
+                    }
                 }
             } else {
                 // TAPI JIKA TIDAK ADA PROSES AKTIF (Mesin idle dan menyala kembali)
