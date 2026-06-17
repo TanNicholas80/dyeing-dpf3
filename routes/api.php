@@ -38,4 +38,7 @@ Route::prefix('iot')->group(function () {
 
     // Arduino polling status alarm (ON/OFF) berdasarkan kelengkapan barcode
     Route::get('/mesin/{mesin}/alarm', [ApiCheckStatusBarcodeController::class, 'getAlarmStatus']);
+
+    // Endpoint Legacy untuk firmware lama (Backward Compatibility)
+    Route::post('/checkStatus', [ApiCheckStatusBarcodeController::class, 'checkStatusLegacy']);
 });

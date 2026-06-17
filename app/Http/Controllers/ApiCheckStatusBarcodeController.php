@@ -602,6 +602,41 @@ class ApiCheckStatusBarcodeController extends Controller
 
         return [$laRequired, $laScanned, $laComplete, $auxRequired, $auxScanned, $auxComplete];
     }
+
+    /**
+     * Fallback endpoint untuk firmware lama (Backward Compatibility)
+     * POST /api/iot/checkStatus
+     */
+    public function checkStatusLegacy(Request $request)
+    {
+        $machineId = $request->input('id_mesin');
+        $statusMesin = $request->input('status_mesin');
+
+        if (!$machineId) {
+            return response()->json(['status' => 'error', 'message' => 'id_mesin required'], 400);
+        }
+
+        $mesin = Mesin::where('jenis_mesin', $machineId)
+            ->orWhere('id', $machineId)
+            ->first();
+
+        if (!$mesin) {
+            return response()->json(['status' => 'error', 'message' => 'Mesin not found'], 404);
+        }
+
+        // Bypass device token check for legacy firmware if missing
+        if (!$request->hasHeader('X-DEVICE-TOKEN') && env('IOT_DEVICE_TOKEN')) {
+            $request->headers->set('X-DEVICE-TOKEN', env('IOT_DEVICE_TOKEN'));
+        }
+
+        // Merge parameter lama ke request
+        $request->merge([
+            'is_on' => (bool)$statusMesin,
+            'source' => 'legacy',
+        ]);
+
+        return $this->updateMesinState($request, $mesin);
+    }
 }
 
 // Trigger Mesin ON itu dari Pompa Air menyala, Relay akan mengirimkan Sinyal API ke ESP32 untuk mematikan Alarm
