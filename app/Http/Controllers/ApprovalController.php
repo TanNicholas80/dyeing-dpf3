@@ -493,9 +493,11 @@ class ApprovalController extends Controller
                 break;
 
             case 'pause_proses':
-                // Tidak perlu merubah is_paused, biarkan true sampai trigger DB mengubahnya saat mesin ON
-                // $proses->is_paused = false;
-                // $proses->save();
+                // Jika saat diapprove ternyata mesin SUDAH menyala kembali, maka otomatis resume prosesnya
+                if ($proses->mesin && $proses->mesin->status) {
+                    $proses->is_paused = false;
+                    $proses->save();
+                }
                 
                 // Broadcast event untuk update real-time
                 $proses->refresh();

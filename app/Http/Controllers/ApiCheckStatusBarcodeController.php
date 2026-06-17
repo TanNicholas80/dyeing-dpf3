@@ -125,25 +125,25 @@ class ApiCheckStatusBarcodeController extends Controller
 
             if ($prosesAktif->isNotEmpty()) {
                 foreach ($prosesAktif as $p) {
-                    // Cek persetujuan PPIC yang aktif
-                    $hasManualPause = $p->approvals()
+                    // Cek apakah ada pengajuan pause yang masih PENDING
+                    $hasPendingPause = $p->approvals()
                         ->where('action', 'pause_proses')
-                        ->where('status', 'approved')
+                        ->where('status', 'pending')
                         ->where('created_at', '>=', $mesin->last_off_at ?? '1970-01-01')
                         ->exists();
 
-                    if (!$hasManualPause) {
+                    if (!$hasPendingPause) {
+                        // Proses otomatis lanjut ketika mesin hidup kembali, KECUALI jika masih ada pengajuan pause yang menggantung (pending)
                         $p->is_paused = false;
                         $p->save();
 
                         // Refresh dan load relasi untuk broadcast
                         $p->refresh();
-                        $p->load(['approvals', 'details.barcodeKains', 'details.barcodeLas', 'details.barcodeAuxs']);
-                        $statusService = new \App\Services\ProsesStatusService();
-                        $affectedProsesIds = $statusService->getAffectedProsesIds();
-                        $statusData = $statusService->generateProsesStatus($p, $affectedProsesIds);
-                        event(new \App\Events\ProsesStatusUpdated($p->id, $statusData));
-                    }
+                    $p->load(['approvals', 'details.barcodeKains', 'details.barcodeLas', 'details.barcodeAuxs']);
+                    $statusService = new \App\Services\ProsesStatusService();
+                    $affectedProsesIds = $statusService->getAffectedProsesIds();
+                    $statusData = $statusService->generateProsesStatus($p, $affectedProsesIds);
+                    event(new \App\Events\ProsesStatusUpdated($p->id, $statusData));
                 }
             } else {
                 // TAPI JIKA TIDAK ADA PROSES AKTIF (Mesin idle dan menyala kembali)
