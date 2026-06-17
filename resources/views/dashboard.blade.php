@@ -6206,6 +6206,9 @@
                 if (statusData.is_paused !== undefined) {
                     proses.is_paused = statusData.is_paused;
                 }
+                if (statusData.updated_at !== undefined && statusData.updated_at !== null) {
+                    proses.updated_at = statusData.updated_at;
+                }
                 if (statusData.mesin_status !== undefined && statusData.mesin_status !== null) {
                     if (!proses.mesin) proses.mesin = {};
                     proses.mesin.status = statusData.mesin_status;
