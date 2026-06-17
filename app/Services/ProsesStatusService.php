@@ -271,6 +271,7 @@ class ProsesStatusService
         return [
             'mulai' => $proses->mulai ? $proses->mulai->format('Y-m-d H:i:s') : null,
             'selesai' => $proses->selesai ? $proses->selesai->format('Y-m-d H:i:s') : null,
+            'updated_at' => $proses->updated_at ? $proses->updated_at->format('Y-m-d H:i:s') : null,
             'bg_color' => $bg,
             'jenis' => $proses->jenis,
             'mode' => $proses->mode ?? 'greige',
