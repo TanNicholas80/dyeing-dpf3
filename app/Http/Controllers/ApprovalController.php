@@ -497,7 +497,7 @@ class ApprovalController extends Controller
                 if ($proses->mesin && $proses->mesin->status) {
                     // Geser 'mulai' maju sebesar durasi pause agar perhitungan elapsed time akurat
                     if ($proses->mulai) {
-                        $pauseDuration = now()->diffInSeconds($proses->updated_at);
+                        $pauseDuration = abs(now()->diffInSeconds($proses->updated_at));
                         if ($pauseDuration > 0) {
                             $proses->mulai = \Carbon\Carbon::parse($proses->mulai)->addSeconds($pauseDuration);
                         }

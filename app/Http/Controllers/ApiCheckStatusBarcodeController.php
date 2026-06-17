@@ -35,7 +35,7 @@ class ApiCheckStatusBarcodeController extends Controller
 
         $provided = $request->header('X-DEVICE-TOKEN');
         if (!$provided || !hash_equals((string) $expected, (string) $provided)) {
-            abort(response()->json([
+            throw new \Illuminate\Http\Exceptions\HttpResponseException(response()->json([
                 'status' => 'error',
                 'message' => 'Unauthorized device',
             ], 401));
@@ -138,7 +138,7 @@ class ApiCheckStatusBarcodeController extends Controller
                         // Geser 'mulai' maju sebesar durasi pause agar perhitungan elapsed time akurat
                         if ($p->is_paused && $p->mulai) {
                             // Waktu mulai pause tepat saat proses diset is_paused = true (yaitu pada $p->updated_at)
-                            $pauseDuration = now()->diffInSeconds($p->updated_at);
+                            $pauseDuration = abs(now()->diffInSeconds($p->updated_at));
                             if ($pauseDuration > 0) {
                                 $p->mulai = \Carbon\Carbon::parse($p->mulai)->addSeconds($pauseDuration);
                             }

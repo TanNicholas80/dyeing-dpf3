@@ -57,7 +57,7 @@ class ProsesStatusService
             $hasPendingChange = $proses->approvals->contains(function ($appr) {
                 return $appr->status === 'pending'
                     && $appr->type === 'FM'
-                    && in_array($appr->action, ['edit_cycle_time', 'delete_proses', 'move_machine', 'swap_position']);
+                    && in_array($appr->action, ['edit_cycle_time', 'delete_proses', 'move_machine', 'swap_position', 'pause_proses']);
             });
             if ($proses->jenis === 'Reproses') {
                 $hasPendingReprocessApproval = $proses->approvals->contains(function ($appr) {
