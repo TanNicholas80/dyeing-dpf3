@@ -200,7 +200,7 @@
             let currentForceAlarmEnabled = null;
 
             setInterval(function() {
-                fetch('/mesin/statuses')
+                fetch('/mesin/statuses?_=' + new Date().getTime(), { cache: 'no-store' })
                     .then(response => response.json())
                     .then(data => {
                         document.querySelectorAll('.status-badge').forEach(function(badge) {

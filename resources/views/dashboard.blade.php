@@ -5164,6 +5164,13 @@
             }
             setInterval(updateRunningTimes, 1000);
             updateRunningTimes(); // jalankan sekali di awal
+            
+            // Trigger background checks for auto-offline every 5 seconds
+            // Ini untuk memastikan logic timeout tetap jalan meskipun menu Data Mesin tidak dibuka
+            setInterval(function() {
+                fetch('/mesin/statuses?_=' + new Date().getTime(), { cache: 'no-store' })
+                    .catch(e => console.error('Error triggering statuses:', e));
+            }, 5000);
         });
 
         // Real-time update warna card berdasarkan status mulai/selesai
