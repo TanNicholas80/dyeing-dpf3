@@ -127,6 +127,7 @@
                                                                             'delete_proses',
                                                                             'move_machine',
                                                                             'swap_position',
+                                                                            'pause_proses',
                                                                         ]);
                                                                 },
                                                             );
