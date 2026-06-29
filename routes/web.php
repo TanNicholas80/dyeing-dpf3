@@ -48,7 +48,7 @@ Route::middleware(['auth', 'prevent-back-history'])->group(function () {
      * - SuperAdmin: full CRUD mesin
      * - FM, VP, PPIC, Owner: hanya melihat mesin (index)
      */
-    Route::middleware('role:super_admin,fm,vp,ppic,owner')->group(function () {
+    Route::middleware('role:super_admin,fm,vp,ppic,owner,spv_listrik')->group(function () {
         Route::get('/mesin', [MesinController::class, 'index'])->name('mesin.index');
     });
     Route::middleware('role:super_admin')->group(function () {

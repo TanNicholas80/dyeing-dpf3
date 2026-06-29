@@ -15,21 +15,29 @@ class BarcodeKain extends Model
     protected $table = 'barcode_kain';
 
     protected $fillable = [
-        'detail_proses_id', 'no_op', 'no_partai', 'barcode', 'matdok', 'item_document', 'qty_gi', 'mesin_id', 'cancel'
+        'detail_proses_id',
+        'no_op',
+        'no_partai',
+        'barcode',
+        'matdok',
+        'item_document',
+        'qty_gi',
+        'mesin_id',
+        'cancel'
     ];
 
     public function mesin()
     {
         return $this->belongsTo(Mesin::class);
     }
-    
+
     public function detailProses()
     {
         return $this->belongsTo(DetailProses::class, 'detail_proses_id', 'id');
     }
 
-    
-                /**
+
+    /**
      * Konfigurasi logging untuk model BarcodeKain.
      */
     public function getActivitylogOptions(): LogOptions
@@ -48,7 +56,7 @@ class BarcodeKain extends Model
      */
     public function tapActivity(Activity $activity, string $eventName): void
     {
-        if (! in_array($eventName, ['created', 'deleted'])) {
+        if (!in_array($eventName, ['created', 'deleted'])) {
             return;
         }
 

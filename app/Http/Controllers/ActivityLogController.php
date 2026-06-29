@@ -19,7 +19,8 @@ class ActivityLogController extends Controller
             $query->where('log_name', '!=', 'Manajemen User');
         }
 
-        $activities = $query->get();
+        // Limit query to prevent memory exhaustion (error 500) if log gets too big
+        $activities = $query->limit(1000)->get();
 
         return view('activity_log.index', compact('activities'));
     }

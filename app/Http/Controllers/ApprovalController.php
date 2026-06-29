@@ -138,8 +138,18 @@ class ApprovalController extends Controller
             // Jika status approved, eksekusi action sesuai jenis action
             if ($validated['status'] === 'approved') {
                 $this->executeApprovedAction($approval);
+                activity('Manajemen Approval')
+                    ->performedOn($approval)
+                    ->causedBy(Auth::user())
+                    ->withProperties(['note' => $approval->note])
+                    ->log("Approval {$approval->action} disetujui secara manual.");
             } elseif ($validated['status'] === 'rejected') {
                 $this->executeRejectedAction($approval);
+                activity('Manajemen Approval')
+                    ->performedOn($approval)
+                    ->causedBy(Auth::user())
+                    ->withProperties(['note' => $approval->note])
+                    ->log("Approval {$approval->action} ditolak secara manual.");
             }
 
             // Commit transaksi
@@ -715,6 +725,11 @@ class ApprovalController extends Controller
             $approval->save();
             
             $controller->executeRejectedAction($approval);
+
+            activity('Manajemen Approval')
+                ->performedOn($approval)
+                ->withProperties(['note' => $approval->note])
+                ->log("Approval {$approval->action} ditolak otomatis oleh sistem (> 10 menit).");
         }
     }
 }
