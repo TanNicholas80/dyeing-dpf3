@@ -799,12 +799,12 @@
             "version": "v3.0.2",
             "source": {
                 "type": "git",
-                "url": "https://github.com/igorw/evenement.git",
+                "url": "https://github.com/evenement/evenement.git",
                 "reference": "0a16b0d71ab13284339abb99d9d2bd813640efbc"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/igorw/evenement/zipball/0a16b0d71ab13284339abb99d9d2bd813640efbc",
+                "url": "https://api.github.com/repos/evenement/evenement/zipball/0a16b0d71ab13284339abb99d9d2bd813640efbc",
                 "reference": "0a16b0d71ab13284339abb99d9d2bd813640efbc",
                 "shasum": ""
             },
