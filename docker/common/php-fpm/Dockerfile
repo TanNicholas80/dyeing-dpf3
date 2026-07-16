@@ -1,12 +1,15 @@
 # Stage 1: Build environment and Composer dependencies
 FROM php:8.4-fpm AS builder
 
-# Install system dependencies and PHP extensions required for Laravel + MySQL/PostgreSQL support
+# Install system dependencies and PHP extensions required for Laravel + MySQL/PostgreSQL/SQL Server support
 # Some dependencies are required for PHP extensions only in the build stage
 # We don't need to install Node.js or build assets, as it was done in the Nginx image
+ENV ACCEPT_EULA=Y
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     unzip \
+    gnupg \
+    apt-transport-https \
     libpq-dev \
     libonig-dev \
     libssl-dev \
@@ -17,6 +20,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpng-dev \
     libjpeg62-turbo-dev \
     libfreetype6-dev \
+    unixodbc-dev \
+    && curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor -o /usr/share/keyrings/microsoft-prod.gpg \
+    && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft-prod.gpg] https://packages.microsoft.com/debian/$(. /etc/os-release && echo ${VERSION_ID%%.*})/prod $(. /etc/os-release && echo $VERSION_CODENAME) main" > /etc/apt/sources.list.d/mssql-release.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends msodbcsql18 \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install -j$(nproc) \
     pdo_mysql \
@@ -30,8 +38,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ftp \
     gd \
     pcntl \
-    && pecl install redis \
-    && docker-php-ext-enable redis \
+    && pecl install redis sqlsrv pdo_sqlsrv \
+    && docker-php-ext-enable redis sqlsrv pdo_sqlsrv \
     && apt-get autoremove -y && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 
@@ -69,7 +77,12 @@ FROM php:8.4-fpm AS production
 # Install only runtime libraries needed in production
 # libfcgi-bin and procps are required for the php-fpm-healthcheck script
 # libpng, libjpeg, libfreetype untuk ext-gd (phpspreadsheet/maatwebsite-excel)
+# msodbcsql18 dibutuhkan runtime untuk koneksi SQL Server (pdo_sqlsrv)
+ENV ACCEPT_EULA=Y
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    gnupg \
+    apt-transport-https \
     libpq-dev \
     libicu-dev \
     libzip-dev \
@@ -78,6 +91,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libfreetype6-dev \
     libfcgi-bin \
     procps \
+    unixodbc \
+    && curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor -o /usr/share/keyrings/microsoft-prod.gpg \
+    && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft-prod.gpg] https://packages.microsoft.com/debian/$(. /etc/os-release && echo ${VERSION_ID%%.*})/prod $(. /etc/os-release && echo $VERSION_CODENAME) main" > /etc/apt/sources.list.d/mssql-release.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends msodbcsql18 \
     && apt-get autoremove -y && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 # Download and install php-fpm health check script
