@@ -1,5 +1,6 @@
 # Stage 1: Build environment and Composer dependencies
-FROM php:8.4-fpm AS builder
+# Pin bookworm: php:8.4-fpm default is Debian trixie, Microsoft ODBC belum signed/stabil di situ
+FROM php:8.4-fpm-bookworm AS builder
 
 # Install system dependencies and PHP extensions required for Laravel + MySQL/PostgreSQL/SQL Server support
 # Some dependencies are required for PHP extensions only in the build stage
@@ -22,7 +23,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libfreetype6-dev \
     unixodbc-dev \
     && curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor -o /usr/share/keyrings/microsoft-prod.gpg \
-    && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft-prod.gpg] https://packages.microsoft.com/debian/$(. /etc/os-release && echo ${VERSION_ID%%.*})/prod $(. /etc/os-release && echo $VERSION_CODENAME) main" > /etc/apt/sources.list.d/mssql-release.list \
+    && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft-prod.gpg] https://packages.microsoft.com/debian/12/prod bookworm main" > /etc/apt/sources.list.d/mssql-release.list \
     && apt-get update \
     && apt-get install -y --no-install-recommends msodbcsql18 \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
@@ -72,7 +73,7 @@ RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local
     && composer dump-autoload --no-dev --classmap-authoritative --no-interaction
 
 # Stage 3: Production environment
-FROM php:8.4-fpm AS production
+FROM php:8.4-fpm-bookworm AS production
 
 # Install only runtime libraries needed in production
 # libfcgi-bin and procps are required for the php-fpm-healthcheck script
@@ -93,7 +94,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     procps \
     unixodbc \
     && curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor -o /usr/share/keyrings/microsoft-prod.gpg \
-    && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft-prod.gpg] https://packages.microsoft.com/debian/$(. /etc/os-release && echo ${VERSION_ID%%.*})/prod $(. /etc/os-release && echo $VERSION_CODENAME) main" > /etc/apt/sources.list.d/mssql-release.list \
+    && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft-prod.gpg] https://packages.microsoft.com/debian/12/prod bookworm main" > /etc/apt/sources.list.d/mssql-release.list \
     && apt-get update \
     && apt-get install -y --no-install-recommends msodbcsql18 \
     && apt-get autoremove -y && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
