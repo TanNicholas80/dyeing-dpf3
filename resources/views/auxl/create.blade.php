@@ -156,10 +156,14 @@
                                             </div>
                                             <div class="col-md-6 col-12">
                                                 <div class="input-group">
+                                                    {{-- <input type="number" step="0.01"
+                                                        name="details[{{ $i }}][konsentrasi]"
+                                                        class="form-control" placeholder="Konsentrasi (kg)"
+                                                        value="{{ $d['konsentrasi'] ?? '' }}" readonly required> --}}
                                                     <input type="number" step="0.01"
                                                         name="details[{{ $i }}][konsentrasi]"
                                                         class="form-control" placeholder="Konsentrasi (kg)"
-                                                        value="{{ $d['konsentrasi'] ?? '' }}" readonly required>
+                                                        value="{{ $d['konsentrasi'] ?? '' }}" required>
                                                     <div class="input-group-append">
                                                         <button type="button" class="btn btn-danger btn-remove-detail ms-2"
                                                             title="Hapus"><i class="fas fa-trash"></i></button>
@@ -178,8 +182,10 @@
                                         </div>
                                         <div class="col-md-6 col-12">
                                             <div class="input-group">
+                                                {{-- <input type="number" step="0.01" name="details[0][konsentrasi]"
+                                                    class="form-control" placeholder="Konsentrasi (kg)" readonly required> --}}
                                                 <input type="number" step="0.01" name="details[0][konsentrasi]"
-                                                    class="form-control" placeholder="Konsentrasi (kg)" readonly required>
+                                                    class="form-control" placeholder="Konsentrasi (kg)" required>
                                                 <div class="input-group-append">
                                                     <button type="button" class="btn btn-danger btn-remove-detail ms-2"
                                                         title="Hapus"><i class="fas fa-trash"></i></button>
@@ -297,8 +303,7 @@
 
             let detailIndex = Number(document.getElementById('initial-detail-index')?.value || 1);
 
-            // Handler untuk menambah detail row
-            $('#btn-add-detail').on('click', function() {
+             $('#btn-add-detail').on('click', function() {
                 const newRow = $(`
                     <div class="row detail-row mb-2">
                         <div class="col-md-6 col-12 mb-2 mb-md-0">
@@ -306,7 +311,8 @@
                         </div>
                         <div class="col-md-6 col-12">
                             <div class="input-group">
-                                <input type="number" step="0.01" name="details[${detailIndex}][konsentrasi]" class="form-control" placeholder="Konsentrasi (kg)" readonly required>
+                                <!-- <input type="number" step="0.01" name="details[${detailIndex}][konsentrasi]" class="form-control" placeholder="Konsentrasi (kg)" readonly required> -->
+                                <input type="number" step="0.01" name="details[${detailIndex}][konsentrasi]" class="form-control" placeholder="Konsentrasi (kg)" required>
                                 <div class="input-group-append">
                                     <button type="button" class="btn btn-danger btn-remove-detail ms-2" title="Hapus">
                                         <i class="fas fa-trash"></i>

@@ -123,7 +123,7 @@
                                         </div>
                                         <div class="col-md-6 col-12">
                                             <div class="input-group">
-                                                <input
+                                                {{-- <input
                                                     type="number"
                                                     step="0.01"
                                                     name="details[{{ $i }}][konsentrasi]"
@@ -131,6 +131,15 @@
                                                     value="{{ $detail->konsentrasi }}"
                                                     placeholder="Konsentrasi (kg)"
                                                     readonly
+                                                    required
+                                                > --}}
+                                                <input
+                                                    type="number"
+                                                    step="0.01"
+                                                    name="details[{{ $i }}][konsentrasi]"
+                                                    class="form-control"
+                                                    value="{{ $detail->konsentrasi }}"
+                                                    placeholder="Konsentrasi (kg)"
                                                     required
                                                 >
                                                 <div class="input-group-append">
@@ -271,7 +280,7 @@
 
             let detailIndex = parseInt('{{ count($auxl->details) }}', 10);
 
-            // Handler untuk menambah detail row (disamakan dengan create)
+             // Handler untuk menambah detail row (disamakan dengan create)
             $('#btn-add-detail').on('click', function () {
                 const row = $(`
                     <div class="row detail-row mb-2">
@@ -280,13 +289,21 @@
                         </div>
                         <div class="col-md-6 col-12">
                             <div class="input-group">
-                                <input
+                                <!-- <input
                                     type="number"
                                     step="0.01"
                                     name="details[${detailIndex}][konsentrasi]"
                                     class="form-control"
                                     placeholder="Konsentrasi (kg)"
                                     readonly
+                                    required
+                                > -->
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    name="details[${detailIndex}][konsentrasi]"
+                                    class="form-control"
+                                    placeholder="Konsentrasi (kg)"
                                     required
                                 >
                                 <div class="input-group-append">
