@@ -20,6 +20,8 @@ class Proses extends Model
         'jenis_op',
         'cycle_time',
         'cycle_time_actual',
+        'qty_dye_stuff',
+        'qty_aux',
         'mulai',
         'selesai',
         'mesin_id',
@@ -32,6 +34,8 @@ class Proses extends Model
         'selesai' => 'datetime',
         'cycle_time' => 'integer',
         'cycle_time_actual' => 'integer',
+        'qty_dye_stuff' => 'integer',
+        'qty_aux' => 'integer',
         'order' => 'integer',
         'is_paused' => 'boolean',
     ];

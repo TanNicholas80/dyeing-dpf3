@@ -274,15 +274,13 @@ class DashboardController extends Controller
                 $laInitialScanned = 0;
                 $auxInitialScanned = 0;
                 foreach ($proses->details ?? [] as $d) {
-                    if ($d->barcodeLas && $d->barcodeLas->where('cancel', false)->filter(fn($b) => $b->approval_id === null)->count() > 0) {
-                        $laInitialScanned = 1;
-                        break;
+                    if ($d->barcodeLas) {
+                        $laInitialScanned += $d->barcodeLas->where('cancel', false)->where('approval_id', null)->count();
                     }
                 }
                 foreach ($proses->details ?? [] as $d) {
-                    if ($d->barcodeAuxs && $d->barcodeAuxs->where('cancel', false)->filter(fn($b) => $b->approval_id === null)->count() > 0) {
-                        $auxInitialScanned = 1;
-                        break;
+                    if ($d->barcodeAuxs) {
+                        $auxInitialScanned += $d->barcodeAuxs->where('cancel', false)->where('approval_id', null)->count();
                     }
                 }
                 $laToppingRequired = collect($proses->approvals ?? [])->where('action', 'topping_la')->where('status', 'approved')->count();
@@ -301,12 +299,12 @@ class DashboardController extends Controller
                         }
                     }
                 }
-                $laRequired = 1 + $laToppingRequired;
-                $auxRequired = 1 + $auxToppingRequired;
+                $laRequired = ($proses->qty_dye_stuff ?? 1) + $laToppingRequired;
+                $auxRequired = ($proses->qty_aux ?? 1) + $auxToppingRequired;
                 $laComplete = ($laInitialScanned + $laToppingScanned) >= $laRequired;
                 $auxComplete = ($auxInitialScanned + $auxToppingScanned) >= $auxRequired;
-                $laInitialComplete = $laInitialScanned >= 1;
-                $auxInitialComplete = $auxInitialScanned >= 1;
+                $laInitialComplete = $laInitialScanned >= ($proses->qty_dye_stuff ?? 1);
+                $auxInitialComplete = $auxInitialScanned >= ($proses->qty_aux ?? 1);
                 $hasToppingLa = collect($proses->approvals ?? [])->contains(fn($a) => ($a->action ?? '') === 'topping_la');
                 $hasToppingAux = collect($proses->approvals ?? [])->contains(fn($a) => ($a->action ?? '') === 'topping_aux');
                 $pendingToppingLa = collect($proses->approvals ?? [])->contains(fn($a) => ($a->action ?? '') === 'topping_la' && ($a->status ?? '') === 'pending');

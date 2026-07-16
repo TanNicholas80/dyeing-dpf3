@@ -170,22 +170,20 @@
                                                             }
                                                             $laInitialScanned = 0;
                                                             foreach ($proses->details ?? [] as $d) {
-                                                                if ($d->barcodeLas && $d->barcodeLas->where('cancel', false)->filter(fn($b) => $b->approval_id === null)->count() > 0) {
-                                                                    $laInitialScanned = 1;
-                                                                    break;
+                                                                if ($d->barcodeLas) {
+                                                                    $laInitialScanned += $d->barcodeLas->where('cancel', false)->where('approval_id', null)->count();
                                                                 }
                                                             }
                                                             $auxInitialScanned = 0;
                                                             foreach ($proses->details ?? [] as $d) {
-                                                                if ($d->barcodeAuxs && $d->barcodeAuxs->where('cancel', false)->filter(fn($b) => $b->approval_id === null)->count() > 0) {
-                                                                    $auxInitialScanned = 1;
-                                                                    break;
+                                                                if ($d->barcodeAuxs) {
+                                                                    $auxInitialScanned += $d->barcodeAuxs->where('cancel', false)->where('approval_id', null)->count();
                                                                 }
                                                             }
-                                                            $laComplete = ($laInitialScanned + $laToppingScanned) >= (1 + $laToppingRequired);
-                                                            $auxComplete = ($auxInitialScanned + $auxToppingScanned) >= (1 + $auxToppingRequired);
-                                                            $laInitialComplete = $laInitialScanned >= 1;
-                                                            $auxInitialComplete = $auxInitialScanned >= 1;
+                                                            $laComplete = ($laInitialScanned + $laToppingScanned) >= (($proses->qty_dye_stuff ?? 1) + $laToppingRequired);
+                                                            $auxComplete = ($auxInitialScanned + $auxToppingScanned) >= (($proses->qty_aux ?? 1) + $auxToppingRequired);
+                                                            $laInitialComplete = $laInitialScanned >= ($proses->qty_dye_stuff ?? 1);
+                                                            $auxInitialComplete = $auxInitialScanned >= ($proses->qty_aux ?? 1);
                                                             if ($barcodeKainOptional) {
                                                                 $blockColors = [$laInitialComplete ? 'green' : 'red', $auxInitialComplete ? 'green' : 'red'];
                                                             } else {

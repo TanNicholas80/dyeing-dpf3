@@ -286,6 +286,8 @@ class ProsesController extends Controller
             'jenis' => 'required|in:Produksi,Maintenance,Reproses',
             'mesin_id' => 'required|exists:mesins,id',
             'cycle_time' => 'required',
+            'qty_dye_stuff' => 'nullable|integer|in:1,2,3',
+            'qty_aux' => 'nullable|integer|in:1,2,3',
         ];
 
         // Finish mode: hanya Reproses
@@ -294,6 +296,8 @@ class ProsesController extends Controller
         }
 
         if ($request->jenis !== 'Maintenance') {
+            $rules['qty_dye_stuff'] = 'required|integer|in:1,2,3';
+            $rules['qty_aux'] = 'required|integer|in:1,2,3';
             $rules += [
                 'jenis_op' => 'required|in:Single,Multiple',
                 // Default: minimal 1 detail OP
@@ -503,6 +507,8 @@ class ProsesController extends Controller
                 'mode' => $validated['mode'] ?? 'greige',
                 'jenis_op' => $validated['jenis_op'] ?? null,
                 'cycle_time' => $validated['cycle_time'],
+                'qty_dye_stuff' => $validated['qty_dye_stuff'] ?? 1,
+                'qty_aux' => $validated['qty_aux'] ?? 1,
                 'mesin_id' => $validated['mesin_id'],
                 'order' => $validated['order'],
             ];
@@ -1048,13 +1054,13 @@ class ProsesController extends Controller
 
             // Validasi: tolak scan LA jika kebutuhan awal + topping sudah terpenuhi
             $laInitialScanned = BarcodeLa::whereHas('detailProses', fn($q) => $q->where('proses_id', $id))
-                ->whereNull('approval_id')->where('cancel', false)->exists() ? 1 : 0;
+                ->whereNull('approval_id')->where('cancel', false)->count();
             $laToppingReq = Approval::where('proses_id', $id)->where('type', 'KEPALA_SHIFT')
                 ->where('action', 'topping_la')->where('status', 'approved')->count();
             $laToppingScn = Approval::where('proses_id', $id)->where('type', 'KEPALA_SHIFT')
                 ->where('action', 'topping_la')->where('status', 'approved')
                 ->whereHas('barcodeLas', fn($q) => $q->where('cancel', false))->count();
-            $laIsComplete = ($laInitialScanned + $laToppingScn) >= (1 + $laToppingReq);
+            $laIsComplete = ($laInitialScanned + $laToppingScn) >= (($proses->qty_dye_stuff ?? 1) + $laToppingReq);
             if ($laIsComplete) {
                 $msg = 'Kebutuhan barcode LA (awal + topping) sudah terpenuhi. Tidak dapat menambah scan.';
                 if ($request->ajax() || $request->wantsJson()) {
@@ -1317,13 +1323,13 @@ class ProsesController extends Controller
 
             // Validasi: tolak scan AUX jika kebutuhan awal + topping sudah terpenuhi
             $auxInitialScanned = BarcodeAux::whereHas('detailProses', fn($q) => $q->where('proses_id', $id))
-                ->whereNull('approval_id')->where('cancel', false)->exists() ? 1 : 0;
+                ->whereNull('approval_id')->where('cancel', false)->count();
             $auxToppingReq = Approval::where('proses_id', $id)->where('type', 'KEPALA_SHIFT')
                 ->where('action', 'topping_aux')->where('status', 'approved')->count();
             $auxToppingScn = Approval::where('proses_id', $id)->where('type', 'KEPALA_SHIFT')
                 ->where('action', 'topping_aux')->where('status', 'approved')
                 ->whereHas('barcodeAuxs', fn($q) => $q->where('cancel', false))->count();
-            $auxIsComplete = ($auxInitialScanned + $auxToppingScn) >= (1 + $auxToppingReq);
+            $auxIsComplete = ($auxInitialScanned + $auxToppingScn) >= (($proses->qty_aux ?? 1) + $auxToppingReq);
             if ($auxIsComplete) {
                 $msg = 'Kebutuhan barcode AUX (awal + topping) sudah terpenuhi. Tidak dapat menambah scan.';
                 if ($request->ajax() || $request->wantsJson()) {
@@ -1918,11 +1924,11 @@ class ProsesController extends Controller
             }
         }
 
-        // Hitung progress LA: 1 awal + topping yang di-approve
+        // Hitung progress LA: qty_dye_stuff awal + topping yang di-approve
         $laInitialScanned = BarcodeLa::whereHas('detailProses', fn($q) => $q->where('proses_id', $id))
             ->whereNull('approval_id')
             ->where('cancel', false)
-            ->exists() ? 1 : 0;
+            ->count();
         $laToppingRequired = Approval::where('proses_id', $id)
             ->where('type', 'KEPALA_SHIFT')
             ->where('action', 'topping_la')
@@ -1934,24 +1940,24 @@ class ProsesController extends Controller
             ->where('status', 'approved')
             ->whereHas('barcodeLas', fn($q) => $q->where('cancel', false))
             ->count();
-        $laRequired = 1 + $laToppingRequired;
+        $laRequired = ($proses->qty_dye_stuff ?? 1) + $laToppingRequired;
         $laScanned = $laInitialScanned + $laToppingScanned;
         $laIsComplete = $laScanned >= $laRequired;
         $laProgress = [
             'required' => $laRequired,
             'scanned' => $laScanned,
-            'initial_required' => 1,
+            'initial_required' => $proses->qty_dye_stuff ?? 1,
             'topping_required' => $laToppingRequired,
             'initial_scanned' => $laInitialScanned,
             'topping_scanned' => $laToppingScanned,
             'is_complete' => $laIsComplete,
         ];
 
-        // Hitung progress AUX: 1 awal + topping yang di-approve
+        // Hitung progress AUX: qty_aux awal + topping yang di-approve
         $auxInitialScanned = BarcodeAux::whereHas('detailProses', fn($q) => $q->where('proses_id', $id))
             ->whereNull('approval_id')
             ->where('cancel', false)
-            ->exists() ? 1 : 0;
+            ->count();
         $auxToppingRequired = Approval::where('proses_id', $id)
             ->where('type', 'KEPALA_SHIFT')
             ->where('action', 'topping_aux')
@@ -1963,13 +1969,13 @@ class ProsesController extends Controller
             ->where('status', 'approved')
             ->whereHas('barcodeAuxs', fn($q) => $q->where('cancel', false))
             ->count();
-        $auxRequired = 1 + $auxToppingRequired;
+        $auxRequired = ($proses->qty_aux ?? 1) + $auxToppingRequired;
         $auxScanned = $auxInitialScanned + $auxToppingScanned;
         $auxIsComplete = $auxScanned >= $auxRequired;
         $auxProgress = [
             'required' => $auxRequired,
             'scanned' => $auxScanned,
-            'initial_required' => 1,
+            'initial_required' => $proses->qty_aux ?? 1,
             'topping_required' => $auxToppingRequired,
             'initial_scanned' => $auxInitialScanned,
             'topping_scanned' => $auxToppingScanned,

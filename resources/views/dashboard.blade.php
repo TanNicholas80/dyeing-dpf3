@@ -733,22 +733,20 @@
                                                                     }
                                                                     $laInitialScanned = 0;
                                                                     foreach ($proses->details ?? [] as $d) {
-                                                                        if ($d->barcodeLas && $d->barcodeLas->where('cancel', false)->filter(fn($b) => $b->approval_id === null)->count() > 0) {
-                                                                            $laInitialScanned = 1;
-                                                                            break;
+                                                                        if ($d->barcodeLas) {
+                                                                            $laInitialScanned += $d->barcodeLas->where('cancel', false)->where('approval_id', null)->count();
                                                                         }
                                                                     }
                                                                     $auxInitialScanned = 0;
                                                                     foreach ($proses->details ?? [] as $d) {
-                                                                        if ($d->barcodeAuxs && $d->barcodeAuxs->where('cancel', false)->filter(fn($b) => $b->approval_id === null)->count() > 0) {
-                                                                            $auxInitialScanned = 1;
-                                                                            break;
+                                                                        if ($d->barcodeAuxs) {
+                                                                            $auxInitialScanned += $d->barcodeAuxs->where('cancel', false)->where('approval_id', null)->count();
                                                                         }
                                                                     }
-                                                                    $laComplete = ($laInitialScanned + $laToppingScanned) >= (1 + $laToppingRequired);
-                                                                    $auxComplete = ($auxInitialScanned + $auxToppingScanned) >= (1 + $auxToppingRequired);
-                                                                    $laInitialComplete = $laInitialScanned >= 1;
-                                                                    $auxInitialComplete = $auxInitialScanned >= 1;
+                                                                    $laComplete = ($laInitialScanned + $laToppingScanned) >= (($proses->qty_dye_stuff ?? 1) + $laToppingRequired);
+                                                                    $auxComplete = ($auxInitialScanned + $auxToppingScanned) >= (($proses->qty_aux ?? 1) + $auxToppingRequired);
+                                                                    $laInitialComplete = $laInitialScanned >= ($proses->qty_dye_stuff ?? 1);
+                                                                    $auxInitialComplete = $auxInitialScanned >= ($proses->qty_aux ?? 1);
                                                                     if ($barcodeKainOptional) {
                                                                         $blockColors = [$laInitialComplete ? 'green' : 'red', $auxInitialComplete ? 'green' : 'red'];
                                                                     } else {
@@ -1300,6 +1298,32 @@
                                         <input type="text" name="cycle_time" class="form-control"
                                             placeholder="Jam:Menit:Detik" pattern="^[0-9]{2}:[0-9]{2}:[0-9]{2}$"
                                             title="Format durasi Jam:Menit:Detik" required>
+                                    </div>
+                                </div>
+
+                                <!-- Dye Stuff -->
+                                <div class="col-md-6 hide-if-maintenance">
+                                    <div class="form-group">
+                                        <label class="form-label fw-semibold">Dye Stuff</label>
+                                        <select name="qty_dye_stuff" id="qty_dye_stuff" class="form-control" required>
+                                            <option value="" disabled selected>-- Pilih --</option>
+                                            <option value="1">1</option>
+                                            <option value="2">2</option>
+                                            <option value="3">3</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <!-- AUX -->
+                                <div class="col-md-6 hide-if-maintenance">
+                                    <div class="form-group">
+                                        <label class="form-label fw-semibold">AUX</label>
+                                        <select name="qty_aux" id="qty_aux" class="form-control" required>
+                                            <option value="" disabled selected>-- Pilih --</option>
+                                            <option value="1">1</option>
+                                            <option value="2">2</option>
+                                            <option value="3">3</option>
+                                        </select>
                                     </div>
                                 </div>
 
@@ -3678,22 +3702,23 @@
                         }
                         $('#barcode-la-badges').html(laBadges);
                         $('#barcode-la-buttons').html(laBtns);
-
+ 
                         // Progress LA: keterangan kebutuhan awal + topping
                         const laProgress = data.la_progress || {};
                         const laReq = laProgress.required ?? 1;
                         const laScn = laProgress.scanned ?? 0;
                         const laComplete = laProgress.is_complete === true;
                         const laToppingReq = laProgress.topping_required ?? 0;
+                        const laInitialReq = laProgress.initial_required ?? 1;
                         let laProgressHtml = '';
                         if (laToppingReq > 0) {
-                            laProgressHtml = `Kebutuhan: 1 awal + ${laToppingReq} topping (TD) = ${laReq} total | Sudah: ${laScn} | ${laComplete ? '<span style="color:#43a047;"><i class="fas fa-check"></i> Lengkap</span>' : '<span style="color:#c62828;">Kurang: ' + (laReq - laScn) + '</span>'}`;
+                            laProgressHtml = `Kebutuhan: ${laInitialReq} awal + ${laToppingReq} topping (TD) = ${laReq} total | Sudah: ${laScn} | ${laComplete ? '<span style="color:#43a047;"><i class="fas fa-check"></i> Lengkap</span>' : '<span style="color:#c62828;">Kurang: ' + (laReq - laScn) + '</span>'}`;
                         } else {
-                            laProgressHtml = `Kebutuhan: 1 awal | Sudah: ${laScn} | ${laComplete ? '<span style="color:#43a047;"><i class="fas fa-check"></i> Lengkap</span>' : '<span style="color:#c62828;">Kurang: ' + (1 - laScn) + '</span>'}`;
+                            laProgressHtml = `Kebutuhan: ${laInitialReq} awal | Sudah: ${laScn} | ${laComplete ? '<span style="color:#43a047;"><i class="fas fa-check"></i> Lengkap</span>' : '<span style="color:#c62828;">Kurang: ' + (laInitialReq - laScn) + '</span>'}`;
                         }
                         const laProgressBg = laComplete ? '#e8f5e9' : '#fff3e0';
                         $('#barcode-la-progress').html('<div style="padding:4px 8px;background:' + laProgressBg + ';border-radius:4px;">' + laProgressHtml + '</div>').show();
-
+ 
                         let auxBadges = '';
                         if (data.pending_topping_aux) {
                             auxBadges += ' <span class="badge badge-warning" title="Topping Auxiliaries - Menunggu approval">TA</span>';
@@ -3708,18 +3733,19 @@
                         }
                         $('#barcode-aux-badges').html(auxBadges);
                         $('#barcode-aux-buttons').html(auxBtns);
-
+ 
                         // Progress AUX: keterangan kebutuhan awal + topping
                         const auxProgress = data.aux_progress || {};
                         const auxReq = auxProgress.required ?? 1;
                         const auxScn = auxProgress.scanned ?? 0;
                         const auxComplete = auxProgress.is_complete === true;
                         const auxToppingReq = auxProgress.topping_required ?? 0;
+                        const auxInitialReq = auxProgress.initial_required ?? 1;
                         let auxProgressHtml = '';
                         if (auxToppingReq > 0) {
-                            auxProgressHtml = `Kebutuhan: 1 awal + ${auxToppingReq} topping (TA) = ${auxReq} total | Sudah: ${auxScn} | ${auxComplete ? '<span style="color:#43a047;"><i class="fas fa-check"></i> Lengkap</span>' : '<span style="color:#c62828;">Kurang: ' + (auxReq - auxScn) + '</span>'}`;
+                            auxProgressHtml = `Kebutuhan: ${auxInitialReq} awal + ${auxToppingReq} topping (TA) = ${auxReq} total | Sudah: ${auxScn} | ${auxComplete ? '<span style="color:#43a047;"><i class="fas fa-check"></i> Lengkap</span>' : '<span style="color:#c62828;">Kurang: ' + (auxReq - auxScn) + '</span>'}`;
                         } else {
-                            auxProgressHtml = `Kebutuhan: 1 awal | Sudah: ${auxScn} | ${auxComplete ? '<span style="color:#43a047;"><i class="fas fa-check"></i> Lengkap</span>' : '<span style="color:#c62828;">Kurang: ' + (1 - auxScn) + '</span>'}`;
+                            auxProgressHtml = `Kebutuhan: ${auxInitialReq} awal | Sudah: ${auxScn} | ${auxComplete ? '<span style="color:#43a047;"><i class="fas fa-check"></i> Lengkap</span>' : '<span style="color:#c62828;">Kurang: ' + (auxInitialReq - auxScn) + '</span>'}`;
                         }
                         const auxProgressBg = auxComplete ? '#e8f5e9' : '#fff3e0';
                         $('#barcode-aux-progress').html('<div style="padding:4px 8px;background:' + auxProgressBg + ';border-radius:4px;">' + auxProgressHtml + '</div>').show();

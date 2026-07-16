@@ -154,16 +154,14 @@ class ProsesStatusService
                 if ($proses->approvals && $proses->approvals->isNotEmpty()) {
                     $laInitialScanned = 0;
                     foreach ($proses->details ?? [] as $d) {
-                        if ($d->barcodeLas && $d->barcodeLas->where('cancel', false)->filter(fn ($b) => $b->approval_id === null)->count() > 0) {
-                            $laInitialScanned = 1;
-                            break;
+                        if ($d->barcodeLas) {
+                            $laInitialScanned += $d->barcodeLas->where('cancel', false)->where('approval_id', null)->count();
                         }
                     }
                     $auxInitialScanned = 0;
                     foreach ($proses->details ?? [] as $d) {
-                        if ($d->barcodeAuxs && $d->barcodeAuxs->where('cancel', false)->filter(fn ($b) => $b->approval_id === null)->count() > 0) {
-                            $auxInitialScanned = 1;
-                            break;
+                        if ($d->barcodeAuxs) {
+                            $auxInitialScanned += $d->barcodeAuxs->where('cancel', false)->where('approval_id', null)->count();
                         }
                     }
                     $laToppingRequired = collect($proses->approvals)->where('action', 'topping_la')->where('status', 'approved')->count();
@@ -180,8 +178,8 @@ class ProsesStatusService
                             if ($ba && $ba->where('cancel', false)->count() > 0) $auxToppingScanned++;
                         }
                     }
-                    $laComplete = ($laInitialScanned + $laToppingScanned) >= (1 + $laToppingRequired);
-                    $auxComplete = ($auxInitialScanned + $auxToppingScanned) >= (1 + $auxToppingRequired);
+                    $laComplete = ($laInitialScanned + $laToppingScanned) >= (($proses->qty_dye_stuff ?? 1) + $laToppingRequired);
+                    $auxComplete = ($auxInitialScanned + $auxToppingScanned) >= (($proses->qty_aux ?? 1) + $auxToppingRequired);
                 }
                 $barcodeKainOptional = $proses->isBarcodeKainOptionalForLaAux();
                 if ($proses->jenis !== 'Maintenance') {
@@ -233,16 +231,14 @@ class ProsesStatusService
             [$tdColor, $taColor] = self::exclusiveToppingIndicatorColors($tdColor, $taColor);
             $laInitialScanned = 0;
             foreach ($proses->details ?? [] as $d) {
-                if ($d->barcodeLas && $d->barcodeLas->where('cancel', false)->filter(fn ($b) => $b->approval_id === null)->count() > 0) {
-                    $laInitialScanned = 1;
-                    break;
+                if ($d->barcodeLas) {
+                    $laInitialScanned += $d->barcodeLas->where('cancel', false)->where('approval_id', null)->count();
                 }
             }
             $auxInitialScanned = 0;
             foreach ($proses->details ?? [] as $d) {
-                if ($d->barcodeAuxs && $d->barcodeAuxs->where('cancel', false)->filter(fn ($b) => $b->approval_id === null)->count() > 0) {
-                    $auxInitialScanned = 1;
-                    break;
+                if ($d->barcodeAuxs) {
+                    $auxInitialScanned += $d->barcodeAuxs->where('cancel', false)->where('approval_id', null)->count();
                 }
             }
             $laToppingRequired = collect($proses->approvals)->where('action', 'topping_la')->where('status', 'approved')->count();
@@ -259,10 +255,10 @@ class ProsesStatusService
                     if ($ba && $ba->where('cancel', false)->count() > 0) $auxToppingScanned++;
                 }
             }
-            $laComplete = ($laInitialScanned + $laToppingScanned) >= (1 + $laToppingRequired);
-            $auxComplete = ($auxInitialScanned + $auxToppingScanned) >= (1 + $auxToppingRequired);
-            $laInitialComplete = $laInitialScanned >= 1;
-            $auxInitialComplete = $auxInitialScanned >= 1;
+            $laComplete = ($laInitialScanned + $laToppingScanned) >= (($proses->qty_dye_stuff ?? 1) + $laToppingRequired);
+            $auxComplete = ($auxInitialScanned + $auxToppingScanned) >= (($proses->qty_aux ?? 1) + $auxToppingRequired);
+            $laInitialComplete = $laInitialScanned >= ($proses->qty_dye_stuff ?? 1);
+            $auxInitialComplete = $auxInitialScanned >= ($proses->qty_aux ?? 1);
         } else {
             $laInitialComplete = $hasBarcodeLa ?? false;
             $auxInitialComplete = $hasBarcodeAux ?? false;
