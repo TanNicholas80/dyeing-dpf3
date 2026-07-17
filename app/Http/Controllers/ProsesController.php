@@ -1983,10 +1983,10 @@ class ProsesController extends Controller
         ];
 
         $userRole = Auth::user()->role ?? null;
-        $canScanLa = (in_array($userRole, ['super_admin', 'ppic'])
+        $canScanLa = (in_array($userRole, ['super_admin', 'ppic', 'operator'])
             || ($userRole === 'kepala_ruangan' && ($approvedToppingLa || $laIsComplete) && $allComplete))
             && $allComplete;
-        $canScanAux = (in_array($userRole, ['super_admin', 'ppic'])
+        $canScanAux = (in_array($userRole, ['super_admin', 'ppic', 'operator'])
             || ($userRole === 'kepala_ruangan' && ($approvedToppingAux || $auxIsComplete) && $allComplete))
             && $allComplete;
 

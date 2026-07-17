@@ -146,8 +146,8 @@
                         $canApprovalVp = in_array($role, ['super_admin', 'vp']);
                         $canApprovalKepalaShift = in_array($role, ['super_admin', 'kepala_shift']);
                         $canUser = in_array($role, ['super_admin']);
-                        $canMesin = in_array($role, ['super_admin', 'fm', 'vp', 'ppic', 'owner', 'spv_listrik']);
-                        $canAux = in_array($role, ['super_admin', 'aux']);
+                        $canMesin = in_array($role, ['super_admin', 'fm', 'vp', 'ppic', 'owner', 'spv_listrik', 'scm']);
+                        $canAux = in_array($role, ['super_admin', 'aux', 'scm']);
                         $canLog = in_array($role, ['super_admin', 'fm', 'vp']);
                         @endphp
 
@@ -285,8 +285,8 @@
                         $canApprovalVp = in_array($role, ['super_admin', 'vp', 'owner']);
                         $canApprovalKepalaShift = in_array($role, ['super_admin', 'kepala_shift']);
                         $canUser = in_array($role, ['super_admin', 'owner']);
-                        $canMesin = in_array($role, ['super_admin', 'fm', 'vp', 'ppic', 'owner', 'spv_listrik']);
-                        $canAux = in_array($role, ['super_admin', 'aux', 'owner']);
+                        $canMesin = in_array($role, ['super_admin', 'fm', 'vp', 'ppic', 'owner', 'spv_listrik', 'scm']);
+                        $canAux = in_array($role, ['super_admin', 'aux', 'owner', 'scm']);
                         $canLog = in_array($role, ['super_admin', 'fm', 'vp']);
                         @endphp
 

@@ -6325,7 +6325,7 @@
                         });
 
                         // Update GDA untuk detail ini menggunakan fungsi global
-                        updateGDAIndicatorsGlobal(prosesId, detailId, hasKain, hasLa, hasAux);
+                        window.updateGDAIndicators(prosesId, detailId, hasKain, hasLa, hasAux);
                     });
                 } else {
                     console.warn('No gda_details in statusData:', statusData);

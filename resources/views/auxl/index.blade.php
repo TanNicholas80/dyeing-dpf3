@@ -29,7 +29,7 @@
                                 <h3 class="card-title">Data Auxiliary </h3>
                                 @php
                                     $userRole = strtolower(Auth::user()->role ?? '');
-                                    $canManageAuxl = $userRole !== 'owner';
+                                    $canManageAuxl = !in_array($userRole, ['owner', 'scm']);
                                     $isSuperAdmin = $userRole === 'super_admin';
                                 @endphp
                                 <div class="d-flex justify-content-end" style="gap: 0.75rem;">

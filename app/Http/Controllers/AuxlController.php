@@ -59,11 +59,17 @@ class AuxlController extends Controller
 
     public function create()
     {
+        if (Auth::user()->role === 'scm') {
+            abort(403, 'Unauthorized action.');
+        }
         return view('auxl.create');
     }
 
     public function store(Request $request)
     {
+        if (Auth::user()->role === 'scm') {
+            abort(403, 'Unauthorized action.');
+        }
         $data = $request->validate([
             'jenis' => 'required',
             'code' => 'required',
@@ -112,12 +118,18 @@ class AuxlController extends Controller
 
     public function edit($id)
     {
+        if (Auth::user()->role === 'scm') {
+            abort(403, 'Unauthorized action.');
+        }
         $auxl = Auxl::with('details')->findOrFail($id);
         return view('auxl.edit', compact('auxl'));
     }
 
     public function update(Request $request, $id)
     {
+        if (Auth::user()->role === 'scm') {
+            abort(403, 'Unauthorized action.');
+        }
         $data = $request->validate([
             'jenis' => 'required',
             'code' => 'required',

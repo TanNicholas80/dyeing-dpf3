@@ -71,6 +71,7 @@
                                     <option value="kepala_ruangan" {{ old('role') == 'kepala_ruangan' ? 'selected' : '' }}>Kepala Ruangan</option>
                                     <option value="kepala_shift" {{ old('role') == 'kepala_shift' ? 'selected' : '' }}>Kepala Shift</option>
                                     <option value="spv_listrik" {{ old('role') == 'spv_listrik' ? 'selected' : '' }}>SPV Listrik</option>
+                                    <option value="scm" {{ old('role') == 'scm' ? 'selected' : '' }}>SCM</option>
                                 </select>
                                 @error('role')
                                     <small class="text-danger">{{ $message }}</small>

@@ -48,7 +48,7 @@ Route::middleware(['auth', 'prevent-back-history'])->group(function () {
      * - SuperAdmin: full CRUD mesin
      * - FM, VP, PPIC, Owner: hanya melihat mesin (index)
      */
-    Route::middleware('role:super_admin,fm,vp,ppic,owner,spv_listrik')->group(function () {
+    Route::middleware('role:super_admin,fm,vp,ppic,owner,spv_listrik,scm')->group(function () {
         Route::get('/mesin', [MesinController::class, 'index'])->name('mesin.index');
     });
     Route::middleware('role:super_admin')->group(function () {
@@ -74,11 +74,11 @@ Route::middleware(['auth', 'prevent-back-history'])->group(function () {
         Route::delete('/proses/{id}/delete', [ProsesController::class, 'destroy'])->name('proses.delete');
     });
 
-    Route::middleware('role:super_admin,mesin,ppic')->group(function () {
+    Route::middleware('role:super_admin,mesin,ppic,operator')->group(function () {
         // Tambah barcode (mesin hanya barcode kain; LA/AUX: ppic, super_admin, kepala_ruangan)
         Route::post('/proses/{id}/barcode/kain', [ProsesController::class, 'barcodeKain'])->name('proses.barcode.kain');
     });
-    Route::middleware('role:super_admin,ppic,kepala_ruangan')->group(function () {
+    Route::middleware('role:super_admin,ppic,kepala_ruangan,operator')->group(function () {
         Route::post('/proses/{id}/barcode/la', [ProsesController::class, 'barcodeLa'])->name('proses.barcode.la');
         Route::post('/proses/{id}/barcode/aux', [ProsesController::class, 'barcodeAux'])->name('proses.barcode.aux');
     });
@@ -90,7 +90,7 @@ Route::middleware(['auth', 'prevent-back-history'])->group(function () {
     });
 
     // View barcode: SuperAdmin, DS, Mesin, PPIC, FM, VP, Owner (untuk melihat barcode yang sudah ditambahkan)
-    Route::middleware('role:super_admin,ds,mesin,ppic,fm,vp,kepala_ruangan,kepala_shift,owner')->group(function () {
+    Route::middleware('role:super_admin,ds,mesin,ppic,fm,vp,kepala_ruangan,kepala_shift,owner,operator,scm')->group(function () {
         Route::get('/proses/{id}/barcodes', [ProsesController::class, 'barcodes'])->name('proses.barcodes');
     });
 
@@ -130,7 +130,7 @@ Route::middleware(['auth', 'prevent-back-history'])->group(function () {
      * - SuperAdmin: akses penuh AUX
      * - Owner: minimal bisa melihat AUX (sementara pakai resource penuh, jika perlu bisa dibatasi di controller)
      */
-    Route::middleware('role:super_admin,aux')->group(function () {
+    Route::middleware('role:super_admin,aux,scm')->group(function () {
         Route::resource('aux', AuxlController::class)->except(['destroy']);
     });
     Route::middleware('role:super_admin')->group(function () {

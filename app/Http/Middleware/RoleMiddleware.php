@@ -34,7 +34,7 @@ class RoleMiddleware
 
         $dashboardRoles = [
             'super_admin', 'ds', 'mesin', 'ppic', 'fm', 'vp', 'owner',
-            'kepala_ruangan', 'kepala_shift', 'dashboard', 'operator'
+            'kepala_ruangan', 'kepala_shift', 'dashboard', 'operator', 'scm'
         ];
         if (in_array($user->role, $dashboardRoles, true)) {
             return redirect()->route('dashboard')->with('error', 'Anda tidak memiliki akses');

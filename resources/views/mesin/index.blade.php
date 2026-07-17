@@ -31,7 +31,7 @@
 
                                 @php
                                     $userRole = Auth::user()->role ?? null;
-                                    $restrictedRoles = ['fm', 'vp', 'ppic', 'owner', 'spv_listrik'];
+                                    $restrictedRoles = ['fm', 'vp', 'ppic', 'owner', 'spv_listrik', 'scm'];
                                     $canManageMesin = !in_array(strtolower($userRole), $restrictedRoles);
                                     $isSuperAdmin = strtolower($userRole ?? '') === 'super_admin';
                                 @endphp

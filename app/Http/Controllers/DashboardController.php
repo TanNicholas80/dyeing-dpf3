@@ -77,11 +77,11 @@ class DashboardController extends Controller
 
         // Ambil role user dan permission untuk optimasi (hindari checking di view)
         $userRole = $user ? $user->role : null;
-        $canCancelBarcode = !in_array($userRole, ['ds', 'mesin', 'vp', 'fm', 'owner']);
+        $canCancelBarcode = !in_array($userRole, ['ds', 'mesin', 'vp', 'fm', 'owner', 'scm']);
 
-        $cantModifyStructure = in_array($userRole, ['fm', 'vp', 'ds', 'mesin', 'owner']);
+        $cantModifyStructure = in_array($userRole, ['fm', 'vp', 'ds', 'mesin', 'owner', 'scm']);
 
-        $cantScan = in_array($userRole, ['fm', 'vp', 'ds', 'owner']);
+        $cantScan = in_array($userRole, ['fm', 'vp', 'ds', 'owner', 'scm']);
         $canAddProses = !$cantModifyStructure;
         $canEditProses = !$cantModifyStructure;
         $canDeleteProses = !$cantModifyStructure;
@@ -198,201 +198,18 @@ class DashboardController extends Controller
                 $affectedProsesIds = [];
             }
 
+            $statusService = new ProsesStatusService();
             $result = [];
             foreach ($prosesList as $proses) {
-                // Cek pending approval
-                $hasPendingChange = false;
-                $hasPendingReprocessApproval = false;
-                if ($proses->approvals) {
-                    $hasPendingChange = $proses->approvals->contains(function ($appr) {
-                        return $appr->status === 'pending'
-                            && $appr->type === 'FM'
-                            && in_array($appr->action, ['edit_cycle_time', 'delete_proses', 'move_machine', 'swap_position', 'pause_proses']);
-                    });
-                    if ($proses->jenis === 'Reproses') {
-                        $hasPendingReprocessApproval = $proses->approvals->contains(function ($appr) {
-                            return $appr->status === 'pending'
-                                && $appr->action === 'create_reprocess'
-                                && ($appr->type === 'FM' || $appr->type === 'VP');
-                        });
-                    }
+                $result[$proses->id] = $statusService->generateProsesStatus($proses, $affectedProsesIds);
+                
+                // Adjust Carbon date formats if they are objects, making sure they match response expectations
+                if (isset($result[$proses->id]['mulai']) && $result[$proses->id]['mulai'] instanceof \Carbon\Carbon) {
+                    $result[$proses->id]['mulai'] = $result[$proses->id]['mulai']->format('Y-m-d H:i:s');
                 }
-                // Cek apakah proses ini terlibat dalam swap position approval dari proses lain
-                // (sebagai swapped_proses_id atau affected_proses_ids di history_data approval swap_position)
-                if (!$hasPendingChange && in_array($proses->id, $affectedProsesIds)) {
-                    $hasPendingChange = true;
+                if (isset($result[$proses->id]['selesai']) && $result[$proses->id]['selesai'] instanceof \Carbon\Carbon) {
+                    $result[$proses->id]['selesai'] = $result[$proses->id]['selesai']->format('Y-m-d H:i:s');
                 }
-
-                // Cek barcode (untuk menentukan warna biru atau merah)
-                // Ambil barcode melalui DetailProses
-                $hasBarcodeKain = false;
-                $hasBarcodeLa = false;
-                $hasBarcodeAux = false;
-
-                // Array untuk menyimpan status GDA per detail proses
-                $gdaDetails = [];
-
-                if ($proses->details) {
-                    foreach ($proses->details as $detail) {
-                        // Cek status barcode per detail
-                        $detailHasLa = false;
-                        $detailHasAux = false;
-
-                        // Untuk indikator G (Kain): cek apakah jumlah barcode kain sudah sesuai dengan roll
-                        $roll = $detail->roll ?? 0;
-                        $barcodeKainCount = 0;
-                        if ($detail->barcodeKains) {
-                            $barcodeKainCount = $detail->barcodeKains->where('cancel', false)->count();
-                        }
-                        // Indikator G hijau hanya jika jumlah barcode kain >= jumlah roll
-                        $detailHasKain = ($barcodeKainCount >= $roll && $roll > 0);
-                        $hasBarcodeKain = $hasBarcodeKain || $detailHasKain;
-
-                        if ($detail->barcodeLas) {
-                            $detailHasLa = $detail->barcodeLas->where('cancel', false)->count() > 0;
-                            $hasBarcodeLa = $hasBarcodeLa || $detailHasLa;
-                        }
-                        if ($detail->barcodeAuxs) {
-                            $detailHasAux = $detail->barcodeAuxs->where('cancel', false)->count() > 0;
-                            $hasBarcodeAux = $hasBarcodeAux || $detailHasAux;
-                        }
-
-                        // Simpan status GDA per detail untuk update real-time
-                        $gdaDetails[] = [
-                            'detail_id' => $detail->id,
-                            'has_kain' => $detailHasKain,
-                            'has_la' => $detailHasLa,
-                            'has_aux' => $detailHasAux,
-                            'roll' => $roll,
-                            'barcode_kain_count' => $barcodeKainCount,
-                        ];
-                    }
-                }
-
-                // Hitung la/aux complete termasuk topping (untuk block bg merah jika belum lengkap)
-                // Multiple OP: 1 approval per proses, barcode topping ditambahkan ke setiap OP saat scan
-                $laInitialScanned = 0;
-                $auxInitialScanned = 0;
-                foreach ($proses->details ?? [] as $d) {
-                    if ($d->barcodeLas) {
-                        $laInitialScanned += $d->barcodeLas->where('cancel', false)->where('approval_id', null)->count();
-                    }
-                }
-                foreach ($proses->details ?? [] as $d) {
-                    if ($d->barcodeAuxs) {
-                        $auxInitialScanned += $d->barcodeAuxs->where('cancel', false)->where('approval_id', null)->count();
-                    }
-                }
-                $laToppingRequired = collect($proses->approvals ?? [])->where('action', 'topping_la')->where('status', 'approved')->count();
-                $auxToppingRequired = collect($proses->approvals ?? [])->where('action', 'topping_aux')->where('status', 'approved')->count();
-                $laToppingScanned = 0;
-                $auxToppingScanned = 0;
-                foreach ($proses->approvals ?? [] as $a) {
-                    if (($a->action ?? '') === 'topping_la' && ($a->status ?? '') === 'approved') {
-                        if ($a->barcodeLas && $a->barcodeLas->where('cancel', false)->count() > 0) {
-                            $laToppingScanned++;
-                        }
-                    }
-                    if (($a->action ?? '') === 'topping_aux' && ($a->status ?? '') === 'approved') {
-                        if ($a->barcodeAuxs && $a->barcodeAuxs->where('cancel', false)->count() > 0) {
-                            $auxToppingScanned++;
-                        }
-                    }
-                }
-                $laRequired = ($proses->qty_dye_stuff ?? 1) + $laToppingRequired;
-                $auxRequired = ($proses->qty_aux ?? 1) + $auxToppingRequired;
-                $laComplete = ($laInitialScanned + $laToppingScanned) >= $laRequired;
-                $auxComplete = ($auxInitialScanned + $auxToppingScanned) >= $auxRequired;
-                $laInitialComplete = $laInitialScanned >= ($proses->qty_dye_stuff ?? 1);
-                $auxInitialComplete = $auxInitialScanned >= ($proses->qty_aux ?? 1);
-                $hasToppingLa = collect($proses->approvals ?? [])->contains(fn($a) => ($a->action ?? '') === 'topping_la');
-                $hasToppingAux = collect($proses->approvals ?? [])->contains(fn($a) => ($a->action ?? '') === 'topping_aux');
-                $pendingToppingLa = collect($proses->approvals ?? [])->contains(fn($a) => ($a->action ?? '') === 'topping_la' && ($a->status ?? '') === 'pending');
-                $pendingToppingAux = collect($proses->approvals ?? [])->contains(fn($a) => ($a->action ?? '') === 'topping_aux' && ($a->status ?? '') === 'pending');
-                $approvedToppingLaNotScanned = collect($proses->approvals ?? [])->contains(function ($a) {
-                    if (($a->action ?? '') !== 'topping_la' || ($a->status ?? '') !== 'approved')
-                        return false;
-                    return !($a->barcodeLas && $a->barcodeLas->where('cancel', false)->count() > 0);
-                });
-                $approvedToppingAuxNotScanned = collect($proses->approvals ?? [])->contains(function ($a) {
-                    if (($a->action ?? '') !== 'topping_aux' || ($a->status ?? '') !== 'approved')
-                        return false;
-                    return !($a->barcodeAuxs && $a->barcodeAuxs->where('cancel', false)->count() > 0);
-                });
-                $tdColor = $hasToppingLa ? ($pendingToppingLa ? 'yellow' : ($approvedToppingLaNotScanned ? 'red' : 'green')) : null;
-                $taColor = $hasToppingAux ? ($pendingToppingAux ? 'yellow' : ($approvedToppingAuxNotScanned ? 'red' : 'green')) : null;
-                [$tdColor, $taColor] = ProsesStatusService::exclusiveToppingIndicatorColors($tdColor, $taColor);
-
-                // Tentukan warna background (sama seperti logika di blade)
-                $bg = '#757575'; // default abu-abu
-                if ($hasPendingChange || $hasPendingReprocessApproval) {
-                    $bg = '#ffeb3b'; // kuning
-                } elseif ($proses->jenis === 'Maintenance') {
-                    $bg = '#757575'; // abu-abu
-                } elseif (!$proses->mulai) {
-                    $bg = '#757575'; // abu-abu
-                } elseif ($proses->selesai) {
-                    // Hitung cycle_time_actual jika belum ada
-                    $cycle_time_actual = $proses->cycle_time_actual;
-                    if (!$cycle_time_actual && $proses->mulai && $proses->selesai) {
-                        $mulai = \Carbon\Carbon::parse($proses->mulai);
-                        $selesai = \Carbon\Carbon::parse($proses->selesai);
-                        $cycle_time_actual = max(0, $mulai->diffInSeconds($selesai, false));
-                    }
-                    $cycle_time = $proses->cycle_time ? (int) $proses->cycle_time : 0;
-                    $cycle_time_actual = $cycle_time_actual ? (int) $cycle_time_actual : 0;
-                    // Merah: durasi sangat singkat (< 1 jam). Hijau: sudah lebih dari 1 jam berjalan dan berhenti.
-                    if ($cycle_time_actual < 3600) {
-                        $bg = '#e53935'; // merah (durasi terlalu singkat, belum 1 jam)
-                    } elseif ($cycle_time_actual > $cycle_time + 3600) {
-                        $bg = '#e53935'; // merah (overtime)
-                    } else {
-                        $bg = '#00c853'; // hijau (selesai normal, >= 1 jam)
-                    }
-                } else {
-                    // Proses sedang berjalan (mulai ada, selesai belum)
-                    $barcodeKainOptional = $proses->isBarcodeKainOptionalForLaAux();
-                    if ($proses->jenis !== 'Maintenance') {
-                        $incomplete = !$barcodeKainOptional && !$hasBarcodeKain;
-                        $incomplete = $incomplete || !$laComplete || !$auxComplete;
-                        if ($incomplete) {
-                            $bg = '#ef9a9a'; // merah muda / merah (barcode termasuk topping belum lengkap)
-                        } else {
-                            $bg = '#002b80'; // biru (berjalan dengan barcode lengkap)
-                        }
-                    } else {
-                        $bg = '#002b80';
-                    }
-                }
-
-                $pendingApprovals = [];
-                if ($proses->approvals) {
-                    foreach ($proses->approvals as $appr) {
-                        if ($appr->status === 'pending') {
-                            $pendingApprovals[] = ['type' => $appr->type, 'action' => $appr->action];
-                        }
-                    }
-                }
-
-                $result[$proses->id] = [
-                    'mulai' => $proses->mulai,
-                    'selesai' => $proses->selesai,
-                    'bg_color' => $bg,
-                    'jenis' => $proses->jenis,
-                    'order' => (int) ($proses->order ?? 0),
-                    'gda_details' => $gdaDetails,
-                    'cycle_time' => $proses->cycle_time !== null ? (int) $proses->cycle_time : null,
-                    'cycle_time_actual' => $proses->cycle_time_actual !== null ? (int) $proses->cycle_time_actual : null,
-                    'pending_approvals' => $pendingApprovals,
-                    'la_complete' => $laComplete,
-                    'aux_complete' => $auxComplete,
-                    'la_initial_complete' => $laInitialComplete,
-                    'aux_initial_complete' => $auxInitialComplete,
-                    'has_topping_la' => $hasToppingLa,
-                    'has_topping_aux' => $hasToppingAux,
-                    'td_color' => $tdColor,
-                    'ta_color' => $taColor,
-                ];
             }
 
             return response()->json($result);
@@ -416,8 +233,8 @@ class DashboardController extends Controller
 
         $user = $request->user();
         $userRole = $user ? $user->role : null;
-        $cantModifyStructure = in_array($userRole, ['operator', 'mesin']);
-        $cantScan = in_array($userRole, ['dashboard']);
+        $cantModifyStructure = in_array($userRole, ['operator', 'mesin', 'scm']);
+        $cantScan = in_array($userRole, ['dashboard', 'scm']);
 
         $canCancelBarcode = in_array($userRole, ['super_admin', 'kepala_shift']);
         $canAddProses = !$cantModifyStructure;

@@ -42,50 +42,45 @@
                                                         if ($proses->jenis === 'Maintenance') {
                                                             $blockColors = ['gray', 'gray', 'gray'];
                                                         } else {
-                                                            // G: hijau hanya jika SEMUA detail OP sudah memenuhi barcode kain >= roll
-                                                            $allKainComplete = true;
-                                                            $hasBarcodeLa = false;
-                                                            $hasBarcodeAux = false;
-                                                            if (isset($proses->details) && is_iterable($proses->details)) {
-                                                                foreach ($proses->details as $d) {
-                                                                    // Cek apakah detail ini sudah memenuhi barcode kain >= roll
-                                                                    $detailRoll = $d->roll ?? 0;
-                                                                    $detailKainCount = isset($d->barcodeKains)
-                                                                        ? $d->barcodeKains->where('cancel', false)->count()
-                                                                        : 0;
-                                                                    if ($detailRoll > 0 && $detailKainCount < $detailRoll) {
-                                                                        $allKainComplete = false;
-                                                                    }
+                                                             // G: hijau hanya jika SEMUA detail OP sudah memenuhi barcode kain >= roll
+                                                             $allKainComplete = true;
+                                                             if (isset($proses->details) && is_iterable($proses->details)) {
+                                                                 foreach ($proses->details as $d) {
+                                                                     // Cek apakah detail ini sudah memenuhi barcode kain >= roll
+                                                                     $detailRoll = $d->roll ?? 0;
+                                                                     $detailKainCount = isset($d->barcodeKains)
+                                                                         ? $d->barcodeKains->where('cancel', false)->count()
+                                                                         : 0;
+                                                                     if ($detailRoll > 0 && $detailKainCount < $detailRoll) {
+                                                                         $allKainComplete = false;
+                                                                     }
+                                                                 }
+                                                             } else {
+                                                                 $allKainComplete = false;
+                                                             }
 
-                                                                    if (isset($d->barcodeLas)) {
-                                                                        $hasBarcodeLa =
-                                                                            $hasBarcodeLa ||
-                                                                            $d->barcodeLas->where('cancel', false)->count() > 0;
-                                                                    }
-                                                                    if (isset($d->barcodeAuxs)) {
-                                                                        $hasBarcodeAux =
-                                                                            $hasBarcodeAux ||
-                                                                            $d->barcodeAuxs->where('cancel', false)->count() > 0;
-                                                                    }
-                                                                }
-                                                            } else {
-                                                                $allKainComplete = false;
-                                                            }
-                                                            // Fallback untuk LA dan AUX
-                                                            if (!$hasBarcodeLa && isset($proses->barcode_la)) {
-                                                                $hasBarcodeLa = (bool) $proses->barcode_la;
-                                                            }
-                                                            if (!$hasBarcodeAux && isset($proses->barcode_aux)) {
-                                                                $hasBarcodeAux = (bool) $proses->barcode_aux;
-                                                            }
-                                                            // G: hijau jika semua detail OP sudah memenuhi barcode kain >= roll
-                                                            // D: hijau jika ada minimal 1 barcode LA (cancel=false)
-                                                            // A: hijau jika ada minimal 1 barcode AUX (cancel=false)
-                                                            $blockColors = [
-                                                                $allKainComplete ? 'green' : 'red',
-                                                                $hasBarcodeLa ? 'green' : 'red',
-                                                                $hasBarcodeAux ? 'green' : 'red',
-                                                            ];
+                                                             $hasBarcodeLa = isset($proses->details) && $proses->details->isNotEmpty()
+                                                                 ? $proses->details->every(fn($d) => $d->barcodeLas && $d->barcodeLas->where('cancel', false)->where('approval_id', null)->count() >= ($proses->qty_dye_stuff ?? 1))
+                                                                 : false;
+                                                             $hasBarcodeAux = isset($proses->details) && $proses->details->isNotEmpty()
+                                                                 ? $proses->details->every(fn($d) => $d->barcodeAuxs && $d->barcodeAuxs->where('cancel', false)->where('approval_id', null)->count() >= ($proses->qty_aux ?? 1))
+                                                                 : false;
+
+                                                             // Fallback untuk LA dan AUX
+                                                             if (!$hasBarcodeLa && isset($proses->barcode_la)) {
+                                                                 $hasBarcodeLa = (bool) $proses->barcode_la;
+                                                             }
+                                                             if (!$hasBarcodeAux && isset($proses->barcode_aux)) {
+                                                                 $hasBarcodeAux = (bool) $proses->barcode_aux;
+                                                             }
+                                                             // G: hijau jika semua detail OP sudah memenuhi barcode kain >= roll
+                                                             // D: hijau jika ada minimal 1 barcode LA (cancel=false)
+                                                             // A: hijau jika ada minimal 1 barcode AUX (cancel=false)
+                                                             $blockColors = [
+                                                                 $allKainComplete ? 'green' : 'red',
+                                                                 $hasBarcodeLa ? 'green' : 'red',
+                                                                 $hasBarcodeAux ? 'green' : 'red',
+                                                             ];
                                                         }
                                                         $barcodeKainOptional = $proses->barcode_kain_optional ?? false;
                                                         if ($barcodeKainOptional) {
@@ -160,30 +155,18 @@
                                                             [$tdColor, $taColor] = \App\Services\ProsesStatusService::exclusiveToppingIndicatorColors($tdColor, $taColor);
                                                             $laToppingRequired = collect($proses->approvals ?? [])->where('action', 'topping_la')->where('status', 'approved')->count();
                                                             $auxToppingRequired = collect($proses->approvals ?? [])->where('action', 'topping_aux')->where('status', 'approved')->count();
-                                                            $laToppingScanned = 0;
-                                                            $auxToppingScanned = 0;
-                                                            foreach ($proses->approvals ?? [] as $a) {
-                                                                if (($a->action ?? '') === 'topping_la' && ($a->status ?? '') === 'approved' && $a->barcodeLas && $a->barcodeLas->where('cancel', false)->count() > 0)
-                                                                    $laToppingScanned++;
-                                                                if (($a->action ?? '') === 'topping_aux' && ($a->status ?? '') === 'approved' && $a->barcodeAuxs && $a->barcodeAuxs->where('cancel', false)->count() > 0)
-                                                                    $auxToppingScanned++;
-                                                            }
-                                                            $laInitialScanned = 0;
-                                                            foreach ($proses->details ?? [] as $d) {
-                                                                if ($d->barcodeLas) {
-                                                                    $laInitialScanned += $d->barcodeLas->where('cancel', false)->where('approval_id', null)->count();
-                                                                }
-                                                            }
-                                                            $auxInitialScanned = 0;
-                                                            foreach ($proses->details ?? [] as $d) {
-                                                                if ($d->barcodeAuxs) {
-                                                                    $auxInitialScanned += $d->barcodeAuxs->where('cancel', false)->where('approval_id', null)->count();
-                                                                }
-                                                            }
-                                                            $laComplete = ($laInitialScanned + $laToppingScanned) >= (($proses->qty_dye_stuff ?? 1) + $laToppingRequired);
-                                                            $auxComplete = ($auxInitialScanned + $auxToppingScanned) >= (($proses->qty_aux ?? 1) + $auxToppingRequired);
-                                                            $laInitialComplete = $laInitialScanned >= ($proses->qty_dye_stuff ?? 1);
-                                                            $auxInitialComplete = $auxInitialScanned >= ($proses->qty_aux ?? 1);
+                                                            $laComplete = isset($proses->details) && $proses->details->isNotEmpty()
+                                                                ? $proses->details->every(fn($d) => ($d->barcodeLas ? $d->barcodeLas->where('cancel', false)->count() : 0) >= (($proses->qty_dye_stuff ?? 1) + $laToppingRequired))
+                                                                : false;
+                                                            $auxComplete = isset($proses->details) && $proses->details->isNotEmpty()
+                                                                ? $proses->details->every(fn($d) => ($d->barcodeAuxs ? $d->barcodeAuxs->where('cancel', false)->count() : 0) >= (($proses->qty_aux ?? 1) + $auxToppingRequired))
+                                                                : false;
+                                                            $laInitialComplete = isset($proses->details) && $proses->details->isNotEmpty()
+                                                                ? $proses->details->every(fn($d) => $d->barcodeLas && $d->barcodeLas->where('cancel', false)->where('approval_id', null)->count() >= ($proses->qty_dye_stuff ?? 1))
+                                                                : false;
+                                                            $auxInitialComplete = isset($proses->details) && $proses->details->isNotEmpty()
+                                                                ? $proses->details->every(fn($d) => $d->barcodeAuxs && $d->barcodeAuxs->where('cancel', false)->where('approval_id', null)->count() >= ($proses->qty_aux ?? 1))
+                                                                : false;
                                                             if ($barcodeKainOptional) {
                                                                 $blockColors = [$laInitialComplete ? 'green' : 'red', $auxInitialComplete ? 'green' : 'red'];
                                                             } else {
@@ -252,32 +235,9 @@
                                                             if ($proses->is_paused) {
                                                                 $bg = '#757575'; // abu-abu
                                                             } else {
-                                                                // Cek barcode menggunakan relasi yang sama seperti DashboardController
-                                                                $hasBarcodeKain = false;
-                                                                $hasBarcodeLa = false;
-                                                                $hasBarcodeAux = false;
-                                                                if (isset($proses->details) && is_iterable($proses->details)) {
-                                                                    foreach ($proses->details as $d) {
-                                                                        if (isset($d->barcodeKains)) {
-                                                                            $hasBarcodeKain =
-                                                                                $hasBarcodeKain ||
-                                                                                $d->barcodeKains->where('cancel', false)->count() > 0;
-                                                                        }
-                                                                        if (isset($d->barcodeLas)) {
-                                                                            $hasBarcodeLa =
-                                                                                $hasBarcodeLa ||
-                                                                                $d->barcodeLas->where('cancel', false)->count() > 0;
-                                                                        }
-                                                                        if (isset($d->barcodeAuxs)) {
-                                                                            $hasBarcodeAux =
-                                                                                $hasBarcodeAux ||
-                                                                                $d->barcodeAuxs->where('cancel', false)->count() > 0;
-                                                                        }
-                                                                    }
-                                                                }
                                                                 $barcodeKainOpt = $barcodeKainOptional ?? false;
                                                                 if ($proses->jenis !== 'Maintenance') {
-                                                                    $incomplete = (!$barcodeKainOpt && !$hasBarcodeKain) || !$laComplete || !$auxComplete;
+                                                                    $incomplete = (!$barcodeKainOpt && !$allKainComplete) || !$laComplete || !$auxComplete;
                                                                     $bg = $incomplete ? '#ef9a9a' : '#002b80';
                                                                 } else {
                                                                     $bg = '#002b80';
@@ -407,12 +367,8 @@
                                                                             ? $firstDetail->barcodeKains->where('cancel', false)->count()
                                                                             : 0;
                                                                         $firstHasKain = ($firstBarcodeKainCount >= $firstRoll && $firstRoll > 0);
-                                                                        $firstHasLa = isset($firstDetail->barcodeLas)
-                                                                            ? $firstDetail->barcodeLas->where('cancel', false)->count() > 0
-                                                                            : false;
-                                                                        $firstHasAux = isset($firstDetail->barcodeAuxs)
-                                                                            ? $firstDetail->barcodeAuxs->where('cancel', false)->count() > 0
-                                                                            : false;
+                                                                        $firstHasLa = ($firstDetail->barcodeLas ? $firstDetail->barcodeLas->where('cancel', false)->where('approval_id', null)->count() : 0) >= ($proses->qty_dye_stuff ?? 1);
+                                                                        $firstHasAux = ($firstDetail->barcodeAuxs ? $firstDetail->barcodeAuxs->where('cancel', false)->where('approval_id', null)->count() : 0) >= ($proses->qty_aux ?? 1);
                                                                         $firstMap = $barcodeKainOptional
                                                                             ? [$blocks[0] => $firstHasLa ? 'green' : 'red', $blocks[1] => $firstHasAux ? 'green' : 'red']
                                                                             : [$blocks[0] => $firstHasKain ? 'green' : 'red', $blocks[1] => $firstHasLa ? 'green' : 'red', $blocks[2] => $firstHasAux ? 'green' : 'red'];
@@ -449,12 +405,8 @@
                                                                                 ? $d->barcodeKains->where('cancel', false)->count()
                                                                                 : 0;
                                                                             $subHasKain = ($subBarcodeKainCount >= $subRoll && $subRoll > 0);
-                                                                            $subHasLa = isset($d->barcodeLas)
-                                                                                ? $d->barcodeLas->where('cancel', false)->count() > 0
-                                                                                : false;
-                                                                            $subHasAux = isset($d->barcodeAuxs)
-                                                                                ? $d->barcodeAuxs->where('cancel', false)->count() > 0
-                                                                                : false;
+                                                                            $subHasLa = ($d->barcodeLas ? $d->barcodeLas->where('cancel', false)->where('approval_id', null)->count() : 0) >= ($proses->qty_dye_stuff ?? 1);
+                                                                            $subHasAux = ($d->barcodeAuxs ? $d->barcodeAuxs->where('cancel', false)->where('approval_id', null)->count() : 0) >= ($proses->qty_aux ?? 1);
                                                                             $subMap = $barcodeKainOptional
                                                                                 ? [$blocks[0] => $subHasLa ? 'green' : 'red', $blocks[1] => $subHasAux ? 'green' : 'red']
                                                                                 : [$blocks[0] => $subHasKain ? 'green' : 'red', $blocks[1] => $subHasLa ? 'green' : 'red', $blocks[2] => $subHasAux ? 'green' : 'red'];
