@@ -19,7 +19,7 @@ Route::middleware(['auth', 'prevent-back-history'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
     // Dashboard: semua role yang perlu lihat dashboard kecuali aux (dashboard & operator ada di enum users)
-    Route::middleware('role:super_admin,ds,mesin,ppic,fm,vp,owner,kepala_ruangan,kepala_shift,dashboard,operator')->group(function () {
+    Route::middleware('role:super_admin,ds,mesin,ppic,fm,vp,owner,kepala_ruangan,kepala_shift,dashboard,operator,scm')->group(function () {
         Route::get('/dashboard', [DashboardController::class, 'dashboard'])->name('dashboard');
         Route::get('/dashboard/proses/{id}/card-html', [DashboardController::class, 'getProsesCardHtml'])->name('dashboard.proses-card');
         Route::get('/dashboard/proses-statuses', [DashboardController::class, 'prosesStatuses'])->name('dashboard.proses-statuses');
