@@ -2,6 +2,9 @@
 # Pin bookworm: php:8.4-fpm default is Debian trixie, Microsoft ODBC belum signed/stabil di situ
 FROM php:8.4-fpm-bookworm AS builder
 
+# Configure OpenSSL for legacy TLS/ciphers compatibility (SQL Server 2014)
+RUN printf '\n[openssl_init]\nssl_conf = ssl_sect\n\n[ssl_sect]\nsystem_default = system_default_sect\n\n[system_default_sect]\nCipherString = DEFAULT@SECLEVEL=0\nMinProtocol = TLSv1.0\n' >> /etc/ssl/openssl.cnf
+
 # Install system dependencies and PHP extensions required for Laravel + MySQL/PostgreSQL/SQL Server support
 # Some dependencies are required for PHP extensions only in the build stage
 # We don't need to install Node.js or build assets, as it was done in the Nginx image
@@ -74,6 +77,9 @@ RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local
 
 # Stage 3: Production environment
 FROM php:8.4-fpm-bookworm AS production
+
+# Configure OpenSSL for legacy TLS/ciphers compatibility (SQL Server 2014)
+RUN printf '\n[openssl_init]\nssl_conf = ssl_sect\n\n[ssl_sect]\nsystem_default = system_default_sect\n\n[system_default_sect]\nCipherString = DEFAULT@SECLEVEL=0\nMinProtocol = TLSv1.0\n' >> /etc/ssl/openssl.cnf
 
 # Install only runtime libraries needed in production
 # libfcgi-bin and procps are required for the php-fpm-healthcheck script
