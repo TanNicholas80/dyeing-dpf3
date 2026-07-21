@@ -58,6 +58,8 @@ services:
       - laravel-production
     environment:
       - RUN_MIGRATIONS=true
+      - OPENSSL_CONF=/etc/ssl/openssl.cnf
+      - OPENSSL_SECLEVEL=0
     healthcheck:
       test: [ "CMD-SHELL", "php-fpm-healthcheck || exit 1" ]
       interval: 10s

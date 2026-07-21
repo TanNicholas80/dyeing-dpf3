@@ -105,11 +105,13 @@ return [
             'database' => env('DB_DATABASE_SQLSRV'),
             'username' => env('DB_USERNAME_SQLSRV'),
             'password' => env('DB_PASSWORD_SQLSRV'),
-            'trust_server_certificate' => env('DB_TRUST_SERVER_CERTIFICATE', true),
-            'encrypt' => env('DB_ENCRYPT', true),
             'charset' => 'utf8',
             'prefix' => '',
             'prefix_indexes' => true,
+
+            // Set langsung menggunakan string 'no' dan 'yes'
+            'encrypt' => 'no',
+            'trust_server_certificate' => 'yes',
         ],
 
     ],
