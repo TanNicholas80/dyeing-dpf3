@@ -123,16 +123,6 @@
                                         </div>
                                         <div class="col-md-6 col-12">
                                             <div class="input-group">
-                                                {{-- <input
-                                                    type="number"
-                                                    step="0.01"
-                                                    name="details[{{ $i }}][konsentrasi]"
-                                                    class="form-control"
-                                                    value="{{ $detail->konsentrasi }}"
-                                                    placeholder="Konsentrasi (kg)"
-                                                    readonly
-                                                    required
-                                                > --}}
                                                 <input
                                                     type="number"
                                                     step="0.01"
@@ -140,6 +130,7 @@
                                                     class="form-control"
                                                     value="{{ $detail->konsentrasi }}"
                                                     placeholder="Konsentrasi (kg)"
+                                                    readonly
                                                     required
                                                 >
                                                 <div class="input-group-append">
@@ -289,21 +280,13 @@
                         </div>
                         <div class="col-md-6 col-12">
                             <div class="input-group">
-                                <!-- <input
-                                    type="number"
-                                    step="0.01"
-                                    name="details[${detailIndex}][konsentrasi]"
-                                    class="form-control"
-                                    placeholder="Konsentrasi (kg)"
-                                    readonly
-                                    required
-                                > -->
                                 <input
                                     type="number"
                                     step="0.01"
                                     name="details[${detailIndex}][konsentrasi]"
                                     class="form-control"
                                     placeholder="Konsentrasi (kg)"
+                                    readonly
                                     required
                                 >
                                 <div class="input-group-append">
