@@ -25,7 +25,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor -o /usr/share/keyrings/microsoft-prod.gpg \
     && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft-prod.gpg] https://packages.microsoft.com/debian/12/prod bookworm main" > /etc/apt/sources.list.d/mssql-release.list \
     && apt-get update \
-    && apt-get install -y --no-install-recommends msodbcsql18 \
+    && apt-get install -y --no-install-recommends msodbcsql17 \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install -j$(nproc) \
     pdo_mysql \
@@ -78,7 +78,7 @@ FROM php:8.4-fpm-bookworm AS production
 # Install only runtime libraries needed in production
 # libfcgi-bin and procps are required for the php-fpm-healthcheck script
 # libpng, libjpeg, libfreetype untuk ext-gd (phpspreadsheet/maatwebsite-excel)
-# msodbcsql18 dibutuhkan runtime untuk koneksi SQL Server (pdo_sqlsrv)
+# msodbcsql17 dibutuhkan runtime untuk koneksi SQL Server (pdo_sqlsrv)
 ENV ACCEPT_EULA=Y
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
@@ -96,7 +96,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor -o /usr/share/keyrings/microsoft-prod.gpg \
     && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft-prod.gpg] https://packages.microsoft.com/debian/12/prod bookworm main" > /etc/apt/sources.list.d/mssql-release.list \
     && apt-get update \
-    && apt-get install -y --no-install-recommends msodbcsql18 \
+    && apt-get install -y --no-install-recommends msodbcsql17 \
     && apt-get autoremove -y && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 # Download and install php-fpm health check script
