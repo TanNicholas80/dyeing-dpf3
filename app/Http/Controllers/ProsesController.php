@@ -10,6 +10,8 @@ use App\Models\BarcodeLa;
 use App\Models\BarcodeAux;
 use App\Models\Approval;
 use App\Models\Auxl;
+use App\Models\DyeStuff;
+use App\Models\DyeStuffDetail;
 use App\Events\ProsesCreated;
 use App\Events\ProsesStatusUpdated;
 use App\Events\BarcodeStatusUpdated;
@@ -1042,6 +1044,40 @@ class ProsesController extends Controller
                     ->with('error', $msg);
             }
 
+            // Validasi Data Dye Stuff (LA) dari model DyeStuff & DyeStuffDetail
+            $dyeStuffObj = DyeStuff::with('details')->where('barcode', $barcode)->first();
+            Log::info('BarcodeLa: DyeStuff lookup', ['barcode' => $barcode, 'found' => !!$dyeStuffObj]);
+            if (!$dyeStuffObj) {
+                $msg = 'Barcode Dye Stuff (LA) tidak ditemukan di database!';
+                Log::error('BarcodeLa: Barcode not found in dye_stuffs', ['barcode' => $barcode]);
+                if ($request->ajax() || $request->wantsJson()) {
+                    return response()->json(['status' => 'error', 'message' => $msg], 400);
+                }
+                return redirect()->route('dashboard', ['page' => $page])->with('error', $msg);
+            }
+
+            // Validasi Tipe DyeStuff (Normal vs Additional)
+            $dsTipe = $dyeStuffObj->tipe ?? 'normal';
+            $isToppingScan = !empty($approvalId);
+
+            if ($isToppingScan && $dsTipe === 'normal') {
+                $msg = 'Barcode Dye Stuff dengan tipe Normal merupakan Dye Stuff utama, tidak dapat digunakan untuk Topping LA! Harap gunakan Dye Stuff bertipe Addition.';
+                Log::error('BarcodeLa: Type mismatch (Normal used for Topping)', ['barcode' => $barcode, 'tipe' => $dsTipe]);
+                if ($request->ajax() || $request->wantsJson()) {
+                    return response()->json(['status' => 'error', 'message' => $msg], 400);
+                }
+                return redirect()->route('dashboard', ['page' => $page])->with('error', $msg);
+            }
+
+            if (!$isToppingScan && $dsTipe === 'additional') {
+                $msg = 'Barcode Dye Stuff dengan tipe Addition merupakan Topping LA, tidak dapat digunakan untuk Dye Stuff utama! Harap gunakan Dye Stuff bertipe Normal.';
+                Log::error('BarcodeLa: Type mismatch (Addition used for Main LA)', ['barcode' => $barcode, 'tipe' => $dsTipe]);
+                if ($request->ajax() || $request->wantsJson()) {
+                    return response()->json(['status' => 'error', 'message' => $msg], 400);
+                }
+                return redirect()->route('dashboard', ['page' => $page])->with('error', $msg);
+            }
+
             $validationResult = $this->validateBarcodeKainCompleteness($id);
             if ($validationResult !== null) {
                 $msg = $validationResult['error'];
@@ -1050,33 +1086,6 @@ class ProsesController extends Controller
                 }
                 return redirect()->route('dashboard', ['page' => $page])
                     ->with('error', $msg);
-            }
-
-            // Validasi: tolak scan LA jika kebutuhan awal + topping sudah terpenuhi
-            $laInitialScanned = BarcodeLa::whereHas('detailProses', fn($q) => $q->where('proses_id', $id))
-                ->whereNull('approval_id')->where('cancel', false)->count();
-            $laToppingReq = Approval::where('proses_id', $id)->where('type', 'KEPALA_SHIFT')
-                ->where('action', 'topping_la')->where('status', 'approved')->count();
-            $laToppingScn = Approval::where('proses_id', $id)->where('type', 'KEPALA_SHIFT')
-                ->where('action', 'topping_la')->where('status', 'approved')
-                ->whereHas('barcodeLas', fn($q) => $q->where('cancel', false))->count();
-            $laIsComplete = ($laInitialScanned + $laToppingScn) >= (($proses->qty_dye_stuff ?? 1) + $laToppingReq);
-            if ($laIsComplete) {
-                $msg = 'Kebutuhan barcode LA (awal + topping) sudah terpenuhi. Tidak dapat menambah scan.';
-                if ($request->ajax() || $request->wantsJson()) {
-                    return response()->json(['status' => 'error', 'message' => $msg], 400);
-                }
-                return redirect()->route('dashboard', ['page' => $page])->with('error', $msg);
-            }
-            if ($approvalId) {
-                $alreadyHasBarcode = BarcodeLa::where('approval_id', $approvalId)->where('cancel', false)->exists();
-                if ($alreadyHasBarcode) {
-                    $msg = 'Barcode untuk topping LA ini sudah di-input.';
-                    if ($request->ajax() || $request->wantsJson()) {
-                        return response()->json(['status' => 'error', 'message' => $msg], 400);
-                    }
-                    return redirect()->route('dashboard', ['page' => $page])->with('error', $msg);
-                }
             }
 
             $detailProses = null;
@@ -1102,10 +1111,37 @@ class ProsesController extends Controller
                 }
             }
 
+            // Validasi: tolak scan LA jika kebutuhan awal + topping untuk proses ini sudah terpenuhi
+            $laInitialScanned = BarcodeLa::whereHas('detailProses', fn($q) => $q->where('proses_id', $id))
+                ->whereNull('approval_id')->where('cancel', false)->distinct('barcode')->count('barcode');
+            $laToppingReq = Approval::where('proses_id', $id)->where('type', 'KEPALA_SHIFT')
+                ->where('action', 'topping_la')->where('status', 'approved')->count();
+            $laToppingScn = Approval::where('proses_id', $id)->where('type', 'KEPALA_SHIFT')
+                ->where('action', 'topping_la')->where('status', 'approved')
+                ->whereHas('barcodeLas', fn($q) => $q->where('cancel', false))->count();
+            $laIsComplete = ($laInitialScanned + $laToppingScn) >= (($proses->qty_dye_stuff ?? 1) + $laToppingReq);
+            if ($laIsComplete) {
+                $msg = 'Kebutuhan barcode LA (awal + topping) untuk proses ini sudah terpenuhi. Tidak dapat menambah scan.';
+                if ($request->ajax() || $request->wantsJson()) {
+                    return response()->json(['status' => 'error', 'message' => $msg], 400);
+                }
+                return redirect()->route('dashboard', ['page' => $page])->with('error', $msg);
+            }
+            if ($approvalId) {
+                $alreadyHasBarcode = BarcodeLa::whereHas('detailProses', fn($q) => $q->where('proses_id', $id))->where('approval_id', $approvalId)->where('cancel', false)->exists();
+                if ($alreadyHasBarcode) {
+                    $msg = 'Barcode untuk topping LA ini sudah di-input pada proses ini.';
+                    if ($request->ajax() || $request->wantsJson()) {
+                        return response()->json(['status' => 'error', 'message' => $msg], 400);
+                    }
+                    return redirect()->route('dashboard', ['page' => $page])->with('error', $msg);
+                }
+            }
+
             $no_partai = $detailProses->no_partai;
             $mesin_id = $proses->mesin_id;
 
-            // Ambil semua detail proses untuk mendapatkan semua no_op
+            // Ambil semua detail proses untuk mendapatkan semua no_op untuk API SAP
             $detailList = DetailProses::where('proses_id', $proses->id)->get();
             if ($detailList->isEmpty()) {
                 $msg = 'Detail proses tidak ditemukan.';
@@ -1115,40 +1151,31 @@ class ProsesController extends Controller
                 return redirect()->route('dashboard', ['page' => $page])->with('error', $msg);
             }
 
-
             // Gabungkan semua no_op dengan total qty_gi dari BarcodeKain dengan delimiter |
-            // Ambil semua DetailProses (termasuk yang no_op-nya sama) tanpa di-unique
             $allNoOps = $detailList->filter(function ($detail) {
                 return !empty($detail->no_op);
             })->map(function ($detail) {
-                // Ambil total QTY GI dari BarcodeKain untuk DetailProses ini
                 $totalQtyGi = BarcodeKain::where('detail_proses_id', $detail->id)
                     ->where('cancel', false)
                     ->sum('qty_gi') ?? 0;
                 return $detail->no_op . '/' . (int) $totalQtyGi;
             })->implode('|');
 
-            $tickets = DB::connection('sqlsrv')
-                ->table('TICKET_DETAIL')
-                ->where('ID_NO', $barcode)
-                ->select('PRODUCT_CODE', 'ACTUAL_WT')
-                ->get();
-            Log::info('BarcodeLa: Ticket data from SQL Server', ['tickets' => $tickets->toArray()]);
-            if ($tickets->isEmpty()) {
-                $msg = 'Barcode tidak ditemukan di database TICKET_DETAIL';
-                Log::error('BarcodeLa: No ticket data found', ['barcode' => $barcode]);
+            $dsDetails = $dyeStuffObj->details;
+            Log::info('BarcodeLa: DyeStuff details lookup', ['count' => $dsDetails ? $dsDetails->count() : 0]);
+            if (!$dsDetails || $dsDetails->isEmpty()) {
+                $msg = 'Data detail Dye Stuff tidak ditemukan di database!';
+                Log::error('BarcodeLa: No details found for dyeStuff', ['barcode' => $barcode]);
                 if ($request->ajax() || $request->wantsJson()) {
                     return response()->json(['status' => 'error', 'message' => $msg], 400);
                 }
                 return redirect()->route('dashboard', ['page' => $page])->with('error', $msg);
             }
-            $details = $tickets->map(function ($row) {
-                $product = DB::connection('sqlsrv')
-                    ->table('PRODUCT')
-                    ->where('ProductCode', $row->PRODUCT_CODE)
-                    ->first();
-                $productName = $product ? $product->ProductCode : $row->PRODUCT_CODE;
-                return $productName . '/' . ($row->ACTUAL_WT ?? 0);
+
+            $details = $dsDetails->map(function ($row) {
+                $chemName = $row->chemical_name;
+                $wt = (float) ($row->weight ?? 0);
+                return $chemName . '/' . $wt;
             })->implode('|');
             $body = '"' . $allNoOps . ';' . $details . '"';
             Log::info('BarcodeLa: API body prepared', ['body' => $body]);
@@ -1187,23 +1214,19 @@ class ProsesController extends Controller
 
             $matdok = $data[0]['mblnr'] ?? null;
 
-            $barcodeLaData = [
-                'detail_proses_id' => null,
-                'no_op' => null,
-                'no_partai' => null,
-                'barcode' => $barcode,
-                'matdok' => $matdok,
-                'item_document' => $data[0]['zeile'] ?? null,
-                'mesin_id' => $mesin_id,
-                'cancel' => false,
-                'approval_id' => $approvalId,
-            ];
-            // Untuk Multiple OP: barcode topping ditambahkan ke setiap OP (1 approval = 1 scan = tambah ke semua detail)
-            foreach ($detailList as $detail) {
-                $barcodeLaData['detail_proses_id'] = $detail->id;
-                $barcodeLaData['no_op'] = $detail->no_op;
-                $barcodeLaData['no_partai'] = $detail->no_partai;
-                BarcodeLa::create($barcodeLaData);
+            // Simpan BarcodeLa untuk SEMUA OP/detailProses pada proses ini
+            foreach ($detailList as $dp) {
+                BarcodeLa::create([
+                    'detail_proses_id' => $dp->id,
+                    'no_op' => $dp->no_op,
+                    'no_partai' => $dp->no_partai,
+                    'barcode' => $barcode,
+                    'matdok' => $matdok,
+                    'item_document' => $data[0]['zeile'] ?? null,
+                    'mesin_id' => $mesin_id,
+                    'cancel' => false,
+                    'approval_id' => $approvalId,
+                ]);
             }
 
             // Broadcast event untuk update real-time
@@ -1215,7 +1238,7 @@ class ProsesController extends Controller
             event(new BarcodeStatusUpdated($proses->id, $statusData));
             Cache::forget("iot:mesin:{$proses->mesin_id}:alarm_result");
 
-            $msg = $approvalId ? 'Barcode LA topping berhasil disimpan!' : 'Barcode LA berhasil disimpan untuk semua OP pada proses ini!';
+            $msg = $approvalId ? "Barcode LA topping berhasil disimpan untuk OP {$detailProses->no_op}!" : "Barcode LA berhasil disimpan untuk OP {$detailProses->no_op}!";
             if ($request->ajax() || $request->wantsJson()) {
                 return response()->json(['status' => 'success', 'message' => $msg]);
             }
@@ -1321,33 +1344,6 @@ class ProsesController extends Controller
                     ->with('error', $msg);
             }
 
-            // Validasi: tolak scan AUX jika kebutuhan awal + topping sudah terpenuhi
-            $auxInitialScanned = BarcodeAux::whereHas('detailProses', fn($q) => $q->where('proses_id', $id))
-                ->whereNull('approval_id')->where('cancel', false)->count();
-            $auxToppingReq = Approval::where('proses_id', $id)->where('type', 'KEPALA_SHIFT')
-                ->where('action', 'topping_aux')->where('status', 'approved')->count();
-            $auxToppingScn = Approval::where('proses_id', $id)->where('type', 'KEPALA_SHIFT')
-                ->where('action', 'topping_aux')->where('status', 'approved')
-                ->whereHas('barcodeAuxs', fn($q) => $q->where('cancel', false))->count();
-            $auxIsComplete = ($auxInitialScanned + $auxToppingScn) >= (($proses->qty_aux ?? 1) + $auxToppingReq);
-            if ($auxIsComplete) {
-                $msg = 'Kebutuhan barcode AUX (awal + topping) sudah terpenuhi. Tidak dapat menambah scan.';
-                if ($request->ajax() || $request->wantsJson()) {
-                    return response()->json(['status' => 'error', 'message' => $msg], 400);
-                }
-                return redirect()->route('dashboard', ['page' => $page])->with('error', $msg);
-            }
-            if ($approvalId) {
-                $alreadyHasBarcode = BarcodeAux::where('approval_id', $approvalId)->where('cancel', false)->exists();
-                if ($alreadyHasBarcode) {
-                    $msg = 'Barcode untuk topping AUX ini sudah di-input.';
-                    if ($request->ajax() || $request->wantsJson()) {
-                        return response()->json(['status' => 'error', 'message' => $msg], 400);
-                    }
-                    return redirect()->route('dashboard', ['page' => $page])->with('error', $msg);
-                }
-            }
-
             $detailProses = null;
             if ($request->has('detail_proses_id') && $request->detail_proses_id) {
                 $detailProses = DetailProses::where('id', $request->detail_proses_id)
@@ -1375,6 +1371,34 @@ class ProsesController extends Controller
                 }
             }
 
+            // Validasi: tolak scan AUX jika kebutuhan awal + topping untuk PROSES ini sudah terpenuhi (Sama seperti LA)
+            $auxInitialScanned = BarcodeAux::whereHas('detailProses', fn($q) => $q->where('proses_id', $id))
+                ->whereNull('approval_id')->where('cancel', false)->distinct('barcode')->count('barcode');
+            $auxToppingReq = Approval::where('proses_id', $id)->where('type', 'KEPALA_SHIFT')
+                ->where('action', 'topping_aux')->where('status', 'approved')->count();
+            $auxToppingScn = Approval::where('proses_id', $id)->where('type', 'KEPALA_SHIFT')
+                ->where('action', 'topping_aux')->where('status', 'approved')
+                ->whereHas('barcodeAuxs', fn($q) => $q->where('cancel', false))->count();
+            $auxIsComplete = ($auxInitialScanned + $auxToppingScn) >= (($proses->qty_aux ?? 1) + $auxToppingReq);
+            
+            if ($auxIsComplete) {
+                $msg = 'Kebutuhan barcode AUX (awal + topping) untuk proses ini sudah terpenuhi. Tidak dapat menambah scan.';
+                if ($request->ajax() || $request->wantsJson()) {
+                    return response()->json(['status' => 'error', 'message' => $msg], 400);
+                }
+                return redirect()->route('dashboard', ['page' => $page])->with('error', $msg);
+            }
+            if ($approvalId) {
+                $alreadyHasBarcode = BarcodeAux::whereHas('detailProses', fn($q) => $q->where('proses_id', $id))->where('approval_id', $approvalId)->where('cancel', false)->exists();
+                if ($alreadyHasBarcode) {
+                    $msg = 'Barcode untuk topping AUX ini sudah di-input pada proses ini.';
+                    if ($request->ajax() || $request->wantsJson()) {
+                        return response()->json(['status' => 'error', 'message' => $msg], 400);
+                    }
+                    return redirect()->route('dashboard', ['page' => $page])->with('error', $msg);
+                }
+            }
+
             $auxl = \App\Models\Auxl::where('barcode', $barcode)->first();
             Log::info('BarcodeAux: Auxl lookup', ['barcode' => $barcode, 'found' => !!$auxl]);
             if (!$auxl) {
@@ -1385,6 +1409,31 @@ class ProsesController extends Controller
                 }
                 return redirect()->route('dashboard', ['page' => $page])->with('error', $msg);
             }
+
+            // Validasi Tipe Aux:
+            // - Tipe 'normal' merupakan aux utama (bukan topping).
+            // - Tipe 'addition' merupakan topping (bukan aux utama).
+            $auxlTipe = $auxl->tipe ?? 'normal';
+            $isToppingScan = !empty($approvalId);
+
+            if ($isToppingScan && $auxlTipe === 'normal') {
+                $msg = 'Barcode AUX dengan tipe Normal merupakan AUX utama, tidak dapat digunakan untuk Topping AUX! Harap gunakan AUX bertipe Addition.';
+                Log::error('BarcodeAux: Type mismatch (Normal used for Topping)', ['barcode' => $barcode, 'tipe' => $auxlTipe]);
+                if ($request->ajax() || $request->wantsJson()) {
+                    return response()->json(['status' => 'error', 'message' => $msg], 400);
+                }
+                return redirect()->route('dashboard', ['page' => $page])->with('error', $msg);
+            }
+
+            if (!$isToppingScan && $auxlTipe === 'addition') {
+                $msg = 'Barcode AUX dengan tipe Addition merupakan Topping AUX, tidak dapat digunakan untuk AUX utama! Harap gunakan AUX bertipe Normal.';
+                Log::error('BarcodeAux: Type mismatch (Addition used for Main Aux)', ['barcode' => $barcode, 'tipe' => $auxlTipe]);
+                if ($request->ajax() || $request->wantsJson()) {
+                    return response()->json(['status' => 'error', 'message' => $msg], 400);
+                }
+                return redirect()->route('dashboard', ['page' => $page])->with('error', $msg);
+            }
+
             $details = $auxl->details;
             Log::info('BarcodeAux: Auxl details', ['count' => $details->count()]);
             if ($details->isEmpty()) {
@@ -1396,7 +1445,7 @@ class ProsesController extends Controller
                 return redirect()->route('dashboard', ['page' => $page])->with('error', $msg);
             }
 
-            // Ambil semua detail proses untuk mendapatkan semua no_op
+            // Ambil semua detail proses untuk mendapatkan semua no_op untuk API SAP
             $detailList = DetailProses::where('proses_id', $proses->id)->get();
             if ($detailList->isEmpty()) {
                 $msg = 'Detail proses tidak ditemukan.';
@@ -1408,11 +1457,9 @@ class ProsesController extends Controller
             }
 
             // Gabungkan semua no_op dengan total qty_gi dari BarcodeKain dengan delimiter |
-            // Ambil semua DetailProses (termasuk yang no_op-nya sama) tanpa di-unique
             $allNoOps = $detailList->filter(function ($detail) {
                 return !empty($detail->no_op);
             })->map(function ($detail) {
-                // Ambil total QTY GI dari BarcodeKain untuk DetailProses ini
                 $totalQtyGi = BarcodeKain::where('detail_proses_id', $detail->id)
                     ->where('cancel', false)
                     ->sum('qty_gi') ?? 0;
@@ -1426,6 +1473,7 @@ class ProsesController extends Controller
             })->implode('|');
             $body = '"' . $allNoOps . ';' . $detailStr . '"';
             Log::info('BarcodeAux: API body prepared', ['body' => $body]);
+            
             $client = new \GuzzleHttp\Client();
             $response = $client->post(
                 SapApi::url('zterima_kimia'),
@@ -1434,6 +1482,7 @@ class ProsesController extends Controller
             $rawResponse = $response->getBody()->getContents();
             Log::info('BarcodeAux: API Response', ['body' => $body, 'response' => $rawResponse]);
             $data = json_decode($rawResponse, true);
+            
             if (empty($data)) {
                 $msg = 'Barcode atau detail auxiliary tidak dikenali oleh sistem SAP (API response kosong)';
                 Log::error('BarcodeAux: API response empty', ['body' => $body]);
@@ -1459,45 +1508,27 @@ class ProsesController extends Controller
                 return redirect()->route('dashboard', ['page' => $page])->with('error', $msg);
             }
 
-            // Validasi Jenis Bahan untuk OP (bedakan kebutuhan awal vs topping AUX)
+            // Validasi Jenis Bahan untuk OP spesifik
             $auxJenis = Auxl::where('barcode', $barcode)->value('jenis');
             $prosesJenis = $proses->jenis ?? null;
             $isToppingAux = !is_null($approvalId);
-            foreach ($detailList as $detail) {
-                Log::info('DEBUG validateOpByJenis', [
-                    'barcode' => $barcode,
-                    'aux_jenis' => $auxJenis,
-                    'no_op' => $detail->no_op,
-                    'proses_jenis' => $prosesJenis,
-                    'is_topping_aux' => $isToppingAux,
-                ]);
 
-                $opValidation = $this->validateOpByJenis($auxJenis, $detail->no_op, $prosesJenis, $isToppingAux);
-
-                if ($opValidation) {
-                    if ($request->ajax() || $request->wantsJson()) {
-                        return response()->json(['status' => 'error', 'message' => $opValidation], 400);
-                    }
-                    return redirect()->route('dashboard', ['page' => $page])->with('error', $opValidation);
+            $opValidation = $this->validateOpByJenis($auxJenis, $detailProses->no_op, $prosesJenis, $isToppingAux);
+            if ($opValidation) {
+                if ($request->ajax() || $request->wantsJson()) {
+                    return response()->json(['status' => 'error', 'message' => $opValidation], 400);
                 }
-
-                Log::info('BarcodeAux: Validasi OP/Jenis passed for detail', [
-                    'barcode' => $barcode,
-                    'proses_id' => $proses->id,
-                    'no_op' => $detail->no_op,
-                ]);
+                return redirect()->route('dashboard', ['page' => $page])->with('error', $opValidation);
             }
 
             $matdok = $data[0]['mblnr'] ?? null;
 
-            // Untuk Multiple OP: barcode topping ditambahkan ke setiap OP (1 approval = 1 scan = tambah ke semua detail)
-            Log::info('BarcodeAux: All DetailProses for proses', ['proses_id' => $proses->id, 'count' => $detailList->count()]);
-
-            foreach ($detailList as $detail) {
+            // Simpan BarcodeAux untuk SEMUA OP/detailProses pada proses ini
+            foreach ($detailList as $dp) {
                 BarcodeAux::create([
-                    'detail_proses_id' => $detail->id,
-                    'no_op' => $detail->no_op,
-                    'no_partai' => $detail->no_partai,
+                    'detail_proses_id' => $dp->id,
+                    'no_op' => $dp->no_op,
+                    'no_partai' => $dp->no_partai,
                     'barcode' => $barcode,
                     'matdok' => $matdok,
                     'item_document' => $data[0]['zeile'] ?? null,
@@ -1506,10 +1537,10 @@ class ProsesController extends Controller
                     'approval_id' => $approvalId,
                 ]);
             }
-            Log::info('BarcodeAux: Successfully saved to all details', [
+            
+            Log::info('BarcodeAux: Successfully saved for all detailProses', [
                 'barcode' => $barcode,
                 'proses_id' => $proses->id,
-                'detail_count' => $detailList->count(),
             ]);
 
             // Broadcast event untuk update real-time
@@ -1521,7 +1552,7 @@ class ProsesController extends Controller
             event(new BarcodeStatusUpdated($proses->id, $statusData));
             Cache::forget("iot:mesin:{$proses->mesin_id}:alarm_result");
 
-            $msg = $approvalId ? 'Barcode AUX topping berhasil disimpan!' : 'Barcode AUX berhasil disimpan untuk semua OP pada proses ini!';
+            $msg = $approvalId ? "Barcode AUX topping berhasil disimpan untuk semua OP pada proses ini!" : "Barcode AUX berhasil disimpan untuk semua OP pada proses ini!";
             if ($request->ajax() || $request->wantsJson()) {
                 return response()->json(['status' => 'success', 'message' => $msg]);
             }
@@ -1892,7 +1923,15 @@ class ProsesController extends Controller
         $tdColor = $hasToppingLa ? ($pendingToppingLa ? 'yellow' : ($approvedToppingLaNotScanned ? 'red' : 'green')) : null;
         $taColor = $hasToppingAux ? ($pendingToppingAux ? 'yellow' : ($approvedToppingAuxNotScanned ? 'red' : 'green')) : null;
 
-        $canRequestToppingLa = $hasLa && $hasAux && !$pendingToppingLa;
+        $laInitialComplete = $detailListForTopping->isNotEmpty()
+            ? $detailListForTopping->every(fn($d) => BarcodeLa::where('detail_proses_id', $d->id)->whereNull('approval_id')->where('cancel', false)->distinct('barcode')->count('barcode') >= ($proses->qty_dye_stuff ?? 1))
+            : false;
+
+        $auxInitialComplete = $detailListForTopping->isNotEmpty()
+            ? $detailListForTopping->every(fn($d) => BarcodeAux::where('detail_proses_id', $d->id)->whereNull('approval_id')->where('cancel', false)->distinct('barcode')->count('barcode') >= ($proses->qty_aux ?? 1))
+            : false;
+
+        $canRequestToppingLa = $laInitialComplete && !$pendingToppingLa;
         if ($canRequestToppingLa) {
             $prevApprovedLa = Approval::where('proses_id', $id)
                 ->where('type', 'KEPALA_SHIFT')
@@ -1908,7 +1947,7 @@ class ProsesController extends Controller
             }
         }
 
-        $canRequestToppingAux = $hasLa && $hasAux && !$pendingToppingAux;
+        $canRequestToppingAux = $auxInitialComplete && !$pendingToppingAux;
         if ($canRequestToppingAux) {
             $prevApprovedAux = Approval::where('proses_id', $id)
                 ->where('type', 'KEPALA_SHIFT')
@@ -1928,7 +1967,8 @@ class ProsesController extends Controller
         $laInitialScanned = BarcodeLa::whereHas('detailProses', fn($q) => $q->where('proses_id', $id))
             ->whereNull('approval_id')
             ->where('cancel', false)
-            ->count();
+            ->distinct('barcode')
+            ->count('barcode');
         $laToppingRequired = Approval::where('proses_id', $id)
             ->where('type', 'KEPALA_SHIFT')
             ->where('action', 'topping_la')
@@ -1943,6 +1983,7 @@ class ProsesController extends Controller
         $laRequired = ($proses->qty_dye_stuff ?? 1) + $laToppingRequired;
         $laScanned = $laInitialScanned + $laToppingScanned;
         $laIsComplete = $laScanned >= $laRequired;
+        $laInitialComplete = $laInitialScanned >= ($proses->qty_dye_stuff ?? 1);
         $laProgress = [
             'required' => $laRequired,
             'scanned' => $laScanned,
@@ -1951,13 +1992,15 @@ class ProsesController extends Controller
             'initial_scanned' => $laInitialScanned,
             'topping_scanned' => $laToppingScanned,
             'is_complete' => $laIsComplete,
+            'initial_is_complete' => $laInitialComplete,
         ];
 
         // Hitung progress AUX: qty_aux awal + topping yang di-approve
         $auxInitialScanned = BarcodeAux::whereHas('detailProses', fn($q) => $q->where('proses_id', $id))
             ->whereNull('approval_id')
             ->where('cancel', false)
-            ->count();
+            ->distinct('barcode') // Pastikan menggunakan distinct
+            ->count('barcode');   // Ubah ke count per barcode
         $auxToppingRequired = Approval::where('proses_id', $id)
             ->where('type', 'KEPALA_SHIFT')
             ->where('action', 'topping_aux')
@@ -1972,6 +2015,7 @@ class ProsesController extends Controller
         $auxRequired = ($proses->qty_aux ?? 1) + $auxToppingRequired;
         $auxScanned = $auxInitialScanned + $auxToppingScanned;
         $auxIsComplete = $auxScanned >= $auxRequired;
+        $auxInitialComplete = $auxInitialScanned >= ($proses->qty_aux ?? 1);
         $auxProgress = [
             'required' => $auxRequired,
             'scanned' => $auxScanned,
@@ -1980,6 +2024,7 @@ class ProsesController extends Controller
             'initial_scanned' => $auxInitialScanned,
             'topping_scanned' => $auxToppingScanned,
             'is_complete' => $auxIsComplete,
+            'initial_is_complete' => $auxInitialComplete,
         ];
 
         $userRole = Auth::user()->role ?? null;
@@ -2036,9 +2081,14 @@ class ProsesController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Tipe barcode tidak valid'], 400);
         }
 
+        if (!$barcodeObj) {
+            Log::error('Cancel barcode gagal: barcode tidak ditemukan', compact('type', 'barcode'));
+            return response()->json(['status' => 'error', 'message' => 'Barcode tidak ditemukan'], 404);
+        }
+
         // Jika matdok kosong/null, ambil dari database barcode
         if (!$matdok) {
-            if ($barcodeObj && $barcodeObj->matdok) {
+            if ($barcodeObj->matdok) {
                 $matdok = $barcodeObj->matdok;
             }
         }
@@ -2047,21 +2097,16 @@ class ProsesController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Material document tidak tersedia'], 400);
         }
 
-        if ($type === 'kain') {
-            $barcodeObj = BarcodeKain::find($barcode);
-            $prosesId = DetailProses::select('proses_id')
-                ->where('id', $barcodeObj->detail_proses_id)
-                ->first();
-            $opberjalan = Proses::select('mulai', 'selesai')
-                ->where('id', $prosesId->proses_id)
-                ->first();
+        $prosesId = $barcodeObj->detailProses->proses_id ?? $proses;
+        $opberjalan = $prosesId ? Proses::select('mulai', 'selesai')->find($prosesId) : null;
 
+        if ($opberjalan) {
             if (!empty($opberjalan->mulai) && empty($opberjalan->selesai)) {
                 return response()->json(['status' => 'error', 'message' => 'Cancel barcode tidak dapat dilakukan saat mesin berjalan'], 400);
             }
-        }
-        if (!empty($opberjalan->mulai) && !empty($opberjalan->selesai)) {
-            return response()->json(['status' => 'error', 'message' => 'Cancel barcode tidak dapat dilakukan saat proses telah selesai'], 400);
+            if (!empty($opberjalan->mulai) && !empty($opberjalan->selesai)) {
+                return response()->json(['status' => 'error', 'message' => 'Cancel barcode tidak dapat dilakukan saat proses telah selesai'], 400);
+            }
         }
 
         try {
@@ -2087,62 +2132,71 @@ class ProsesController extends Controller
             Log::info('SAP Cancel Raw Response', ['response' => $rawResponse]);
             $data = json_decode($rawResponse, true);
             $stats = isset($data[0]['stats']) ? $data[0]['stats'] : null;
+            
             if (empty($data)) {
                 Log::error('Cancel barcode gagal: SAP API response kosong', ['matdok' => $matdok, 'response' => $data]);
                 return response()->json(['status' => 'error', 'message' => 'Material document tidak ditemukan di SAP atau sudah dicancel.'], 400);
             }
+            
             // Anggap sukses baik untuk response 'Success' maupun pesan bahwa semua item sudah dicancel/reversed
             $alreadyCanceled = is_string($stats)
                 && stripos($stats, 'already') !== false
                 && (stripos($stats, 'cancel') !== false || stripos($stats, 'reverse') !== false || stripos($stats, 'reversed') !== false);
 
             if ($stats === 'Success' || $alreadyCanceled) {
-                if (!isset($barcodeObj)) {
-                    if ($type === 'kain') {
-                        $barcodeObj = \App\Models\BarcodeKain::find($barcode);
-                    } elseif ($type === 'la') {
-                        $barcodeObj = \App\Models\BarcodeLa::find($barcode);
-                    } elseif ($type === 'aux') {
-                        $barcodeObj = \App\Models\BarcodeAux::find($barcode);
-                    }
-                }
                 if ($barcodeObj) {
-                    // Ambil prosesId sebelum update untuk memastikan relasi masih ada
-                    $prosesId = null;
-                    $detailProsesId = null;
-                    if ($type === 'kain') {
-                        $detailProsesId = $barcodeObj->detail_proses_id;
-                        $prosesId = $barcodeObj->detailProses->proses_id ?? null;
-                    } elseif ($type === 'la') {
-                        $detailProsesId = $barcodeObj->detail_proses_id;
-                        $prosesId = $barcodeObj->detailProses->proses_id ?? null;
+                    $detailProsesId = $barcodeObj->detail_proses_id;
+
+                    if ($type === 'la') {
+                        $targetProsesId = $barcodeObj->detailProses->proses_id ?? $prosesId;
+                        BarcodeLa::whereHas('detailProses', function ($q) use ($targetProsesId) {
+                            $q->where('proses_id', $targetProsesId);
+                        })
+                        ->where('barcode', $barcodeObj->barcode)
+                        ->where(function ($q) use ($barcodeObj) {
+                            if ($barcodeObj->approval_id) {
+                                $q->where('approval_id', $barcodeObj->approval_id);
+                            } else {
+                                $q->whereNull('approval_id');
+                            }
+                        })
+                        ->update(['cancel' => true]);
                     } elseif ($type === 'aux') {
-                        $detailProsesId = $barcodeObj->detail_proses_id;
-                        $prosesId = $barcodeObj->detailProses->proses_id ?? null;
+                        $targetProsesId = $barcodeObj->detailProses->proses_id ?? $prosesId;
+                        BarcodeAux::whereHas('detailProses', function ($q) use ($targetProsesId) {
+                            $q->where('proses_id', $targetProsesId);
+                        })
+                        ->where('barcode', $barcodeObj->barcode)
+                        ->where(function ($q) use ($barcodeObj) {
+                            if ($barcodeObj->approval_id) {
+                                $q->where('approval_id', $barcodeObj->approval_id);
+                            } else {
+                                $q->whereNull('approval_id');
+                            }
+                        })
+                        ->update(['cancel' => true]);
+                    } else {
+                        $barcodeObj->cancel = true;
+                        $barcodeObj->save();
+                        $barcodeObj->refresh();
                     }
-
-                    $barcodeObj->cancel = true;
-                    $barcodeObj->save();
-
-                    // Refresh model untuk memastikan perubahan tersimpan
-                    $barcodeObj->refresh();
 
                     // Broadcast event untuk update real-time
                     if ($prosesId) {
                         // Refresh proses dengan relasi yang fresh - gunakan fresh() untuk bypass cache
-                        $proses = Proses::with(['approvals', 'details.barcodeKains', 'details.barcodeLas', 'details.barcodeAuxs'])->find($prosesId);
-                        if ($proses) {
+                        $prosesObj = Proses::with(['approvals', 'details.barcodeKains', 'details.barcodeLas', 'details.barcodeAuxs'])->find($prosesId);
+                        if ($prosesObj) {
                             // Refresh semua relasi untuk memastikan data terbaru (termasuk yang sudah di-cancel)
-                            $proses->load(['approvals', 'details.barcodeKains', 'details.barcodeLas', 'details.barcodeAuxs']);
+                            $prosesObj->load(['approvals', 'details.barcodeKains', 'details.barcodeLas', 'details.barcodeAuxs']);
 
                             // Pastikan setiap detail juga di-refresh
-                            foreach ($proses->details as $detail) {
+                            foreach ($prosesObj->details as $detail) {
                                 $detail->load(['barcodeKains', 'barcodeLas', 'barcodeAuxs']);
                             }
 
                             $statusService = new ProsesStatusService();
                             $affectedProsesIds = $statusService->getAffectedProsesIds();
-                            $statusData = $statusService->generateProsesStatus($proses, $affectedProsesIds);
+                            $statusData = $statusService->generateProsesStatus($prosesObj, $affectedProsesIds);
 
                             Log::info('Broadcasting BarcodeStatusUpdated after cancel', [
                                 'proses_id' => $prosesId,
@@ -2152,7 +2206,7 @@ class ProsesController extends Controller
                             ]);
 
                             event(new BarcodeStatusUpdated($prosesId, $statusData));
-                            Cache::forget("iot:mesin:{$proses->mesin_id}:alarm_result");
+                            Cache::forget("iot:mesin:{$prosesObj->mesin_id}:alarm_result");
                         }
                     }
 

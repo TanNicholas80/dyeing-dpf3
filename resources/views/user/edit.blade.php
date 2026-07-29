@@ -61,6 +61,7 @@
                                             'super_admin' => 'Super Admin',
                                             'owner' => 'Owner',
                                             'aux' => 'Aux',
+                                            'dye_stuff' => 'Dye Stuff',
                                             'ppic' => 'PPIC',
                                             'operator' => 'Operator',
                                             'dashboard' => 'Dashboard',

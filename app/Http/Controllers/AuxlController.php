@@ -6,6 +6,7 @@ use App\Models\Auxl;
 use App\Models\AuxlDetail;
 use App\Models\BarcodeAux;
 use App\Models\Approval;
+use App\Models\Proses;
 use App\Support\SapApi;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -16,7 +17,7 @@ class AuxlController extends Controller
 {
     public function index()
     {
-        $auxls = Auxl::with('details')->orderByDesc('created_at')->get();
+        $auxls = Auxl::with(['proses.details', 'proses.mesin', 'details'])->orderByDesc('created_at')->get();
 
         // Tandai auxl yang sudah dipakai proses (ter-scan sebagai Barcode AUX aktif).
         $usageCountsByBarcode = collect();
@@ -62,7 +63,20 @@ class AuxlController extends Controller
         if (Auth::user()->role === 'scm') {
             abort(403, 'Unauthorized action.');
         }
-        return view('auxl.create');
+
+        $allProses = Proses::with(['details', 'mesin'])
+            ->withCount(['auxls as normal_aux_count' => function ($q) {
+                $q->where('tipe', 'normal');
+            }])
+            ->whereNull('selesai')
+            ->orderByDesc('created_at')
+            ->get();
+
+        // Pisahkan menjadi Sedang Berjalan dan Belum Berjalan
+        $prosesRunning = $allProses->filter(fn($p) => !is_null($p->mulai));
+        $prosesPending = $allProses->filter(fn($p) => is_null($p->mulai));
+
+        return view('auxl.create', compact('prosesRunning', 'prosesPending'));
     }
 
     public function store(Request $request)
@@ -71,23 +85,87 @@ class AuxlController extends Controller
             abort(403, 'Unauthorized action.');
         }
         $data = $request->validate([
-            'jenis' => 'required',
-            'code' => 'required',
-            'konstruksi' => 'nullable',
-            'customer' => 'nullable',
-            'marketing' => 'nullable',
-            'date' => 'nullable|date',
-            'color' => 'nullable',
-            'details' => 'required|array',
-            'details.*.auxiliary' => 'required',
-            'details.*.konsentrasi' => 'required|numeric',
+            'proses_id'   => 'required|exists:proses,id',
+            'jenis'       => 'required|in:normal,reproses,perbaikan',
+            'tipe'        => 'required|in:normal,addition',
+            'step_proses' => 'nullable|integer|in:1,2,3',
+            'total_wt'    => 'required|numeric|min:0',
+            'volume_litres' => 'required|numeric|min:0',
+            'code'        => 'required|string',
+            'konstruksi'  => 'nullable|string',
+            'customer'    => 'nullable|string',
+            'marketing'   => 'nullable|string',
+            'date'        => 'nullable|date',
+            'color'       => 'nullable|string',
+            'details'     => 'required|array|min:1',
+            'details.*.auxiliary'   => 'required|string',
+            'details.*.konsentrasi' => 'required|numeric|min:0',
         ]);
 
+        $proses = Proses::findOrFail($data['proses_id']);
+        $maxQty = (int) ($proses->qty_aux ?? 1);
+        if ($maxQty < 1) {
+            $maxQty = 1;
+        }
+
+        if ($maxQty > 1 && empty($data['step_proses'])) {
+            return back()->withInput()->withErrors([
+                'step_proses' => 'Pick List Step wajib dipilih ketika QTY Aux lebih dari 1.'
+            ]);
+        }
+
+        // Cek kuota dan keunikan step untuk Aux Type Normal
+        if ($data['tipe'] === 'normal') {
+            $existingNormalCount = Auxl::where('proses_id', $data['proses_id'])
+                ->where('tipe', 'normal')
+                ->count();
+
+            if ($existingNormalCount >= $maxQty) {
+                return back()->withInput()->withErrors([
+                    'tipe' => "AUX Type Normal untuk proses ini sudah mencapai batas maksimum ({$maxQty}x)."
+                ]);
+            }
+
+            $targetStep = $data['step_proses'] ?? 1;
+            $stepExists = Auxl::where('proses_id', $data['proses_id'])
+                ->where('tipe', 'normal')
+                ->where('step_proses', $targetStep)
+                ->exists();
+
+            if ($stepExists) {
+                return back()->withInput()->withErrors([
+                    'step_proses' => "AUX Type Normal untuk Step {$targetStep} sudah pernah dibuat pada proses ini."
+                ]);
+            }
+        } elseif ($data['tipe'] === 'addition') {
+            if (empty($data['step_proses'])) {
+                return back()->withInput()->withErrors([
+                    'step_proses' => 'Pick List Step (1 - Reactive / 2 - Dispers) wajib dipilih untuk Tipe Addition (Topping).'
+                ]);
+            }
+            $targetStep = (int) $data['step_proses'];
+            if (!in_array($targetStep, [1, 2])) {
+                return back()->withInput()->withErrors([
+                    'step_proses' => 'Pick List Step Tipe Addition (Topping) harus berupa 1 (Reactive) atau 2 (Dispers).'
+                ]);
+            }
+            $stepExists = Auxl::where('proses_id', $data['proses_id'])
+                ->where('tipe', 'addition')
+                ->where('step_proses', $targetStep)
+                ->exists();
+
+            if ($stepExists) {
+                $stepLabel = $targetStep == 1 ? '1 - Reactive' : '2 - Dispers';
+                return back()->withInput()->withErrors([
+                    'step_proses' => "AUX Tipe Addition (Topping) untuk Step {$stepLabel} sudah pernah dibuat pada proses ini."
+                ]);
+            }
+        }
+
+        $data['step_proses'] = $data['step_proses'] ?? 1;
+
         return DB::transaction(function () use ($data) {
-            // Generate barcode unik: AUX-[running number 10 digit]
-            $last = Auxl::orderByDesc('id')->first();
-            $nextNumber = $last ? ($last->id + 1) : 1;
-            $barcode = 'AUX-' . str_pad($nextNumber, 10, '0', STR_PAD_LEFT);
+            $barcode = Auxl::generateBarcode();
             $data['barcode'] = $barcode;
 
             $auxl = Auxl::create($data);
@@ -95,8 +173,8 @@ class AuxlController extends Controller
                 $auxl->details()->create($detail);
             }
 
-            // Jika jenis reproses, trigger approval 2 step (FM lalu VP)
-            if ($auxl->jenis === 'reproses') {
+            // Jika jenis reproses / perbaikan, trigger approval 2 step (FM lalu VP)
+            if (in_array($auxl->jenis, ['reproses', 'perbaikan'])) {
                 $this->createReprocessApproval($auxl);
 
                 return redirect()
@@ -112,7 +190,7 @@ class AuxlController extends Controller
 
     public function show($id)
     {
-        $auxl = Auxl::with('details')->findOrFail($id);
+        $auxl = Auxl::with(['proses.details', 'proses.mesin', 'details'])->findOrFail($id);
         return view('auxl.show', compact('auxl'));
     }
 
@@ -121,8 +199,20 @@ class AuxlController extends Controller
         if (Auth::user()->role === 'scm') {
             abort(403, 'Unauthorized action.');
         }
-        $auxl = Auxl::with('details')->findOrFail($id);
-        return view('auxl.edit', compact('auxl'));
+        $auxl = Auxl::with(['proses.details', 'details'])->findOrFail($id);
+
+        $allProses = Proses::with(['details', 'mesin'])
+            ->withCount(['auxls as normal_aux_count' => function ($q) use ($id) {
+                $q->where('tipe', 'normal')->where('id', '!=', $id);
+            }])
+            ->whereNull('selesai')
+            ->orderByDesc('created_at')
+            ->get();
+
+        $prosesRunning = $allProses->filter(fn($p) => !is_null($p->mulai));
+        $prosesPending = $allProses->filter(fn($p) => is_null($p->mulai));
+
+        return view('auxl.edit', compact('auxl', 'prosesRunning', 'prosesPending'));
     }
 
     public function update(Request $request, $id)
@@ -131,32 +221,140 @@ class AuxlController extends Controller
             abort(403, 'Unauthorized action.');
         }
         $data = $request->validate([
-            'jenis' => 'required',
-            'code' => 'required',
-            'konstruksi' => 'nullable',
-            'customer' => 'nullable',
-            'marketing' => 'nullable',
-            'date' => 'nullable|date',
-            'color' => 'nullable',
-            'barcode' => 'nullable',
-            'details' => 'required|array',
-            'details.*.auxiliary' => 'required',
-            'details.*.konsentrasi' => 'required|numeric',
+            'proses_id'   => 'required|exists:proses,id',
+            'jenis'       => 'required|in:normal,reproses,perbaikan',
+            'tipe'        => 'required|in:normal,addition',
+            'step_proses' => 'nullable|integer|in:1,2,3',
+            'total_wt'    => 'required|numeric|min:0',
+            'volume_litres' => 'required|numeric|min:0',
+            'code'        => 'required|string',
+            'konstruksi'  => 'nullable|string',
+            'customer'    => 'nullable|string',
+            'marketing'   => 'nullable|string',
+            'date'        => 'nullable|date',
+            'color'       => 'nullable|string',
+            'barcode'     => 'nullable|string',
+            'details'     => 'required|array|min:1',
+            'details.*.auxiliary'   => 'required|string',
+            'details.*.konsentrasi' => 'required|numeric|min:0',
         ]);
+
         $auxl = Auxl::findOrFail($id);
-        $auxl->update($data);
-        // Hapus detail lama, simpan ulang
-        $auxl->details()->delete();
-        foreach ($data['details'] as $detail) {
-            $auxl->details()->create($detail);
+        $proses = Proses::findOrFail($data['proses_id']);
+        $maxQty = (int) ($proses->qty_aux ?? 1);
+        if ($maxQty < 1) {
+            $maxQty = 1;
         }
-        return redirect()->route('aux.index')->with('success', 'Data Auxl berhasil diupdate.');
+
+        if ($maxQty > 1 && empty($data['step_proses'])) {
+            return back()->withInput()->withErrors([
+                'step_proses' => 'Pick List Step wajib dipilih ketika QTY Aux lebih dari 1.'
+            ]);
+        }
+
+        if ($data['tipe'] === 'normal') {
+            $existingNormalCount = Auxl::where('proses_id', $data['proses_id'])
+                ->where('tipe', 'normal')
+                ->where('id', '!=', $id)
+                ->count();
+
+            if ($existingNormalCount >= $maxQty) {
+                return back()->withInput()->withErrors([
+                    'tipe' => "AUX Type Normal untuk proses ini sudah mencapai batas maksimum ({$maxQty}x)."
+                ]);
+            }
+
+            $targetStep = $data['step_proses'] ?? 1;
+            $stepExists = Auxl::where('proses_id', $data['proses_id'])
+                ->where('tipe', 'normal')
+                ->where('step_proses', $targetStep)
+                ->where('id', '!=', $id)
+                ->exists();
+
+            if ($stepExists) {
+                return back()->withInput()->withErrors([
+                    'step_proses' => "AUX Type Normal untuk Step {$targetStep} sudah pernah dibuat pada proses ini."
+                ]);
+            }
+        } elseif ($data['tipe'] === 'addition') {
+            if (empty($data['step_proses'])) {
+                return back()->withInput()->withErrors([
+                    'step_proses' => 'Pick List Step (1 - Reactive / 2 - Dispers) wajib dipilih untuk Tipe Addition (Topping).'
+                ]);
+            }
+            $targetStep = (int) $data['step_proses'];
+            if (!in_array($targetStep, [1, 2])) {
+                return back()->withInput()->withErrors([
+                    'step_proses' => 'Pick List Step Tipe Addition (Topping) harus berupa 1 (Reactive) atau 2 (Dispers).'
+                ]);
+            }
+            $stepExists = Auxl::where('proses_id', $data['proses_id'])
+                ->where('tipe', 'addition')
+                ->where('step_proses', $targetStep)
+                ->where('id', '!=', $id)
+                ->exists();
+
+            if ($stepExists) {
+                $stepLabel = $targetStep == 1 ? '1 - Reactive' : '2 - Dispers';
+                return back()->withInput()->withErrors([
+                    'step_proses' => "AUX Tipe Addition (Topping) untuk Step {$stepLabel} sudah pernah dibuat pada proses ini."
+                ]);
+            }
+        }
+
+        $data['step_proses'] = $data['step_proses'] ?? 1;
+
+        return DB::transaction(function () use ($auxl, $data) {
+            $auxl->update($data);
+            // Hapus detail lama, simpan ulang
+            $auxl->details()->delete();
+            foreach ($data['details'] as $detail) {
+                $auxl->details()->create($detail);
+            }
+            return redirect()->route('aux.index')->with('success', 'Data Auxl berhasil diupdate.');
+        });
+    }
+
+    public function print($id)
+    {
+        $auxl = Auxl::with(['proses.details', 'proses.mesin', 'details'])->findOrFail($id);
+        return view('auxl.print', compact('auxl'));
+    }
+
+    public function printBulk(Request $request)
+    {
+        $rawIds = $request->query('ids', '');
+        $ids = array_filter(explode(',', $rawIds));
+
+        $auxls = Auxl::with(['proses.details', 'proses.mesin', 'details'])
+            ->whereIn('id', $ids)
+            ->get();
+
+        if ($auxls->isEmpty()) {
+            return redirect()->route('aux.index')->with('error', 'Tidak ada data AUX yang dipilih.');
+        }
+
+        return view('auxl.print_bulk', compact('auxls'));
     }
 
     public function destroy($id)
     {
         $auxl = Auxl::findOrFail($id);
-        $auxl->delete();
+
+        // Cek apakah barcode AUX sudah di-scan di proses (BarcodeAux aktif)
+        $isUsed = BarcodeAux::where('barcode', $auxl->barcode)
+            ->where('cancel', false)
+            ->exists();
+
+        if ($isUsed) {
+            return redirect()->route('aux.index')->with('error', 'Data Auxl tidak dapat dihapus karena barcode sudah di-scan pada proses.');
+        }
+
+        DB::transaction(function () use ($auxl) {
+            $auxl->details()->delete();
+            $auxl->delete();
+        });
+
         return redirect()->route('aux.index')->with('success', 'Data Auxl berhasil dihapus.');
     }
 

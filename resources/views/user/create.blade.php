@@ -63,6 +63,7 @@
                                     <option value="owner" {{ old('role') == 'owner' ? 'selected' : '' }}>Owner</option>
                                     <option value="aux" {{ old('role') == 'aux' ? 'selected' : '' }}>Aux
                                     </option>
+                                    <option value="dye_stuff" {{ old('role') == 'dye_stuff' ? 'selected' : '' }}>Dye Stuff</option>
                                     <option value="ppic" {{ old('role') == 'ppic' ? 'selected' : '' }}>PPIC</option>
                                     <option value="operator" {{ old('role') == 'operator' ? 'selected' : '' }}>Operator</option>
                                     <option value="dashboard" {{ old('role') == 'dashboard' ? 'selected' : '' }}>Dashboard</option>

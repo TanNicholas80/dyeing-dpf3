@@ -105,6 +105,7 @@
                                                 'pause_proses' => 'Pause Proses',
                                                 'create_reprocess' => 'Buat Reproses',
                                                 'create_aux_reprocess' => 'Buat Reproses Auxl',
+                                                'create_la_reprocess' => 'Buat Reproses Dye Stuff',
                                                 'swap_position' => 'Tukar Posisi'
                                             ];
                                             $actionLabel = $actionLabels[$approval->action] ?? ucfirst(str_replace('_', ' ', $approval->action));
@@ -183,6 +184,8 @@
                                                         History Data - 
                                                         @if($approval->action === 'create_aux_reprocess' && $approval->auxl)
                                                         {{ $approval->auxl->barcode ?? 'AUXL' }}
+                                                        @elseif($approval->action === 'create_la_reprocess' && $approval->dyeStuff)
+                                                        {{ $approval->dyeStuff->barcode ?? 'LA' }}
                                                         @else
                                                         @php
                                                         // Ambil no_op dari DetailProses jika ada, atau dari history_data, atau fallback ke MAINTENANCE
@@ -829,6 +832,90 @@
                                                             <div class="alert alert-info mb-0">
                                                                 <i class="fas fa-info-circle mr-2"></i>
                                                                 <strong>Catatan:</strong> Setelah disetujui oleh FM, proses reproses auxl akan menunggu persetujuan VP (tahap 2) sebelum dapat digunakan.
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    @elseif($approval->action === 'create_la_reprocess')
+                                                    <!-- Tampilan khusus untuk Create Dye Stuff Reproses (Tahap 1: FM Approval) -->
+                                                    <div class="row">
+                                                        <div class="col-md-12">
+                                                            <div class="alert alert-warning">
+                                                                <i class="fas fa-exclamation-triangle mr-2"></i>
+                                                                <strong>Informasi:</strong> Pembuatan Dye Stuff (LA) reproses berikut akan menunggu persetujuan VP setelah disetujui oleh FM.
+                                                            </div>
+                                                            @php
+                                                            $dsSnapshot = $history['dyestuff_snapshot'] ?? [];
+                                                            $dsDetails = [];
+                                                            if (isset($history['details']) && is_array($history['details'])) {
+                                                                $dsDetails = $history['details'];
+                                                            } elseif (isset($dsSnapshot['details']) && is_array($dsSnapshot['details'])) {
+                                                                $dsDetails = $dsSnapshot['details'];
+                                                            } elseif ($approval->dyeStuff && $approval->dyeStuff->details) {
+                                                                $dsDetails = $approval->dyeStuff->details->toArray();
+                                                            }
+                                                            @endphp
+                                                            <div class="card border-warning mb-3">
+                                                                <div class="card-header bg-warning text-dark">
+                                                                    <h6 class="mb-0"><i class="fas fa-flask mr-2"></i>Detail Dye Stuff Reproses (Tahap 1: Approval FM)</h6>
+                                                                </div>
+                                                                <div class="card-body">
+                                                                    <div class="row">
+                                                                        @if(!empty($dsSnapshot['barcode']))
+                                                                        <div class="col-md-6 mb-3">
+                                                                            <strong class="text-muted d-block">Barcode</strong>
+                                                                            <h5 class="mb-0"><span class="badge badge-info">{{ $dsSnapshot['barcode'] }}</span></h5>
+                                                                        </div>
+                                                                        @endif
+                                                                        <div class="col-md-6 mb-3">
+                                                                            <strong class="text-muted d-block">Jenis</strong>
+                                                                            <span class="badge badge-warning">{{ ucfirst($dsSnapshot['jenis'] ?? 'Reproses') }}</span>
+                                                                        </div>
+                                                                        <div class="col-md-6 mb-3">
+                                                                            <strong class="text-muted d-block">Tipe</strong>
+                                                                            <span class="badge badge-secondary">{{ ucfirst($dsSnapshot['tipe'] ?? 'Normal') }}</span>
+                                                                        </div>
+                                                                        <div class="col-md-6 mb-3">
+                                                                            <strong class="text-muted d-block">Total Weight</strong>
+                                                                            <span>{{ number_format($dsSnapshot['total_wt'] ?? 0, 1) }} kg</span>
+                                                                        </div>
+                                                                        <div class="col-md-6 mb-3">
+                                                                            <strong class="text-muted d-block">Volume</strong>
+                                                                            <span>{{ number_format($dsSnapshot['volume_litres'] ?? 0, 1) }} L</span>
+                                                                        </div>
+                                                                        <div class="col-md-6 mb-3">
+                                                                            <strong class="text-muted d-block">Liquor Ratio</strong>
+                                                                            <span>1 : {{ $dsSnapshot['liquor_ratio'] ?? 0 }}</span>
+                                                                        </div>
+                                                                    </div>
+                                                                    
+                                                                    <!-- Detail Bahan Kimia -->
+                                                                    @if(!empty($dsDetails) && count($dsDetails) > 0)
+                                                                    <hr class="my-3">
+                                                                    <h6 class="mb-3">
+                                                                        <i class="fas fa-vial mr-2"></i>
+                                                                        <strong>Detail Resep / List Kimia</strong>
+                                                                        <span class="badge badge-secondary ml-2">{{ count($dsDetails) }} item</span>
+                                                                    </h6>
+                                                                    <div class="list-group">
+                                                                        @foreach($dsDetails as $index => $detail)
+                                                                        <div class="list-group-item list-group-item-action d-flex justify-content-between align-items-center py-2 px-3">
+                                                                            <div>
+                                                                                <span class="badge badge-secondary mr-2">{{ $index + 1 }}</span>
+                                                                                <strong>{{ $detail['chemical_name'] ?? '-' }}</strong>
+                                                                            </div>
+                                                                            <div>
+                                                                                <span class="badge badge-info badge-pill mr-2">Timbangan: {{ isset($detail['weight']) ? number_format($detail['weight'], 2) : '-' }} {{ $detail['unit'] ?? 'g' }}</span>
+                                                                                <span class="badge badge-secondary badge-pill">Kons: {{ isset($detail['konsentrasi']) ? number_format($detail['konsentrasi'], 2) : '-' }} g/L</span>
+                                                                            </div>
+                                                                        </div>
+                                                                        @endforeach
+                                                                    </div>
+                                                                    @endif
+                                                                </div>
+                                                            </div>
+                                                            <div class="alert alert-info mb-0">
+                                                                <i class="fas fa-info-circle mr-2"></i>
+                                                                <strong>Catatan:</strong> Setelah disetujui oleh FM, persetujuan Dye Stuff reproses akan diteruskan ke VP (tahap 2).
                                                             </div>
                                                         </div>
                                                     </div>

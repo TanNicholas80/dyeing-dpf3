@@ -531,7 +531,8 @@ class ApiCheckStatusBarcodeController extends Controller
         $laInitialScanned = BarcodeLa::whereHas('detailProses', fn($q) => $q->where('proses_id', $proses->id))
             ->whereNull('approval_id')
             ->where('cancel', false)
-            ->count();
+            ->distinct('barcode')
+            ->count('barcode');
         $laToppingRequired = Approval::where('proses_id', $proses->id)
             ->where('type', 'KEPALA_SHIFT')
             ->where('action', 'topping_la')
@@ -575,7 +576,8 @@ class ApiCheckStatusBarcodeController extends Controller
         $laInitialScanned = BarcodeLa::whereHas('detailProses', fn($q) => $q->where('proses_id', $proses->id))
             ->whereNull('approval_id')
             ->where('cancel', false)
-            ->count();
+            ->distinct('barcode')
+            ->count('barcode');
         $laToppingRequired = Approval::where('proses_id', $proses->id)
             ->where('type', 'KEPALA_SHIFT')
             ->where('action', 'topping_la')

@@ -130,14 +130,27 @@ Route::middleware(['auth', 'prevent-back-history'])->group(function () {
      * - SuperAdmin: akses penuh AUX
      * - Owner: minimal bisa melihat AUX (sementara pakai resource penuh, jika perlu bisa dibatasi di controller)
      */
-    Route::middleware('role:super_admin,aux,scm')->group(function () {
+    Route::middleware('role:super_admin,aux,scm,ppic,kepala_ruangan,operator')->group(function () {
+        Route::get('aux/print-bulk', [AuxlController::class, 'printBulk'])->name('aux.print-bulk');
         Route::resource('aux', AuxlController::class)->except(['destroy']);
+        Route::get('aux/{id}/print', [AuxlController::class, 'print'])->name('aux.print');
     });
     Route::middleware('role:super_admin')->group(function () {
         Route::delete('aux/{aux}', [AuxlController::class, 'destroy'])
             ->name('aux.destroy');
     });
+
+    /**
+     * Dye Stuff (LA)
+     */
+    Route::middleware('role:super_admin,ds,dye_stuff,aux,ppic,scm,kepala_ruangan,operator')->group(function () {
+        Route::get('dye-stuff/print-bulk', [\App\Http\Controllers\DyeStuffController::class, 'printBulk'])->name('dye-stuff.print-bulk');
+        Route::resource('dye-stuff', \App\Http\Controllers\DyeStuffController::class);
+        Route::get('dye-stuff/{id}/print', [\App\Http\Controllers\DyeStuffController::class, 'print'])->name('dye-stuff.print');
+    });
 });
+
+Route::get('/api/proses-info/{id}', [\App\Http\Controllers\DyeStuffController::class, 'getProsesInfo']);
 
 // Tambahkan di luar middleware auth agar bisa diakses select2
 Route::post('/api/proxy-op', [ProsesController::class, 'proxyOpSearch']);

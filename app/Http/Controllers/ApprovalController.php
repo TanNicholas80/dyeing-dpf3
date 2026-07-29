@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Approval;
 use App\Models\Auxl;
+use App\Models\DyeStuff;
 use App\Models\Proses;
 use App\Models\DetailProses;
 use App\Models\Mesin;
@@ -205,6 +206,47 @@ class ApprovalController extends Controller
      */
     private function executeApprovedAction(Approval $approval)
     {
+        if ($approval->action === 'create_la_reprocess') {
+            $dyeStuff = DyeStuff::find($approval->dyestuff_id);
+
+            if (! $dyeStuff) {
+                throw new \Exception("Data Dye Stuff tidak ditemukan untuk approval ini.");
+            }
+
+            // Setelah FM approve, otomatis buat approval VP jika belum ada
+            if ($approval->type === 'FM') {
+                $existingVpApproval = Approval::where('dyestuff_id', $dyeStuff->id)
+                    ->where('type', 'VP')
+                    ->where('action', 'create_la_reprocess')
+                    ->first();
+
+                if (! $existingVpApproval) {
+                    $dsDetails = $dyeStuff->details ? $dyeStuff->details->toArray() : [];
+
+                    if (empty($dsDetails) && $approval->history_data && isset($approval->history_data['details'])) {
+                        $dsDetails = $approval->history_data['details'];
+                    }
+
+                    Approval::create([
+                        'dyestuff_id'  => $dyeStuff->id,
+                        'status'       => 'pending',
+                        'type'         => 'VP',
+                        'action'       => 'create_la_reprocess',
+                        'history_data' => [
+                            'dyestuff_snapshot' => $dyeStuff->toArray(),
+                            'details'           => $dsDetails,
+                            'fm_approval_id'    => $approval->id,
+                        ],
+                        'note'         => null,
+                        'requested_by' => $approval->requested_by,
+                        'approved_by'  => null,
+                    ]);
+                }
+            }
+
+            return;
+        }
+
         if ($approval->action === 'create_aux_reprocess') {
             $auxl = Auxl::find($approval->auxl_id);
 
@@ -538,6 +580,20 @@ class ApprovalController extends Controller
     private function executeRejectedAction(Approval $approval)
     {
         switch ($approval->action) {
+            case 'create_la_reprocess':
+                // Jika approval Dye Stuff (LA) ditolak, hapus Dye Stuff dan approval VP yang masih pending
+                $dyeStuff = DyeStuff::find($approval->dyestuff_id);
+                if ($dyeStuff) {
+                    $dyeStuff->delete();
+                }
+
+                Approval::where('dyestuff_id', $approval->dyestuff_id)
+                    ->where('action', 'create_la_reprocess')
+                    ->where('type', 'VP')
+                    ->where('status', 'pending')
+                    ->delete();
+                break;
+
             case 'create_aux_reprocess':
                 // Jika approval Auxl ditolak, hapus Auxl dan approval VP yang masih pending
                 $auxl = Auxl::find($approval->auxl_id);

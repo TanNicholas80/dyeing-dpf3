@@ -18,6 +18,8 @@ class AuthController extends Controller
             // Redirect berdasarkan role
             if ($user->role === 'aux') {
                 return redirect()->route('aux.index');
+            } elseif ($user->role === 'dye_stuff') {
+                return redirect()->route('dye-stuff.index');
             } elseif ($user->role === 'spv_listrik') {
                 return redirect()->route('mesin.index');
             }
@@ -55,6 +57,8 @@ class AuthController extends Controller
             $redirectRoute = 'dashboard';
             if ($user->role === 'aux') {
                 $redirectRoute = 'aux.index';
+            } elseif ($user->role === 'dye_stuff') {
+                $redirectRoute = 'dye-stuff.index';
             } elseif ($user->role === 'spv_listrik') {
                 $redirectRoute = 'mesin.index';
             }

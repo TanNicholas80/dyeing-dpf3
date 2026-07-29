@@ -14,9 +14,14 @@ class Auxl extends Model
     use HasFactory, LogsActivity;
 
     protected $fillable = [
-        'no_op', 'no_partai', 'barcode', 'matdok', 'mesin_id', 'cancel',
-        'jenis', 'code', 'konstruksi', 'customer', 'marketing', 'date', 'color'
+        'proses_id', 'no_op', 'no_partai', 'barcode', 'matdok', 'mesin_id', 'cancel',
+        'jenis', 'tipe', 'step_proses', 'total_wt', 'volume_litres', 'code', 'konstruksi', 'customer', 'marketing', 'date', 'color'
     ];
+
+    public function proses()
+    {
+        return $this->belongsTo(Proses::class, 'proses_id');
+    }
 
     public static function getJenisOptions()
     {
@@ -25,6 +30,42 @@ class Auxl extends Model
             'reproses' => 'Reproses FG',
             'perbaikan' => 'Perbaikan BDP',
         ];
+    }
+
+    public static function getTipeOptions()
+    {
+        return [
+            'normal' => 'Normal',
+            'addition' => 'Addition',
+        ];
+    }
+
+    public static function getStepProsesOptions()
+    {
+        return [
+            1 => 'Step 1',
+            2 => 'Step 2',
+            3 => 'Step 3',
+        ];
+    }
+
+    public static function generateBarcode(): string
+    {
+        $year = date('y');
+        $prefix = 'AUX-' . $year . '-';
+
+        $last = static::where('barcode', 'like', $prefix . '%')
+            ->orderByDesc('id')
+            ->first();
+
+        $nextNumber = 1;
+        if ($last && !empty($last->barcode)) {
+            $parts = explode('-', $last->barcode);
+            $lastNum = (int) end($parts);
+            $nextNumber = $lastNum + 1;
+        }
+
+        return $prefix . str_pad($nextNumber, 10, '0', STR_PAD_LEFT);
     }
 
     public function details()
@@ -37,7 +78,7 @@ class Auxl extends Model
      */
     public function getActivitylogOptions(): LogOptions
     {
-        $logFields = ['barcode', 'jenis', 'code', 'konstruksi', 'customer', 'marketing', 'date', 'color', 'no_op', 'no_partai', 'mesin_id', 'cancel'];
+        $logFields = ['barcode', 'jenis', 'tipe', 'step_proses', 'code', 'konstruksi', 'customer', 'marketing', 'date', 'color', 'no_op', 'no_partai', 'mesin_id', 'cancel'];
 
         return LogOptions::defaults()
             ->useLogName('Manajemen Auxl')
@@ -79,6 +120,8 @@ class Auxl extends Model
         $baseData = [
             'barcode' => $this->barcode,
             'jenis' => $this->jenis,
+            'tipe' => $this->tipe,
+            'step_proses' => $this->step_proses,
             'code' => $this->code,
             'konstruksi' => $this->konstruksi,
             'customer' => $this->customer,

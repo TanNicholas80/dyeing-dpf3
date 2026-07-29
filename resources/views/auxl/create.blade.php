@@ -45,23 +45,70 @@
 
         <section class="content">
             <div class="container-fluid">
-                <input type="hidden" id="initial-detail-index" value="{{ max(1, count(old('details', []))) }}">
-                <form action="{{ route('aux.store') }}" method="POST">
+                <form action="{{ route('aux.store') }}" method="POST" id="form-aux">
                     @csrf
                     <div class="card">
-                        <div class="card-header">
-                            <h3 class="card-title">Form Tambah Auxiliary</h3>
+                        <div class="card-header bg-primary text-white">
+                            <h3 class="card-title"><i class="fas fa-flask"></i> Form Tambah Auxiliary</h3>
                         </div>
                         <div class="card-body">
                             <div class="row">
-                                <div class="col-md-4 mb-2">
-                                    <label>Jenis</label>
-                                    <select name="jenis" class="form-control" required>
-                                        <option value="" disabled {{ old('jenis') ? '' : 'selected' }}>-- Pilih Jenis
-                                            --</option>
+                                <!-- Pilih Planning Proses -->
+                                <div class="col-md-6 mb-3">
+                                    <label>Planning Proses <span class="text-danger">*</span></label>
+                                    <select name="proses_id" id="proses_id" class="form-control select2" required>
+                                        <option value="" disabled {{ old('proses_id') ? '' : 'selected' }}>-- Pilih Planning Proses --</option>
+
+                                        @if(isset($prosesRunning) && $prosesRunning->isNotEmpty())
+                                            <optgroup label="⚡ --- Sedang Berjalan ---">
+                                                @foreach ($prosesRunning as $p)
+                                                    @php $f = optional($p->details)->first(); @endphp
+                                                    <option value="{{ $p->id }}" {{ old('proses_id') == $p->id ? 'selected' : '' }}>
+                                                        [Berjalan] OP: {{ $f->no_op ?? '-' }} | Partai: {{ $f->no_partai ?? '-' }} |
+                                                        Mesin: {{ optional($p->mesin)->jenis_mesin ?? '-' }} (Normal: {{ $p->normal_aux_count }}/{{ $p->qty_aux ?? 1 }}{{ $p->normal_aux_count >= ($p->qty_aux ?? 1) ? ' - Penuh' : '' }})
+                                                    </option>
+                                                @endforeach
+                                            </optgroup>
+                                        @endif
+
+                                        @if(isset($prosesPending) && $prosesPending->isNotEmpty())
+                                            <optgroup label="⏳ --- Belum Berjalan ---">
+                                                @foreach ($prosesPending as $p)
+                                                    @php $f = optional($p->details)->first(); @endphp
+                                                    <option value="{{ $p->id }}" {{ old('proses_id') == $p->id ? 'selected' : '' }}>
+                                                        [Belum Berjalan] OP: {{ $f->no_op ?? '-' }} | Partai: {{ $f->no_partai ?? '-' }} | Customer: {{ $f->customer ?? '-' }} (Normal: {{ $p->normal_aux_count }}/{{ $p->qty_aux ?? 1 }}{{ $p->normal_aux_count >= ($p->qty_aux ?? 1) ? ' - Penuh' : '' }})
+                                                    </option>
+                                                @endforeach
+                                            </optgroup>
+                                        @endif
+                                    </select>
+                                    @error('proses_id')
+                                        <small class="text-danger">{{ $message }}</small>
+                                    @enderror
+                                </div>
+
+                                <!-- Tipe Aux -->
+                                <div class="col-md-3 mb-3">
+                                    <label>Tipe Aux <span class="text-danger">*</span></label>
+                                    <select name="tipe" id="tipe" class="form-control" required>
+                                        @foreach (\App\Models\Auxl::getTipeOptions() as $key => $val)
+                                            <option value="{{ $key }}" {{ old('tipe', 'normal') == $key ? 'selected' : '' }}>
+                                                {{ $val }}</option>
+                                        @endforeach
+                                    </select>
+                                    @error('tipe')
+                                        <small class="text-danger">{{ $message }}</small>
+                                    @enderror
+                                </div>
+
+                                <!-- Jenis (Locked - Otomatis dari Planning) -->
+                                <div class="col-md-3 mb-3">
+                                    <label>Jenis <span class="text-danger">*</span></label>
+                                    <select name="jenis" id="jenis" class="form-control"
+                                        style="pointer-events: none; background-color: #e9ecef;" tabindex="-1" required>
                                         @foreach (\App\Models\Auxl::getJenisOptions() as $key => $val)
-                                            <option value="{{ $key }}"
-                                                {{ old('jenis') == $key ? 'selected' : '' }}>{{ $val }}</option>
+                                            <option value="{{ $key }}" {{ old('jenis') == $key ? 'selected' : '' }}>{{ $val }}
+                                            </option>
                                         @endforeach
                                     </select>
                                     @error('jenis')
@@ -69,132 +116,198 @@
                                     @enderror
                                 </div>
 
-                                <div class="col-md-4 mb-2">
-                                    <label>Code</label>
-                                    <input type="text" name="code" class="form-control" placeholder="Code"
+                                <!-- Pick List Step Process (Locked by default until process with qty_aux > 1 selected) -->
+                                <div class="col-md-4 mb-3">
+                                    <label>Pick List Step <span class="text-danger" id="step_proses_star" style="display: none;">*</span></label>
+                                    <select name="step_proses" id="step_proses" class="form-control"
+                                        data-initial-val="{{ old('step_proses') }}"
+                                        style="pointer-events: none; background-color: #e9ecef;" tabindex="-1">
+                                        <option value="" disabled selected>-- Pilih Step --</option>
+                                    </select>
+                                    @error('step_proses')
+                                        <small class="text-danger">{{ $message }}</small>
+                                    @enderror
+                                </div>
+
+                                <!-- Total Wt. (Kg) - Readonly / Locked -->
+                                <div class="col-md-4 mb-3">
+                                    <label>Total Wt. (Kg) <span class="text-danger">*</span></label>
+                                    <div class="input-group">
+                                        <input type="number" step="0.01" name="total_wt" id="total_wt" class="form-control"
+                                            placeholder="Total WT (Kg)" value="{{ old('total_wt', '0.00') }}" readonly required>
+                                        <div class="input-group-append">
+                                            <span class="input-group-text">Kg</span>
+                                        </div>
+                                    </div>
+                                    @error('total_wt')
+                                        <small class="text-danger">{{ $message }}</small>
+                                    @enderror
+                                </div>
+
+                                <!-- Volume (Litres) - Readonly / Dihitung Otomatis -->
+                                <div class="col-md-4 mb-3">
+                                    <label>Volume (Litres) <span class="text-danger">*</span></label>
+                                    <div class="input-group">
+                                        <input type="number" step="0.01" name="volume_litres" id="volume_litres"
+                                            class="form-control" placeholder="Volume Litres"
+                                            value="{{ old('volume_litres', '0.00') }}" readonly required>
+                                        <div class="input-group-append">
+                                            <span class="input-group-text">L</span>
+                                        </div>
+                                    </div>
+                                    <small class="form-text text-muted">Dihitung otomatis dari total Weight (kg) List Auxiliary</small>
+                                    @error('volume_litres')
+                                        <small class="text-danger">{{ $message }}</small>
+                                    @enderror
+                                </div>
+
+                                <!-- Code (Input Manual oleh User) -->
+                                <div class="col-md-4 mb-3">
+                                    <label>Code <span class="text-danger">*</span></label>
+                                    <input type="text" name="code" id="code" class="form-control" placeholder="Code Auxiliary"
                                         value="{{ old('code') }}" required>
                                     @error('code')
                                         <small class="text-danger">{{ $message }}</small>
                                     @enderror
                                 </div>
 
-                                <div class="col-md-4 mb-2">
-                                    <label>Konstruksi</label>
-                                    <input type="text" name="konstruksi" class="form-control" placeholder="Konstruksi"
-                                        value="{{ old('konstruksi') }}">
+                                <!-- Konstruksi (Readonly - Otomatis) -->
+                                <div class="col-md-4 mb-3">
+                                    <label>Konstruksi <span class="text-danger">*</span></label>
+                                    <input type="text" name="konstruksi" id="konstruksi" class="form-control" placeholder="Konstruksi"
+                                        value="{{ old('konstruksi') }}" readonly required>
                                     @error('konstruksi')
                                         <small class="text-danger">{{ $message }}</small>
                                     @enderror
                                 </div>
 
-                                <div class="col-md-4 mb-2">
-                                    <label>Customer</label>
-                                    <select name="customer" class="form-control select2-customer">
-                                        @if(old('customer'))
-                                            <option value="{{ old('customer') }}" selected>{{ old('customer') }}</option>
-                                        @else
-                                            <option value="">-- Pilih atau cari Customer --</option>
-                                        @endif
-                                    </select>
+                                <!-- Customer (Readonly - Otomatis) -->
+                                <div class="col-md-4 mb-3">
+                                    <label>Customer <span class="text-danger">*</span></label>
+                                    <input type="text" name="customer" id="customer" class="form-control" placeholder="Customer"
+                                        value="{{ old('customer') }}" readonly required>
                                     @error('customer')
                                         <small class="text-danger">{{ $message }}</small>
                                     @enderror
                                 </div>
 
-                                <div class="col-md-4 mb-2">
-                                    <label>Marketing</label>
-                                    <select name="marketing" class="form-control select2-marketing">
-                                        @if(old('marketing'))
-                                            <option value="{{ old('marketing') }}" selected>{{ old('marketing') }}</option>
-                                        @else
-                                            <option value="">-- Pilih atau cari Marketing --</option>
-                                        @endif
-                                    </select>
+                                <!-- Marketing (Readonly - Otomatis) -->
+                                <div class="col-md-4 mb-3">
+                                    <label>Marketing <span class="text-danger">*</span></label>
+                                    <input type="text" name="marketing" id="marketing" class="form-control" placeholder="Marketing"
+                                        value="{{ old('marketing') }}" readonly required>
                                     @error('marketing')
                                         <small class="text-danger">{{ $message }}</small>
                                     @enderror
                                 </div>
 
-                                <div class="col-md-4 mb-2">
-                                    <label>Date</label>
-                                    <input type="date" name="date" class="form-control"
-                                        value="{{ old('date', date('Y-m-d')) }}">
+                                <!-- Date (Input Date) -->
+                                <div class="col-md-4 mb-3">
+                                    <label>Date <span class="text-danger">*</span></label>
+                                    <input type="date" name="date" id="date" class="form-control"
+                                        value="{{ old('date', date('Y-m-d')) }}" required>
                                     @error('date')
                                         <small class="text-danger">{{ $message }}</small>
                                     @enderror
                                 </div>
 
-                                <div class="col-md-4 mb-2">
-                                    <label>Color</label>
-                                    <input type="text" name="color" class="form-control" placeholder="Color"
-                                        value="{{ old('color') }}">
+                                <!-- Color (Readonly - Otomatis) -->
+                                <div class="col-md-4 mb-3">
+                                    <label>Color <span class="text-danger">*</span></label>
+                                    <input type="text" name="color" id="color" class="form-control" placeholder="Color"
+                                        value="{{ old('color') }}" readonly required>
                                     @error('color')
                                         <small class="text-danger">{{ $message }}</small>
                                     @enderror
                                 </div>
-                            </div>
 
-                            <hr>
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <h5 class="mb-0">Data Detail Auxiliary</h5>
-                                <button type="button" class="btn btn-success" id="btn-add-detail" title="Tambah Detail">
-                                    <i class="fas fa-plus"></i>
-                                </button>
-                            </div>
-                            <div id="details-list">
-                                @php
-                                    $oldDetails = old('details', []);
-                                @endphp
-
-                                @if (count($oldDetails) > 0)
-                                    @foreach ($oldDetails as $i => $d)
-                                        <div class="row detail-row mb-2">
-                                            <div class="col-md-6 col-12 mb-2 mb-md-0">
-                                                <input type="text" name="details[{{ $i }}][auxiliary]"
-                                                    class="form-control" placeholder="Nama Auxiliary"
-                                                    value="{{ $d['auxiliary'] ?? '' }}" required>
-                                            </div>
-                                            <div class="col-md-6 col-12">
-                                                <div class="input-group">
-                                                     <input type="number" step="0.01"
-                                                         name="details[{{ $i }}][konsentrasi]"
-                                                         class="form-control" placeholder="Konsentrasi (kg)"
-                                                         value="{{ $d['konsentrasi'] ?? '' }}" readonly required>
-                                                    <div class="input-group-append">
-                                                        <button type="button" class="btn btn-danger btn-remove-detail ms-2"
-                                                            title="Hapus"><i class="fas fa-trash"></i></button>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    @endforeach
-                                @else
-                                    <div class="row detail-row mb-2">
-                                        <div class="col-md-6 col-12 mb-2 mb-md-0">
-                                            <select name="details[0][auxiliary]" class="form-control select2-auxiliary"
-                                                required>
-                                                <option value="" disabled selected>-- Pilih Auxiliary --</option>
-                                            </select>
-                                        </div>
-                                        <div class="col-md-6 col-12">
-                                            <div class="input-group">
-                                                 <input type="number" step="0.01" name="details[0][konsentrasi]"
-                                                     class="form-control" placeholder="Konsentrasi (kg)" readonly required>
-                                                <div class="input-group-append">
-                                                    <button type="button" class="btn btn-danger btn-remove-detail ms-2"
-                                                        title="Hapus"><i class="fas fa-trash"></i></button>
-                                                </div>
-                                            </div>
-                                        </div>
+                                <!-- Card Preview Info Proses -->
+                                <div class="col-md-12 mb-3">
+                                    <div class="p-3 bg-light rounded border" id="proses-info-box" style="display: none;">
+                                        <strong>Detail Info Proses:</strong> <span id="info-status-badge"
+                                            class="badge badge-info ml-2">-</span><br>
+                                        <span id="info-op">Batch / JO: -</span> | <span id="info-partai">Order No: -</span><br>
+                                        <span id="info-customer">Customer: -</span> | <span id="info-material">Fabric: -</span><br>
+                                        <span id="info-color">Color: -</span> | <span id="info-mesin">M/C: -</span>
+                                        <div id="info-aux-quota" class="mt-2 text-primary font-weight-bold">AUX Normal: 0 / 1</div>
                                     </div>
-                                @endif
+                                    <div id="tipe-warning-alert" class="alert alert-warning mt-2 mb-0" style="display: none;">
+                                        <i class="fas fa-exclamation-triangle"></i> <span id="tipe-warning-text"></span>
+                                    </div>
+                                </div>
                             </div>
-
                         </div>
+                    </div>
 
+                    <!-- Card Detail List Auxiliary -->
+                    <div class="card mt-3">
+                        <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center w-100">
+                            <h3 class="card-title mb-0"><i class="fas fa-vials"></i> Data Detail List Auxiliary</h3>
+                            <button type="button" class="btn btn-success btn-sm ml-auto" id="btn-add-detail"
+                                title="Tambah List Auxiliary">
+                                <i class="fas fa-plus"></i> Tambah Auxiliary
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-bordered" id="table-details">
+                                    <thead class="thead-light">
+                                        <tr>
+                                            <th style="width: 60%">Nama Auxiliary (List SAP) <span class="text-danger">*</span></th>
+                                            <th style="width: 30%">Weight (kg) <span class="text-danger">*</span></th>
+                                            <th style="width: 10%">Aksi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="details-list">
+                                        @php $oldDetails = old('details', []); @endphp
+                                        @if (count($oldDetails) > 0)
+                                            @foreach ($oldDetails as $i => $d)
+                                                <tr class="detail-row">
+                                                    <td>
+                                                        <select name="details[{{ $i }}][auxiliary]"
+                                                            class="form-control select2-auxiliary" required>
+                                                            @if(!empty($d['auxiliary']))
+                                                                <option value="{{ $d['auxiliary'] }}" selected>
+                                                                    {{ $d['auxiliary'] }}</option>
+                                                            @endif
+                                                        </select>
+                                                    </td>
+                                                    <td>
+                                                        <input type="number" step="0.01" name="details[{{ $i }}][konsentrasi]"
+                                                            class="form-control form-control-sm weight-input"
+                                                            placeholder="Weight (kg)" value="{{ $d['konsentrasi'] ?? '' }}"
+                                                            required>
+                                                    </td>
+                                                    <td class="text-center">
+                                                        <button type="button" class="btn btn-danger btn-sm btn-remove-detail"><i
+                                                                class="fas fa-trash"></i></button>
+                                                    </td>
+                                                </tr>
+                                            @endforeach
+                                        @else
+                                            <tr class="detail-row">
+                                                <td>
+                                                    <select name="details[0][auxiliary]"
+                                                        class="form-control select2-auxiliary" required></select>
+                                                </td>
+                                                <td>
+                                                    <input type="number" step="0.01" name="details[0][konsentrasi]"
+                                                        class="form-control form-control-sm weight-input"
+                                                        placeholder="Weight (kg)" required>
+                                                </td>
+                                                <td class="text-center">
+                                                    <button type="button" class="btn btn-danger btn-sm btn-remove-detail"><i
+                                                            class="fas fa-trash"></i></button>
+                                                </td>
+                                            </tr>
+                                        @endif
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
                         <div class="card-footer text-right">
-                            <a href="{{ route('aux.index') }}" class="btn btn-secondary">Kembali</a>
-                            <button type="submit" class="btn btn-primary">Simpan</button>
+                            <a href="{{ route('aux.index') }}" class="btn btn-secondary mr-2">Kembali</a>
+                            <button type="submit" id="btn-submit-form" class="btn btn-primary"><i class="fas fa-save"></i> Simpan Data Auxiliary</button>
                         </div>
                     </div>
                 </form>
@@ -205,128 +318,247 @@
 
 @section('scripts')
     <script>
-        $(document).ready(function() {
-            // Select2 Customer dari API SAP
-            $('.select2-customer').select2({
-                placeholder: '-- Pilih atau cari Customer --',
-                allowClear: true,
-                minimumInputLength: 3,
-                ajax: {
-                    url: '/api/proxy-customer',
-                    type: 'POST',
-                    dataType: 'json',
-                    delay: 500,
-                    data: function(params) {
-                        return {
-                            q: params.term,
-                            _token: $('meta[name="csrf-token"]').attr('content')
-                        };
-                    },
-                    processResults: function(data) {
-                        return {
-                            results: Array.isArray(data.results) ? data.results : []
-                        };
-                    }
-                }
-            });
+        $(document).ready(function () {
+            $('.select2').select2({ width: '100%' });
 
-            // Select2 Marketing dari API SAP
-            $('.select2-marketing').select2({
-                placeholder: '-- Pilih atau cari Marketing --',
-                allowClear: true,
-                minimumInputLength: 3,
-                ajax: {
-                    url: '/api/proxy-marketing',
-                    type: 'POST',
-                    dataType: 'json',
-                    delay: 500,
-                    data: function(params) {
-                        return {
-                            q: params.term,
-                            _token: $('meta[name="csrf-token"]').attr('content')
-                        };
-                    },
-                    processResults: function(data) {
-                        return {
-                            results: Array.isArray(data.results) ? data.results : []
-                        };
-                    }
-                }
-            });
-
-            // Fungsi untuk inisialisasi Select2 pada detail rows
+            // Inisialisasi Select2 AJAX untuk Auxiliary dari API SAP
             function initAuxiliarySelect2(selector) {
                 $(selector).select2({
-                    placeholder: '-- Pilih Auxiliary --',
+                    placeholder: '-- Cari & Pilih Nama Auxiliary (min. 3 karakter) --',
                     minimumInputLength: 3,
+                    width: '100%',
                     ajax: {
                         url: '/api/proxy-auxiliary',
                         type: 'POST',
                         dataType: 'json',
                         delay: 500,
-                        data: function(params) {
+                        data: function (params) {
                             return {
-                                q: params.term
+                                q: params.term,
+                                _token: $('meta[name="csrf-token"]').attr('content')
                             };
                         },
-                        processResults: function(data) {
-                            if (Array.isArray(data.results)) {
-                                return {
-                                    results: data.results
-                                };
-                            } else {
-                                return {
-                                    results: []
-                                };
-                            }
+                        processResults: function (data) {
+                            return {
+                                results: Array.isArray(data.results) ? data.results : []
+                            };
                         },
-                        error: function(xhr, status, error) {
+                        error: function (xhr, status, error) {
                             console.error('Error loading auxiliary data:', error);
-                            return {
-                                results: []
-                            };
+                            return { results: [] };
                         }
                     }
                 });
             }
 
-            // Inisialisasi Select2 untuk detail rows yang sudah ada
-            $('.select2-auxiliary').each(function() {
+            $('.select2-auxiliary').each(function () {
                 initAuxiliarySelect2(this);
             });
 
-            let detailIndex = Number(document.getElementById('initial-detail-index')?.value || 1);
+            let detailIndex = {{ max(1, count(old('details', []))) }};
+            let currentProsesInfo = null;
 
-             $('#btn-add-detail').on('click', function() {
-                const newRow = $(`
-                    <div class="row detail-row mb-2">
-                        <div class="col-md-6 col-12 mb-2 mb-md-0">
-                            <select name="details[${detailIndex}][auxiliary]" class="form-control select2-auxiliary" required></select>
-                        </div>
-                        <div class="col-md-6 col-12">
-                            <div class="input-group">
-                                <input type="number" step="0.01" name="details[${detailIndex}][konsentrasi]" class="form-control" placeholder="Konsentrasi (kg)" readonly required>
-                                <div class="input-group-append">
-                                    <button type="button" class="btn btn-danger btn-remove-detail ms-2" title="Hapus">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                `);
+            function calcVolume() {
+                let totalWeight = 0;
+                $('.weight-input').each(function () {
+                    const w = parseFloat($(this).val()) || 0;
+                    totalWeight += w;
+                });
+                $('#volume_litres').val(totalWeight.toFixed(2));
+            }
 
-                $('#details-list').append(newRow);
-                initAuxiliarySelect2(newRow.find('.select2-auxiliary'));
+            $(document).on('input change', '.weight-input', calcVolume);
+
+            function updateStepAndQuotaState() {
+                if (!currentProsesInfo) return;
+
+                const data = currentProsesInfo;
+                const selectedTipe = $('#tipe').val() || 'normal';
+                const qtyAux = parseInt(data.qty_aux) || 1;
+                const existingNormalAuxCount = parseInt(data.existing_normal_aux_count) || 0;
+                const usedNormalAuxSteps = data.used_normal_aux_steps || [];
+                const usedAdditionAuxSteps = data.used_addition_aux_steps || [];
+                const canCreateNormalAux = data.can_create_normal_aux;
+
+                // Update Info Kuota
+                if (existingNormalAuxCount >= qtyAux) {
+                    $('#info-aux-quota').html(`AUX Normal Dibuat: <span class="badge badge-danger">${existingNormalAuxCount} / ${qtyAux} (Kuota Penuh)</span>`);
+                } else {
+                    $('#info-aux-quota').html(`AUX Normal Dibuat: <span class="badge badge-success">${existingNormalAuxCount} / ${qtyAux} (Sisa ${qtyAux - existingNormalAuxCount}x)</span>`);
+                }
+
+                const $stepSelect = $('#step_proses');
+                const prevVal = $stepSelect.data('initial-val') || $stepSelect.val();
+                $stepSelect.empty();
+
+                if (selectedTipe === 'addition' || selectedTipe === 'additional') {
+                    // Tipe Addition (Topping): 2 Pilihan Step (1 - Reactive, 2 - Dispers)
+                    const isAdditionFull = usedAdditionAuxSteps.includes(1) && usedAdditionAuxSteps.includes(2);
+
+                    if (isAdditionFull) {
+                        $('#tipe-warning-text').text(`AUX Type Addition (Topping) untuk proses ini sudah mencapai batas maksimum (2x: Reactive & Dispers). Silakan pilih Tipe Normal atau pilih proses lain.`);
+                        $('#tipe-warning-alert').slideDown(200);
+                        $('#btn-submit-form').prop('disabled', true).addClass('disabled');
+                    } else {
+                        $('#tipe-warning-alert').slideUp(200);
+                        $('#btn-submit-form').prop('disabled', false).removeClass('disabled');
+                    }
+
+                    $('#step_proses_star').show();
+                    $stepSelect.attr('required', 'required');
+                    $stepSelect.css('pointer-events', 'auto').css('background-color', '#fff').removeAttr('tabindex');
+
+                    $stepSelect.append('<option value="" disabled selected>-- Pilih Step Topping --</option>');
+
+                    const stepsObj = { 1: '1 - Reactive', 2: '2 - Dispers' };
+                    $.each(stepsObj, function (val, label) {
+                        const isUsed = usedAdditionAuxSteps.includes(parseInt(val));
+                        const isSel = (prevVal == val) ? 'selected' : '';
+                        if (isUsed) {
+                            $stepSelect.append(`<option value="${val}" disabled style="color: #aaa;">${label} (Sudah Dibuat)</option>`);
+                        } else {
+                            $stepSelect.append(`<option value="${val}" ${isSel}>${label}</option>`);
+                        }
+                    });
+
+                    if (prevVal && [1, 2].includes(parseInt(prevVal)) && !usedAdditionAuxSteps.includes(parseInt(prevVal))) {
+                        $stepSelect.val(prevVal);
+                    }
+                } else {
+                    // Tipe Normal
+                    if (selectedTipe === 'normal' && !canCreateNormalAux) {
+                        $('#tipe-warning-text').text(`AUX Type Normal untuk proses ini sudah mencapai batas maksimum (${qtyAux}x). Silakan pilih Tipe Addition (Topping) atau pilih proses lain.`);
+                        $('#tipe-warning-alert').slideDown(200);
+                        $('#btn-submit-form').prop('disabled', true).addClass('disabled');
+                    } else {
+                        $('#tipe-warning-alert').slideUp(200);
+                        $('#btn-submit-form').prop('disabled', false).removeClass('disabled');
+                    }
+
+                    if (qtyAux <= 1) {
+                        $('#step_proses_star').hide();
+                        $stepSelect.removeAttr('required');
+                        const isUsed = (selectedTipe === 'normal' && usedNormalAuxSteps.includes(1));
+                        if (isUsed) {
+                            $stepSelect.append('<option value="1" selected disabled>Step 1 (Sudah Dibuat)</option>');
+                        } else {
+                            $stepSelect.append('<option value="1" selected>Step 1 (Default)</option>');
+                        }
+                        $stepSelect.val('1');
+                        $stepSelect.css('pointer-events', 'none').css('background-color', '#e9ecef').attr('tabindex', '-1');
+                    } else {
+                        $('#step_proses_star').show();
+                        $stepSelect.attr('required', 'required');
+                        $stepSelect.css('pointer-events', 'auto').css('background-color', '#fff').removeAttr('tabindex');
+
+                        const isPlaceholderSelected = !prevVal || usedNormalAuxSteps.includes(parseInt(prevVal));
+                        $stepSelect.append('<option value="" disabled ' + (isPlaceholderSelected ? 'selected' : '') + '>-- Pilih Step --</option>');
+                        
+                        for (let i = 1; i <= qtyAux; i++) {
+                            const isUsed = (selectedTipe === 'normal' && usedNormalAuxSteps.includes(i));
+                            if (isUsed) {
+                                $stepSelect.append(`<option value="${i}" disabled style="color: #aaa;">Step ${i} (Sudah Dibuat)</option>`);
+                            } else {
+                                const isSel = (prevVal == i) ? 'selected' : '';
+                                $stepSelect.append(`<option value="${i}" ${isSel}>Step ${i}</option>`);
+                            }
+                        }
+
+                        if (prevVal && !usedNormalAuxSteps.includes(parseInt(prevVal))) {
+                            $stepSelect.val(prevVal);
+                        } else {
+                            $stepSelect.val('');
+                        }
+                    }
+                }
+            }
+
+            $('#tipe').on('change', function () {
+                updateStepAndQuotaState();
+            });
+
+            $('#proses_id').on('change', function () {
+                const id = $(this).val();
+                if (!id) return;
+                $.ajax({
+                    url: '/api/proses-info/' + id,
+                    type: 'GET',
+                    success: function (data) {
+                        currentProsesInfo = data;
+                        $('#proses-info-box').show();
+                        $('#info-status-badge').text(data.status_proses || 'Status -').removeClass('badge-primary badge-secondary badge-success').addClass(data.status_proses === 'Sedang Berjalan' ? 'badge-primary' : 'badge-secondary');
+                        $('#info-op').text('Batch / JO: ' + (data.no_jo || '-'));
+                        $('#info-partai').text('Order No: ' + (data.no_partai || '-'));
+                        $('#info-customer').text('Customer: ' + (data.customer || '-'));
+                        $('#info-material').text('Fabric: ' + (data.material || '-'));
+                        $('#info-color').text('Color: ' + (data.color || '-'));
+                        $('#info-mesin').text('M/C: ' + (data.mesin || '-'));
+
+                        // Autofill fields
+                        if (data.auto_jenis) {
+                            $('#jenis').val(data.auto_jenis);
+                        }
+                        if (typeof data.customer !== 'undefined') {
+                            $('#customer').val(data.customer);
+                        }
+                        if (typeof data.material !== 'undefined') {
+                            $('#konstruksi').val(data.material);
+                        }
+                        if (typeof data.color !== 'undefined') {
+                            $('#color').val(data.color);
+                        }
+                        if (typeof data.marketing !== 'undefined') {
+                            $('#marketing').val(data.marketing || '-');
+                        }
+
+                        // Total WT (Kg)
+                        if (typeof data.total_wt !== 'undefined' && parseFloat(data.total_wt) > 0) {
+                            $('#total_wt').val(parseFloat(data.total_wt).toFixed(2));
+                        }
+
+                        // Update Kuota & Pick List Step State
+                        updateStepAndQuotaState();
+                    }
+                });
+            });
+
+            if ($('#proses_id').val()) {
+                $('#proses_id').trigger('change');
+            }
+
+            $('#btn-add-detail').on('click', function () {
+                const tr = `
+                        <tr class="detail-row">
+                            <td>
+                                <select name="details[${detailIndex}][auxiliary]" class="form-control select2-auxiliary" required></select>
+                            </td>
+                            <td>
+                                <input type="number" step="0.01" name="details[${detailIndex}][konsentrasi]" class="form-control form-control-sm weight-input" placeholder="Weight (kg)" required>
+                            </td>
+                            <td class="text-center">
+                                <button type="button" class="btn btn-danger btn-sm btn-remove-detail"><i class="fas fa-trash"></i></button>
+                            </td>
+                        </tr>
+                    `;
+                $('#details-list').append(tr);
+                initAuxiliarySelect2($('#details-list tr:last .select2-auxiliary'));
                 detailIndex++;
+                calcVolume();
             });
 
-            // Handler untuk menghapus detail row
-            $(document).on('click', '.btn-remove-detail', function() {
-                $(this).closest('.detail-row').remove();
+            $(document).on('click', '.btn-remove-detail', function () {
+                if ($('#details-list .detail-row').length > 1) {
+                    $(this).closest('tr').remove();
+                    calcVolume();
+                } else {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Peringatan',
+                        text: 'Minimal harus ada 1 detail list auxiliary.'
+                    });
+                }
             });
 
-            // Fungsi untuk mengambil data berat dari timbangan
             async function fetchWeight() {
                 try {
                     const res = await fetch('https://dpf3dunia.com/api/weight');
@@ -334,12 +566,10 @@
 
                     const data = await res.json();
                     if (typeof data.weight !== 'undefined' && !isNaN(parseFloat(data.weight))) {
-                        // Cari input konsentrasi terakhir yang readonly
-                        const konsInputs = document.querySelectorAll(
-                            'input[name^="details"][name$="[konsentrasi]"]');
-                        if (konsInputs.length > 0) {
-                            // Update hanya input yang terakhir (untuk input baru)
-                            konsInputs[konsInputs.length - 1].value = parseFloat(data.weight).toFixed(2);
+                        const weightInputs = document.querySelectorAll('.weight-input');
+                        if (weightInputs.length > 0) {
+                            weightInputs[weightInputs.length - 1].value = parseFloat(data.weight).toFixed(2);
+                            calcVolume();
                         }
                     }
                 } catch (error) {
@@ -347,53 +577,7 @@
                 }
             }
 
-            // Mulai polling setiap 1 detik
-            const weightPolling = setInterval(fetchWeight, 1000);
-
-            // Set document title
-            document.title = "Tambah Auxiliary";
-            function showSwalWarning(message) {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Validasi',
-                    text: message
-                });
-            }
-
-            // Validasi form sebelum submit
-            $('form').on('submit', function(e) {
-                // Validasi bahwa setidaknya ada satu detail auxiliary
-                const detailRows = $('.detail-row').length;
-                if (detailRows === 0) {
-                    e.preventDefault();
-                    showSwalWarning('Harap tambahkan minimal satu auxiliary detail.');
-                    return false;
-                }
-
-                // Validasi bahwa semua auxiliary terpilih
-                let isValid = true;
-                $('.select2-auxiliary').each(function() {
-                    if (!$(this).val()) {
-                        isValid = false;
-                        $(this).closest('.col-md-6').find('.select2-container').css('border-color',
-                            '#dc3545');
-                    } else {
-                        $(this).closest('.col-md-6').find('.select2-container').css('border-color',
-                            '');
-                    }
-                });
-
-                if (!isValid) {
-                    e.preventDefault();
-                    showSwalWarning('Harap pilih auxiliary untuk semua detail.');
-                    return false;
-                }
-            });
-
-            // Clear error styling ketika user memilih auxiliary
-            $(document).on('select2:select', '.select2-auxiliary', function() {
-                $(this).closest('.col-md-6').find('.select2-container').css('border-color', '');
-            });
+            setInterval(fetchWeight, 1000);
         });
     </script>
 @endsection

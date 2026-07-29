@@ -53,6 +53,16 @@ class Proses extends Model
         return $this->hasMany(Approval::class, 'proses_id', 'id');
     }
 
+    public function dyeStuffs()
+    {
+        return $this->hasMany(DyeStuff::class, 'proses_id');
+    }
+
+    public function auxls()
+    {
+        return $this->hasMany(Auxl::class, 'proses_id');
+    }
+
     /**
      * Cek apakah proses ini boleh scan LA/AUX tanpa wajib barcode kain lengkap.
      * - Greige Reproses: D & A saja wajib, G tidak wajib → true.

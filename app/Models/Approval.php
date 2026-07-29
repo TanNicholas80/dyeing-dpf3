@@ -20,6 +20,7 @@ class Approval extends Model
     protected $fillable = [
         'proses_id', 
         'auxl_id',
+        'dyestuff_id',
         'status',
         'type',
         'action',
@@ -50,6 +51,14 @@ class Approval extends Model
     public function auxl()
     {
         return $this->belongsTo(Auxl::class, 'auxl_id');
+    }
+
+    /**
+     * Relasi ke DyeStuff (untuk approval terkait dye stuff / LA).
+     */
+    public function dyeStuff()
+    {
+        return $this->belongsTo(DyeStuff::class, 'dyestuff_id');
     }
 
     /**

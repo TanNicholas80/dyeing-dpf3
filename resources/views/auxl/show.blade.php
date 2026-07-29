@@ -20,8 +20,10 @@
         <section class="content">
             <div class="container-fluid">
                 <div class="d-flex justify-content-end mb-3" style="gap: 0.75rem;">
-                    <button type="button" class="btn btn-info" onclick="printDetailBarcode()"><i class="fas fa-print"></i> Print Barcode</button>
-                    <a href="{{ route('aux.index') }}" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Kembali</a>
+                    <a href="{{ route('aux.print', $auxl->id) }}" target="_blank" class="btn btn-info shadow-sm">
+                        <i class="fas fa-print"></i> Print Barcode
+                    </a>
+                    <a href="{{ route('aux.index') }}" class="btn btn-outline-secondary shadow-sm"><i class="fas fa-arrow-left"></i> Kembali</a>
                 </div>
                 <div class="card mb-4 shadow">
                     <div class="card-header bg-primary text-white">
@@ -34,6 +36,20 @@
                             </div>
                             <div class="col-md-6 col-lg-4 mb-3"><span class="label">Jenis</span><span
                                     class="colon">:</span><span class="value">{{ ucfirst($auxl->jenis) }}</span></div>
+                            <div class="col-md-6 col-lg-4 mb-3"><span class="label">Tipe Aux</span><span
+                                    class="colon">:</span><span class="value">{{ \App\Models\Auxl::getTipeOptions()[$auxl->tipe ?? 'normal'] ?? ucfirst($auxl->tipe ?? 'normal') }}</span></div>
+                            <div class="col-md-6 col-lg-4 mb-3"><span class="label">Step Process</span><span
+                                    class="colon">:</span><span class="value">
+                                    @if(($auxl->tipe ?? 'normal') === 'addition')
+                                        {{ $auxl->step_proses == 1 ? 'Reactive' : ($auxl->step_proses == 2 ? 'Dispers' : 'Step ' . ($auxl->step_proses ?? '-')) }}
+                                    @else
+                                        {{ $auxl->step_proses ? 'Step ' . $auxl->step_proses : '-' }}
+                                    @endif
+                                    </span></div>
+                            <div class="col-md-6 col-lg-4 mb-3"><span class="label">Total Wt.</span><span
+                                    class="colon">:</span><span class="value font-weight-bold">{{ number_format($auxl->total_wt, 1) }} kg</span></div>
+                            <div class="col-md-6 col-lg-4 mb-3"><span class="label">Volume</span><span
+                                    class="colon">:</span><span class="value font-weight-bold text-primary">{{ number_format($auxl->volume_litres, 1) }} L</span></div>
                             <div class="col-md-6 col-lg-4 mb-3"><span class="label">Code</span><span
                                     class="colon">:</span><span class="value">{{ $auxl->code }}</span></div>
                             <div class="col-md-6 col-lg-4 mb-3"><span class="label">Konstruksi</span><span
@@ -59,7 +75,7 @@
                                 <thead class="thead-light">
                                     <tr>
                                         <th style="width:60%">Nama Auxiliary</th>
-                                        <th style="width:40%">Konsentrasi (kg)</th>
+                                        <th style="width:40%">Weight (kg)</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -128,40 +144,5 @@
     </style>
     <script>
         document.title = "Detail Auxiliary";
-    </script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/qrious@4.0.2/dist/qrious.min.js"></script>
-    <script>
-        function generateInspectPDF(barcode, code, customer, marketing) {
-            const { jsPDF } = window.jspdf;
-            const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [65, 25] });
-            pdf.setFont("Courier", "Bold");
-            pdf.setFontSize(9);
-            // QR code besar dan tajam
-            const qrCode = new QRious({ value: barcode, size: 200 });
-            const qrDataUrl = qrCode.toDataURL();
-            pdf.addImage(qrDataUrl, 'PNG', 2, 2, 21, 21, undefined, 'FAST');
-            // Cetak barcode lengkap
-            let kodeCetak = barcode;
-            // Data di kanan QR, urutan: barcode, code, customer-marketing
-            let startX = 25;
-            let startY = 6;
-            let lineGap = 5;
-            pdf.text(kodeCetak, startX, startY);
-            pdf.text(code, startX, startY + lineGap);
-            pdf.text(`${customer}`, startX, startY + lineGap * 2);
-            pdf.text(`${marketing}`, startX, startY + lineGap * 3);
-            pdf.autoPrint();
-            window.open(pdf.output('bloburl'), '_blank');
-        }
-
-        function printDetailBarcode() {
-            // Ambil data dari auxl
-            const barcode = "{{ $auxl->barcode }}";
-            const code = "{{ $auxl->code }}";
-            const customer = "{{ $auxl->customer }}";
-            const marketing = "{{ $auxl->marketing }}";
-            generateInspectPDF(barcode, code, customer, marketing);
-        }
     </script>
 @endsection

@@ -17,7 +17,7 @@ class SuperAdminSeeder extends Seeder
 
         // Buat atau update user super admin
         User::updateOrCreate(
-            ['username' => 'DT_VIN'],
+            ['username' => 'DT_NIC'],
             [
                 'nama' => 'Super Admin',
                 'password' => '123456', 

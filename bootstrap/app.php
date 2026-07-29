@@ -26,6 +26,8 @@ return Application::configure(basePath: dirname(__DIR__))
 
             if ($user?->role === 'aux') {
                 return route('aux.index');
+            } elseif ($user?->role === 'dye_stuff') {
+                return route('dye-stuff.index');
             }
 
             return route('dashboard');
@@ -43,7 +45,7 @@ return Application::configure(basePath: dirname(__DIR__))
                 return response()->json([
                     'message' => 'Token CSRF kedaluwarsa.',
                     'redirect' => $user
-                        ? ($user->role === 'aux' ? route('aux.index') : route('dashboard'))
+                        ? ($user->role === 'aux' ? route('aux.index') : ($user->role === 'dye_stuff' ? route('dye-stuff.index') : route('dashboard')))
                         : route('login'),
                 ], 419);
             }
@@ -52,6 +54,8 @@ return Application::configure(basePath: dirname(__DIR__))
                 $user = Auth::user();
                 if ($user->role === 'aux') {
                     return redirect()->route('aux.index');
+                } elseif ($user->role === 'dye_stuff') {
+                    return redirect()->route('dye-stuff.index');
                 }
 
                 return redirect()->route('dashboard');

@@ -32,24 +32,29 @@
                                     $canManageAuxl = !in_array($userRole, ['owner', 'scm']);
                                     $isSuperAdmin = $userRole === 'super_admin';
                                 @endphp
-                                <div class="d-flex justify-content-end" style="gap: 0.75rem;">
-                                    <button type="button" class="btn btn-info btn-sm" id="bulkPrintBtn"><i
-                                            class="fas fa-print"></i> Print Barcode</button>
+                                <div class="d-flex justify-content-end" style="gap: 0.5rem;">
+                                    <button type="button" class="btn btn-info btn-sm" id="bulkPrintBtn">
+                                        <i class="fas fa-print"></i> Print Barcode
+                                    </button>
                                     @if ($canManageAuxl)
-                                        <a href="{{ route('aux.create') }}" class="btn-sm btn-primary">
-                                            <i class="fas fa-plus"></i> Tambah
+                                        <a href="{{ route('aux.create') }}" class="btn btn-sm btn-primary">
+                                            <i class="fas fa-plus"></i> Tambah Auxiliary
                                         </a>
                                     @endif
                                 </div>
                             </div>
                             <div class="card-body">
                                 <form id="bulkPrintForm">
-                                    <table id="auxl" class="table table-head-fixed text-nowrap">
+                                    <table id="auxl" class="table table-head-fixed text-nowrap table-hover table-striped">
                                         <thead>
                                             <tr>
-                                                <th></th>
+                                                <th style="width: 30px;"><input type="checkbox" id="selectAll"></th>
                                                 <th>Barcode</th>
                                                 <th>Jenis</th>
+                                                <th>Tipe</th>
+                                                <th>Step Process</th>
+                                                <th>Total Wt (Kg)</th>
+                                                <th>Volume (L)</th>
                                                 <th>Code</th>
                                                 <th>Konstruksi</th>
                                                 <th>Customer</th>
@@ -70,11 +75,33 @@
                                                 @endphp
                                                 <tr class="{{ $pendingApproval ? 'table-warning' : '' }}">
                                                     <td><input type="checkbox" class="barcode-checkbox"
-                                                            value="{{ $auxl->barcode }}" data-code="{{ $auxl->code }}"
+                                                            value="{{ $auxl->barcode }}"
+                                                            data-id="{{ $auxl->id }}"
+                                                            data-code="{{ $auxl->code }}"
                                                             data-customer="{{ $auxl->customer }}"
                                                             data-marketing="{{ $auxl->marketing }}"></td>
-                                                    <td>{{ $auxl->barcode }}</td>
+                                                    <td><strong>{{ $auxl->barcode }}</strong></td>
                                                     <td>{{ \App\Models\Auxl::getJenisOptions()[$auxl->jenis] ?? ucfirst($auxl->jenis ?? '-') }}</td>
+                                                    <td>
+                                                        @if(($auxl->tipe ?? 'normal') === 'addition')
+                                                            <span class="badge badge-warning">Addition (Topping)</span>
+                                                        @else
+                                                            <span class="badge badge-info">Normal (Utama)</span>
+                                                        @endif
+                                                    </td>
+                                                    <td>
+                                                        @if($auxl->step_proses)
+                                                            @if(($auxl->tipe ?? 'normal') === 'addition')
+                                                                <span class="badge badge-secondary">{{ $auxl->step_proses == 1 ? 'Reactive' : ($auxl->step_proses == 2 ? 'Dispers' : 'Step ' . $auxl->step_proses) }}</span>
+                                                            @else
+                                                                <span class="badge badge-secondary">Step {{ $auxl->step_proses }}</span>
+                                                            @endif
+                                                        @else
+                                                            -
+                                                        @endif
+                                                    </td>
+                                                    <td>{{ number_format($auxl->total_wt, 1) }} kg</td>
+                                                    <td><span class="text-primary font-weight-bold">{{ number_format($auxl->volume_litres, 1) }} L</span></td>
                                                     <td>{{ $auxl->code }}</td>
                                                     <td>{{ $auxl->konstruksi }}</td>
                                                     <td>{{ $auxl->customer }}</td>
@@ -165,98 +192,36 @@
         </section>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/qrious@4.0.2/dist/qrious.min.js"></script>
     <script>
         document.title = "Data Auxiliary";
-        // Select all functionality
         document.addEventListener('DOMContentLoaded', function() {
-            document.getElementById('selectAll').addEventListener('change', function() {
-                let checked = this.checked;
-                document.querySelectorAll('.barcode-checkbox').forEach(function(cb) {
-                    cb.checked = checked;
+            const selectAllEl = document.getElementById('selectAll');
+            if (selectAllEl) {
+                selectAllEl.addEventListener('change', function() {
+                    let checked = this.checked;
+                    document.querySelectorAll('.barcode-checkbox').forEach(function(cb) {
+                        cb.checked = checked;
+                    });
                 });
-            });
-        });
-        // Bulk print barcode
-        function generateInspectPDF(barcode, code, customer, marketing) {
-            const {
-                jsPDF
-            } = window.jspdf;
-            const pdf = new jsPDF({
-                orientation: 'landscape',
-                unit: 'mm',
-                format: [65, 25]
-            });
-            pdf.setFont("Courier", "Bold");
-            pdf.setFontSize(9);
-            // QR code besar dan tajam
-            const qrCode = new QRious({
-                value: barcode,
-                size: 200
-            });
-            const qrDataUrl = qrCode.toDataURL();
-            pdf.addImage(qrDataUrl, 'PNG', 2, 2, 21, 21, undefined, 'FAST');
-            // Cetak barcode lengkap
-            let kodeCetak = barcode;
-            // Data di kanan QR, urutan: barcode, code, customer, marketing
-            let startX = 25;
-            let startY = 6;
-            let lineGap = 5;
-            pdf.text(kodeCetak, startX, startY);
-            pdf.text(code, startX, startY + lineGap);
-            pdf.text(`${customer}`, startX, startY + lineGap * 2);
-            pdf.text(`${marketing}`, startX, startY + lineGap * 3);
-            return pdf;
-        }
-
-        function generateInspectPDFPage(pdf, barcode, code, customer, marketing, isFirstPage) {
-            if (!isFirstPage) pdf.addPage([65, 25], 'landscape');
-            pdf.setFont("Courier", "Bold");
-            pdf.setFontSize(9);
-            // QR code besar dan tajam
-            const qrCode = new QRious({
-                value: barcode,
-                size: 200
-            });
-            const qrDataUrl = qrCode.toDataURL();
-            pdf.addImage(qrDataUrl, 'PNG', 2, 2, 21, 21, undefined, 'FAST');
-            // Data di kanan QR, urutan: barcode, code, customer, marketing
-            let startX = 25;
-            let startY = 6;
-            let lineGap = 5;
-            pdf.text(barcode, startX, startY);
-            pdf.text(code, startX, startY + lineGap);
-            pdf.text(`${customer}`, startX, startY + lineGap * 2);
-            pdf.text(`${marketing}`, startX, startY + lineGap * 3);
-        }
-        document.getElementById('bulkPrintBtn').addEventListener('click', function() {
-            let selected = Array.from(document.querySelectorAll('.barcode-checkbox:checked'));
-            if (selected.length === 0) {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Validasi',
-                    text: 'Pilih data barcode yang ingin di-print!'
-                });
-                return;
             }
-            const {
-                jsPDF
-            } = window.jspdf;
-            let pdf = new jsPDF({
-                orientation: 'landscape',
-                unit: 'mm',
-                format: [65, 25]
-            });
-            selected.forEach(function(cb, idx) {
-                let barcode = cb.value;
-                let code = cb.getAttribute('data-code');
-                let customer = cb.getAttribute('data-customer');
-                let marketing = cb.getAttribute('data-marketing');
-                generateInspectPDFPage(pdf, barcode, code, customer, marketing, idx === 0);
-            });
-            pdf.autoPrint();
-            window.open(pdf.output('bloburl'), '_blank');
+
+            // Print Bulk Barcode / Ticket
+            const bulkPrintBtn = document.getElementById('bulkPrintBtn');
+            if (bulkPrintBtn) {
+                bulkPrintBtn.addEventListener('click', function() {
+                    let selected = Array.from(document.querySelectorAll('.barcode-checkbox:checked'));
+                    if (selected.length === 0) {
+                        Swal.fire({
+                            icon: 'warning',
+                            title: 'Validasi',
+                            text: 'Pilih data Auxiliary yang ingin di-print!'
+                        });
+                        return;
+                    }
+                    let ids = selected.map(cb => cb.getAttribute('data-id')).filter(Boolean).join(',');
+                    window.open("{{ route('aux.print-bulk') }}?ids=" + ids, '_blank');
+                });
+            }
         });
     </script>
 @endsection

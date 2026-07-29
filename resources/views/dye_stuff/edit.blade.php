@@ -30,13 +30,13 @@
             <div class="container-fluid">
                 <div class="row mb-2">
                     <div class="col-sm-6">
-                        <h1 class="m-0">Edit Auxiliary</h1>
+                        <h1 class="m-0">Edit Dye Stuff (LA)</h1>
                     </div>
                     <div class="col-sm-6">
                         <ol class="breadcrumb float-sm-right">
                             <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">Home</a></li>
-                            <li class="breadcrumb-item"><a href="{{ route('aux.index') }}">Auxiliary</a></li>
-                            <li class="breadcrumb-item active">Edit Auxiliary</li>
+                            <li class="breadcrumb-item"><a href="{{ route('dye-stuff.index') }}">Dye Stuff</a></li>
+                            <li class="breadcrumb-item active">Edit Dye Stuff</li>
                         </ol>
                     </div>
                 </div>
@@ -45,12 +45,14 @@
 
         <section class="content">
             <div class="container-fluid">
-                <form action="{{ route('aux.update', $auxl->id) }}" method="POST" id="form-aux">
+                <form action="{{ route('dye-stuff.update', $dyeStuff->id) }}" method="POST" id="form-dye-stuff">
                     @csrf
                     @method('PUT')
                     <div class="card">
-                        <div class="card-header bg-primary text-white">
-                            <h3 class="card-title"><i class="fas fa-edit"></i> Form Edit Auxiliary</h3>
+                        <div class="card-header bg-warning text-white">
+                            <h3 class="card-title"><i class="fas fa-edit"></i> Form Edit Dye Stuff:
+                                <strong>{{ $dyeStuff->barcode }}</strong>
+                            </h3>
                         </div>
                         <div class="card-body">
                             <div class="row">
@@ -59,15 +61,13 @@
                                     <label>Planning Proses <span class="text-danger">*</span></label>
                                     <select name="proses_id" id="proses_id" class="form-control select2" required>
                                         <option value="" disabled>-- Pilih Planning Proses --</option>
-
                                         @if(isset($prosesRunning) && $prosesRunning->isNotEmpty())
                                             <optgroup label="⚡ --- Sedang Berjalan ---">
                                                 @foreach ($prosesRunning as $p)
                                                     @php $f = optional($p->details)->first(); @endphp
-                                                    <option value="{{ $p->id }}" {{ old('proses_id', $auxl->proses_id) == $p->id ? 'selected' : '' }}>
+                                                    <option value="{{ $p->id }}" {{ old('proses_id', $dyeStuff->proses_id) == $p->id ? 'selected' : '' }}>
                                                         [Berjalan] OP: {{ $f->no_op ?? '-' }} | Partai: {{ $f->no_partai ?? '-' }} |
-                                                        Mesin: {{ optional($p->mesin)->jenis_mesin ?? '-' }} (Normal:
-                                                        {{ $p->normal_aux_count }}/{{ $p->qty_aux ?? 1 }}{{ $p->normal_aux_count >= ($p->qty_aux ?? 1) ? ' - Penuh' : '' }})
+                                                        Mesin: {{ optional($p->mesin)->jenis_mesin ?? '-' }} (Normal: {{ $p->normal_dyestuff_count }}/{{ $p->qty_dye_stuff ?? 1 }}{{ $p->normal_dyestuff_count >= ($p->qty_dye_stuff ?? 1) ? ' - Penuh' : '' }})
                                                     </option>
                                                 @endforeach
                                             </optgroup>
@@ -77,10 +77,9 @@
                                             <optgroup label="⏳ --- Belum Berjalan ---">
                                                 @foreach ($prosesPending as $p)
                                                     @php $f = optional($p->details)->first(); @endphp
-                                                    <option value="{{ $p->id }}" {{ old('proses_id', $auxl->proses_id) == $p->id ? 'selected' : '' }}>
+                                                    <option value="{{ $p->id }}" {{ old('proses_id', $dyeStuff->proses_id) == $p->id ? 'selected' : '' }}>
                                                         [Belum Berjalan] OP: {{ $f->no_op ?? '-' }} | Partai:
-                                                        {{ $f->no_partai ?? '-' }} | Customer: {{ $f->customer ?? '-' }} (Normal:
-                                                        {{ $p->normal_aux_count }}/{{ $p->qty_aux ?? 1 }}{{ $p->normal_aux_count >= ($p->qty_aux ?? 1) ? ' - Penuh' : '' }})
+                                                        {{ $f->no_partai ?? '-' }} | Customer: {{ $f->customer ?? '-' }} (Normal: {{ $p->normal_dyestuff_count }}/{{ $p->qty_dye_stuff ?? 1 }}{{ $p->normal_dyestuff_count >= ($p->qty_dye_stuff ?? 1) ? ' - Penuh' : '' }})
                                                     </option>
                                                 @endforeach
                                             </optgroup>
@@ -91,14 +90,12 @@
                                     @enderror
                                 </div>
 
-                                <!-- Tipe Aux -->
+                                <!-- Tipe Dye Stuff -->
                                 <div class="col-md-3 mb-3">
-                                    <label>Tipe Aux <span class="text-danger">*</span></label>
+                                    <label>Dye Stuff Type <span class="text-danger">*</span></label>
                                     <select name="tipe" id="tipe" class="form-control" required>
-                                        @foreach (\App\Models\Auxl::getTipeOptions() as $key => $val)
-                                            <option value="{{ $key }}" {{ old('tipe', $auxl->tipe ?? 'normal') == $key ? 'selected' : '' }}>
-                                                {{ $val }}
-                                            </option>
+                                        @foreach (\App\Models\DyeStuff::getTipeOptions() as $key => $val)
+                                            <option value="{{ $key }}" {{ old('tipe', $dyeStuff->tipe) == $key ? 'selected' : '' }}>{{ $val }}</option>
                                         @endforeach
                                     </select>
                                     @error('tipe')
@@ -111,10 +108,8 @@
                                     <label>Jenis <span class="text-danger">*</span></label>
                                     <select name="jenis" id="jenis" class="form-control"
                                         style="pointer-events: none; background-color: #e9ecef;" tabindex="-1" required>
-                                        @foreach (\App\Models\Auxl::getJenisOptions() as $key => $val)
-                                            <option value="{{ $key }}" {{ old('jenis', $auxl->jenis) == $key ? 'selected' : '' }}>
-                                                {{ $val }}
-                                            </option>
+                                        @foreach (\App\Models\DyeStuff::getJenisOptions() as $key => $val)
+                                            <option value="{{ $key }}" {{ old('jenis', $dyeStuff->jenis) == $key ? 'selected' : '' }}>{{ $val }}</option>
                                         @endforeach
                                     </select>
                                     @error('jenis')
@@ -122,27 +117,42 @@
                                     @enderror
                                 </div>
 
-                                <!-- Pick List Step Process -->
+                                <!-- Step Process (Pick List) - Locked by default until process with qty_dye_stuff > 1 selected -->
                                 <div class="col-md-4 mb-3">
-                                    <label>Pick List Step <span class="text-danger" id="step_proses_star"
-                                            style="display: none;">*</span></label>
+                                    <label>Pick List Step <span class="text-danger" id="step_proses_star" style="display: none;">*</span></label>
                                     <select name="step_proses" id="step_proses" class="form-control"
-                                        data-initial-val="{{ old('step_proses', $auxl->step_proses) }}"
+                                        data-initial-val="{{ old('step_proses', $dyeStuff->step_proses) }}"
                                         style="pointer-events: none; background-color: #e9ecef;" tabindex="-1">
-                                        <option value="" disabled {{ old('step_proses', $auxl->step_proses) ? '' : 'selected' }}>-- Pilih Step --</option>
+                                        <option value="" disabled {{ old('step_proses', $dyeStuff->step_proses) ? '' : 'selected' }}>-- Pilih Step --</option>
                                     </select>
                                     @error('step_proses')
                                         <small class="text-danger">{{ $message }}</small>
                                     @enderror
                                 </div>
 
-                                <!-- Total Wt. (Kg) -->
+                                <!-- Liquor Ratio -->
+                                <div class="col-md-4 mb-3">
+                                    <label>Liquor Ratio <span class="text-danger">*</span></label>
+                                    <div class="input-group">
+                                        <div class="input-group-prepend">
+                                            <span class="input-group-text">1 :</span>
+                                        </div>
+                                        <input type="number" step="0.1" name="liquor_ratio" id="liquor_ratio"
+                                            class="form-control" placeholder="10.0"
+                                            value="{{ old('liquor_ratio', $dyeStuff->liquor_ratio) }}" required>
+                                    </div>
+                                    @error('liquor_ratio')
+                                        <small class="text-danger">{{ $message }}</small>
+                                    @enderror
+                                </div>
+
+                                <!-- Total Wt. (Kg) - Readonly / Locked -->
                                 <div class="col-md-4 mb-3">
                                     <label>Total Wt. (Kg) <span class="text-danger">*</span></label>
                                     <div class="input-group">
                                         <input type="number" step="0.01" name="total_wt" id="total_wt" class="form-control"
-                                            placeholder="Total WT (Kg)"
-                                            value="{{ old('total_wt', $auxl->total_wt ?? '0.00') }}" readonly required>
+                                            placeholder="Total WT (Kg)" value="{{ old('total_wt', $dyeStuff->total_wt) }}"
+                                            readonly required>
                                         <div class="input-group-append">
                                             <span class="input-group-text">Kg</span>
                                         </div>
@@ -158,84 +168,20 @@
                                     <div class="input-group">
                                         <input type="number" step="0.01" name="volume_litres" id="volume_litres"
                                             class="form-control" placeholder="Volume Litres"
-                                            value="{{ old('volume_litres', $auxl->volume_litres ?? '0.00') }}" readonly
-                                            required>
+                                            value="{{ old('volume_litres', $dyeStuff->volume_litres) }}" readonly required>
                                         <div class="input-group-append">
                                             <span class="input-group-text">L</span>
                                         </div>
                                     </div>
-                                    <small class="form-text text-muted">Dihitung otomatis dari total Weight (kg) List
-                                        Auxiliary</small>
+                                    <small class="form-text text-muted">Dihitung otomatis dari total Weight (Timbangan) List
+                                        Kimia</small>
                                     @error('volume_litres')
                                         <small class="text-danger">{{ $message }}</small>
                                     @enderror
                                 </div>
 
-                                <!-- Code -->
-                                <div class="col-md-4 mb-3">
-                                    <label>Code <span class="text-danger">*</span></label>
-                                    <input type="text" name="code" id="code" class="form-control"
-                                        placeholder="Code Auxiliary" value="{{ old('code', $auxl->code) }}" required>
-                                    @error('code')
-                                        <small class="text-danger">{{ $message }}</small>
-                                    @enderror
-                                </div>
-
-                                <!-- Konstruksi -->
-                                <div class="col-md-4 mb-3">
-                                    <label>Konstruksi <span class="text-danger">*</span></label>
-                                    <input type="text" name="konstruksi" id="konstruksi" class="form-control"
-                                        placeholder="Konstruksi" value="{{ old('konstruksi', $auxl->konstruksi) }}" readonly
-                                        required>
-                                    @error('konstruksi')
-                                        <small class="text-danger">{{ $message }}</small>
-                                    @enderror
-                                </div>
-
-                                <!-- Customer -->
-                                <div class="col-md-4 mb-3">
-                                    <label>Customer <span class="text-danger">*</span></label>
-                                    <input type="text" name="customer" id="customer" class="form-control"
-                                        placeholder="Customer" value="{{ old('customer', $auxl->customer) }}" readonly
-                                        required>
-                                    @error('customer')
-                                        <small class="text-danger">{{ $message }}</small>
-                                    @enderror
-                                </div>
-
-                                <!-- Marketing -->
-                                <div class="col-md-4 mb-3">
-                                    <label>Marketing <span class="text-danger">*</span></label>
-                                    <input type="text" name="marketing" id="marketing" class="form-control"
-                                        placeholder="Marketing" value="{{ old('marketing', $auxl->marketing) }}" readonly
-                                        required>
-                                    @error('marketing')
-                                        <small class="text-danger">{{ $message }}</small>
-                                    @enderror
-                                </div>
-
-                                <!-- Date -->
-                                <div class="col-md-4 mb-3">
-                                    <label>Date <span class="text-danger">*</span></label>
-                                    <input type="date" name="date" id="date" class="form-control"
-                                        value="{{ old('date', $auxl->date) }}" required>
-                                    @error('date')
-                                        <small class="text-danger">{{ $message }}</small>
-                                    @enderror
-                                </div>
-
-                                <!-- Color -->
-                                <div class="col-md-4 mb-3">
-                                    <label>Color <span class="text-danger">*</span></label>
-                                    <input type="text" name="color" id="color" class="form-control" placeholder="Color"
-                                        value="{{ old('color', $auxl->color) }}" readonly required>
-                                    @error('color')
-                                        <small class="text-danger">{{ $message }}</small>
-                                    @enderror
-                                </div>
-
                                 <!-- Card Preview Info Proses -->
-                                <div class="col-md-12 mb-3">
+                                <div class="col-md-8 mb-3">
                                     <div class="p-3 bg-light rounded border" id="proses-info-box" style="display: none;">
                                         <strong>Detail Info Proses:</strong> <span id="info-status-badge"
                                             class="badge badge-info ml-2">-</span><br>
@@ -244,11 +190,9 @@
                                         <span id="info-customer">Customer: -</span> | <span id="info-material">Fabric:
                                             -</span><br>
                                         <span id="info-color">Color: -</span> | <span id="info-mesin">M/C: -</span>
-                                        <div id="info-aux-quota" class="mt-2 text-primary font-weight-bold">AUX Normal: 0 /
-                                            1</div>
+                                        <div id="info-dye-stuff-quota" class="mt-2 text-primary font-weight-bold">Dye Stuff Normal: 0 / 1</div>
                                     </div>
-                                    <div id="tipe-warning-alert" class="alert alert-warning mt-2 mb-0"
-                                        style="display: none;">
+                                    <div id="tipe-warning-alert" class="alert alert-warning mt-2 mb-0" style="display: none;">
                                         <i class="fas fa-exclamation-triangle"></i> <span id="tipe-warning-text"></span>
                                     </div>
                                 </div>
@@ -256,14 +200,14 @@
                         </div>
                     </div>
 
-                    <!-- Card Detail List Auxiliary -->
+                    <!-- Card Detail List Kimia -->
                     <div class="card mt-3">
                         <div
                             class="card-header bg-secondary text-white d-flex justify-content-between align-items-center w-100">
-                            <h3 class="card-title mb-0"><i class="fas fa-vials"></i> Data Detail List Auxiliary</h3>
+                            <h3 class="card-title mb-0"><i class="fas fa-vials"></i> Data Detail List Kimia / Dye Stuff</h3>
                             <button type="button" class="btn btn-success btn-sm ml-auto" id="btn-add-detail"
-                                title="Tambah List Auxiliary">
-                                <i class="fas fa-plus"></i> Tambah Auxiliary
+                                title="Tambah List Kimia">
+                                <i class="fas fa-plus"></i> Tambah Kimia
                             </button>
                         </div>
                         <div class="card-body">
@@ -271,32 +215,47 @@
                                 <table class="table table-bordered" id="table-details">
                                     <thead class="thead-light">
                                         <tr>
-                                            <th style="width: 60%">Nama Auxiliary (List SAP) <span
+                                            <th style="width: 35%">Chemical Name / Zat Warna (List SAP) <span
                                                     class="text-danger">*</span></th>
-                                            <th style="width: 30%">Weight (kg) <span class="text-danger">*</span></th>
+                                            <th style="width: 15%">Concentrate (%) <span class="text-danger">*</span></th>
+                                            <th style="width: 15%">Weight (Timbangan) <span class="text-danger">*</span>
+                                            </th>
+                                            <th style="width: 25%">Remark / Catatan</th>
                                             <th style="width: 10%">Aksi</th>
                                         </tr>
                                     </thead>
                                     <tbody id="details-list">
-                                        @php $details = old('details', $auxl->details); @endphp
-                                        @foreach ($details as $i => $d)
-                                            @php
-                                                $auxName = is_array($d) ? ($d['auxiliary'] ?? '') : ($d->auxiliary ?? '');
-                                                $weightVal = is_array($d) ? ($d['konsentrasi'] ?? '') : ($d->konsentrasi ?? '');
-                                            @endphp
+                                        @foreach ($dyeStuff->details as $i => $detail)
                                             <tr class="detail-row">
                                                 <td>
-                                                    <select name="details[{{ $i }}][auxiliary]"
-                                                        class="form-control select2-auxiliary" required>
-                                                        @if(!empty($auxName))
-                                                            <option value="{{ $auxName }}" selected>{{ $auxName }}</option>
-                                                        @endif
+                                                    <select name="details[{{ $i }}][chemical_name]"
+                                                        class="form-control select2-chemical" required>
+                                                        <option
+                                                            value="{{ old("details.{$i}.chemical_name", $detail->chemical_name) }}"
+                                                            selected>
+                                                            {{ old("details.{$i}.chemical_name", $detail->chemical_name) }}
+                                                        </option>
                                                     </select>
+                                                    <input type="hidden" name="details[{{ $i }}][unit]"
+                                                        value="{{ old("details.{$i}.unit", $detail->unit ?? 'g') }}">
                                                 </td>
                                                 <td>
-                                                    <input type="number" step="0.01" name="details[{{ $i }}][konsentrasi]"
+                                                    <input type="number" step="0.0001" name="details[{{ $i }}][konsentrasi]"
+                                                        class="form-control form-control-sm conc-input" placeholder="Conc. %"
+                                                        value="{{ old("details.{$i}.konsentrasi", $detail->konsentrasi) }}"
+                                                        required>
+                                                </td>
+                                                <td>
+                                                    <input type="number" step="0.01" name="details[{{ $i }}][weight]"
                                                         class="form-control form-control-sm weight-input"
-                                                        placeholder="Weight (kg)" value="{{ $weightVal }}" required>
+                                                        placeholder="Weight (g)"
+                                                        value="{{ old("details.{$i}.weight", $detail->weight) }}" required>
+                                                </td>
+                                                <td>
+                                                    <input type="text" name="details[{{ $i }}][remark]"
+                                                        class="form-control form-control-sm"
+                                                        placeholder="Remark / Catatan"
+                                                        value="{{ old("details.{$i}.remark", $detail->remark) }}">
                                                 </td>
                                                 <td class="text-center">
                                                     <button type="button" class="btn btn-danger btn-sm btn-remove-detail"><i
@@ -309,9 +268,8 @@
                             </div>
                         </div>
                         <div class="card-footer text-right">
-                            <a href="{{ route('aux.index') }}" class="btn btn-secondary mr-2">Kembali</a>
-                            <button type="submit" id="btn-submit-form" class="btn btn-primary"><i class="fas fa-save"></i>
-                                Update Data Auxiliary</button>
+                            <a href="{{ route('dye-stuff.index') }}" class="btn btn-secondary mr-2">Kembali</a>
+                            <button type="submit" id="btn-submit-form" class="btn btn-primary"><i class="fas fa-save"></i> Update Data Dye Stuff</button>
                         </div>
                     </div>
                 </form>
@@ -325,9 +283,9 @@
         $(document).ready(function () {
             $('.select2').select2({ width: '100%' });
 
-            function initAuxiliarySelect2(selector) {
+            function initChemicalSelect2(selector) {
                 $(selector).select2({
-                    placeholder: '-- Cari & Pilih Nama Auxiliary (min. 3 karakter) --',
+                    placeholder: '-- Cari & Pilih Nama Kimia / Zat Warna (min. 3 karakter) --',
                     minimumInputLength: 3,
                     width: '100%',
                     ajax: {
@@ -347,18 +305,18 @@
                             };
                         },
                         error: function (xhr, status, error) {
-                            console.error('Error loading auxiliary data:', error);
+                            console.error('Error loading chemical data:', error);
                             return { results: [] };
                         }
                     }
                 });
             }
 
-            $('.select2-auxiliary').each(function () {
-                initAuxiliarySelect2(this);
+            $('.select2-chemical').each(function () {
+                initChemicalSelect2(this);
             });
 
-            let detailIndex = {{ count($auxl->details) }};
+            let detailIndex = {{ count($dyeStuff->details) }};
             let currentProsesInfo = null;
 
             function calcVolume() {
@@ -377,29 +335,29 @@
 
                 const data = currentProsesInfo;
                 const selectedTipe = $('#tipe').val() || 'normal';
-                const qtyAux = parseInt(data.qty_aux) || 1;
-                const existingNormalAuxCount = parseInt(data.existing_normal_aux_count) || 0;
-                const usedNormalAuxSteps = data.used_normal_aux_steps || [];
-                const usedAdditionAuxSteps = data.used_addition_aux_steps || [];
-                const canCreateNormalAux = data.can_create_normal_aux;
+                const qtyDyeStuff = parseInt(data.qty_dye_stuff) || 1;
+                const existingNormalCount = parseInt(data.existing_normal_count) || 0;
+                const usedNormalSteps = data.used_normal_steps || [];
+                const usedAdditionSteps = data.used_addition_steps || [];
+                const canCreateNormal = data.can_create_normal;
 
                 // Update Info Kuota
-                if (existingNormalAuxCount >= qtyAux) {
-                    $('#info-aux-quota').html(`AUX Normal Dibuat: <span class="badge badge-danger">${existingNormalAuxCount} / ${qtyAux} (Kuota Penuh)</span>`);
+                if (existingNormalCount >= qtyDyeStuff) {
+                    $('#info-dye-stuff-quota').html(`Dye Stuff Normal Dibuat: <span class="badge badge-danger">${existingNormalCount} / ${qtyDyeStuff} (Kuota Penuh)</span>`);
                 } else {
-                    $('#info-aux-quota').html(`AUX Normal Dibuat: <span class="badge badge-success">${existingNormalAuxCount} / ${qtyAux} (Sisa ${qtyAux - existingNormalAuxCount}x)</span>`);
+                    $('#info-dye-stuff-quota').html(`Dye Stuff Normal Dibuat: <span class="badge badge-success">${existingNormalCount} / ${qtyDyeStuff} (Sisa ${qtyDyeStuff - existingNormalCount}x)</span>`);
                 }
 
                 const $stepSelect = $('#step_proses');
                 const prevVal = $stepSelect.data('initial-val') || $stepSelect.val();
                 $stepSelect.empty();
 
-                if (selectedTipe === 'addition' || selectedTipe === 'additional') {
+                if (selectedTipe === 'additional' || selectedTipe === 'addition') {
                     // Tipe Addition (Topping): 2 Pilihan Step (1 - Reactive, 2 - Dispers)
-                    const isAdditionFull = usedAdditionAuxSteps.includes(1) && usedAdditionAuxSteps.includes(2);
+                    const isAdditionFull = usedAdditionSteps.includes(1) && usedAdditionSteps.includes(2);
 
-                    if (isAdditionFull && (!prevVal || !usedAdditionAuxSteps.includes(parseInt(prevVal)))) {
-                        $('#tipe-warning-text').text(`AUX Type Addition (Topping) untuk proses ini sudah mencapai batas maksimum (2x: Reactive & Dispers). Silakan pilih Tipe Normal atau pilih proses lain.`);
+                    if (isAdditionFull && (!prevVal || !usedAdditionSteps.includes(parseInt(prevVal)))) {
+                        $('#tipe-warning-text').text(`Dye Stuff Type Addition (Topping) untuk proses ini sudah mencapai batas maksimum (2x: Reactive & Dispers). Silakan pilih Tipe Normal atau pilih proses lain.`);
                         $('#tipe-warning-alert').slideDown(200);
                         $('#btn-submit-form').prop('disabled', true).addClass('disabled');
                     } else {
@@ -415,7 +373,7 @@
 
                     const stepsObj = { 1: '1 - Reactive', 2: '2 - Dispers' };
                     $.each(stepsObj, function (val, label) {
-                        const isUsed = usedAdditionAuxSteps.includes(parseInt(val));
+                        const isUsed = usedAdditionSteps.includes(parseInt(val));
                         const isSel = (prevVal == val) ? 'selected' : '';
                         if (isUsed && prevVal != val) {
                             $stepSelect.append(`<option value="${val}" disabled style="color: #aaa;">${label} (Sudah Dibuat)</option>`);
@@ -429,8 +387,8 @@
                     }
                 } else {
                     // Tipe Normal
-                    if (selectedTipe === 'normal' && !canCreateNormalAux) {
-                        $('#tipe-warning-text').text(`AUX Type Normal untuk proses ini sudah mencapai batas maksimum (${qtyAux}x). Silakan pilih Tipe Addition (Topping) atau pilih proses lain.`);
+                    if (selectedTipe === 'normal' && !canCreateNormal) {
+                        $('#tipe-warning-text').text(`Dye Stuff Type Normal untuk proses ini sudah mencapai batas maksimum (${qtyDyeStuff}x). Silakan pilih Tipe Addition (Topping) atau pilih proses lain.`);
                         $('#tipe-warning-alert').slideDown(200);
                         $('#btn-submit-form').prop('disabled', true).addClass('disabled');
                     } else {
@@ -438,10 +396,10 @@
                         $('#btn-submit-form').prop('disabled', false).removeClass('disabled');
                     }
 
-                    if (qtyAux <= 1) {
+                    if (qtyDyeStuff <= 1) {
                         $('#step_proses_star').hide();
                         $stepSelect.removeAttr('required');
-                        const isUsed = (selectedTipe === 'normal' && usedNormalAuxSteps.includes(1));
+                        const isUsed = (selectedTipe === 'normal' && usedNormalSteps.includes(1));
                         if (isUsed && prevVal != 1) {
                             $stepSelect.append('<option value="1" selected disabled>Step 1 (Sudah Dibuat)</option>');
                         } else {
@@ -454,11 +412,11 @@
                         $stepSelect.attr('required', 'required');
                         $stepSelect.css('pointer-events', 'auto').css('background-color', '#fff').removeAttr('tabindex');
 
-                        const isPlaceholderSelected = !prevVal || (usedNormalAuxSteps.includes(parseInt(prevVal)) && prevVal != $stepSelect.data('initial-val'));
+                        const isPlaceholderSelected = !prevVal || (usedNormalSteps.includes(parseInt(prevVal)) && prevVal != $stepSelect.data('initial-val'));
                         $stepSelect.append('<option value="" disabled ' + (isPlaceholderSelected ? 'selected' : '') + '>-- Pilih Step --</option>');
                         
-                        for (let i = 1; i <= qtyAux; i++) {
-                            const isUsed = (selectedTipe === 'normal' && usedNormalAuxSteps.includes(i));
+                        for (let i = 1; i <= qtyDyeStuff; i++) {
+                            const isUsed = (selectedTipe === 'normal' && usedNormalSteps.includes(i));
                             if (isUsed && prevVal != i) {
                                 $stepSelect.append(`<option value="${i}" disabled style="color: #aaa;">Step ${i} (Sudah Dibuat)</option>`);
                             } else {
@@ -467,7 +425,7 @@
                             }
                         }
 
-                        if (prevVal && (!usedNormalAuxSteps.includes(parseInt(prevVal)) || prevVal == $stepSelect.data('initial-val'))) {
+                        if (prevVal && (!usedNormalSteps.includes(parseInt(prevVal)) || prevVal == $stepSelect.data('initial-val'))) {
                             $stepSelect.val(prevVal);
                         } else {
                             $stepSelect.val('');
@@ -484,7 +442,7 @@
                 const id = $(this).val();
                 if (!id) return;
                 $.ajax({
-                    url: '/api/proses-info/' + id + '?exclude_aux_id={{ $auxl->id }}',
+                    url: '/api/proses-info/' + id + '?exclude_id={{ $dyeStuff->id }}',
                     type: 'GET',
                     success: function (data) {
                         currentProsesInfo = data;
@@ -497,27 +455,20 @@
                         $('#info-color').text('Color: ' + (data.color || '-'));
                         $('#info-mesin').text('M/C: ' + (data.mesin || '-'));
 
+                        // 1. Jenis Otomatis Berdasarkan Planning (Locked)
                         if (data.auto_jenis) {
-                            $('#jenis').val(data.auto_jenis);
-                        }
-                        if (typeof data.customer !== 'undefined') {
-                            $('#customer').val(data.customer);
-                        }
-                        if (typeof data.material !== 'undefined') {
-                            $('#konstruksi').val(data.material);
-                        }
-                        if (typeof data.color !== 'undefined') {
-                            $('#color').val(data.color);
-                        }
-                        if (typeof data.marketing !== 'undefined') {
-                            $('#marketing').val(data.marketing || '-');
+                            $('select[name="jenis"]').val(data.auto_jenis);
                         }
 
-                        if (typeof data.total_wt !== 'undefined' && parseFloat(data.total_wt) > 0) {
+                        // 2. Total WT (Kg) dari DetailProses QTY (jika kosong/0)
+                        if ((!$('#total_wt').val() || parseFloat($('#total_wt').val()) === 0) && typeof data.total_wt !== 'undefined' && parseFloat(data.total_wt) > 0) {
                             $('#total_wt').val(parseFloat(data.total_wt).toFixed(2));
                         }
 
+                        // 3. Update Kuota & Pick List Step State
                         updateStepAndQuotaState();
+
+                        $('#proses_id').data('loaded-once', true);
                     }
                 });
             });
@@ -530,10 +481,17 @@
                 const tr = `
                             <tr class="detail-row">
                                 <td>
-                                    <select name="details[${detailIndex}][auxiliary]" class="form-control select2-auxiliary" required></select>
+                                    <select name="details[${detailIndex}][chemical_name]" class="form-control select2-chemical" required></select>
+                                    <input type="hidden" name="details[${detailIndex}][unit]" value="g">
                                 </td>
                                 <td>
-                                    <input type="number" step="0.01" name="details[${detailIndex}][konsentrasi]" class="form-control form-control-sm weight-input" placeholder="Weight (kg)" required>
+                                    <input type="number" step="0.0001" name="details[${detailIndex}][konsentrasi]" class="form-control form-control-sm conc-input" placeholder="Conc. %" required>
+                                </td>
+                                <td>
+                                    <input type="number" step="0.01" name="details[${detailIndex}][weight]" class="form-control form-control-sm weight-input" placeholder="Weight (g)" required>
+                                </td>
+                                <td>
+                                    <input type="text" name="details[${detailIndex}][remark]" class="form-control form-control-sm" placeholder="Remark / Catatan">
                                 </td>
                                 <td class="text-center">
                                     <button type="button" class="btn btn-danger btn-sm btn-remove-detail"><i class="fas fa-trash"></i></button>
@@ -541,7 +499,7 @@
                             </tr>
                         `;
                 $('#details-list').append(tr);
-                initAuxiliarySelect2($('#details-list tr:last .select2-auxiliary'));
+                initChemicalSelect2($('#details-list tr:last .select2-chemical'));
                 detailIndex++;
                 calcVolume();
             });
@@ -554,7 +512,7 @@
                     Swal.fire({
                         icon: 'warning',
                         title: 'Peringatan',
-                        text: 'Minimal harus ada 1 detail list auxiliary.'
+                        text: 'Minimal harus ada 1 detail list kimia.'
                     });
                 }
             });

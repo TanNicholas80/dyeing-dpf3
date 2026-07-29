@@ -121,10 +121,16 @@
 
         <!-- Navbar -->
         <nav class="main-header navbar navbar-expand-md navbar-light navbar-white">
-            <div class="container">
-                <a href="{{ route('dashboard') }}" class="navbar-brand" title="Halaman Dashboard">
-                    <img src="{{ asset('images/logopanjang.svg') }}" alt="Duniatex Logo" class="brand-image">
-                </a>
+            <div class="container-fluid px-3">
+                <div class="d-flex align-items-center">
+                    <a class="nav-link text-dark mr-2" data-widget="pushmenu" href="#" role="button"
+                        title="Toggle Sidebar">
+                        <i class="fas fa-bars fa-lg"></i>
+                    </a>
+                    <a href="{{ route('dashboard') }}" class="navbar-brand m-0" title="Halaman Dashboard">
+                        <img src="{{ asset('images/logopanjang.svg') }}" alt="Duniatex Logo" class="brand-image">
+                    </a>
+                </div>
 
                 <button class="navbar-toggler order-1" type="button" data-toggle="collapse"
                     data-target="#navbarCollapse" aria-controls="navbarCollapse" aria-expanded="false"
@@ -133,92 +139,96 @@
                 </button>
 
                 <div class="collapse navbar-collapse order-3" id="navbarCollapse">
-                    <!-- Left navbar links -->
-                    <ul class="navbar-nav">
-                        <li class="nav-item">
-                            <a class="nav-link" data-widget="pushmenu" href="#" role="button"><i
-                                    class="fas fa-bars"></i></a>
-                        </li>
+                    <!-- Centered navbar links -->
+                    <ul class="navbar-nav text-nowrap mx-auto">
                         @php
-                        $role = Auth::user()->role ?? null;
-                        $canDashboard = !in_array($role, ['aux', 'spv_listrik']); // Semua role bisa akses dashboard kecuali aux & spv_listrik
-                        $canApprovalFm = in_array($role, ['super_admin', 'fm']);
-                        $canApprovalVp = in_array($role, ['super_admin', 'vp']);
-                        $canApprovalKepalaShift = in_array($role, ['super_admin', 'kepala_shift']);
-                        $canUser = in_array($role, ['super_admin']);
-                        $canMesin = in_array($role, ['super_admin', 'fm', 'vp', 'ppic', 'owner', 'spv_listrik', 'scm']);
-                        $canAux = in_array($role, ['super_admin', 'aux', 'scm']);
-                        $canLog = in_array($role, ['super_admin', 'fm', 'vp']);
+                            $role = Auth::user()->role ?? null;
+                            $canDashboard = !in_array($role, ['aux', 'spv_listrik', 'dye_stuff']); // Semua role bisa akses dashboard kecuali aux, spv_listrik & dye_stuff
+                            $canApprovalFm = in_array($role, ['super_admin', 'fm']);
+                            $canApprovalVp = in_array($role, ['super_admin', 'vp']);
+                            $canApprovalKepalaShift = in_array($role, ['super_admin', 'kepala_shift']);
+                            $canUser = in_array($role, ['super_admin']);
+                            $canMesin = in_array($role, ['super_admin', 'fm', 'vp', 'ppic', 'owner', 'spv_listrik', 'scm']);
+                            $canAux = in_array($role, ['super_admin', 'aux', 'scm']);
+                            $canDyeStuff = in_array($role, ['super_admin', 'ds', 'dye_stuff', 'aux', 'ppic', 'scm', 'kepala_ruangan', 'operator']);
+                            $canLog = in_array($role, ['super_admin', 'fm', 'vp']);
                         @endphp
 
                         @if ($canDashboard)
-                        <li class="nav-item">
-                            <a href="{{ route('dashboard') }}" class="nav-link">Dashboard
-                            </a>
-                        </li>
+                            <li class="nav-item">
+                                <a href="{{ route('dashboard') }}" class="nav-link">Dashboard
+                                </a>
+                            </li>
                         @endif
 
                         @if ($canApprovalFm || $canApprovalVp || $canApprovalKepalaShift)
-                        <li class="nav-item dropdown">
-                            <a id="dropdownSubMenu1" href="#" data-toggle="dropdown" aria-haspopup="true"
-                                aria-expanded="false" class="nav-link dropdown-toggle" title="Approval">Approval</a>
-                            <ul aria-labelledby="dropdownSubMenu1" class="dropdown-menu border-0 shadow">
-                                @if ($canApprovalFm)
-                                <li>
-                                    <a href="{{ route('approval.fm') }}" class="dropdown-item">
-                                        Approval FM
-                                        @if($pendingApprovalFM > 0)
-                                        <span class="badge badge-warning float-right">{{ $pendingApprovalFM }}</span>
-                                        @endif
-                                    </a>
-                                </li>
-                                @endif
-                                @if ($canApprovalVp)
-                                <li>
-                                    <a href="{{ route('approval.vp') }}" class="dropdown-item">
-                                        Approval VP
-                                        @if($pendingApprovalVP > 0)
-                                        <span class="badge badge-warning float-right">{{ $pendingApprovalVP }}</span>
-                                        @endif
-                                    </a>
-                                </li>
-                                @endif
-                                @if ($canApprovalKepalaShift)
-                                <li>
-                                    <a href="{{ route('approval.kepala_shift') }}" class="dropdown-item">
-                                        Approval Kepala Shift
-                                        @if($pendingApprovalKepalaShift > 0)
-                                        <span class="badge badge-warning float-right">{{ $pendingApprovalKepalaShift }}</span>
-                                        @endif
-                                    </a>
-                                </li>
-                                @endif
-                            </ul>
-                        </li>
+                            <li class="nav-item dropdown">
+                                <a id="dropdownSubMenu1" href="#" data-toggle="dropdown" aria-haspopup="true"
+                                    aria-expanded="false" class="nav-link dropdown-toggle" title="Approval">Approval</a>
+                                <ul aria-labelledby="dropdownSubMenu1" class="dropdown-menu border-0 shadow">
+                                    @if ($canApprovalFm)
+                                        <li>
+                                            <a href="{{ route('approval.fm') }}" class="dropdown-item">
+                                                Approval FM
+                                                @if($pendingApprovalFM > 0)
+                                                    <span class="badge badge-warning float-right">{{ $pendingApprovalFM }}</span>
+                                                @endif
+                                            </a>
+                                        </li>
+                                    @endif
+                                    @if ($canApprovalVp)
+                                        <li>
+                                            <a href="{{ route('approval.vp') }}" class="dropdown-item">
+                                                Approval VP
+                                                @if($pendingApprovalVP > 0)
+                                                    <span class="badge badge-warning float-right">{{ $pendingApprovalVP }}</span>
+                                                @endif
+                                            </a>
+                                        </li>
+                                    @endif
+                                    @if ($canApprovalKepalaShift)
+                                        <li>
+                                            <a href="{{ route('approval.kepala_shift') }}" class="dropdown-item">
+                                                Approval Kepala Shift
+                                                @if($pendingApprovalKepalaShift > 0)
+                                                    <span
+                                                        class="badge badge-warning float-right">{{ $pendingApprovalKepalaShift }}</span>
+                                                @endif
+                                            </a>
+                                        </li>
+                                    @endif
+                                </ul>
+                            </li>
                         @endif
 
                         @if ($canUser)
-                        <li class="nav-item">
-                            <a href="{{ route('user.index') }}" class="nav-link" title="User">User</a>
-                        </li>
+                            <li class="nav-item">
+                                <a href="{{ route('user.index') }}" class="nav-link" title="User">User</a>
+                            </li>
                         @endif
 
                         @if ($canMesin)
-                        <li class="nav-item">
-                            <a href="{{ route('mesin.index') }}" class="nav-link" title="Mesin">Mesin</a>
-                        </li>
+                            <li class="nav-item">
+                                <a href="{{ route('mesin.index') }}" class="nav-link" title="Mesin">Mesin</a>
+                            </li>
                         @endif
 
                         @if ($canAux)
-                        <li class="nav-item">
-                            <a href="{{ route('aux.index') }}" class="nav-link" title="Aux">Aux</a>
-                        </li>
+                            <li class="nav-item">
+                                <a href="{{ route('aux.index') }}" class="nav-link" title="Aux">Aux</a>
+                            </li>
+                        @endif
+
+                        @if ($canDyeStuff)
+                            <li class="nav-item">
+                                <a href="{{ route('dye-stuff.index') }}" class="nav-link" title="Dye Stuff">Dye Stuff</a>
+                            </li>
                         @endif
 
                         @if ($canLog)
-                        <li class="nav-item">
-                            <a href="{{ route('activity-log.index') }}" class="nav-link" title="Log">Log</a>
-                        </li>
+                            <li class="nav-item">
+                                <a href="{{ route('activity-log.index') }}" class="nav-link" title="Log">Log</a>
+                            </li>
                         @endif
                     </ul>
 
@@ -240,8 +250,7 @@
                                 onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
                                 <i class="fas fa-sign-out-alt"></i> Logout
                             </a>
-                            <form id="logout-form" action="{{ route('logout') }}" method="POST"
-                                style="display: none;">
+                            <form id="logout-form" action="{{ route('logout') }}" method="POST" style="display: none;">
                                 @csrf
                             </form>
                         </div>
@@ -249,8 +258,8 @@
                     <li class="nav-item" style="display:flex; align-items:center;">
                         <a id="global-fullscreen-btn" href="#" title="Fullscreen"
                             style="margin-left:8px; display:flex; align-items:center; justify-content:center; height:40px; width:40px; border-radius:6px; transition:background 0.2s;">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22"
-                                fill="currentColor" viewBox="0 0 16 16" style="display:block; margin:auto;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="currentColor"
+                                viewBox="0 0 16 16" style="display:block; margin:auto;">
                                 <path
                                     d="M1 1v5h2V3h3V1H1zm14 0h-5v2h3v3h2V1zm-2 11v3h-3v2h5v-5h-2zm-9 3v-3H1v5h5v-2H3z" />
                             </svg>
@@ -263,14 +272,20 @@
 
         <!-- Main Sidebar Container -->
         <aside class="main-sidebar sidebar-light-primary elevation-4">
-            <!-- Brand Logo -->
-            <a href="{{ route('dashboard') }}" class="brand-link">
-                <img src="{{ asset('images/logo.png') }}" alt="Duniatex Logo" class="brand-image"
-                    style="opacity: .8">
-                <span class="brand-text font-weight-bold">
-                    <span style="color: #000000;">DYEING DUNIATEX</span>
-                </span>
-            </a>
+            <!-- Brand Logo with Pushmenu Toggle -->
+            <div class="brand-link d-flex align-items-center justify-content-between pr-2">
+                <a href="{{ route('dashboard') }}" class="d-flex align-items-center text-dark"
+                    style="text-decoration: none;">
+                    <img src="{{ asset('images/logo.png') }}" alt="Duniatex Logo" class="brand-image"
+                        style="opacity: .8">
+                    <span class="brand-text font-weight-bold ml-1">
+                        <span style="color: #000000;">DYEING Duniatex</span>
+                    </span>
+                </a>
+                <a class="nav-link text-dark p-0" data-widget="pushmenu" href="#" role="button" title="Tutup Sidebar">
+                    <i class="fas fa-times fa-lg"></i>
+                </a>
+            </div>
 
             <!-- Sidebar -->
             <div class="sidebar">
@@ -279,115 +294,128 @@
                     <ul class="nav nav-pills nav-sidebar flex-column" data-widget="treeview" role="menu"
                         data-accordion="false">
                         @php
-                        $role = Auth::user()->role ?? null;
-                        $canDashboard = !in_array($role, ['aux', 'spv_listrik']); // Semua role bisa akses dashboard kecuali aux & spv_listrik
-                        $canApprovalFm = in_array($role, ['super_admin', 'fm', 'owner']);
-                        $canApprovalVp = in_array($role, ['super_admin', 'vp', 'owner']);
-                        $canApprovalKepalaShift = in_array($role, ['super_admin', 'kepala_shift']);
-                        $canUser = in_array($role, ['super_admin', 'owner']);
-                        $canMesin = in_array($role, ['super_admin', 'fm', 'vp', 'ppic', 'owner', 'spv_listrik', 'scm']);
-                        $canAux = in_array($role, ['super_admin', 'aux', 'owner', 'scm']);
-                        $canLog = in_array($role, ['super_admin', 'fm', 'vp']);
+                            $role = Auth::user()->role ?? null;
+                            $canDashboard = !in_array($role, ['aux', 'spv_listrik', 'dye_stuff']); // Semua role bisa akses dashboard kecuali aux, spv_listrik & dye_stuff
+                            $canApprovalFm = in_array($role, ['super_admin', 'fm', 'owner']);
+                            $canApprovalVp = in_array($role, ['super_admin', 'vp', 'owner']);
+                            $canApprovalKepalaShift = in_array($role, ['super_admin', 'kepala_shift']);
+                            $canUser = in_array($role, ['super_admin', 'owner']);
+                            $canMesin = in_array($role, ['super_admin', 'fm', 'vp', 'ppic', 'owner', 'spv_listrik', 'scm']);
+                            $canAux = in_array($role, ['super_admin', 'aux', 'owner', 'scm']);
+                            $canDyeStuff = in_array($role, ['super_admin', 'ds', 'dye_stuff', 'aux', 'ppic', 'scm', 'kepala_ruangan', 'operator', 'owner']);
+                            $canLog = in_array($role, ['super_admin', 'fm', 'vp']);
                         @endphp
 
                         @if ($canDashboard)
-                        <li class="nav-item">
-                            <a href="{{ route('dashboard') }}" class="nav-link">
-                                <i class="nav-icon fas fa-tachometer-alt"></i>
-                                <p>Dashboard</p>
-                            </a>
-                        </li>
+                            <li class="nav-item">
+                                <a href="{{ route('dashboard') }}" class="nav-link">
+                                    <i class="nav-icon fas fa-tachometer-alt"></i>
+                                    <p>Dashboard</p>
+                                </a>
+                            </li>
                         @endif
 
                         @if ($canApprovalFm || $canApprovalVp || $canApprovalKepalaShift)
-                        <li class="nav-header">APPROVAL</li>
-                        @if ($canApprovalFm)
-                        <li class="nav-item">
-                            <a href="{{ route('approval.fm') }}" class="nav-link">
-                                <i class="nav-icon fas fa-clipboard-check"></i>
-                                <p>
-                                    Approval FM
-                                    @if($pendingApprovalFM > 0)
-                                    <span class="badge badge-warning right">{{ $pendingApprovalFM }}</span>
-                                    @endif
-                                </p>
-                            </a>
-                        </li>
-                        @endif
-                        @if ($canApprovalVp)
-                        <li class="nav-item">
-                            <a href="{{ route('approval.vp') }}" class="nav-link">
-                                <i class="nav-icon fas fa-clipboard-check"></i>
-                                <p>
-                                    Approval VP
-                                    @if($pendingApprovalVP > 0)
-                                    <span class="badge badge-warning right">{{ $pendingApprovalVP }}</span>
-                                    @endif
-                                </p>
-                            </a>
-                        </li>
-                        @endif
-                        @if ($canApprovalKepalaShift)
-                        <li class="nav-item">
-                            <a href="{{ route('approval.kepala_shift') }}" class="nav-link">
-                                <i class="nav-icon fas fa-clipboard-check"></i>
-                                <p>
-                                    Approval Kepala Shift
-                                    @if($pendingApprovalKepalaShift > 0)
-                                    <span class="badge badge-warning right">{{ $pendingApprovalKepalaShift }}</span>
-                                    @endif
-                                </p>
-                            </a>
-                        </li>
-                        @endif
+                            <li class="nav-header">APPROVAL</li>
+                            @if ($canApprovalFm)
+                                <li class="nav-item">
+                                    <a href="{{ route('approval.fm') }}" class="nav-link">
+                                        <i class="nav-icon fas fa-clipboard-check"></i>
+                                        <p>
+                                            Approval FM
+                                            @if($pendingApprovalFM > 0)
+                                                <span class="badge badge-warning right">{{ $pendingApprovalFM }}</span>
+                                            @endif
+                                        </p>
+                                    </a>
+                                </li>
+                            @endif
+                            @if ($canApprovalVp)
+                                <li class="nav-item">
+                                    <a href="{{ route('approval.vp') }}" class="nav-link">
+                                        <i class="nav-icon fas fa-clipboard-check"></i>
+                                        <p>
+                                            Approval VP
+                                            @if($pendingApprovalVP > 0)
+                                                <span class="badge badge-warning right">{{ $pendingApprovalVP }}</span>
+                                            @endif
+                                        </p>
+                                    </a>
+                                </li>
+                            @endif
+                            @if ($canApprovalKepalaShift)
+                                <li class="nav-item">
+                                    <a href="{{ route('approval.kepala_shift') }}" class="nav-link">
+                                        <i class="nav-icon fas fa-clipboard-check"></i>
+                                        <p>
+                                            Approval Kepala Shift
+                                            @if($pendingApprovalKepalaShift > 0)
+                                                <span class="badge badge-warning right">{{ $pendingApprovalKepalaShift }}</span>
+                                            @endif
+                                        </p>
+                                    </a>
+                                </li>
+                            @endif
                         @endif
 
                         @if ($canUser)
-                        <li class="nav-header">USER</li>
-                        <li class="nav-item">
-                            <a href="{{ route('user.index') }}" class="nav-link">
-                                <i class="nav-icon fas fa-users"></i>
-                                <p>
-                                    Data User
-                                </p>
-                            </a>
-                        </li>
+                            <li class="nav-header">USER</li>
+                            <li class="nav-item">
+                                <a href="{{ route('user.index') }}" class="nav-link">
+                                    <i class="nav-icon fas fa-users"></i>
+                                    <p>
+                                        Data User
+                                    </p>
+                                </a>
+                            </li>
                         @endif
 
                         @if ($canMesin)
-                        <li class="nav-header">MASTER DATA</li>
-                        <li class="nav-item">
-                            <a href="{{ route('mesin.index') }}" class="nav-link">
-                                <i class="nav-icon fas fa-cogs"></i>
-                                <p>
-                                    Mesin
-                                </p>
-                            </a>
-                        </li>
+                            <li class="nav-header">MASTER DATA</li>
+                            <li class="nav-item">
+                                <a href="{{ route('mesin.index') }}" class="nav-link">
+                                    <i class="nav-icon fas fa-cogs"></i>
+                                    <p>
+                                        Mesin
+                                    </p>
+                                </a>
+                            </li>
                         @endif
 
-                        @if ($canAux)
-                        <li class="nav-header">KIMIA</li>
-                        <li class="nav-item">
-                            <a href="{{ route('aux.index') }}" class="nav-link">
-                                <i class="nav-icon fas fa-flask"></i>
-                                <p>
-                                    Auxiliary
-                                </p>
-                            </a>
-                        </li>
+                        @if ($canAux || $canDyeStuff)
+                            <li class="nav-header">KIMIA</li>
+                            @if ($canAux)
+                                <li class="nav-item">
+                                    <a href="{{ route('aux.index') }}" class="nav-link">
+                                        <i class="nav-icon fas fa-flask"></i>
+                                        <p>
+                                            Auxiliary
+                                        </p>
+                                    </a>
+                                </li>
+                            @endif
+                            @if ($canDyeStuff)
+                                <li class="nav-item">
+                                    <a href="{{ route('dye-stuff.index') }}" class="nav-link">
+                                        <i class="nav-icon fas fa-vials"></i>
+                                        <p>
+                                            Dye Stuff
+                                        </p>
+                                    </a>
+                                </li>
+                            @endif
                         @endif
 
                         @if ($canLog)
-                        <li class="nav-header">LAINNYA</li>
-                        <li class="nav-item">
-                            <a href="{{ route('activity-log.index') }}" class="nav-link">
-                                <i class="nav-icon fas fa-clipboard-list"></i>
-                                <p>
-                                    Log Activity
-                                </p>
-                            </a>
-                        </li>
+                            <li class="nav-header">LAINNYA</li>
+                            <li class="nav-item">
+                                <a href="{{ route('activity-log.index') }}" class="nav-link">
+                                    <i class="nav-icon fas fa-clipboard-list"></i>
+                                    <p>
+                                        Log Activity
+                                    </p>
+                                </a>
+                            </li>
                         @endif
 
 
@@ -449,7 +477,7 @@
         });
 
         // Update CSRF token setiap kali meta tag berubah (setelah logout/login)
-        $(document).ajaxComplete(function(event, xhr, settings) {
+        $(document).ajaxComplete(function (event, xhr, settings) {
             if (xhr.status === 419) {
                 $.ajaxSetup({
                     headers: {
@@ -480,14 +508,14 @@
         setInterval(updateDateTime, 1000);
 
         // Inisialisasi Select2
-        $(document).ready(function() {
+        $(document).ready(function () {
             $('.select2').select2();
         });
 
         // Inisialisasi DataTable (hanya jika ada table dengan id yang sesuai)
-        $(document).ready(function() {
+        $(document).ready(function () {
             const tableIds = ['#user', '#mesin', '#approval_fm', '#approval_vp', '#auxl', '#activity_log'];
-            tableIds.forEach(function(tableId) {
+            tableIds.forEach(function (tableId) {
                 if ($(tableId).length) {
                     $(tableId).DataTable({
                         paging: true,
@@ -504,10 +532,10 @@
         });
 
         // Fullscreen global button logic
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             const fsBtn = document.getElementById('global-fullscreen-btn');
             if (!fsBtn) return;
-            fsBtn.addEventListener('click', function(e) {
+            fsBtn.addEventListener('click', function (e) {
                 e.preventDefault();
                 if (!document.fullscreenElement) {
                     if (document.documentElement.requestFullscreen) {
@@ -527,88 +555,87 @@
                     }
                 }
             });
-        document.addEventListener('fullscreenchange', function() {
-            const isFullscreen = !!document.fullscreenElement;
-            const navbar = document.querySelector('.main-header.navbar');
-            const footer = document.querySelector('.main-footer');
-            const sidebar = document.querySelector('.main-sidebar');
+            document.addEventListener('fullscreenchange', function () {
+                const isFullscreen = !!document.fullscreenElement;
+                const navbar = document.querySelector('.main-header.navbar');
+                const footer = document.querySelector('.main-footer');
+                const sidebar = document.querySelector('.main-sidebar');
 
-            if (navbar) navbar.style.display = isFullscreen ? 'none' : '';
-            if (footer) footer.style.display = isFullscreen ? 'none' : '';
-            if (sidebar) sidebar.style.display = isFullscreen ? 'none' : '';
+                if (navbar) navbar.style.display = isFullscreen ? 'none' : '';
+                if (footer) footer.style.display = isFullscreen ? 'none' : '';
+                if (sidebar) sidebar.style.display = isFullscreen ? 'none' : '';
 
-            document.body.classList.toggle('fullscreen-active', isFullscreen);
+                document.body.classList.toggle('fullscreen-active', isFullscreen);
 
-            window.dispatchEvent(new CustomEvent('globalFullscreenToggle', {
-                detail: isFullscreen
-            }));
+                window.dispatchEvent(new CustomEvent('globalFullscreenToggle', {
+                    detail: isFullscreen
+                }));
+            });
+
+            document.addEventListener('webkitfullscreenchange', function () {
+                const isFullscreen = !!document.webkitFullscreenElement;
+                const navbar = document.querySelector('.main-header.navbar');
+                const footer = document.querySelector('.main-footer');
+                const sidebar = document.querySelector('.main-sidebar');
+
+                if (navbar) navbar.style.display = isFullscreen ? 'none' : '';
+                if (footer) footer.style.display = isFullscreen ? 'none' : '';
+                if (sidebar) sidebar.style.display = isFullscreen ? 'none' : '';
+
+                document.body.classList.toggle('fullscreen-active', isFullscreen);
+            });
         });
-
-        document.addEventListener('webkitfullscreenchange', function() {
-            const isFullscreen = !!document.webkitFullscreenElement;
-            const navbar = document.querySelector('.main-header.navbar');
-            const footer = document.querySelector('.main-footer');
-            const sidebar = document.querySelector('.main-sidebar');
-
-            if (navbar) navbar.style.display = isFullscreen ? 'none' : '';
-            if (footer) footer.style.display = isFullscreen ? 'none' : '';
-            if (sidebar) sidebar.style.display = isFullscreen ? 'none' : '';
-
-            document.body.classList.toggle('fullscreen-active', isFullscreen);
-        });
-    });
     </script>
 
     <script>
         @if(session('success'))
-        Swal.fire({
-            toast: true,
-            position: 'top-end',
-            icon: 'success',
-            title: {!! json_encode(session('success')) !!},
-            showConfirmButton: false,
-            timer: 8000,
-            timerProgressBar: true
-        });
+            Swal.fire({
+                toast: true,
+                position: 'top-end',
+                icon: 'success',
+                title: {!! json_encode(session('success')) !!},
+                showConfirmButton: false,
+                timer: 8000,
+                timerProgressBar: true
+            });
         @endif
         @if(session('error'))
-        Swal.fire({
-            toast: true,
-            position: 'top-end',
-            icon: 'error',
-            title: {!! json_encode(session('error')) !!},
-            showConfirmButton: true,
-            confirmButtonText: 'Tutup',
-            showCloseButton: true,
-            timer: undefined,
-            timerProgressBar: false
-        });
+            Swal.fire({
+                toast: true,
+                position: 'top-end',
+                icon: 'error',
+                title: {!! json_encode(session('error')) !!},
+                showConfirmButton: true,
+                confirmButtonText: 'Tutup',
+                showCloseButton: true,
+                timer: undefined,
+                timerProgressBar: false
+            });
         @endif
         @if(session('info'))
-        Swal.fire({
-            toast: true,
-            position: 'top-end',
-            icon: 'info',
-            title: {!! json_encode(session('info')) !!},
-            showConfirmButton: false,
-            timer: 8000,
-            timerProgressBar: true
-        });
+            Swal.fire({
+                toast: true,
+                position: 'top-end',
+                icon: 'info',
+                title: {!! json_encode(session('info')) !!},
+                showConfirmButton: false,
+                timer: 8000,
+                timerProgressBar: true
+            });
         @endif
 
-        {{-- Notifikasi error validasi (dari withErrors) --}}
         @if(isset($errors) && $errors->any())
-        Swal.fire({
-            toast: true,
-            position: 'top-end',
-            icon: 'error',
-            title: {!! json_encode($errors->count() > 1 ? $errors->first() . ' (dan ' . ($errors->count() - 1) . ' error lainnya)' : $errors->first()) !!},
-            showConfirmButton: true,
-            confirmButtonText: 'Tutup',
-            showCloseButton: true,
-            timer: undefined,
-            timerProgressBar: false
-        });
+            Swal.fire({
+                toast: true,
+                position: 'top-end',
+                icon: 'error',
+                title: {!! json_encode($errors->count() > 1 ? $errors->first() . ' (dan ' . ($errors->count() - 1) . ' error lainnya)' : $errors->first()) !!},
+                showConfirmButton: true,
+                confirmButtonText: 'Tutup',
+                showCloseButton: true,
+                timer: undefined,
+                timerProgressBar: false
+            });
         @endif
     </script>
 
