@@ -425,6 +425,34 @@ class ProsesController extends Controller
                     ->get();
 
                 if ($jenisProses === 'Reproses') {
+                    $produksis = $existingDetails->filter(function ($d) {
+                        return $d->proses && $d->proses->jenis === 'Produksi';
+                    });
+
+                    if ($produksis->isEmpty()) {
+                        return back()
+                            ->withInput()
+                            ->withErrors([
+                                "details.$index.no_partai" =>
+                                    "Kombinasi No OP \"{$noOp}\" + No Partai \"{$noPartai}\" belum pernah melalui proses Produksi. " .
+                                    "Reproses hanya dapat dibuat jika sudah ada proses Produksi sebelumnya.",
+                            ]);
+                    }
+
+                    $hasCompletedProduksi = $produksis->contains(function ($d) {
+                        return $d->proses && $d->proses->selesai !== null;
+                    });
+
+                    if (!$hasCompletedProduksi) {
+                        return back()
+                            ->withInput()
+                            ->withErrors([
+                                "details.$index.no_partai" =>
+                                    "Proses Produksi untuk kombinasi No OP \"{$noOp}\" + No Partai \"{$noPartai}\" belum selesai. " .
+                                    "Reproses baru dapat dibuat setelah proses Produksi selesai.",
+                            ]);
+                    }
+
                     foreach ($existingDetails as $existingDetail) {
                         $proses = $existingDetail->proses;
                         if ($proses && $proses->selesai === null) {
@@ -433,21 +461,6 @@ class ProsesController extends Controller
                                 ->withErrors([
                                     "details.$index.no_partai" =>
                                         "Kombinasi No OP '$noOp' + No Partai '$noPartai' tidak dapat digunakan untuk Reproses karena masih ada proses yang berjalan / belum selesai.",
-                                ]);
-                        }
-                    }
-                    // Mode Greige - Reproses: No OP & No Partai harus pernah dipakai pada jenis proses Produksi
-                    if ($mode === 'greige') {
-                        $pernahProduksi = $existingDetails->contains(function ($d) {
-                            return $d->proses && $d->proses->jenis === 'Produksi';
-                        });
-                        if (!$pernahProduksi) {
-                            return back()
-                                ->withInput()
-                                ->withErrors([
-                                    "details.$index.no_partai" =>
-                                        "Kombinasi No OP \"{$noOp}\" + No Partai \"{$noPartai}\" belum pernah dipakai pada jenis proses Produksi. " .
-                                        "Reproses hanya dapat dibuat untuk Detail OP yang pernah dipakai di Produksi.",
                                 ]);
                         }
                     }
@@ -707,6 +720,35 @@ class ProsesController extends Controller
         }
 
         if ($jenis === 'Reproses') {
+            if ($existing->isEmpty()) {
+                return response()->json([
+                    'ok' => false,
+                    'message' => "Kombinasi No OP \"{$noOp}\" + No Partai \"{$noPartai}\" belum pernah melalui proses Produksi. Reproses hanya dapat dibuat jika sudah ada proses Produksi sebelumnya.",
+                ]);
+            }
+
+            $produksis = $existing->filter(function ($d) {
+                return $d->proses && $d->proses->jenis === 'Produksi';
+            });
+
+            if ($produksis->isEmpty()) {
+                return response()->json([
+                    'ok' => false,
+                    'message' => "Kombinasi No OP \"{$noOp}\" + No Partai \"{$noPartai}\" belum pernah melalui proses Produksi. Reproses hanya dapat dibuat jika sudah ada proses Produksi sebelumnya.",
+                ]);
+            }
+
+            $hasCompletedProduksi = $produksis->contains(function ($d) {
+                return $d->proses && $d->proses->selesai !== null;
+            });
+
+            if (!$hasCompletedProduksi) {
+                return response()->json([
+                    'ok' => false,
+                    'message' => "Proses Produksi untuk kombinasi No OP \"{$noOp}\" + No Partai \"{$noPartai}\" belum selesai. Reproses baru dapat dibuat setelah proses Produksi selesai.",
+                ]);
+            }
+
             foreach ($existing as $d) {
                 $p = $d->proses;
                 if ($p && $p->selesai === null) {
