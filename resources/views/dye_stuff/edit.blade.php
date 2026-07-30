@@ -62,12 +62,12 @@
                                     <select name="proses_id" id="proses_id" class="form-control select2" required>
                                         <option value="" disabled>-- Pilih Planning Proses --</option>
                                         @if(isset($prosesRunning) && $prosesRunning->isNotEmpty())
-                                            <optgroup label="⚡ --- Sedang Berjalan ---">
+                                             <optgroup label="⚡ --- Sedang Berjalan ---">
                                                 @foreach ($prosesRunning as $p)
                                                     @php $f = optional($p->details)->first(); @endphp
                                                     <option value="{{ $p->id }}" {{ old('proses_id', $dyeStuff->proses_id) == $p->id ? 'selected' : '' }}>
                                                         [Berjalan] OP: {{ $f->no_op ?? '-' }} | Partai: {{ $f->no_partai ?? '-' }} |
-                                                        Mesin: {{ optional($p->mesin)->jenis_mesin ?? '-' }} (Normal: {{ $p->normal_dyestuff_count }}/{{ $p->qty_dye_stuff ?? 1 }}{{ $p->normal_dyestuff_count >= ($p->qty_dye_stuff ?? 1) ? ' - Penuh' : '' }})
+                                                        Mesin: {{ optional($p->mesin)->jenis_mesin ?? '-' }} (Normal: {{ $p->normal_dyestuff_count }}/{{ $p->qty_dye_stuff ?? 0 }}{{ $p->normal_dyestuff_count >= ($p->qty_dye_stuff ?? 0) ? ' - Penuh' : '' }})
                                                     </option>
                                                 @endforeach
                                             </optgroup>
@@ -79,9 +79,9 @@
                                                     @php $f = optional($p->details)->first(); @endphp
                                                     <option value="{{ $p->id }}" {{ old('proses_id', $dyeStuff->proses_id) == $p->id ? 'selected' : '' }}>
                                                         [Belum Berjalan] OP: {{ $f->no_op ?? '-' }} | Partai:
-                                                        {{ $f->no_partai ?? '-' }} | Customer: {{ $f->customer ?? '-' }} (Normal: {{ $p->normal_dyestuff_count }}/{{ $p->qty_dye_stuff ?? 1 }}{{ $p->normal_dyestuff_count >= ($p->qty_dye_stuff ?? 1) ? ' - Penuh' : '' }})
+                                                        {{ $f->no_partai ?? '-' }} | Customer: {{ $f->customer ?? '-' }} (Normal: {{ $p->normal_dyestuff_count }}/{{ $p->qty_dye_stuff ?? 0 }}{{ $p->normal_dyestuff_count >= ($p->qty_dye_stuff ?? 0) ? ' - Penuh' : '' }})
                                                     </option>
-                                                @endforeach
+                                                @endforeacheach
                                             </optgroup>
                                         @endif
                                     </select>

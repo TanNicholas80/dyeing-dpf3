@@ -66,7 +66,7 @@
                                                     @php $f = optional($p->details)->first(); @endphp
                                                     <option value="{{ $p->id }}" {{ old('proses_id') == $p->id ? 'selected' : '' }}>
                                                         [Berjalan] OP: {{ $f->no_op ?? '-' }} | Partai: {{ $f->no_partai ?? '-' }} |
-                                                        Mesin: {{ optional($p->mesin)->jenis_mesin ?? '-' }} (Normal: {{ $p->normal_dyestuff_count }}/{{ $p->qty_dye_stuff ?? 1 }}{{ $p->normal_dyestuff_count >= ($p->qty_dye_stuff ?? 1) ? ' - Penuh' : '' }})
+                                                        Mesin: {{ optional($p->mesin)->jenis_mesin ?? '-' }} (Normal: {{ $p->normal_dyestuff_count }}/{{ $p->qty_dye_stuff ?? 0 }}{{ $p->normal_dyestuff_count >= ($p->qty_dye_stuff ?? 0) ? ' - Penuh' : '' }})
                                                     </option>
                                                 @endforeach
                                             </optgroup>
@@ -78,7 +78,7 @@
                                                     @php $f = optional($p->details)->first(); @endphp
                                                     <option value="{{ $p->id }}" {{ old('proses_id') == $p->id ? 'selected' : '' }}>
                                                         [Belum Berjalan] OP: {{ $f->no_op ?? '-' }} | Partai:
-                                                        {{ $f->no_partai ?? '-' }} | Customer: {{ $f->customer ?? '-' }} (Normal: {{ $p->normal_dyestuff_count }}/{{ $p->qty_dye_stuff ?? 1 }}{{ $p->normal_dyestuff_count >= ($p->qty_dye_stuff ?? 1) ? ' - Penuh' : '' }})
+                                                        {{ $f->no_partai ?? '-' }} | Customer: {{ $f->customer ?? '-' }} (Normal: {{ $p->normal_dyestuff_count }}/{{ $p->qty_dye_stuff ?? 0 }}{{ $p->normal_dyestuff_count >= ($p->qty_dye_stuff ?? 0) ? ' - Penuh' : '' }})
                                                     </option>
                                                 @endforeach
                                             </optgroup>

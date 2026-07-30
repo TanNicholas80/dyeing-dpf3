@@ -544,7 +544,7 @@ class ApiCheckStatusBarcodeController extends Controller
             ->where('status', 'approved')
             ->whereHas('barcodeLas', fn($q) => $q->where('cancel', false))
             ->count();
-        $laComplete = ($laInitialScanned + $laToppingScanned) >= (($proses->qty_dye_stuff ?? 1) + $laToppingRequired);
+        $laComplete = ($laInitialScanned + $laToppingScanned) >= (($proses->qty_dye_stuff ?? 0) + $laToppingRequired);
 
         $auxInitialScanned = BarcodeAux::whereHas('detailProses', fn($q) => $q->where('proses_id', $proses->id))
             ->whereNull('approval_id')
@@ -561,7 +561,7 @@ class ApiCheckStatusBarcodeController extends Controller
             ->where('status', 'approved')
             ->whereHas('barcodeAuxs', fn($q) => $q->where('cancel', false))
             ->count();
-        $auxComplete = ($auxInitialScanned + $auxToppingScanned) >= (($proses->qty_aux ?? 1) + $auxToppingRequired);
+        $auxComplete = ($auxInitialScanned + $auxToppingScanned) >= (($proses->qty_aux ?? 0) + $auxToppingRequired);
 
         return $kainIncomplete || !$laComplete || !$auxComplete;
     }
@@ -589,7 +589,7 @@ class ApiCheckStatusBarcodeController extends Controller
             ->where('status', 'approved')
             ->whereHas('barcodeLas', fn($q) => $q->where('cancel', false))
             ->count();
-        $laRequired = ($proses->qty_dye_stuff ?? 1) + $laToppingRequired;
+        $laRequired = ($proses->qty_dye_stuff ?? 0) + $laToppingRequired;
         $laScanned = $laInitialScanned + $laToppingScanned;
         $laComplete = $laScanned >= $laRequired;
 
@@ -608,7 +608,7 @@ class ApiCheckStatusBarcodeController extends Controller
             ->where('status', 'approved')
             ->whereHas('barcodeAuxs', fn($q) => $q->where('cancel', false))
             ->count();
-        $auxRequired = ($proses->qty_aux ?? 1) + $auxToppingRequired;
+        $auxRequired = ($proses->qty_aux ?? 0) + $auxToppingRequired;
         $auxScanned = $auxInitialScanned + $auxToppingScanned;
         $auxComplete = $auxScanned >= $auxRequired;
 

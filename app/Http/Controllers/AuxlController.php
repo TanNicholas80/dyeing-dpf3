@@ -69,6 +69,7 @@ class AuxlController extends Controller
                 $q->where('tipe', 'normal');
             }])
             ->whereNull('selesai')
+            ->where('qty_aux', '>', 0)
             ->orderByDesc('created_at')
             ->get();
 
@@ -103,7 +104,12 @@ class AuxlController extends Controller
         ]);
 
         $proses = Proses::findOrFail($data['proses_id']);
-        $maxQty = (int) ($proses->qty_aux ?? 1);
+        $maxQty = (int) ($proses->qty_aux ?? 0);
+        if ($data['tipe'] === 'normal' && $maxQty < 1) {
+            return back()->withInput()->withErrors([
+                'proses_id' => 'Proses ini memiliki QTY AUX = 0 (tidak memerlukan AUX Normal).'
+            ]);
+        }
         if ($maxQty < 1) {
             $maxQty = 1;
         }
@@ -206,6 +212,9 @@ class AuxlController extends Controller
                 $q->where('tipe', 'normal')->where('id', '!=', $id);
             }])
             ->whereNull('selesai')
+            ->where(function ($q) use ($auxl) {
+                $q->where('qty_aux', '>', 0)->orWhere('id', $auxl->proses_id);
+            })
             ->orderByDesc('created_at')
             ->get();
 
@@ -241,7 +250,12 @@ class AuxlController extends Controller
 
         $auxl = Auxl::findOrFail($id);
         $proses = Proses::findOrFail($data['proses_id']);
-        $maxQty = (int) ($proses->qty_aux ?? 1);
+        $maxQty = (int) ($proses->qty_aux ?? 0);
+        if ($data['tipe'] === 'normal' && $maxQty < 1) {
+            return back()->withInput()->withErrors([
+                'proses_id' => 'Proses ini memiliki QTY AUX = 0 (tidak memerlukan AUX Normal).'
+            ]);
+        }
         if ($maxQty < 1) {
             $maxQty = 1;
         }

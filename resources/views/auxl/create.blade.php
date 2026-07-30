@@ -65,7 +65,7 @@
                                                     @php $f = optional($p->details)->first(); @endphp
                                                     <option value="{{ $p->id }}" {{ old('proses_id') == $p->id ? 'selected' : '' }}>
                                                         [Berjalan] OP: {{ $f->no_op ?? '-' }} | Partai: {{ $f->no_partai ?? '-' }} |
-                                                        Mesin: {{ optional($p->mesin)->jenis_mesin ?? '-' }} (Normal: {{ $p->normal_aux_count }}/{{ $p->qty_aux ?? 1 }}{{ $p->normal_aux_count >= ($p->qty_aux ?? 1) ? ' - Penuh' : '' }})
+                                                        Mesin: {{ optional($p->mesin)->jenis_mesin ?? '-' }} (Normal: {{ $p->normal_aux_count }}/{{ $p->qty_aux ?? 0 }}{{ $p->normal_aux_count >= ($p->qty_aux ?? 0) ? ' - Penuh' : '' }})
                                                     </option>
                                                 @endforeach
                                             </optgroup>
@@ -76,7 +76,7 @@
                                                 @foreach ($prosesPending as $p)
                                                     @php $f = optional($p->details)->first(); @endphp
                                                     <option value="{{ $p->id }}" {{ old('proses_id') == $p->id ? 'selected' : '' }}>
-                                                        [Belum Berjalan] OP: {{ $f->no_op ?? '-' }} | Partai: {{ $f->no_partai ?? '-' }} | Customer: {{ $f->customer ?? '-' }} (Normal: {{ $p->normal_aux_count }}/{{ $p->qty_aux ?? 1 }}{{ $p->normal_aux_count >= ($p->qty_aux ?? 1) ? ' - Penuh' : '' }})
+                                                        [Belum Berjalan] OP: {{ $f->no_op ?? '-' }} | Partai: {{ $f->no_partai ?? '-' }} | Customer: {{ $f->customer ?? '-' }} (Normal: {{ $p->normal_aux_count }}/{{ $p->qty_aux ?? 0 }}{{ $p->normal_aux_count >= ($p->qty_aux ?? 0) ? ' - Penuh' : '' }})
                                                     </option>
                                                 @endforeach
                                             </optgroup>

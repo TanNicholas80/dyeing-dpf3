@@ -97,12 +97,12 @@ class ProsesStatusService
                 $hasBarcodeKain = $hasBarcodeKain && $detailHasKain;
                 
                 if ($detail->barcodeLas) {
-                    $detailHasLa = $detail->barcodeLas->where('cancel', false)->where('approval_id', null)->count() >= ($proses->qty_dye_stuff ?? 1);
+                    $detailHasLa = $detail->barcodeLas->where('cancel', false)->where('approval_id', null)->count() >= ($proses->qty_dye_stuff ?? 0);
                 }
                 $hasBarcodeLa = $hasBarcodeLa && $detailHasLa;
 
                 if ($detail->barcodeAuxs) {
-                    $detailHasAux = $detail->barcodeAuxs->where('cancel', false)->where('approval_id', null)->count() >= ($proses->qty_aux ?? 1);
+                    $detailHasAux = $detail->barcodeAuxs->where('cancel', false)->where('approval_id', null)->count() >= ($proses->qty_aux ?? 0);
                 }
                 $hasBarcodeAux = $hasBarcodeAux && $detailHasAux;
                 
@@ -158,11 +158,11 @@ class ProsesStatusService
                 }
 
                 $laComplete = $proses->details && $proses->details->isNotEmpty()
-                    ? $proses->details->every(fn($d) => ($d->barcodeLas ? $d->barcodeLas->where('cancel', false)->count() : 0) >= (($proses->qty_dye_stuff ?? 1) + $laToppingRequired))
+                    ? $proses->details->every(fn($d) => ($d->barcodeLas ? $d->barcodeLas->where('cancel', false)->count() : 0) >= (($proses->qty_dye_stuff ?? 0) + $laToppingRequired))
                     : false;
 
                 $auxComplete = $proses->details && $proses->details->isNotEmpty()
-                    ? $proses->details->every(fn($d) => ($d->barcodeAuxs ? $d->barcodeAuxs->where('cancel', false)->count() : 0) >= (($proses->qty_aux ?? 1) + $auxToppingRequired))
+                    ? $proses->details->every(fn($d) => ($d->barcodeAuxs ? $d->barcodeAuxs->where('cancel', false)->count() : 0) >= (($proses->qty_aux ?? 0) + $auxToppingRequired))
                     : false;
                 $barcodeKainOptional = $proses->isBarcodeKainOptionalForLaAux();
                 if ($proses->jenis !== 'Maintenance') {
@@ -216,19 +216,19 @@ class ProsesStatusService
             $auxToppingRequired = collect($proses->approvals)->where('action', 'topping_aux')->where('status', 'approved')->count();
 
             $laComplete = $proses->details && $proses->details->isNotEmpty()
-                ? $proses->details->every(fn($d) => ($d->barcodeLas ? $d->barcodeLas->where('cancel', false)->count() : 0) >= (($proses->qty_dye_stuff ?? 1) + $laToppingRequired))
+                ? $proses->details->every(fn($d) => ($d->barcodeLas ? $d->barcodeLas->where('cancel', false)->count() : 0) >= (($proses->qty_dye_stuff ?? 0) + $laToppingRequired))
                 : false;
 
             $auxComplete = $proses->details && $proses->details->isNotEmpty()
-                ? $proses->details->every(fn($d) => ($d->barcodeAuxs ? $d->barcodeAuxs->where('cancel', false)->count() : 0) >= (($proses->qty_aux ?? 1) + $auxToppingRequired))
+                ? $proses->details->every(fn($d) => ($d->barcodeAuxs ? $d->barcodeAuxs->where('cancel', false)->count() : 0) >= (($proses->qty_aux ?? 0) + $auxToppingRequired))
                 : false;
 
             $laInitialComplete = $proses->details && $proses->details->isNotEmpty()
-                ? $proses->details->every(fn($d) => $d->barcodeLas && $d->barcodeLas->where('cancel', false)->where('approval_id', null)->count() >= ($proses->qty_dye_stuff ?? 1))
+                ? $proses->details->every(fn($d) => $d->barcodeLas && $d->barcodeLas->where('cancel', false)->where('approval_id', null)->count() >= ($proses->qty_dye_stuff ?? 0))
                 : false;
 
             $auxInitialComplete = $proses->details && $proses->details->isNotEmpty()
-                ? $proses->details->every(fn($d) => $d->barcodeAuxs && $d->barcodeAuxs->where('cancel', false)->where('approval_id', null)->count() >= ($proses->qty_aux ?? 1))
+                ? $proses->details->every(fn($d) => $d->barcodeAuxs && $d->barcodeAuxs->where('cancel', false)->where('approval_id', null)->count() >= ($proses->qty_aux ?? 0))
                 : false;
         } else {
             $laInitialComplete = $hasBarcodeLa ?? false;

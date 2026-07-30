@@ -619,10 +619,10 @@
                                                                     // G: hijau hanya jika SEMUA detail OP sudah memenuhi barcode kain >= roll
                                                                     $allKainComplete = true;
                                                                     $hasBarcodeLa = isset($proses->details) && $proses->details->isNotEmpty()
-                                                                        ? $proses->details->every(fn($d) => $d->barcodeLas && $d->barcodeLas->where('cancel', false)->where('approval_id', null)->count() >= ($proses->qty_dye_stuff ?? 1))
+                                                                        ? $proses->details->every(fn($d) => $d->barcodeLas && $d->barcodeLas->where('cancel', false)->where('approval_id', null)->count() >= ($proses->qty_dye_stuff ?? 0))
                                                                         : false;
                                                                     $hasBarcodeAux = isset($proses->details) && $proses->details->isNotEmpty()
-                                                                        ? $proses->details->every(fn($d) => $d->barcodeAuxs && $d->barcodeAuxs->where('cancel', false)->where('approval_id', null)->count() >= ($proses->qty_aux ?? 1))
+                                                                        ? $proses->details->every(fn($d) => $d->barcodeAuxs && $d->barcodeAuxs->where('cancel', false)->where('approval_id', null)->count() >= ($proses->qty_aux ?? 0))
                                                                         : false;
 
                                                                     if (isset($proses->details) && is_iterable($proses->details)) {
@@ -731,10 +731,10 @@
                                                                     $auxInitialScanned = isset($proses->details) && $proses->details->isNotEmpty()
                                                                         ? $proses->details->flatMap(fn($d) => $d->barcodeAuxs ?? [])->where('cancel', false)->where('approval_id', null)->pluck('barcode')->unique()->count()
                                                                         : 0;
-                                                                    $laComplete = ($laInitialScanned + $laToppingScanned) >= (($proses->qty_dye_stuff ?? 1) + $laToppingRequired);
-                                                                    $auxComplete = ($auxInitialScanned + $auxToppingScanned) >= (($proses->qty_aux ?? 1) + $auxToppingRequired);
-                                                                    $laInitialComplete = $laInitialScanned >= ($proses->qty_dye_stuff ?? 1);
-                                                                    $auxInitialComplete = $auxInitialScanned >= ($proses->qty_aux ?? 1);
+                                                                    $laComplete = ($laInitialScanned + $laToppingScanned) >= (($proses->qty_dye_stuff ?? 0) + $laToppingRequired);
+                                                                    $auxComplete = ($auxInitialScanned + $auxToppingScanned) >= (($proses->qty_aux ?? 0) + $auxToppingRequired);
+                                                                    $laInitialComplete = $laInitialScanned >= ($proses->qty_dye_stuff ?? 0);
+                                                                    $auxInitialComplete = $auxInitialScanned >= ($proses->qty_aux ?? 0);
                                                                     if ($barcodeKainOptional) {
                                                                         $blockColors = [$laInitialComplete ? 'green' : 'red', $auxInitialComplete ? 'green' : 'red'];
                                                                     } else {
@@ -1301,8 +1301,8 @@
                                 <div class="col-md-6 hide-if-maintenance">
                                     <div class="form-group">
                                         <label class="form-label fw-semibold">Dye Stuff</label>
-                                        <select name="qty_dye_stuff" id="qty_dye_stuff" class="form-control" required>
-                                            <option value="" disabled selected>-- Pilih --</option>
+                                        <select name="qty_dye_stuff" id="qty_dye_stuff" class="form-control">
+                                            <option value="0" selected>0 (Tidak Ada)</option>
                                             <option value="1">1</option>
                                             <option value="2">2</option>
                                             <option value="3">3</option>
@@ -1314,8 +1314,8 @@
                                 <div class="col-md-6 hide-if-maintenance">
                                     <div class="form-group">
                                         <label class="form-label fw-semibold">AUX</label>
-                                        <select name="qty_aux" id="qty_aux" class="form-control" required>
-                                            <option value="" disabled selected>-- Pilih --</option>
+                                        <select name="qty_aux" id="qty_aux" class="form-control">
+                                            <option value="0" selected>0 (Tidak Ada)</option>
                                             <option value="1">1</option>
                                             <option value="2">2</option>
                                             <option value="3">3</option>
@@ -3702,13 +3702,15 @@
 
                         // Progress LA: keterangan kebutuhan awal + topping
                         const laProgress = data.la_progress || {};
-                        const laReq = laProgress.required ?? 1;
+                        const laReq = laProgress.required ?? 0;
                         const laScn = laProgress.scanned ?? 0;
                         const laComplete = laProgress.is_complete === true;
                         const laToppingReq = laProgress.topping_required ?? 0;
-                        const laInitialReq = laProgress.initial_required ?? 1;
+                        const laInitialReq = laProgress.initial_required ?? 0;
                         let laProgressHtml = '';
-                        if (laToppingReq > 0) {
+                        if (laInitialReq === 0 && laToppingReq === 0) {
+                            laProgressHtml = `Kebutuhan: 0 awal (Tidak Memerlukan Scanning) | <span style="color:#43a047;"><i class="fas fa-check"></i> Lengkap</span>`;
+                        } else if (laToppingReq > 0) {
                             laProgressHtml = `Kebutuhan: ${laInitialReq} awal + ${laToppingReq} topping (TD) = ${laReq} total | Sudah: ${laScn} | ${laComplete ? '<span style="color:#43a047;"><i class="fas fa-check"></i> Lengkap</span>' : '<span style="color:#c62828;">Kurang: ' + (laReq - laScn) + '</span>'}`;
                         } else {
                             laProgressHtml = `Kebutuhan: ${laInitialReq} awal | Sudah: ${laScn} | ${laComplete ? '<span style="color:#43a047;"><i class="fas fa-check"></i> Lengkap</span>' : '<span style="color:#c62828;">Kurang: ' + (laInitialReq - laScn) + '</span>'}`;
@@ -3733,13 +3735,15 @@
 
                         // Progress AUX: keterangan kebutuhan awal + topping
                         const auxProgress = data.aux_progress || {};
-                        const auxReq = auxProgress.required ?? 1;
+                        const auxReq = auxProgress.required ?? 0;
                         const auxScn = auxProgress.scanned ?? 0;
                         const auxComplete = auxProgress.is_complete === true;
                         const auxToppingReq = auxProgress.topping_required ?? 0;
-                        const auxInitialReq = auxProgress.initial_required ?? 1;
+                        const auxInitialReq = auxProgress.initial_required ?? 0;
                         let auxProgressHtml = '';
-                        if (auxToppingReq > 0) {
+                        if (auxInitialReq === 0 && auxToppingReq === 0) {
+                            auxProgressHtml = `Kebutuhan: 0 awal (Tidak Memerlukan Scanning) | <span style="color:#43a047;"><i class="fas fa-check"></i> Lengkap</span>`;
+                        } else if (auxToppingReq > 0) {
                             auxProgressHtml = `Kebutuhan: ${auxInitialReq} awal + ${auxToppingReq} topping (TA) = ${auxReq} total | Sudah: ${auxScn} | ${auxComplete ? '<span style="color:#43a047;"><i class="fas fa-check"></i> Lengkap</span>' : '<span style="color:#c62828;">Kurang: ' + (auxReq - auxScn) + '</span>'}`;
                         } else {
                             auxProgressHtml = `Kebutuhan: ${auxInitialReq} awal | Sudah: ${auxScn} | ${auxComplete ? '<span style="color:#43a047;"><i class="fas fa-check"></i> Lengkap</span>' : '<span style="color:#c62828;">Kurang: ' + (auxInitialReq - auxScn) + '</span>'}`;
@@ -3870,8 +3874,8 @@
                         const hasKainActiveGlobal = data.can_scan_la_aux === true;
                         const laProgGlobal = data.la_progress || {};
                         const auxProgGlobal = data.aux_progress || {};
-                        const hasLaActiveGlobal = laProgGlobal.initial_is_complete !== undefined ? laProgGlobal.initial_is_complete : (laProgGlobal.initial_scanned >= (laProgGlobal.initial_required || 1));
-                        const hasAuxActiveGlobal = auxProgGlobal.initial_is_complete !== undefined ? auxProgGlobal.initial_is_complete : (auxProgGlobal.initial_scanned >= (auxProgGlobal.initial_required || 1));
+                        const hasLaActiveGlobal = laProgGlobal.initial_is_complete !== undefined ? laProgGlobal.initial_is_complete : (laProgGlobal.initial_scanned >= (laProgGlobal.initial_required !== undefined ? laProgGlobal.initial_required : 0));
+                        const hasAuxActiveGlobal = auxProgGlobal.initial_is_complete !== undefined ? auxProgGlobal.initial_is_complete : (auxProgGlobal.initial_scanned >= (auxProgGlobal.initial_required !== undefined ? auxProgGlobal.initial_required : 0));
                         window.updateGDAIndicators(proses.id, selectedDetailId, hasKainActiveGlobal, hasLaActiveGlobal, hasAuxActiveGlobal);
                     },
                     error: function () {
@@ -5400,16 +5404,20 @@
                         $('#barcode-aux-buttons').html(auxBtnsLocal);
 
                         // Progress LA & AUX rendering
-                        const laInitialReqLocal = laProgressLocal.initial_required ?? 1;
-                        let laProgressHtmlLocal = laToppingReqLocal > 0 ?
+                        const laInitialReqLocal = laProgressLocal.initial_required ?? 0;
+                        let laProgressHtmlLocal = (laInitialReqLocal === 0 && laToppingReqLocal === 0) ?
+                            'Kebutuhan: 0 awal (Tidak Memerlukan Scanning) | <span style="color:#43a047;"><i class="fas fa-check"></i> Lengkap</span>' :
+                            (laToppingReqLocal > 0 ?
                             'Kebutuhan: ' + laInitialReqLocal + ' awal + ' + laToppingReqLocal + ' topping (TD) = ' + laReqLocal + ' total | Sudah: ' + laScnLocal + ' | ' + (laCompleteLocal ? '<span style="color:#43a047;"><i class="fas fa-check"></i> Lengkap</span>' : '<span style="color:#c62828;">Kurang: ' + (laReqLocal - laScnLocal) + '</span>') :
-                            'Kebutuhan: ' + laInitialReqLocal + ' awal | Sudah: ' + laScnLocal + ' | ' + (laCompleteLocal ? '<span style="color:#43a047;"><i class="fas fa-check"></i> Lengkap</span>' : '<span style="color:#c62828;">Kurang: ' + (laInitialReqLocal - laScnLocal) + '</span>');
+                            'Kebutuhan: ' + laInitialReqLocal + ' awal | Sudah: ' + laScnLocal + ' | ' + (laCompleteLocal ? '<span style="color:#43a047;"><i class="fas fa-check"></i> Lengkap</span>' : '<span style="color:#c62828;">Kurang: ' + (laInitialReqLocal - laScnLocal) + '</span>'));
                         $('#barcode-la-progress').html('<div style="padding:4px 8px;background:' + (laCompleteLocal ? '#e8f5e9' : '#fff3e0') + ';border-radius:4px;">' + laProgressHtmlLocal + '</div>').show();
 
-                        const auxInitialReqLocal = auxProgressLocal.initial_required ?? 1;
-                        let auxProgressHtmlLocal = auxToppingReqLocal > 0 ?
+                        const auxInitialReqLocal = auxProgressLocal.initial_required ?? 0;
+                        let auxProgressHtmlLocal = (auxInitialReqLocal === 0 && auxToppingReqLocal === 0) ?
+                            'Kebutuhan: 0 awal (Tidak Memerlukan Scanning) | <span style="color:#43a047;"><i class="fas fa-check"></i> Lengkap</span>' :
+                            (auxToppingReqLocal > 0 ?
                             'Kebutuhan: ' + auxInitialReqLocal + ' awal + ' + auxToppingReqLocal + ' topping (TA) = ' + auxReqLocal + ' total | Sudah: ' + auxScnLocal + ' | ' + (auxCompleteLocal ? '<span style="color:#43a047;"><i class="fas fa-check"></i> Lengkap</span>' : '<span style="color:#c62828;">Kurang: ' + (auxReqLocal - auxScnLocal) + '</span>') :
-                            'Kebutuhan: ' + auxInitialReqLocal + ' awal | Sudah: ' + auxScnLocal + ' | ' + (auxCompleteLocal ? '<span style="color:#43a047;"><i class="fas fa-check"></i> Lengkap</span>' : '<span style="color:#c62828;">Kurang: ' + (auxInitialReqLocal - auxScnLocal) + '</span>');
+                            'Kebutuhan: ' + auxInitialReqLocal + ' awal | Sudah: ' + auxScnLocal + ' | ' + (auxCompleteLocal ? '<span style="color:#43a047;"><i class="fas fa-check"></i> Lengkap</span>' : '<span style="color:#c62828;">Kurang: ' + (auxInitialReqLocal - auxScnLocal) + '</span>'));
                         $('#barcode-aux-progress').html('<div style="padding:4px 8px;background:' + (auxCompleteLocal ? '#e8f5e9' : '#fff3e0') + ';border-radius:4px;">' + auxProgressHtmlLocal + '</div>').show();
 
                         const selectedProgress = data.barcode_kain_progress || [];
@@ -5456,8 +5464,8 @@
                         const hasKainActiveGlobal = data.can_scan_la_aux === true;
                         const laProgGlobal = data.la_progress || {};
                         const auxProgGlobal = data.aux_progress || {};
-                        const hasLaActiveGlobal = laProgGlobal.initial_is_complete !== undefined ? laProgGlobal.initial_is_complete : (laProgGlobal.initial_scanned >= (laProgGlobal.initial_required || 1));
-                        const hasAuxActiveGlobal = auxProgGlobal.initial_is_complete !== undefined ? auxProgGlobal.initial_is_complete : (auxProgGlobal.initial_scanned >= (auxProgGlobal.initial_required || 1));
+                        const hasLaActiveGlobal = laProgGlobal.initial_is_complete !== undefined ? laProgGlobal.initial_is_complete : (laProgGlobal.initial_scanned >= (laProgGlobal.initial_required !== undefined ? laProgGlobal.initial_required : 0));
+                        const hasAuxActiveGlobal = auxProgGlobal.initial_is_complete !== undefined ? auxProgGlobal.initial_is_complete : (auxProgGlobal.initial_scanned >= (auxProgGlobal.initial_required !== undefined ? auxProgGlobal.initial_required : 0));
                         window.updateGDAIndicators(prosesId, selectedDetailId, hasKainActiveGlobal, hasLaActiveGlobal, hasAuxActiveGlobal);
                     },
                     error: function () {

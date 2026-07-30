@@ -298,8 +298,8 @@ class ProsesController extends Controller
         }
 
         if ($request->jenis !== 'Maintenance') {
-            $rules['qty_dye_stuff'] = 'required|integer|in:1,2,3';
-            $rules['qty_aux'] = 'required|integer|in:1,2,3';
+            $rules['qty_dye_stuff'] = 'nullable|integer|in:0,1,2,3';
+            $rules['qty_aux'] = 'nullable|integer|in:0,1,2,3';
             $rules += [
                 'jenis_op' => 'required|in:Single,Multiple',
                 // Default: minimal 1 detail OP
@@ -509,8 +509,8 @@ class ProsesController extends Controller
                 'mode' => $validated['mode'] ?? 'greige',
                 'jenis_op' => $validated['jenis_op'] ?? null,
                 'cycle_time' => $validated['cycle_time'],
-                'qty_dye_stuff' => $validated['qty_dye_stuff'] ?? 1,
-                'qty_aux' => $validated['qty_aux'] ?? 1,
+                'qty_dye_stuff' => isset($validated['qty_dye_stuff']) ? (int) $validated['qty_dye_stuff'] : 0,
+                'qty_aux' => isset($validated['qty_aux']) ? (int) $validated['qty_aux'] : 0,
                 'mesin_id' => $validated['mesin_id'],
                 'order' => $validated['order'],
             ];
@@ -1111,6 +1111,14 @@ class ProsesController extends Controller
                 }
             }
 
+            if (($proses->qty_dye_stuff ?? 0) < 1 && !$approvalId) {
+                $msg = 'Proses ini memiliki QTY Dye Stuff = 0 (tidak memerlukan scan Dye Stuff).';
+                if ($request->ajax() || $request->wantsJson()) {
+                    return response()->json(['status' => 'error', 'message' => $msg], 400);
+                }
+                return redirect()->route('dashboard', ['page' => $page])->with('error', $msg);
+            }
+
             // Validasi: tolak scan LA jika kebutuhan awal + topping untuk proses ini sudah terpenuhi
             $laInitialScanned = BarcodeLa::whereHas('detailProses', fn($q) => $q->where('proses_id', $id))
                 ->whereNull('approval_id')->where('cancel', false)->distinct('barcode')->count('barcode');
@@ -1119,7 +1127,7 @@ class ProsesController extends Controller
             $laToppingScn = Approval::where('proses_id', $id)->where('type', 'KEPALA_SHIFT')
                 ->where('action', 'topping_la')->where('status', 'approved')
                 ->whereHas('barcodeLas', fn($q) => $q->where('cancel', false))->count();
-            $laIsComplete = ($laInitialScanned + $laToppingScn) >= (($proses->qty_dye_stuff ?? 1) + $laToppingReq);
+            $laIsComplete = ($laInitialScanned + $laToppingScn) >= (($proses->qty_dye_stuff ?? 0) + $laToppingReq);
             if ($laIsComplete) {
                 $msg = 'Kebutuhan barcode LA (awal + topping) untuk proses ini sudah terpenuhi. Tidak dapat menambah scan.';
                 if ($request->ajax() || $request->wantsJson()) {
@@ -1371,6 +1379,14 @@ class ProsesController extends Controller
                 }
             }
 
+            if (($proses->qty_aux ?? 0) < 1 && !$approvalId) {
+                $msg = 'Proses ini memiliki QTY AUX = 0 (tidak memerlukan scan AUX).';
+                if ($request->ajax() || $request->wantsJson()) {
+                    return response()->json(['status' => 'error', 'message' => $msg], 400);
+                }
+                return redirect()->route('dashboard', ['page' => $page])->with('error', $msg);
+            }
+
             // Validasi: tolak scan AUX jika kebutuhan awal + topping untuk PROSES ini sudah terpenuhi (Sama seperti LA)
             $auxInitialScanned = BarcodeAux::whereHas('detailProses', fn($q) => $q->where('proses_id', $id))
                 ->whereNull('approval_id')->where('cancel', false)->distinct('barcode')->count('barcode');
@@ -1379,7 +1395,7 @@ class ProsesController extends Controller
             $auxToppingScn = Approval::where('proses_id', $id)->where('type', 'KEPALA_SHIFT')
                 ->where('action', 'topping_aux')->where('status', 'approved')
                 ->whereHas('barcodeAuxs', fn($q) => $q->where('cancel', false))->count();
-            $auxIsComplete = ($auxInitialScanned + $auxToppingScn) >= (($proses->qty_aux ?? 1) + $auxToppingReq);
+            $auxIsComplete = ($auxInitialScanned + $auxToppingScn) >= (($proses->qty_aux ?? 0) + $auxToppingReq);
             
             if ($auxIsComplete) {
                 $msg = 'Kebutuhan barcode AUX (awal + topping) untuk proses ini sudah terpenuhi. Tidak dapat menambah scan.';
@@ -1924,11 +1940,11 @@ class ProsesController extends Controller
         $taColor = $hasToppingAux ? ($pendingToppingAux ? 'yellow' : ($approvedToppingAuxNotScanned ? 'red' : 'green')) : null;
 
         $laInitialComplete = $detailListForTopping->isNotEmpty()
-            ? $detailListForTopping->every(fn($d) => BarcodeLa::where('detail_proses_id', $d->id)->whereNull('approval_id')->where('cancel', false)->distinct('barcode')->count('barcode') >= ($proses->qty_dye_stuff ?? 1))
+            ? $detailListForTopping->every(fn($d) => BarcodeLa::where('detail_proses_id', $d->id)->whereNull('approval_id')->where('cancel', false)->distinct('barcode')->count('barcode') >= ($proses->qty_dye_stuff ?? 0))
             : false;
 
         $auxInitialComplete = $detailListForTopping->isNotEmpty()
-            ? $detailListForTopping->every(fn($d) => BarcodeAux::where('detail_proses_id', $d->id)->whereNull('approval_id')->where('cancel', false)->distinct('barcode')->count('barcode') >= ($proses->qty_aux ?? 1))
+            ? $detailListForTopping->every(fn($d) => BarcodeAux::where('detail_proses_id', $d->id)->whereNull('approval_id')->where('cancel', false)->distinct('barcode')->count('barcode') >= ($proses->qty_aux ?? 0))
             : false;
 
         $canRequestToppingLa = $laInitialComplete && !$pendingToppingLa;
@@ -1980,14 +1996,14 @@ class ProsesController extends Controller
             ->where('status', 'approved')
             ->whereHas('barcodeLas', fn($q) => $q->where('cancel', false))
             ->count();
-        $laRequired = ($proses->qty_dye_stuff ?? 1) + $laToppingRequired;
+        $laRequired = ($proses->qty_dye_stuff ?? 0) + $laToppingRequired;
         $laScanned = $laInitialScanned + $laToppingScanned;
         $laIsComplete = $laScanned >= $laRequired;
-        $laInitialComplete = $laInitialScanned >= ($proses->qty_dye_stuff ?? 1);
+        $laInitialComplete = $laInitialScanned >= ($proses->qty_dye_stuff ?? 0);
         $laProgress = [
             'required' => $laRequired,
             'scanned' => $laScanned,
-            'initial_required' => $proses->qty_dye_stuff ?? 1,
+            'initial_required' => $proses->qty_dye_stuff ?? 0,
             'topping_required' => $laToppingRequired,
             'initial_scanned' => $laInitialScanned,
             'topping_scanned' => $laToppingScanned,
@@ -2012,14 +2028,14 @@ class ProsesController extends Controller
             ->where('status', 'approved')
             ->whereHas('barcodeAuxs', fn($q) => $q->where('cancel', false))
             ->count();
-        $auxRequired = ($proses->qty_aux ?? 1) + $auxToppingRequired;
+        $auxRequired = ($proses->qty_aux ?? 0) + $auxToppingRequired;
         $auxScanned = $auxInitialScanned + $auxToppingScanned;
         $auxIsComplete = $auxScanned >= $auxRequired;
-        $auxInitialComplete = $auxInitialScanned >= ($proses->qty_aux ?? 1);
+        $auxInitialComplete = $auxInitialScanned >= ($proses->qty_aux ?? 0);
         $auxProgress = [
             'required' => $auxRequired,
             'scanned' => $auxScanned,
-            'initial_required' => $proses->qty_aux ?? 1,
+            'initial_required' => $proses->qty_aux ?? 0,
             'topping_required' => $auxToppingRequired,
             'initial_scanned' => $auxInitialScanned,
             'topping_scanned' => $auxToppingScanned,
@@ -2028,11 +2044,13 @@ class ProsesController extends Controller
         ];
 
         $userRole = Auth::user()->role ?? null;
-        $canScanLa = (in_array($userRole, ['super_admin', 'ppic', 'operator'])
-            || ($userRole === 'kepala_ruangan' && ($approvedToppingLa || $laIsComplete) && $allComplete))
+        $canScanLa = (($proses->qty_dye_stuff ?? 0) > 0 || $approvedToppingLa)
+            && (in_array($userRole, ['super_admin', 'ppic', 'operator'])
+                || ($userRole === 'kepala_ruangan' && ($approvedToppingLa || $laIsComplete) && $allComplete))
             && $allComplete;
-        $canScanAux = (in_array($userRole, ['super_admin', 'ppic', 'operator'])
-            || ($userRole === 'kepala_ruangan' && ($approvedToppingAux || $auxIsComplete) && $allComplete))
+        $canScanAux = (($proses->qty_aux ?? 0) > 0 || $approvedToppingAux)
+            && (in_array($userRole, ['super_admin', 'ppic', 'operator'])
+                || ($userRole === 'kepala_ruangan' && ($approvedToppingAux || $auxIsComplete) && $allComplete))
             && $allComplete;
 
         $jenisOp = $proses->jenis_op ?? 'Single';

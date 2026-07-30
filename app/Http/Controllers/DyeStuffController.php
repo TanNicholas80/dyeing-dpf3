@@ -69,6 +69,7 @@ class DyeStuffController extends Controller
                 $q->where('tipe', 'normal')->where('cancel', false);
             }])
             ->whereNull('selesai')
+            ->where('qty_dye_stuff', '>', 0)
             ->orderByDesc('created_at')
             ->get();
 
@@ -102,7 +103,12 @@ class DyeStuffController extends Controller
         ]);
 
         $proses = Proses::findOrFail($data['proses_id']);
-        $maxQty = (int) ($proses->qty_dye_stuff ?? 1);
+        $maxQty = (int) ($proses->qty_dye_stuff ?? 0);
+        if ($data['tipe'] === 'normal' && $maxQty < 1) {
+            return back()->withInput()->withErrors([
+                'proses_id' => 'Proses ini memiliki QTY Dye Stuff = 0 (tidak memerlukan Dye Stuff Normal).'
+            ]);
+        }
         if ($maxQty < 1) {
             $maxQty = 1;
         }
@@ -222,6 +228,9 @@ class DyeStuffController extends Controller
                 $q->where('tipe', 'normal')->where('cancel', false)->where('id', '!=', $id);
             }])
             ->whereNull('selesai')
+            ->where(function ($q) use ($dyeStuff) {
+                $q->where('qty_dye_stuff', '>', 0)->orWhere('id', $dyeStuff->proses_id);
+            })
             ->orderByDesc('created_at')
             ->get();
 
@@ -256,7 +265,12 @@ class DyeStuffController extends Controller
         $dyeStuff = DyeStuff::findOrFail($id);
 
         $proses = Proses::findOrFail($data['proses_id']);
-        $maxQty = (int) ($proses->qty_dye_stuff ?? 1);
+        $maxQty = (int) ($proses->qty_dye_stuff ?? 0);
+        if ($data['tipe'] === 'normal' && $maxQty < 1) {
+            return back()->withInput()->withErrors([
+                'proses_id' => 'Proses ini memiliki QTY Dye Stuff = 0 (tidak memerlukan Dye Stuff Normal).'
+            ]);
+        }
         if ($maxQty < 1) {
             $maxQty = 1;
         }
@@ -419,10 +433,7 @@ class DyeStuffController extends Controller
         }
 
         // 3. QTY Dye Stuff & Existing Normal Dye Stuffs
-        $qtyDyeStuff = (int) ($proses->qty_dye_stuff ?? 1);
-        if ($qtyDyeStuff < 1) {
-            $qtyDyeStuff = 1;
-        }
+        $qtyDyeStuff = (int) ($proses->qty_dye_stuff ?? 0);
 
         $excludeId = $request->query('exclude_id');
 
@@ -441,13 +452,10 @@ class DyeStuffController extends Controller
             ->values()
             ->all();
 
-        $canCreateNormal = $existingNormalCount < $qtyDyeStuff;
+        $canCreateNormal = $qtyDyeStuff > 0 && ($existingNormalCount < $qtyDyeStuff);
 
         // 4. QTY Aux & Existing Normal Auxls
-        $qtyAux = (int) ($proses->qty_aux ?? 1);
-        if ($qtyAux < 1) {
-            $qtyAux = 1;
-        }
+        $qtyAux = (int) ($proses->qty_aux ?? 0);
 
         $excludeAuxId = $request->query('exclude_aux_id');
 
@@ -465,7 +473,7 @@ class DyeStuffController extends Controller
             ->values()
             ->all();
 
-        $canCreateNormalAux = $existingNormalAuxCount < $qtyAux;
+        $canCreateNormalAux = $qtyAux > 0 && ($existingNormalAuxCount < $qtyAux);
 
         $existingAdditionQuery = DyeStuff::where('proses_id', $id)
             ->where('tipe', 'additional')

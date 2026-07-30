@@ -63,10 +63,10 @@
         }
 
         $hasBarcodeLa = isset($proses->details) && $proses->details->isNotEmpty()
-            ? $proses->details->every(fn($d) => $d->barcodeLas && $d->barcodeLas->where('cancel', false)->where('approval_id', null)->count() >= ($proses->qty_dye_stuff ?? 1))
+            ? $proses->details->every(fn($d) => $d->barcodeLas && $d->barcodeLas->where('cancel', false)->where('approval_id', null)->count() >= ($proses->qty_dye_stuff ?? 0))
             : false;
         $hasBarcodeAux = isset($proses->details) && $proses->details->isNotEmpty()
-            ? $proses->details->every(fn($d) => $d->barcodeAuxs && $d->barcodeAuxs->where('cancel', false)->where('approval_id', null)->count() >= ($proses->qty_aux ?? 1))
+            ? $proses->details->every(fn($d) => $d->barcodeAuxs && $d->barcodeAuxs->where('cancel', false)->where('approval_id', null)->count() >= ($proses->qty_aux ?? 0))
             : false;
 
         // Fallback untuk LA dan AUX
@@ -159,16 +159,16 @@
         $laToppingRequired = collect($proses->approvals ?? [])->where('action', 'topping_la')->where('status', 'approved')->count();
         $auxToppingRequired = collect($proses->approvals ?? [])->where('action', 'topping_aux')->where('status', 'approved')->count();
         $laComplete = isset($proses->details) && $proses->details->isNotEmpty()
-            ? $proses->details->every(fn($d) => ($d->barcodeLas ? $d->barcodeLas->where('cancel', false)->count() : 0) >= (($proses->qty_dye_stuff ?? 1) + $laToppingRequired))
+            ? $proses->details->every(fn($d) => ($d->barcodeLas ? $d->barcodeLas->where('cancel', false)->count() : 0) >= (($proses->qty_dye_stuff ?? 0) + $laToppingRequired))
             : false;
         $auxComplete = isset($proses->details) && $proses->details->isNotEmpty()
-            ? $proses->details->every(fn($d) => ($d->barcodeAuxs ? $d->barcodeAuxs->where('cancel', false)->count() : 0) >= (($proses->qty_aux ?? 1) + $auxToppingRequired))
+            ? $proses->details->every(fn($d) => ($d->barcodeAuxs ? $d->barcodeAuxs->where('cancel', false)->count() : 0) >= (($proses->qty_aux ?? 0) + $auxToppingRequired))
             : false;
         $laInitialComplete = isset($proses->details) && $proses->details->isNotEmpty()
-            ? $proses->details->every(fn($d) => $d->barcodeLas && $d->barcodeLas->where('cancel', false)->where('approval_id', null)->count() >= ($proses->qty_dye_stuff ?? 1))
+            ? $proses->details->every(fn($d) => $d->barcodeLas && $d->barcodeLas->where('cancel', false)->where('approval_id', null)->count() >= ($proses->qty_dye_stuff ?? 0))
             : false;
         $auxInitialComplete = isset($proses->details) && $proses->details->isNotEmpty()
-            ? $proses->details->every(fn($d) => $d->barcodeAuxs && $d->barcodeAuxs->where('cancel', false)->where('approval_id', null)->count() >= ($proses->qty_aux ?? 1))
+            ? $proses->details->every(fn($d) => $d->barcodeAuxs && $d->barcodeAuxs->where('cancel', false)->where('approval_id', null)->count() >= ($proses->qty_aux ?? 0))
             : false;
         if ($barcodeKainOptional) {
             $blockColors = [$laInitialComplete ? 'green' : 'red', $auxInitialComplete ? 'green' : 'red'];
@@ -365,8 +365,8 @@
                         ? $firstDetail->barcodeKains->where('cancel', false)->count()
                         : 0;
                     $firstHasKain = ($firstBarcodeKainCount >= $firstRoll && $firstRoll > 0);
-                    $firstHasLa = ($firstDetail->barcodeLas ? $firstDetail->barcodeLas->where('cancel', false)->where('approval_id', null)->count() : 0) >= ($proses->qty_dye_stuff ?? 1);
-                    $firstHasAux = ($firstDetail->barcodeAuxs ? $firstDetail->barcodeAuxs->where('cancel', false)->where('approval_id', null)->count() : 0) >= ($proses->qty_aux ?? 1);
+                    $firstHasLa = ($firstDetail->barcodeLas ? $firstDetail->barcodeLas->where('cancel', false)->where('approval_id', null)->count() : 0) >= ($proses->qty_dye_stuff ?? 0);
+                    $firstHasAux = ($firstDetail->barcodeAuxs ? $firstDetail->barcodeAuxs->where('cancel', false)->where('approval_id', null)->count() : 0) >= ($proses->qty_aux ?? 0);
                     $firstMap = $barcodeKainOptional
                         ? [$blocks[0] => $firstHasLa ? 'green' : 'red', $blocks[1] => $firstHasAux ? 'green' : 'red']
                         : [$blocks[0] => $firstHasKain ? 'green' : 'red', $blocks[1] => $firstHasLa ? 'green' : 'red', $blocks[2] => $firstHasAux ? 'green' : 'red'];
@@ -402,8 +402,8 @@
                             ? $d->barcodeKains->where('cancel', false)->count()
                             : 0;
                         $subHasKain = ($subBarcodeKainCount >= $subRoll && $subRoll > 0);
-                        $subHasLa = ($d->barcodeLas ? $d->barcodeLas->where('cancel', false)->where('approval_id', null)->count() : 0) >= ($proses->qty_dye_stuff ?? 1);
-                        $subHasAux = ($d->barcodeAuxs ? $d->barcodeAuxs->where('cancel', false)->where('approval_id', null)->count() : 0) >= ($proses->qty_aux ?? 1);
+                        $subHasLa = ($d->barcodeLas ? $d->barcodeLas->where('cancel', false)->where('approval_id', null)->count() : 0) >= ($proses->qty_dye_stuff ?? 0);
+                        $subHasAux = ($d->barcodeAuxs ? $d->barcodeAuxs->where('cancel', false)->where('approval_id', null)->count() : 0) >= ($proses->qty_aux ?? 0);
                         $subMap = $barcodeKainOptional
                             ? [$blocks[0] => $subHasLa ? 'green' : 'red', $blocks[1] => $subHasAux ? 'green' : 'red']
                             : [$blocks[0] => $subHasKain ? 'green' : 'red', $blocks[1] => $subHasLa ? 'green' : 'red', $blocks[2] => $subHasAux ? 'green' : 'red'];
