@@ -4,6 +4,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Cache;
 use App\Http\Controllers\ApiCheckStatusBarcodeController;
+use App\Http\Controllers\Api\TicketDetailController;
 
 // Endpoint untuk menerima data berat dari timbangan (POST) dan juga bisa GET data terakhir
 Route::match(['get', 'post'], '/weight', function(Request $request) {
@@ -23,6 +24,18 @@ Route::match(['get', 'post'], '/weight', function(Request $request) {
         'device' => $data['device'] ?? null,
         'time' => $data['time'] ?? null,
     ]);
+});
+
+/**
+ * Ticket Details CSV & Data API (Public for node-sqlserver crawler)
+ * Base path: /api/ticket-details/...
+ */
+Route::prefix('ticket-details')->group(function () {
+    Route::get('/', [TicketDetailController::class, 'index']);
+    Route::get('/export-csv', [TicketDetailController::class, 'exportCsv']);
+    Route::post('/import-csv', [TicketDetailController::class, 'importCsv']);
+    Route::post('/update-delta-csv', [TicketDetailController::class, 'updateDeltaCsv']);
+    Route::post('/sync-from-api', [TicketDetailController::class, 'syncFromApi']);
 });
 
 /**

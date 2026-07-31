@@ -46,6 +46,8 @@
                                         {{ $auxl->step_proses ? 'Step ' . $auxl->step_proses : '-' }}
                                     @endif
                                     </span></div>
+                            <div class="col-md-6 col-lg-4 mb-3"><span class="label">Liquor Ratio</span><span
+                                    class="colon">:</span><span class="value font-weight-bold">1 : {{ round($auxl->liquor_ratio ?? 10) }}</span></div>
                             <div class="col-md-6 col-lg-4 mb-3"><span class="label">Total Wt.</span><span
                                     class="colon">:</span><span class="value font-weight-bold">{{ number_format($auxl->total_wt, 1) }} kg</span></div>
                             <div class="col-md-6 col-lg-4 mb-3"><span class="label">Volume</span><span

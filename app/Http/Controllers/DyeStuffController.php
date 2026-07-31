@@ -2,558 +2,185 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\DyeStuff;
-use App\Models\DyeStuffDetail;
+use App\Models\TicketDetail;
 use App\Models\BarcodeLa;
-use App\Models\Proses;
-use App\Models\DetailProses;
-use App\Models\BarcodeKain;
-use App\Models\Approval;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 class DyeStuffController extends Controller
 {
-    public function index()
+    /**
+     * Display grouped Ticket Detail (Dye Stuff / LA) records with high performance DB grouping & pagination.
+     * Fully compatible with PostgreSQL & MySQL databases.
+     */
+    public function index(Request $request)
     {
-        $dyeStuffs = DyeStuff::with(['proses.details', 'proses.mesin', 'details'])->orderByDesc('created_at')->get();
+        $query = TicketDetail::select(
+                'id_no',
+                DB::raw('MAX(recipe_code) as recipe_code'),
+                DB::raw('MAX(machine) as machine'),
+                DB::raw('MAX(product_lot) as product_lot'),
+                DB::raw('MAX(comp_date) as comp_date'),
+                DB::raw('MAX(comp_time) as comp_time'),
+                DB::raw('COUNT(*) as items_count'),
+                DB::raw('SUM(target_wt) as total_target_wt'),
+                DB::raw('SUM(actual_wt) as total_actual_wt'),
+                DB::raw("MAX(CASE WHEN actual_wt > 0 AND comp_date IS NOT NULL AND TRIM(comp_date) != '' THEN 1 ELSE 0 END) as is_weighed"),
+                DB::raw('MAX(id) as max_id')
+            )
+            ->whereNotNull('id_no')
+            ->where('id_no', '!=', '')
+            ->groupBy('id_no');
 
-        // Tandai DyeStuff yang sudah dipakai proses (ter-scan sebagai Barcode LA aktif).
-        $usageCountsByBarcode = collect();
-        if ($dyeStuffs->isNotEmpty()) {
-            $barcodes = $dyeStuffs->pluck('barcode')->filter()->unique()->values();
-            if ($barcodes->isNotEmpty()) {
-                $usageCountsByBarcode = BarcodeLa::whereIn('barcode', $barcodes)
-                    ->where('cancel', false)
-                    ->selectRaw('barcode, COUNT(*) as total')
-                    ->groupBy('barcode')
-                    ->pluck('total', 'barcode');
-            }
-        }
-
-        // Tandai dye stuff yang masih menunggu approval (FM atau VP) untuk jenis reproses / perbaikan
-        if ($dyeStuffs->isNotEmpty()) {
-            $pendingApprovals = Approval::whereIn('dyestuff_id', $dyeStuffs->pluck('id'))
-                ->where('action', 'create_la_reprocess')
-                ->where('status', 'pending')
-                ->orderByDesc('created_at')
-                ->get()
-                ->groupBy('dyestuff_id');
-
-            $dyeStuffs->transform(function ($item) use ($pendingApprovals) {
-                $itemCollection = $pendingApprovals->get($item->id);
-                $item->pendingApproval = $itemCollection ? $itemCollection->first() : null;
-                return $item;
+        // Filter Pencarian (Case-Insensitive Search: Support PostgreSQL ILIKE & MySQL LIKE)
+        if ($request->filled('search')) {
+            $search = strtolower(trim($request->search));
+            $query->where(function ($q) use ($search) {
+                $q->whereRaw('LOWER(id_no) LIKE ?', ["%{$search}%"])
+                  ->orWhereRaw('LOWER(recipe_code) LIKE ?', ["%{$search}%"])
+                  ->orWhereRaw('LOWER(machine) LIKE ?', ["%{$search}%"])
+                  ->orWhereRaw('LOWER(product_lot) LIKE ?', ["%{$search}%"]);
             });
         }
 
-        $dyeStuffs->transform(function ($item) use ($usageCountsByBarcode) {
-            $usedCount = (int) ($usageCountsByBarcode[$item->barcode] ?? 0);
+        // Filter Status Penimbangan
+        if ($request->filled('status_timbang')) {
+            if ($request->status_timbang === 'sudah') {
+                $query->havingRaw("MAX(CASE WHEN actual_wt > 0 AND comp_date IS NOT NULL AND TRIM(comp_date) != '' THEN 1 ELSE 0 END) = 1");
+            } elseif ($request->status_timbang === 'belum') {
+                $query->havingRaw("MAX(CASE WHEN actual_wt > 0 AND comp_date IS NOT NULL AND TRIM(comp_date) != '' THEN 1 ELSE 0 END) = 0");
+            }
+        }
+
+        $perPage = (int) $request->input('per_page', 25);
+        if (!in_array($perPage, [10, 25, 50, 100])) {
+            $perPage = 25;
+        }
+
+        // Execute Paginated DB Query (Compatible with PostgreSQL & MySQL)
+        $dyeStuffs = $query->orderByDesc(DB::raw('MAX(id)'))
+            ->paginate($perPage)
+            ->withQueryString();
+
+        $pageBarcodes = $dyeStuffs->pluck('id_no')->filter()->toArray();
+
+        // Pengecekan BarcodeLa HANYA untuk barcode yang ada di halaman aktif (Max 25-100 data)
+        $usageCountsByBarcode = [];
+        if (!empty($pageBarcodes)) {
+            $usageCountsByBarcode = BarcodeLa::whereIn('barcode', $pageBarcodes)
+                ->where('cancel', false)
+                ->selectRaw('barcode, COUNT(*) as total')
+                ->groupBy('barcode')
+                ->pluck('total', 'barcode')
+                ->toArray();
+        }
+
+        // Transform koleksi halaman aktif dengan properti pendukung
+        $dyeStuffs->getCollection()->transform(function ($item) use ($usageCountsByBarcode) {
+            $usedCount = (int) ($usageCountsByBarcode[$item->id_no] ?? 0);
+            $item->barcode = $item->id_no;
             $item->isUsedByProses = $usedCount > 0;
             $item->usedCount = $usedCount;
+            $item->is_weighed = ((int) $item->is_weighed) === 1;
             return $item;
         });
 
         return view('dye_stuff.index', compact('dyeStuffs'));
     }
 
-    public function create()
-    {
-        if (Auth::user()->role === 'scm') {
-            abort(403, 'Unauthorized action.');
-        }
-
-        $allProses = Proses::with(['details', 'mesin'])
-            ->withCount(['dyeStuffs as normal_dyestuff_count' => function ($q) {
-                $q->where('tipe', 'normal')->where('cancel', false);
-            }])
-            ->whereNull('selesai')
-            ->where('qty_dye_stuff', '>', 0)
-            ->orderByDesc('created_at')
-            ->get();
-
-        // Pisahkan menjadi Sedang Berjalan dan Belum Berjalan
-        $prosesRunning = $allProses->filter(fn($p) => !is_null($p->mulai));
-        $prosesPending = $allProses->filter(fn($p) => is_null($p->mulai));
-
-        return view('dye_stuff.create', compact('prosesRunning', 'prosesPending'));
-    }
-
-    public function store(Request $request)
-    {
-        if (Auth::user()->role === 'scm') {
-            abort(403, 'Unauthorized action.');
-        }
-
-        $data = $request->validate([
-            'proses_id'            => 'required|exists:proses,id',
-            'tipe'                 => 'required|in:normal,additional',
-            'jenis'                => 'required|in:normal,reproses,perbaikan',
-            'liquor_ratio'         => 'required|numeric|min:0.1',
-            'total_wt'             => 'required|numeric|min:0',
-            'volume_litres'        => 'required|numeric|min:0',
-            'step_proses'          => 'nullable|integer|in:1,2,3',
-            'details'              => 'required|array|min:1',
-            'details.*.chemical_name' => 'required|string',
-            'details.*.konsentrasi'   => 'required|numeric|min:0',
-            'details.*.weight'        => 'required|numeric|min:0',
-            'details.*.unit'          => 'nullable|string',
-            'details.*.remark'        => 'nullable|string',
-        ]);
-
-        $proses = Proses::findOrFail($data['proses_id']);
-        $maxQty = (int) ($proses->qty_dye_stuff ?? 0);
-        if ($data['tipe'] === 'normal' && $maxQty < 1) {
-            return back()->withInput()->withErrors([
-                'proses_id' => 'Proses ini memiliki QTY Dye Stuff = 0 (tidak memerlukan Dye Stuff Normal).'
-            ]);
-        }
-        if ($maxQty < 1) {
-            $maxQty = 1;
-        }
-
-        if ($maxQty > 1 && empty($data['step_proses'])) {
-            return back()->withInput()->withErrors([
-                'step_proses' => 'Pick List Step wajib dipilih ketika QTY Dye Stuff lebih dari 1.'
-            ]);
-        }
-
-        // Cek kuota dan keunikan step untuk Dye Stuff Type Normal
-        if ($data['tipe'] === 'normal') {
-            $existingNormalCount = DyeStuff::where('proses_id', $data['proses_id'])
-                ->where('tipe', 'normal')
-                ->where('cancel', false)
-                ->count();
-
-            if ($existingNormalCount >= $maxQty) {
-                return back()->withInput()->withErrors([
-                    'tipe' => "Dye Stuff Type Normal untuk proses ini sudah mencapai batas maksimum ({$maxQty}x)."
-                ]);
-            }
-
-            $targetStep = $data['step_proses'] ?? 1;
-            $stepExists = DyeStuff::where('proses_id', $data['proses_id'])
-                ->where('tipe', 'normal')
-                ->where('step_proses', $targetStep)
-                ->where('cancel', false)
-                ->exists();
-
-            if ($stepExists) {
-                return back()->withInput()->withErrors([
-                    'step_proses' => "Dye Stuff Type Normal untuk Step {$targetStep} sudah pernah dibuat pada proses ini."
-                ]);
-            }
-        } elseif ($data['tipe'] === 'additional') {
-            if (empty($data['step_proses'])) {
-                return back()->withInput()->withErrors([
-                    'step_proses' => 'Pick List Step (1 - Reactive / 2 - Dispers) wajib dipilih untuk Tipe Addition (Topping).'
-                ]);
-            }
-            $targetStep = (int) $data['step_proses'];
-            if (!in_array($targetStep, [1, 2])) {
-                return back()->withInput()->withErrors([
-                    'step_proses' => 'Pick List Step Tipe Addition (Topping) harus berupa 1 (Reactive) atau 2 (Dispers).'
-                ]);
-            }
-            $stepExists = DyeStuff::where('proses_id', $data['proses_id'])
-                ->where('tipe', 'additional')
-                ->where('step_proses', $targetStep)
-                ->where('cancel', false)
-                ->exists();
-
-            if ($stepExists) {
-                $stepLabel = $targetStep == 1 ? '1 - Reactive' : '2 - Dispers';
-                return back()->withInput()->withErrors([
-                    'step_proses' => "Dye Stuff Tipe Addition (Topping) untuk Step {$stepLabel} sudah pernah dibuat pada proses ini."
-                ]);
-            }
-        }
-
-        return DB::transaction(function () use ($data) {
-            $barcode = DyeStuff::generateBarcode();
-
-            $dyeStuff = DyeStuff::create([
-                'proses_id'     => $data['proses_id'],
-                'barcode'       => $barcode,
-                'tipe'          => $data['tipe'],
-                'jenis'         => $data['jenis'],
-                'liquor_ratio'  => $data['liquor_ratio'],
-                'total_wt'      => $data['total_wt'],
-                'volume_litres' => $data['volume_litres'],
-                'step_proses'   => $data['step_proses'] ?? 1,
-            ]);
-
-            foreach ($data['details'] as $detail) {
-                $dyeStuff->details()->create([
-                    'chemical_name' => $detail['chemical_name'],
-                    'konsentrasi'   => $detail['konsentrasi'],
-                    'weight'        => $detail['weight'],
-                    'unit'          => $detail['unit'] ?? 'g',
-                    'remark'        => $detail['remark'] ?? null,
-                ]);
-            }
-
-            // Jika jenis reproses / perbaikan, trigger approval 2 step (FM lalu VP)
-            if (in_array($dyeStuff->jenis, ['reproses', 'perbaikan'])) {
-                $this->createReprocessApproval($dyeStuff);
-
-                return redirect()
-                    ->route('dye-stuff.index')
-                    ->with('success', 'Data Dye Stuff disimpan dengan status menunggu approval FM & VP. Barcode: ' . $barcode);
-            }
-
-            return redirect()
-                ->route('dye-stuff.index')
-                ->with('success', 'Data Dye Stuff berhasil disimpan. Barcode: ' . $barcode);
-        });
-    }
-
+    /**
+     * Display detailed chemical items for a specific barcode (id_no).
+     */
     public function show($id)
     {
-        $dyeStuff = DyeStuff::with(['proses.details', 'proses.mesin', 'details'])->findOrFail($id);
-        return view('dye_stuff.show', compact('dyeStuff'));
-    }
+        $ticketDetails = TicketDetail::where('id_no', $id)->get();
 
-    public function edit($id)
-    {
-        if (Auth::user()->role === 'scm') {
-            abort(403, 'Unauthorized action.');
+        if ($ticketDetails->isEmpty()) {
+            return redirect()->route('dye-stuff.index')->with('error', 'Data Barcode Dye Stuff / Ticket Detail tidak ditemukan.');
         }
 
-        $dyeStuff = DyeStuff::with('details')->findOrFail($id);
+        $first = $ticketDetails->first();
+        $usedCount = BarcodeLa::where('barcode', $id)->where('cancel', false)->count();
 
-        $allProses = Proses::with(['details', 'mesin'])
-            ->withCount(['dyeStuffs as normal_dyestuff_count' => function ($q) use ($id) {
-                $q->where('tipe', 'normal')->where('cancel', false)->where('id', '!=', $id);
-            }])
-            ->whereNull('selesai')
-            ->where(function ($q) use ($dyeStuff) {
-                $q->where('qty_dye_stuff', '>', 0)->orWhere('id', $dyeStuff->proses_id);
-            })
-            ->orderByDesc('created_at')
-            ->get();
+        $summary = (object) [
+            'id_no'           => $id,
+            'barcode'         => $id,
+            'recipe_code'     => $first->recipe_code ?? '-',
+            'machine'         => $first->machine ?? '-',
+            'product_lot'     => $first->product_lot ?? '-',
+            'comp_date'       => $first->comp_date ?? '-',
+            'comp_time'       => $first->comp_time ?? '-',
+            'total_target_wt' => $ticketDetails->sum('target_wt'),
+            'total_actual_wt' => $ticketDetails->sum('actual_wt'),
+            'items_count'     => $ticketDetails->count(),
+            'isUsedByProses'  => $usedCount > 0,
+            'usedCount'       => $usedCount,
+        ];
 
-        $prosesRunning = $allProses->filter(fn($p) => !is_null($p->mulai));
-        $prosesPending = $allProses->filter(fn($p) => is_null($p->mulai));
-
-        return view('dye_stuff.edit', compact('dyeStuff', 'prosesRunning', 'prosesPending'));
-    }
-
-    public function update(Request $request, $id)
-    {
-        if (Auth::user()->role === 'scm') {
-            abort(403, 'Unauthorized action.');
-        }
-
-        $data = $request->validate([
-            'proses_id'            => 'required|exists:proses,id',
-            'tipe'                 => 'required|in:normal,additional',
-            'jenis'                => 'required|in:normal,reproses,perbaikan',
-            'liquor_ratio'         => 'required|numeric|min:0.1',
-            'total_wt'             => 'required|numeric|min:0',
-            'volume_litres'        => 'required|numeric|min:0',
-            'step_proses'          => 'nullable|integer|in:1,2,3',
-            'details'              => 'required|array|min:1',
-            'details.*.chemical_name' => 'required|string',
-            'details.*.konsentrasi'   => 'required|numeric|min:0',
-            'details.*.weight'        => 'required|numeric|min:0',
-            'details.*.unit'          => 'nullable|string',
-            'details.*.remark'        => 'nullable|string',
-        ]);
-
-        $dyeStuff = DyeStuff::findOrFail($id);
-
-        $proses = Proses::findOrFail($data['proses_id']);
-        $maxQty = (int) ($proses->qty_dye_stuff ?? 0);
-        if ($data['tipe'] === 'normal' && $maxQty < 1) {
-            return back()->withInput()->withErrors([
-                'proses_id' => 'Proses ini memiliki QTY Dye Stuff = 0 (tidak memerlukan Dye Stuff Normal).'
-            ]);
-        }
-        if ($maxQty < 1) {
-            $maxQty = 1;
-        }
-
-        if ($maxQty > 1 && empty($data['step_proses'])) {
-            return back()->withInput()->withErrors([
-                'step_proses' => 'Pick List Step wajib dipilih ketika QTY Dye Stuff lebih dari 1.'
-            ]);
-        }
-
-        // Cek kuota dan keunikan step untuk Dye Stuff Type Normal (abaikan ID yang sedang diedit)
-        if ($data['tipe'] === 'normal') {
-            $existingNormalCount = DyeStuff::where('proses_id', $data['proses_id'])
-                ->where('tipe', 'normal')
-                ->where('cancel', false)
-                ->where('id', '!=', $id)
-                ->count();
-
-            if ($existingNormalCount >= $maxQty) {
-                return back()->withInput()->withErrors([
-                    'tipe' => "Dye Stuff Type Normal untuk proses ini sudah mencapai batas maksimum ({$maxQty}x)."
-                ]);
-            }
-
-            $targetStep = $data['step_proses'] ?? 1;
-            $stepExists = DyeStuff::where('proses_id', $data['proses_id'])
-                ->where('tipe', 'normal')
-                ->where('step_proses', $targetStep)
-                ->where('cancel', false)
-                ->where('id', '!=', $id)
-                ->exists();
-
-            if ($stepExists) {
-                return back()->withInput()->withErrors([
-                    'step_proses' => "Dye Stuff Type Normal untuk Step {$targetStep} sudah pernah dibuat pada proses ini."
-                ]);
-            }
-        } elseif ($data['tipe'] === 'additional') {
-            if (empty($data['step_proses'])) {
-                return back()->withInput()->withErrors([
-                    'step_proses' => 'Pick List Step (1 - Reactive / 2 - Dispers) wajib dipilih untuk Tipe Addition (Topping).'
-                ]);
-            }
-            $targetStep = (int) $data['step_proses'];
-            if (!in_array($targetStep, [1, 2])) {
-                return back()->withInput()->withErrors([
-                    'step_proses' => 'Pick List Step Tipe Addition (Topping) harus berupa 1 (Reactive) atau 2 (Dispers).'
-                ]);
-            }
-            $stepExists = DyeStuff::where('proses_id', $data['proses_id'])
-                ->where('tipe', 'additional')
-                ->where('step_proses', $targetStep)
-                ->where('cancel', false)
-                ->where('id', '!=', $id)
-                ->exists();
-
-            if ($stepExists) {
-                $stepLabel = $targetStep == 1 ? '1 - Reactive' : '2 - Dispers';
-                return back()->withInput()->withErrors([
-                    'step_proses' => "Dye Stuff Tipe Addition (Topping) Untuk Step {$stepLabel} sudah pernah dibuat pada proses ini."
-                ]);
-            }
-        }
-
-        DB::transaction(function () use ($dyeStuff, $data) {
-            $dyeStuff->update([
-                'proses_id'     => $data['proses_id'],
-                'tipe'          => $data['tipe'],
-                'jenis'         => $data['jenis'],
-                'liquor_ratio'  => $data['liquor_ratio'],
-                'total_wt'      => $data['total_wt'],
-                'volume_litres' => $data['volume_litres'],
-                'step_proses'   => $data['step_proses'] ?? 1,
-            ]);
-
-            $dyeStuff->details()->delete();
-
-            foreach ($data['details'] as $detail) {
-                $dyeStuff->details()->create([
-                    'chemical_name' => $detail['chemical_name'],
-                    'konsentrasi'   => $detail['konsentrasi'],
-                    'weight'        => $detail['weight'],
-                    'unit'          => $detail['unit'] ?? 'g',
-                    'remark'        => $detail['remark'] ?? null,
-                ]);
-            }
-        });
-
-        return redirect()->route('dye-stuff.index')->with('success', 'Data Dye Stuff berhasil diperbarui.');
-    }
-
-    public function destroy($id)
-    {
-        $dyeStuff = DyeStuff::findOrFail($id);
-        $dyeStuff->delete();
-        return redirect()->route('dye-stuff.index')->with('success', 'Data Dye Stuff berhasil dihapus.');
-    }
-
-    public function print($id)
-    {
-        $dyeStuff = DyeStuff::with(['proses.details', 'proses.mesin', 'details'])->findOrFail($id);
-        return view('dye_stuff.print', compact('dyeStuff'));
-    }
-
-    public function printBulk(Request $request)
-    {
-        $rawIds = $request->query('ids', '');
-        $ids = array_filter(explode(',', $rawIds));
-
-        $dyeStuffs = DyeStuff::with(['proses.details', 'proses.mesin', 'details'])
-            ->whereIn('id', $ids)
-            ->get();
-
-        if ($dyeStuffs->isEmpty()) {
-            return redirect()->route('dye-stuff.index')->with('error', 'Tidak ada data Dye Stuff yang dipilih.');
-        }
-
-        return view('dye_stuff.print_bulk', compact('dyeStuffs'));
-    }
-
-    public function getProsesInfo(Request $request, $id)
-    {
-        $proses = Proses::with(['details', 'mesin'])->find($id);
-        if (!$proses) {
-            return response()->json(['error' => 'Proses tidak ditemukan'], 404);
-        }
-
-        $detailList = $proses->details;
-        $firstDetail = $detailList->first();
-
-        // 1. Total WT (Kg): Sum QTY per OP dari DetailProses (Multiple OP dijumlahkan, Single OP ambil 1 qty)
-        $totalWt = (float) $detailList->sum('qty');
-
-        // Fallback jika QTY di DetailProses 0, ambil dari BarcodeKain
-        if ($totalWt <= 0 && $detailList->isNotEmpty()) {
-            $detailIds = $detailList->pluck('id');
-            $totalWt = (float) BarcodeKain::whereIn('detail_proses_id', $detailIds)
-                ->where('cancel', false)
-                ->sum('qty_gi');
-        }
-
-        // 2. Jenis Dye Stuff Otomatis berdasarkan Planning Proses:
-        // - Jika jenis proses === 'produksi' -> 'normal' (Normal)
-        // - Jika jenis proses === 'reproses' & mode === 'greige' -> 'perbaikan' (Perbaikan BDP)
-        // - Jika jenis proses === 'reproses' & mode === 'finish' -> 'reproses' (Reproses FG)
-        $autoJenis = 'normal';
-        $pJenis = strtolower($proses->jenis ?? 'produksi');
-        $pMode = strtolower($proses->mode ?? '');
-
-        if ($pJenis === 'produksi') {
-            $autoJenis = 'normal';
-        } elseif ($pJenis === 'reproses') {
-            if ($pMode === 'greige') {
-                $autoJenis = 'perbaikan';
-            } elseif ($pMode === 'finish') {
-                $autoJenis = 'reproses';
-            } else {
-                $autoJenis = 'reproses';
-            }
-        }
-
-        // 3. QTY Dye Stuff & Existing Normal Dye Stuffs
-        $qtyDyeStuff = (int) ($proses->qty_dye_stuff ?? 0);
-
-        $excludeId = $request->query('exclude_id');
-
-        $existingNormalQuery = DyeStuff::where('proses_id', $id)
-            ->where('tipe', 'normal')
-            ->where('cancel', false);
-
-        if ($excludeId) {
-            $existingNormalQuery->where('id', '!=', $excludeId);
-        }
-
-        $existingNormalCount = $existingNormalQuery->count();
-        $usedNormalSteps = $existingNormalQuery->pluck('step_proses')
-            ->map(fn($v) => (int)$v)
-            ->filter()
-            ->values()
-            ->all();
-
-        $canCreateNormal = $qtyDyeStuff > 0 && ($existingNormalCount < $qtyDyeStuff);
-
-        // 4. QTY Aux & Existing Normal Auxls
-        $qtyAux = (int) ($proses->qty_aux ?? 0);
-
-        $excludeAuxId = $request->query('exclude_aux_id');
-
-        $existingNormalAuxQuery = \App\Models\Auxl::where('proses_id', $id)
-            ->where('tipe', 'normal');
-
-        if ($excludeAuxId) {
-            $existingNormalAuxQuery->where('id', '!=', $excludeAuxId);
-        }
-
-        $existingNormalAuxCount = $existingNormalAuxQuery->count();
-        $usedNormalAuxSteps = $existingNormalAuxQuery->pluck('step_proses')
-            ->map(fn($v) => (int)$v)
-            ->filter()
-            ->values()
-            ->all();
-
-        $canCreateNormalAux = $qtyAux > 0 && ($existingNormalAuxCount < $qtyAux);
-
-        $existingAdditionQuery = DyeStuff::where('proses_id', $id)
-            ->where('tipe', 'additional')
-            ->where('cancel', false);
-        if ($excludeId) {
-            $existingAdditionQuery->where('id', '!=', $excludeId);
-        }
-        $usedAdditionSteps = $existingAdditionQuery->pluck('step_proses')
-            ->map(fn($v) => (int)$v)
-            ->filter()
-            ->values()
-            ->all();
-
-        $existingAdditionAuxQuery = \App\Models\Auxl::where('proses_id', $id)
-            ->where('tipe', 'addition');
-        if ($excludeAuxId) {
-            $existingAdditionAuxQuery->where('id', '!=', $excludeAuxId);
-        }
-        $usedAdditionAuxSteps = $existingAdditionAuxQuery->pluck('step_proses')
-            ->map(fn($v) => (int)$v)
-            ->filter()
-            ->values()
-            ->all();
-
-        $statusLabel = !is_null($proses->selesai) ? 'Selesai' : (!is_null($proses->mulai) ? 'Sedang Berjalan' : 'Belum Berjalan');
-
-        return response()->json([
-            'id'                        => $proses->id,
-            'no_jo'                     => $firstDetail->no_op ?? '-',
-            'no_partai'                 => $firstDetail->no_partai ?? '-',
-            'customer'                  => $firstDetail->customer ?? '-',
-            'marketing'                 => $firstDetail->marketing ?? '-',
-            'material'                  => $firstDetail->konstruksi ?? '-',
-            'color'                     => $firstDetail->warna ?? $firstDetail->color ?? '-',
-            'mesin'                     => $proses->mesin->jenis_mesin ?? '-',
-            'status_proses'             => $statusLabel,
-            'auto_jenis'                => $autoJenis,
-            'qty_dye_stuff'             => $qtyDyeStuff,
-            'existing_normal_count'     => $existingNormalCount,
-            'used_normal_steps'         => $usedNormalSteps,
-            'can_create_normal'         => $canCreateNormal,
-            'qty_aux'                   => $qtyAux,
-            'existing_normal_aux_count' => $existingNormalAuxCount,
-            'used_normal_aux_steps'     => $usedNormalAuxSteps,
-            'can_create_normal_aux'     => $canCreateNormalAux,
-            'used_addition_steps'       => $usedAdditionSteps,
-            'used_addition_aux_steps'   => $usedAdditionAuxSteps,
-            'total_wt'                  => $totalWt,
-            'step_count'                => $detailList->count(),
-            'all_no_op'                 => $detailList->pluck('no_op')->filter()->implode(', '),
-        ]);
+        return view('dye_stuff.show', compact('summary', 'ticketDetails'));
     }
 
     /**
-     * Membuat approval awal untuk alur reproses Dye Stuff (LA):
-     * 1) Pending FM
-     * 2) Setelah FM approve, otomatis dibuat approval VP (di ApprovalController)
+     * Print barcode label for a specific id_no.
      */
-    private function createReprocessApproval(DyeStuff $dyeStuff): void
+    public function print($id)
     {
-        $existingPending = Approval::where('dyestuff_id', $dyeStuff->id)
-            ->where('action', 'create_la_reprocess')
-            ->where('type', 'FM')
-            ->where('status', 'pending')
-            ->first();
+        $ticketDetails = TicketDetail::where('id_no', $id)->get();
 
-        if ($existingPending) {
-            return;
+        if ($ticketDetails->isEmpty()) {
+            return redirect()->route('dye-stuff.index')->with('error', 'Data Barcode Dye Stuff tidak ditemukan.');
         }
 
-        Approval::create([
-            'dyestuff_id'  => $dyeStuff->id,
-            'status'       => 'pending',
-            'type'         => 'FM',
-            'action'       => 'create_la_reprocess',
-            'history_data' => [
-                'dyestuff_snapshot' => $dyeStuff->toArray(),
-                'details'           => $dyeStuff->details()->get()->toArray(),
-            ],
-            'requested_by' => Auth::id(),
-        ]);
+        $first = $ticketDetails->first();
+        $summary = (object) [
+            'id_no'           => $id,
+            'barcode'         => $id,
+            'recipe_code'     => $first->recipe_code ?? '-',
+            'machine'         => $first->machine ?? '-',
+            'product_lot'     => $first->product_lot ?? '-',
+            'comp_date'       => $first->comp_date ?? '-',
+            'comp_time'       => $first->comp_time ?? '-',
+            'total_target_wt' => $ticketDetails->sum('target_wt'),
+            'total_actual_wt' => $ticketDetails->sum('actual_wt'),
+            'items_count'     => $ticketDetails->count(),
+        ];
+
+        return view('dye_stuff.print', compact('summary', 'ticketDetails'));
+    }
+
+    /**
+     * Print multiple barcode labels in bulk.
+     */
+    public function printBulk(Request $request)
+    {
+        $rawIds = $request->query('ids', '');
+        $barcodes = array_filter(explode(',', $rawIds));
+
+        $groupedDetails = TicketDetail::whereIn('id_no', $barcodes)
+            ->get()
+            ->groupBy('id_no');
+
+        if ($groupedDetails->isEmpty()) {
+            return redirect()->route('dye-stuff.index')->with('error', 'Tidak ada data Dye Stuff yang dipilih.');
+        }
+
+        $dyeStuffs = $groupedDetails->map(function ($items, $barcode) {
+            $first = $items->first();
+            return (object) [
+                'id_no'           => $barcode,
+                'barcode'         => $barcode,
+                'recipe_code'     => $first->recipe_code ?? '-',
+                'machine'         => $first->machine ?? '-',
+                'product_lot'     => $first->product_lot ?? '-',
+                'comp_date'       => $first->comp_date ?? '-',
+                'comp_time'       => $first->comp_time ?? '-',
+                'total_target_wt' => $items->sum('target_wt'),
+                'total_actual_wt' => $items->sum('actual_wt'),
+                'items_count'     => $items->count(),
+                'items'           => $items,
+            ];
+        })->values();
+
+        return view('dye_stuff.print_bulk', compact('dyeStuffs'));
     }
 }

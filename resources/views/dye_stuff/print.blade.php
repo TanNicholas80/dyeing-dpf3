@@ -1,9 +1,10 @@
 <!DOCTYPE html>
 <html lang="id">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Print Ticket - {{ $dyeStuff->barcode }}</title>
+    <title>Print Ticket - {{ $summary->barcode }}</title>
     <style>
         @page {
             size: auto;
@@ -31,11 +32,13 @@
             body {
                 padding: 0;
             }
+
             .ticket-container {
                 border: none;
                 max-width: 100%;
                 padding: 0;
             }
+
             .no-print {
                 display: none !important;
             }
@@ -93,14 +96,6 @@
             font-weight: bold;
         }
 
-        .step-header {
-            display: flex;
-            justify-content: space-between;
-            font-size: 12px;
-            font-weight: bold;
-            margin: 6px 0 4px 0;
-        }
-
         .detail-table {
             width: 100%;
             border-collapse: collapse;
@@ -108,7 +103,8 @@
             border-bottom: 1.5px solid #000;
         }
 
-        .detail-table th, .detail-table td {
+        .detail-table th,
+        .detail-table td {
             border-top: 1px dashed #444;
             border-bottom: 1px dashed #444;
             padding: 4px 2px;
@@ -122,8 +118,15 @@
             text-align: center !important;
         }
 
-        .text-right, .detail-table td.text-right { text-align: right !important; }
-        .text-center, .detail-table td.text-center { text-align: center !important; }
+        .text-right,
+        .detail-table td.text-right {
+            text-align: right !important;
+        }
+
+        .text-center,
+        .detail-table td.text-center {
+            text-align: center !important;
+        }
 
         .btn-print {
             padding: 8px 16px;
@@ -136,141 +139,105 @@
         }
     </style>
 </head>
+
 <body>
 
     <div class="no-print" style="max-width: 800px; margin: 0 auto 15px auto; text-align: right;">
         <button class="btn-print" onclick="window.print()"><i class="fas fa-print"></i> Cetak / Print Ticket</button>
     </div>
 
-    @php
-        $firstDetail = optional(optional($dyeStuff->proses)->details)->first();
-        $noOp = $firstDetail->no_op ?? '-';
-        $noPartai = $firstDetail->no_partai ?? '-';
-        $customer = $firstDetail->customer ?? '-';
-        $material = $firstDetail->konstruksi ?? '-';
-        $color = $firstDetail->warna ?? $firstDetail->color ?? '-';
-        $mesin = optional(optional($dyeStuff->proses)->mesin)->jenis_mesin ?? '-';
-        $tipeLabel = ($dyeStuff->tipe ?? 'normal') === 'additional' ? 'Type Addition' : 'Type Normal';
-    @endphp
-
     <div class="ticket-container">
-        <!-- QR Code (Centered Top) -->
         <div class="barcode-section">
-            <canvas id="qr-graphic"></canvas>
-            <div class="barcode-text">{{ $dyeStuff->barcode }}</div>
-        </div>
-
-        <!-- Top Bar (Printout Timestamp & Dye Stuff Type) -->
-        <div class="top-bar">
-            <span>Printout {{ date('Y-m-d H:i:s') }}</span>
-            <span style="font-weight: bold;">{{ $tipeLabel }}</span>
+            <canvas id="qr-code"></canvas>
+            <div class="barcode-text">{{ $summary->barcode }}</div>
         </div>
 
         <div class="divider"></div>
 
-        <!-- 2 Column Information Grid -->
         <table class="info-grid">
             <tr>
-                <td class="info-label">Batch:</td>
-                <td class="info-val" style="width: 38%;">{{ $noOp }}</td>
-                <td class="info-label">Color Name:</td>
-                <td class="info-val">{{ $color }}</td>
+                <td class="info-label">KODE RESEP</td>
+                <td>: <span class="info-val">{{ $summary->recipe_code }}</span></td>
+                <td class="info-label">MESIN</td>
+                <td>: <span class="info-val">{{ $summary->machine }}</span></td>
             </tr>
             <tr>
-                <td class="info-label">Fabric Name:</td>
-                <td class="info-val">{{ $material }}</td>
-                <td class="info-label">Order No:</td>
-                <td class="info-val">{{ $noPartai }}</td>
-            </tr>
-            <tr>
-                <td class="info-label">Customer Name:</td>
-                <td class="info-val">{{ $customer }}</td>
-                <td class="info-label">M/C:</td>
-                <td class="info-val">{{ $mesin }}</td>
-            </tr>
-            <tr>
-                <td class="info-label">Total Wt.(Kg):</td>
-                <td class="info-val">{{ number_format($dyeStuff->total_wt, 1) }}</td>
-                <td class="info-label">Volume(Litres):</td>
-                <td class="info-val">{{ number_format($dyeStuff->volume_litres, 1) }}</td>
+                <td class="info-label">PRODUCT LOT</td>
+                <td>: <span class="info-val">{{ $summary->product_lot }}</span></td>
+                <td class="info-label">TGL / JAM TIMBANG</td>
+                <td>: <span class="info-val">{{ $summary->comp_date }} {{ $summary->comp_time }}</span></td>
             </tr>
         </table>
 
         <div class="divider"></div>
 
-        <!-- Step Header & Liquor Ratio -->
-        <div class="step-header">
-            <span>Step {{ $dyeStuff->step_proses ?? 1 }}</span>
-            <span>Liquor Ratio = 1 : {{ number_format($dyeStuff->liquor_ratio, 1) }}</span>
-        </div>
-
-        <!-- Detail Table Chemical / Dye Stuff List -->
         <table class="detail-table">
             <thead>
                 <tr>
-                    <th style="width: 45%;">Name</th>
-                    <th style="width: 20%;">Conc.</th>
-                    <th style="width: 20%;">Weight</th>
-                    <th style="width: 15%;">Remark</th>
+                    <th style="width: 5%;">STEP</th>
+                    <th style="width: 20%;">KODE KIMIA</th>
+                    <th style="width: 35%;">NAMA KIMIA (PRODUCT_NAME)</th>
+                    <th style="width: 15%;" class="text-right">TARGET WT (g)</th>
+                    <th style="width: 15%;" class="text-right">ACTUAL WT (g)</th>
+                    <th style="width: 10%;" class="text-center">UNIT</th>
                 </tr>
             </thead>
             <tbody>
-                @forelse($dyeStuff->details as $detail)
+                @foreach ($ticketDetails as $row)
                     <tr>
-                        <td>{{ $detail->chemical_name }}</td>
-                        <td class="text-right" style="text-align: right;">{{ number_format($detail->konsentrasi, 5) }} %</td>
-                        <td class="text-right" style="text-align: right;">{{ number_format($detail->weight, 2) }} {{ $detail->unit ?? 'g' }}</td>
-                        <td>{{ $detail->remark ?? '' }}</td>
+                        <td class="text-center">{{ $row->step_no }}</td>
+                        <td>{{ $row->product_code }}</td>
+                        <td><strong>{{ $row->product_name ?? '-' }}</strong></td>
+                        <td class="text-right">{{ number_format((float) $row->target_wt, 2) }}</td>
+                        <td class="text-right"><strong>{{ number_format((float) $row->actual_wt, 2) }}</strong></td>
+                        <td class="text-center">{{ $row->unit ?? 'g' }}</td>
                     </tr>
-                @empty
-                    <tr>
-                        <td colspan="4" class="text-center" style="text-align: center;">Tidak ada detail kimia.</td>
-                    </tr>
-                @endforelse
+                @endforeach
             </tbody>
         </table>
     </div>
 
-    <!-- CDN QRious untuk render QR Code -->
     <script src="https://cdn.jsdelivr.net/npm/qrious@4.0.2/dist/qrious.min.js"></script>
     <script>
-        document.addEventListener("DOMContentLoaded", function() {
+        document.addEventListener("DOMContentLoaded", function () {
             function triggerPrint() {
-                setTimeout(function() {
+                setTimeout(function () {
                     window.print();
                 }, 300);
             }
 
             try {
-                const canvas = document.getElementById('qr-graphic');
-                const size = 110;
+                var canvas = document.getElementById('qr-code');
+                var size = 130;
                 new QRious({
                     element: canvas,
-                    value: "{{ $dyeStuff->barcode }}",
+                    value: "{{ $summary->id_no }}",
                     size: size,
                     level: 'H'
                 });
-                const logo = new Image();
+
+                var logo = new Image();
                 logo.src = "{{ asset('images/logo.png') }}";
-                logo.onload = function() {
-                    const ctx = canvas.getContext('2d');
-                    const logoSize = Math.floor(size * 0.22);
-                    const center = (size - logoSize) / 2;
-                    const padding = Math.max(2, Math.floor(logoSize * 0.15));
+                logo.onload = function () {
+                    var ctx = canvas.getContext('2d');
+                    var logoSize = Math.floor(size * 0.22);
+                    var center = (size - logoSize) / 2;
+                    var padding = Math.max(2, Math.floor(logoSize * 0.15));
 
                     ctx.fillStyle = '#FFFFFF';
                     ctx.fillRect(center - padding / 2, center - padding / 2, logoSize + padding, logoSize + padding);
                     ctx.drawImage(logo, center, center, logoSize, logoSize);
                     triggerPrint();
                 };
-                logo.onerror = function() {
+                logo.onerror = function () {
                     triggerPrint();
                 };
-            } catch(e) {
+            } catch (e) {
                 console.error("QRious error:", e);
                 triggerPrint();
             }
         });
     </script>
 </body>
+
 </html>

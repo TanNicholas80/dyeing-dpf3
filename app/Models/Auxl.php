@@ -15,7 +15,7 @@ class Auxl extends Model
 
     protected $fillable = [
         'proses_id', 'no_op', 'no_partai', 'barcode', 'matdok', 'mesin_id', 'cancel',
-        'jenis', 'tipe', 'step_proses', 'total_wt', 'volume_litres', 'code', 'konstruksi', 'customer', 'marketing', 'date', 'color'
+        'jenis', 'tipe', 'step_proses', 'liquor_ratio', 'total_wt', 'volume_litres', 'code', 'konstruksi', 'customer', 'marketing', 'date', 'color'
     ];
 
     public function proses()
@@ -78,7 +78,7 @@ class Auxl extends Model
      */
     public function getActivitylogOptions(): LogOptions
     {
-        $logFields = ['barcode', 'jenis', 'tipe', 'step_proses', 'code', 'konstruksi', 'customer', 'marketing', 'date', 'color', 'no_op', 'no_partai', 'mesin_id', 'cancel'];
+        $logFields = ['barcode', 'jenis', 'tipe', 'step_proses', 'liquor_ratio', 'code', 'konstruksi', 'customer', 'marketing', 'date', 'color', 'no_op', 'no_partai', 'mesin_id', 'cancel'];
 
         return LogOptions::defaults()
             ->useLogName('Manajemen Auxl')
@@ -122,6 +122,7 @@ class Auxl extends Model
             'jenis' => $this->jenis,
             'tipe' => $this->tipe,
             'step_proses' => $this->step_proses,
+            'liquor_ratio' => $this->liquor_ratio,
             'code' => $this->code,
             'konstruksi' => $this->konstruksi,
             'customer' => $this->customer,

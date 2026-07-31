@@ -136,6 +136,22 @@
                                     @enderror
                                 </div>
 
+                                <!-- Liquor Ratio (Depan 1 :, belakang diisi user) -->
+                                <div class="col-md-4 mb-3">
+                                    <label>Liquor Ratio <span class="text-danger">*</span></label>
+                                    <div class="input-group">
+                                        <div class="input-group-prepend">
+                                            <span class="input-group-text">1 :</span>
+                                        </div>
+                                        <input type="number" step="1" name="liquor_ratio" id="liquor_ratio"
+                                            class="form-control" placeholder="10"
+                                            value="{{ old('liquor_ratio', isset($auxl->liquor_ratio) ? round($auxl->liquor_ratio) : '10') }}" required>
+                                    </div>
+                                    @error('liquor_ratio')
+                                        <small class="text-danger">{{ $message }}</small>
+                                    @enderror
+                                </div>
+
                                 <!-- Total Wt. (Kg) -->
                                 <div class="col-md-4 mb-3">
                                     <label>Total Wt. (Kg) <span class="text-danger">*</span></label>
@@ -362,15 +378,13 @@
             let currentProsesInfo = null;
 
             function calcVolume() {
-                let totalWeight = 0;
-                $('.weight-input').each(function () {
-                    const w = parseFloat($(this).val()) || 0;
-                    totalWeight += w;
-                });
-                $('#volume_litres').val(totalWeight.toFixed(2));
+                const totalWt = parseFloat($('#total_wt').val()) || 0;
+                const ratio = parseFloat($('#liquor_ratio').val()) || 0;
+                const volume = totalWt * ratio;
+                $('#volume_litres').val(volume.toFixed(2));
             }
 
-            $(document).on('input change', '.weight-input', calcVolume);
+            $(document).on('input change', '#liquor_ratio, #total_wt', calcVolume);
 
             function updateStepAndQuotaState() {
                 if (!currentProsesInfo) return;
@@ -516,6 +530,8 @@
                         if (typeof data.total_wt !== 'undefined' && parseFloat(data.total_wt) > 0) {
                             $('#total_wt').val(parseFloat(data.total_wt).toFixed(2));
                         }
+
+                        calcVolume();
 
                         updateStepAndQuotaState();
                     }

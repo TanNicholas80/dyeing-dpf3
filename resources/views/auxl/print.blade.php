@@ -194,6 +194,10 @@
                 <td class="info-label">Volume(Litres):</td>
                 <td class="info-val">{{ number_format($auxl->volume_litres, 1) }}</td>
             </tr>
+            <tr>
+                <td class="info-label">Liquor Ratio:</td>
+                <td class="info-val" colspan="3">1 : {{ round($auxl->liquor_ratio ?? 10) }}</td>
+            </tr>
         </table>
 
         <div class="divider"></div>

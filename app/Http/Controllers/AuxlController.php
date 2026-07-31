@@ -69,7 +69,6 @@ class AuxlController extends Controller
                 $q->where('tipe', 'normal');
             }])
             ->whereNull('selesai')
-            ->where('qty_aux', '>', 0)
             ->orderByDesc('created_at')
             ->get();
 
@@ -90,6 +89,7 @@ class AuxlController extends Controller
             'jenis'       => 'required|in:normal,reproses,perbaikan',
             'tipe'        => 'required|in:normal,addition',
             'step_proses' => 'nullable|integer|in:1,2,3',
+            'liquor_ratio' => 'required|numeric|min:0.1',
             'total_wt'    => 'required|numeric|min:0',
             'volume_litres' => 'required|numeric|min:0',
             'code'        => 'required|string',
@@ -169,6 +169,7 @@ class AuxlController extends Controller
         }
 
         $data['step_proses'] = $data['step_proses'] ?? 1;
+        $data['volume_litres'] = round(floatval($data['total_wt']) * floatval($data['liquor_ratio']), 2);
 
         return DB::transaction(function () use ($data) {
             $barcode = Auxl::generateBarcode();
@@ -212,9 +213,6 @@ class AuxlController extends Controller
                 $q->where('tipe', 'normal')->where('id', '!=', $id);
             }])
             ->whereNull('selesai')
-            ->where(function ($q) use ($auxl) {
-                $q->where('qty_aux', '>', 0)->orWhere('id', $auxl->proses_id);
-            })
             ->orderByDesc('created_at')
             ->get();
 
@@ -234,6 +232,7 @@ class AuxlController extends Controller
             'jenis'       => 'required|in:normal,reproses,perbaikan',
             'tipe'        => 'required|in:normal,addition',
             'step_proses' => 'nullable|integer|in:1,2,3',
+            'liquor_ratio' => 'required|numeric|min:0.1',
             'total_wt'    => 'required|numeric|min:0',
             'volume_litres' => 'required|numeric|min:0',
             'code'        => 'required|string',
@@ -317,6 +316,7 @@ class AuxlController extends Controller
         }
 
         $data['step_proses'] = $data['step_proses'] ?? 1;
+        $data['volume_litres'] = round(floatval($data['total_wt']) * floatval($data['liquor_ratio']), 2);
 
         return DB::transaction(function () use ($auxl, $data) {
             $auxl->update($data);

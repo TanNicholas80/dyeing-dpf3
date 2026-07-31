@@ -75,13 +75,12 @@
                                                 @endphp
                                                 <tr class="{{ $pendingApproval ? 'table-warning' : '' }}">
                                                     <td><input type="checkbox" class="barcode-checkbox"
-                                                            value="{{ $auxl->barcode }}"
-                                                            data-id="{{ $auxl->id }}"
-                                                            data-code="{{ $auxl->code }}"
-                                                            data-customer="{{ $auxl->customer }}"
+                                                            value="{{ $auxl->barcode }}" data-id="{{ $auxl->id }}"
+                                                            data-code="{{ $auxl->code }}" data-customer="{{ $auxl->customer }}"
                                                             data-marketing="{{ $auxl->marketing }}"></td>
                                                     <td><strong>{{ $auxl->barcode }}</strong></td>
-                                                    <td>{{ \App\Models\Auxl::getJenisOptions()[$auxl->jenis] ?? ucfirst($auxl->jenis ?? '-') }}</td>
+                                                    <td>{{ \App\Models\Auxl::getJenisOptions()[$auxl->jenis] ?? ucfirst($auxl->jenis ?? '-') }}
+                                                    </td>
                                                     <td>
                                                         @if(($auxl->tipe ?? 'normal') === 'addition')
                                                             <span class="badge badge-warning">Addition (Topping)</span>
@@ -92,7 +91,8 @@
                                                     <td>
                                                         @if($auxl->step_proses)
                                                             @if(($auxl->tipe ?? 'normal') === 'addition')
-                                                                <span class="badge badge-secondary">{{ $auxl->step_proses == 1 ? 'Reactive' : ($auxl->step_proses == 2 ? 'Dispers' : 'Step ' . $auxl->step_proses) }}</span>
+                                                                <span
+                                                                    class="badge badge-secondary">{{ $auxl->step_proses == 1 ? 'Reactive' : ($auxl->step_proses == 2 ? 'Dispers' : 'Step ' . $auxl->step_proses) }}</span>
                                                             @else
                                                                 <span class="badge badge-secondary">Step {{ $auxl->step_proses }}</span>
                                                             @endif
@@ -101,7 +101,9 @@
                                                         @endif
                                                     </td>
                                                     <td>{{ number_format($auxl->total_wt, 1) }} kg</td>
-                                                    <td><span class="text-primary font-weight-bold">{{ number_format($auxl->volume_litres, 1) }} L</span></td>
+                                                    <td><span
+                                                            class="text-primary font-weight-bold">{{ number_format($auxl->volume_litres, 1) }}
+                                                            L</span></td>
                                                     <td>{{ $auxl->code }}</td>
                                                     <td>{{ $auxl->konstruksi }}</td>
                                                     <td>{{ $auxl->customer }}</td>
@@ -110,7 +112,8 @@
                                                     <td>{{ $auxl->color }}</td>
                                                     <td>
                                                         @if ($auxl->isUsedByProses ?? false)
-                                                            <span class="badge badge-success">Sudah dipakai ({{ $auxl->usedCount ?? 0 }})</span>
+                                                            <span class="badge badge-success">Sudah dipakai
+                                                                ({{ $auxl->usedCount ?? 0 }})</span>
                                                         @else
                                                             <span class="badge badge-secondary">Belum dipakai</span>
                                                         @endif
@@ -141,8 +144,7 @@
                                                                 </a>
 
                                                                 <!-- Modal Hapus -->
-                                                                <div class="modal fade"
-                                                                    id="modal-hapus{{ $auxl->id }}">
+                                                                <div class="modal fade" id="modal-hapus{{ $auxl->id }}">
                                                                     <div class="modal-dialog">
                                                                         <div class="modal-content">
                                                                             <div class="modal-header">
@@ -158,13 +160,10 @@
                                                                                     <b>{{ $auxl->barcode }}</b>?
                                                                                 </p>
                                                                             </div>
-                                                                            <div
-                                                                                class="modal-footer justify-content-between">
-                                                                                <button type="button"
-                                                                                    class="btn btn-secondary"
+                                                                            <div class="modal-footer justify-content-between">
+                                                                                <button type="button" class="btn btn-secondary"
                                                                                     data-dismiss="modal">Batal</button>
-                                                                                <form
-                                                                                    action="{{ route('aux.destroy', $auxl->id) }}"
+                                                                                <form action="{{ route('aux.destroy', $auxl->id) }}"
                                                                                     method="POST">
                                                                                     @csrf
                                                                                     @method('DELETE')
@@ -194,12 +193,12 @@
 
     <script>
         document.title = "Data Auxiliary";
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             const selectAllEl = document.getElementById('selectAll');
             if (selectAllEl) {
-                selectAllEl.addEventListener('change', function() {
+                selectAllEl.addEventListener('change', function () {
                     let checked = this.checked;
-                    document.querySelectorAll('.barcode-checkbox').forEach(function(cb) {
+                    document.querySelectorAll('.barcode-checkbox').forEach(function (cb) {
                         cb.checked = checked;
                     });
                 });
@@ -208,7 +207,7 @@
             // Print Bulk Barcode / Ticket
             const bulkPrintBtn = document.getElementById('bulkPrintBtn');
             if (bulkPrintBtn) {
-                bulkPrintBtn.addEventListener('click', function() {
+                bulkPrintBtn.addEventListener('click', function () {
                     let selected = Array.from(document.querySelectorAll('.barcode-checkbox:checked'));
                     if (selected.length === 0) {
                         Swal.fire({

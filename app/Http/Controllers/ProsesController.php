@@ -10,8 +10,7 @@ use App\Models\BarcodeLa;
 use App\Models\BarcodeAux;
 use App\Models\Approval;
 use App\Models\Auxl;
-use App\Models\DyeStuff;
-use App\Models\DyeStuffDetail;
+use App\Models\TicketDetail;
 use App\Events\ProsesCreated;
 use App\Events\ProsesStatusUpdated;
 use App\Events\BarcodeStatusUpdated;
@@ -1086,34 +1085,29 @@ class ProsesController extends Controller
                     ->with('error', $msg);
             }
 
-            // Validasi Data Dye Stuff (LA) dari model DyeStuff & DyeStuffDetail
-            $dyeStuffObj = DyeStuff::with('details')->where('barcode', $barcode)->first();
-            Log::info('BarcodeLa: DyeStuff lookup', ['barcode' => $barcode, 'found' => !!$dyeStuffObj]);
-            if (!$dyeStuffObj) {
-                $msg = 'Barcode Dye Stuff (LA) tidak ditemukan di database!';
-                Log::error('BarcodeLa: Barcode not found in dye_stuffs', ['barcode' => $barcode]);
+            // Validasi Data Dye Stuff / Ticket Detail dari model TicketDetail
+            $ticketDetails = TicketDetail::where('id_no', $barcode)->get();
+            Log::info('BarcodeLa: TicketDetail lookup', ['barcode' => $barcode, 'count' => $ticketDetails->count()]);
+            if ($ticketDetails->isEmpty()) {
+                $msg = 'Barcode Dye Stuff / Ticket Detail (LA) "' . $barcode . '" tidak ditemukan di database!';
+                Log::error('BarcodeLa: Barcode not found in ticket_details', ['barcode' => $barcode]);
                 if ($request->ajax() || $request->wantsJson()) {
                     return response()->json(['status' => 'error', 'message' => $msg], 400);
                 }
                 return redirect()->route('dashboard', ['page' => $page])->with('error', $msg);
             }
 
-            // Validasi Tipe DyeStuff (Normal vs Additional)
-            $dsTipe = $dyeStuffObj->tipe ?? 'normal';
-            $isToppingScan = !empty($approvalId);
+            // Validasi penimbangan: Harus memuat ACTUAL_WT, COMP_DATE, dan COMP_TIME
+            $unweighed = $ticketDetails->filter(function ($item) {
+                return empty($item->actual_wt) || ((float) $item->actual_wt <= 0) || empty($item->comp_date) || empty($item->comp_time);
+            });
 
-            if ($isToppingScan && $dsTipe === 'normal') {
-                $msg = 'Barcode Dye Stuff dengan tipe Normal merupakan Dye Stuff utama, tidak dapat digunakan untuk Topping LA! Harap gunakan Dye Stuff bertipe Addition.';
-                Log::error('BarcodeLa: Type mismatch (Normal used for Topping)', ['barcode' => $barcode, 'tipe' => $dsTipe]);
-                if ($request->ajax() || $request->wantsJson()) {
-                    return response()->json(['status' => 'error', 'message' => $msg], 400);
-                }
-                return redirect()->route('dashboard', ['page' => $page])->with('error', $msg);
-            }
-
-            if (!$isToppingScan && $dsTipe === 'additional') {
-                $msg = 'Barcode Dye Stuff dengan tipe Addition merupakan Topping LA, tidak dapat digunakan untuk Dye Stuff utama! Harap gunakan Dye Stuff bertipe Normal.';
-                Log::error('BarcodeLa: Type mismatch (Addition used for Main LA)', ['barcode' => $barcode, 'tipe' => $dsTipe]);
+            if ($unweighed->isNotEmpty()) {
+                $msg = 'Kimia dengan barcode "' . $barcode . '" ini tidak valid karena belum ditimbang di mesin LA!';
+                Log::error('BarcodeLa: Unweighed chemical barcode scanned', [
+                    'barcode' => $barcode,
+                    'unweighed_count' => $unweighed->count(),
+                ]);
                 if ($request->ajax() || $request->wantsJson()) {
                     return response()->json(['status' => 'error', 'message' => $msg], 400);
                 }
@@ -1211,20 +1205,9 @@ class ProsesController extends Controller
                 return $detail->no_op . '/' . (int) $totalQtyGi;
             })->implode('|');
 
-            $dsDetails = $dyeStuffObj->details;
-            Log::info('BarcodeLa: DyeStuff details lookup', ['count' => $dsDetails ? $dsDetails->count() : 0]);
-            if (!$dsDetails || $dsDetails->isEmpty()) {
-                $msg = 'Data detail Dye Stuff tidak ditemukan di database!';
-                Log::error('BarcodeLa: No details found for dyeStuff', ['barcode' => $barcode]);
-                if ($request->ajax() || $request->wantsJson()) {
-                    return response()->json(['status' => 'error', 'message' => $msg], 400);
-                }
-                return redirect()->route('dashboard', ['page' => $page])->with('error', $msg);
-            }
-
-            $details = $dsDetails->map(function ($row) {
-                $chemName = $row->chemical_name;
-                $wt = (float) ($row->weight ?? 0);
+            $details = $ticketDetails->map(function ($row) {
+                $chemName = $row->product_name ?: $row->product_code;
+                $wt = (float) ($row->actual_wt ?? 0);
                 return $chemName . '/' . $wt;
             })->implode('|');
             $body = '"' . $allNoOps . ';' . $details . '"';
