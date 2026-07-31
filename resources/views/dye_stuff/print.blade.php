@@ -211,7 +211,7 @@
                 var size = 130;
                 new QRious({
                     element: canvas,
-                    value: "{{ $summary->id_no }}",
+                    value: "{{ $summary->barcode }}",
                     size: size,
                     level: 'H'
                 });
