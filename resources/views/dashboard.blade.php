@@ -6998,7 +6998,7 @@
                                     url: '/api/check-partai-used',
                                     method: 'POST',
                                     headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
-                                    data: { no_op: p.noOp, no_partai: p.noPartai, jenis: jenisProses },
+                                    data: { no_op: p.noOp, no_partai: p.noPartai, jenis: jenisProses, mode: $('#proses_mode').val() },
                                     dataType: 'json'
                                 });
                             });

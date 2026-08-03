@@ -150,7 +150,7 @@
                             $canUser = in_array($role, ['super_admin']);
                             $canMesin = in_array($role, ['super_admin', 'fm', 'vp', 'ppic', 'owner', 'spv_listrik', 'scm']);
                             $canAux = in_array($role, ['super_admin', 'aux', 'scm']);
-                            $canDyeStuff = in_array($role, ['super_admin', 'ds', 'dye_stuff', 'aux', 'ppic', 'scm', 'kepala_ruangan', 'operator']);
+                            $canDyeStuff = in_array($role, ['super_admin', 'ds', 'dye_stuff', 'ppic', 'scm', 'kepala_ruangan', 'operator']);
                             $canLog = in_array($role, ['super_admin', 'fm', 'vp']);
                         @endphp
 

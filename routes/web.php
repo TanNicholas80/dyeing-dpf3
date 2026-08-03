@@ -143,7 +143,7 @@ Route::middleware(['auth', 'prevent-back-history'])->group(function () {
     /**
      * Dye Stuff (LA)
      */
-    Route::middleware('role:super_admin,ds,dye_stuff,aux,ppic,scm,kepala_ruangan,operator')->group(function () {
+    Route::middleware('role:super_admin,ds,dye_stuff,ppic,scm,kepala_ruangan,operator')->group(function () {
         Route::get('dye-stuff/print-bulk', [\App\Http\Controllers\DyeStuffController::class, 'printBulk'])->name('dye-stuff.print-bulk');
         Route::resource('dye-stuff', \App\Http\Controllers\DyeStuffController::class);
         Route::get('dye-stuff/{id}/print', [\App\Http\Controllers\DyeStuffController::class, 'print'])->name('dye-stuff.print');
