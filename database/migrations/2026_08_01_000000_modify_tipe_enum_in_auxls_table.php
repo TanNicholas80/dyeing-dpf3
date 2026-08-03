@@ -9,14 +9,24 @@ return new class extends Migration {
     public function up(): void
     {
         if (Schema::hasTable('auxls')) {
-            DB::statement("ALTER TABLE `auxls` MODIFY COLUMN `tipe` VARCHAR(30) NOT NULL DEFAULT 'normal'");
+            $driver = DB::getDriverName();
+            if ($driver === 'pgsql') {
+                DB::statement("ALTER TABLE auxls ALTER COLUMN tipe TYPE VARCHAR(30) USING tipe::text, ALTER COLUMN tipe SET DEFAULT 'normal', ALTER COLUMN tipe SET NOT NULL");
+            } else {
+                DB::statement("ALTER TABLE auxls MODIFY COLUMN tipe VARCHAR(30) NOT NULL DEFAULT 'normal'");
+            }
         }
     }
 
     public function down(): void
     {
         if (Schema::hasTable('auxls')) {
-            DB::statement("ALTER TABLE `auxls` MODIFY COLUMN `tipe` ENUM('normal', 'additional') NOT NULL DEFAULT 'normal'");
+            $driver = DB::getDriverName();
+            if ($driver === 'pgsql') {
+                DB::statement("ALTER TABLE auxls ALTER COLUMN tipe TYPE VARCHAR(30) USING tipe::text, ALTER COLUMN tipe SET DEFAULT 'normal', ALTER COLUMN tipe SET NOT NULL");
+            } else {
+                DB::statement("ALTER TABLE auxls MODIFY COLUMN tipe VARCHAR(30) NOT NULL DEFAULT 'normal'");
+            }
         }
     }
 };
