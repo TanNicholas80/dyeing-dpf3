@@ -44,87 +44,93 @@
             }
         }
 
-        .top-bar {
+        .barcode-section {
+            text-align: center;
+            margin-bottom: 2px;
+        }
+
+        .barcode-section canvas {
+            max-height: 80px;
+        }
+
+        .barcode-text {
+            font-size: 14px;
+            font-weight: normal;
+            letter-spacing: 1px;
+            margin-top: 1px;
+        }
+
+        .header-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            font-size: 12px;
+            margin-bottom: 4px;
+        }
+
+        .divider {
+            border-bottom: 1.5px solid #000;
+            margin: 4px 0 8px 0;
+        }
+
+        .info-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 6px;
+        }
+
+        .info-table td {
+            padding: 2px 4px;
+            vertical-align: top;
+            font-size: 12px;
+            line-height: 1.35;
+        }
+
+        .label-col {
+            width: 125px;
+            color: #000;
+        }
+
+        .val-col {
+            font-weight: normal;
+        }
+
+        .recipe-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
             font-size: 12px;
             font-weight: normal;
-            margin-top: 6px;
-            margin-bottom: 6px;
-        }
-
-        .barcode-section {
-            text-align: center;
+            margin-top: 4px;
             margin-bottom: 4px;
-        }
-
-        .barcode-section canvas {
-            max-height: 110px;
-        }
-
-        .barcode-text {
-            font-size: 13px;
-            font-weight: bold;
-            letter-spacing: 1px;
-            margin-top: 2px;
-        }
-
-        .divider {
-            border-bottom: 1.5px solid #000;
-            margin: 6px 0;
-        }
-
-        .info-grid {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 4px;
-        }
-
-        .info-grid td {
-            padding: 2px 4px;
-            vertical-align: top;
-            font-size: 12px;
-        }
-
-        .info-label {
-            font-weight: normal;
-            width: 110px;
-        }
-
-        .info-val {
-            font-weight: bold;
         }
 
         .detail-table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 4px;
+            margin-top: 2px;
             border-bottom: 1.5px solid #000;
         }
 
         .detail-table th,
         .detail-table td {
-            border-top: 1px dashed #444;
-            border-bottom: 1px dashed #444;
-            padding: 4px 2px;
+            border-top: 1px dashed #666;
+            border-bottom: 1px dashed #666;
+            padding: 5px 4px;
             text-align: left;
             font-size: 11px;
         }
 
         .detail-table th {
-            font-weight: bold;
+            font-weight: normal;
             background-color: transparent;
-            text-align: center !important;
         }
 
-        .text-right,
-        .detail-table td.text-right {
+        .text-right {
             text-align: right !important;
         }
 
-        .text-center,
-        .detail-table td.text-center {
+        .text-center {
             text-align: center !important;
         }
 
@@ -147,50 +153,91 @@
     </div>
 
     <div class="ticket-container">
+        <!-- Barcode Utama -->
         <div class="barcode-section">
             <canvas id="qr-code"></canvas>
-            <div class="barcode-text">{{ $summary->barcode }}</div>
+            <div class="barcode-text">*{{ $summary->barcode }}*</div>
+        </div>
+
+        <!-- Header Metadata -->
+        <div class="header-meta">
+            <div>Printout {{ $summary->print_time }}</div>
+            <div>Type {{ $summary->type_name }}</div>
         </div>
 
         <div class="divider"></div>
 
-        <table class="info-grid">
+        <!-- Grid Informasi Tiket Fisik -->
+        <table class="info-table">
             <tr>
-                <td class="info-label">KODE RESEP</td>
-                <td>: <span class="info-val">{{ $summary->recipe_code }}</span></td>
-                <td class="info-label">MESIN</td>
-                <td>: <span class="info-val">{{ $summary->machine }}</span></td>
+                <td class="label-col">Batch:</td>
+                <td class="val-col" style="width: 35%;">
+                    {{ $summary->batch_no }}
+                    @if($summary->no_jo && $summary->no_jo !== '-')
+                        <span style="margin-left: 8px; color: #555;">(No JO: {{ $summary->no_jo }})</span>
+                    @endif
+                </td>
+                <td class="label-col">Color Name:</td>
+                <td class="val-col">{{ $summary->color_name }}</td>
             </tr>
             <tr>
-                <td class="info-label">PRODUCT LOT</td>
-                <td>: <span class="info-val">{{ $summary->product_lot }}</span></td>
-                <td class="info-label">TGL / JAM TIMBANG</td>
-                <td>: <span class="info-val">{{ $summary->comp_date }} {{ $summary->comp_time }}</span></td>
+                <td class="label-col">Fabric Name:</td>
+                <td class="val-col">
+                    {{ $summary->fabric_name }}
+                </td>
+                <td class="label-col">Order No:</td>
+                <td class="val-col">
+                    {{ $summary->order_no }}
+                    @if($summary->order_no !== $summary->product_lot && $summary->product_lot !== '-')
+                        <span style="color: #555;">({{ $summary->product_lot }})</span>
+                    @endif
+                </td>
+            </tr>
+            <tr>
+                <td class="label-col">Customer Name:</td>
+                <td class="val-col">{{ $summary->customer_name }}</td>
+                <td class="label-col">M/C:</td>
+                <td class="val-col">{{ $summary->machine }}</td>
+            </tr>
+            <tr>
+                <td class="label-col">Total Wt.(Kg):</td>
+                <td class="val-col">{{ number_format((float) $summary->total_wt_kg, 1) }}</td>
+                <td class="label-col">Volume(Litres):</td>
+                <td class="val-col">{{ number_format((float) $summary->volume, 1) }}</td>
             </tr>
         </table>
 
         <div class="divider"></div>
 
+        <!-- Sub-header Resep & Liquor Ratio -->
+        <div class="recipe-header">
+            <div>Step 1 &nbsp; Recipe Code: {{ $summary->recipe_code }}</div>
+            <div>Liquor Ratio = 1 : {{ $summary->lr }}</div>
+        </div>
+
+        <!-- Tabel Detail Kimia / Dye Stuff -->
         <table class="detail-table">
             <thead>
                 <tr>
-                    <th style="width: 5%;">STEP</th>
-                    <th style="width: 20%;">KODE KIMIA</th>
-                    <th style="width: 35%;">NAMA KIMIA (PRODUCT_NAME)</th>
-                    <th style="width: 15%;" class="text-right">TARGET WT (g)</th>
-                    <th style="width: 15%;" class="text-right">ACTUAL WT (g)</th>
-                    <th style="width: 10%;" class="text-center">UNIT</th>
+                    <th style="width: 15%;">Code</th>
+                    <th style="width: 40%;">Name</th>
+                    <th style="width: 15%;" class="text-right">Conc.</th>
+                    <th style="width: 8%;"></th>
+                    <th style="width: 12%;" class="text-right">Weight</th>
+                    <th style="width: 5%;"></th>
+                    <th style="width: 5%;">Remark</th>
                 </tr>
             </thead>
             <tbody>
                 @foreach ($ticketDetails as $row)
                     <tr>
-                        <td class="text-center">{{ $row->step_no }}</td>
                         <td>{{ $row->product_code }}</td>
-                        <td><strong>{{ $row->product_name ?? '-' }}</strong></td>
-                        <td class="text-right">{{ number_format((float) $row->target_wt, 2) }}</td>
-                        <td class="text-right"><strong>{{ number_format((float) $row->actual_wt, 2) }}</strong></td>
-                        <td class="text-center">{{ $row->unit ?? 'g' }}</td>
+                        <td>{{ $row->product_name ?? '-' }}</td>
+                        <td class="text-right">{{ number_format((float) ($row->conc ?? 0), 5) }}</td>
+                        <td class="text-center">{{ $row->conc_unit ?? '%' }}</td>
+                        <td class="text-right">{{ number_format((float) ($row->target_wt ?? $row->actual_wt), 2) }}</td>
+                        <td class="text-left">{{ $row->unit ?? 'g' }}</td>
+                        <td>{{ $row->remark ?? '' }}</td>
                     </tr>
                 @endforeach
             </tbody>
@@ -208,7 +255,7 @@
 
             try {
                 var canvas = document.getElementById('qr-code');
-                var size = 130;
+                var size = 110;
                 new QRious({
                     element: canvas,
                     value: "{{ $summary->barcode }}",

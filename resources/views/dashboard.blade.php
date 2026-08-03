@@ -6827,13 +6827,12 @@
                     $produksi.prop('disabled', true).hide();
                     $maintenance.prop('disabled', true).hide();
                     $reproses.prop('disabled', false).show();
-                    if ($('#jenis').val() === 'Produksi' || $('#jenis').val() === 'Maintenance') {
-                        $('#jenis').val('Reproses');
-                    }
+                    $('#jenis').val('Reproses').css({'pointer-events': 'none', 'background-color': '#e9ecef'}).attr('tabindex', '-1');
                 } else {
                     $produksi.prop('disabled', false).show();
                     $maintenance.prop('disabled', false).show();
                     $reproses.prop('disabled', false).show();
+                    $('#jenis').css({'pointer-events': 'auto', 'background-color': '#fff'}).removeAttr('tabindex');
                 }
                 toggleReprocessHint();
             }

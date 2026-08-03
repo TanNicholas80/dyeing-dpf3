@@ -40,6 +40,7 @@
                                 <select name="status_timbang" id="status_timbang" class="form-control form-control-sm w-100" onchange="this.form.submit()">
                                     <option value="">-- Semua Status --</option>
                                     <option value="sudah" {{ request('status_timbang') === 'sudah' ? 'selected' : '' }}>Sudah Ditimbang</option>
+                                    <option value="parsial" {{ request('status_timbang') === 'parsial' ? 'selected' : '' }}>Sebagian Ditimbang (Parsial)</option>
                                     <option value="belum" {{ request('status_timbang') === 'belum' ? 'selected' : '' }}>Belum Ditimbang</option>
                                 </select>
                             </div>
@@ -119,8 +120,12 @@
                                             </strong>
                                         </td>
                                         <td class="text-center">
-                                            @if ($item->is_weighed)
+                                            @if ($item->status_timbang === 'sudah')
                                                 <span class="badge badge-success"><i class="fas fa-check-circle mr-1"></i>Sudah Ditimbang</span>
+                                            @elseif ($item->status_timbang === 'parsial')
+                                                <span class="badge badge-warning text-dark" title="{{ $item->weighed_count }}/{{ $item->items_count }} item ditimbang">
+                                                    <i class="fas fa-exclamation-triangle mr-1"></i>Parsial ({{ $item->weighed_count }}/{{ $item->items_count }})
+                                                </span>
                                             @else
                                                 <span class="badge badge-danger"><i class="fas fa-hourglass-half mr-1"></i>Belum Ditimbang</span>
                                             @endif

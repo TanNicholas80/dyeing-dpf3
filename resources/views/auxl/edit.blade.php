@@ -378,31 +378,76 @@
             let currentProsesInfo = null;
 
             function calcVolume() {
+                let sumWeight = 0;
+                let hasDetailWeight = false;
+
+                $('.weight-input').each(function () {
+                    const val = parseFloat($(this).val());
+                    if (!isNaN(val) && val > 0) {
+                        sumWeight += val;
+                        hasDetailWeight = true;
+                    }
+                });
+
+                if (hasDetailWeight) {
+                    $('#total_wt').val(sumWeight.toFixed(2));
+                }
+
                 const totalWt = parseFloat($('#total_wt').val()) || 0;
                 const ratio = parseFloat($('#liquor_ratio').val()) || 0;
                 const volume = totalWt * ratio;
                 $('#volume_litres').val(volume.toFixed(2));
             }
 
-            $(document).on('input change', '#liquor_ratio, #total_wt', calcVolume);
+            $(document).on('input change', '#liquor_ratio, #total_wt, .weight-input', calcVolume);
 
             function updateStepAndQuotaState() {
                 if (!currentProsesInfo) return;
 
                 const data = currentProsesInfo;
-                const selectedTipe = $('#tipe').val() || 'normal';
-                const qtyAux = parseInt(data.qty_aux) || 1;
+                const qtyAux = (typeof data.qty_aux !== 'undefined') ? parseInt(data.qty_aux) : 0;
                 const existingNormalAuxCount = parseInt(data.existing_normal_aux_count) || 0;
                 const usedNormalAuxSteps = data.used_normal_aux_steps || [];
                 const usedAdditionAuxSteps = data.used_addition_aux_steps || [];
-                const canCreateNormalAux = data.can_create_normal_aux;
 
-                // Update Info Kuota
-                if (existingNormalAuxCount >= qtyAux) {
-                    $('#info-aux-quota').html(`AUX Normal Dibuat: <span class="badge badge-danger">${existingNormalAuxCount} / ${qtyAux} (Kuota Penuh)</span>`);
+                const canCreateNormalAux = (qtyAux > 0) && data.can_create_normal_aux;
+
+                // Jika Kebutuhan Aux QTY = 0 atau Kuota Normal Penuh
+                if (qtyAux === 0 || !canCreateNormalAux) {
+                    $('#tipe option[value="normal"]').prop('disabled', true);
+                    $('#tipe').val('addition');
+                    $('#tipe option[value="addition"]').prop('selected', true);
+                    $('#info-aux-quota').html('').hide();
                 } else {
-                    $('#info-aux-quota').html(`AUX Normal Dibuat: <span class="badge badge-success">${existingNormalAuxCount} / ${qtyAux} (Sisa ${qtyAux - existingNormalAuxCount}x)</span>`);
+                    $('#tipe option[value="normal"]').prop('disabled', false);
+                    $('#info-aux-quota').show();
+                    if (existingNormalAuxCount >= qtyAux) {
+                        $('#info-aux-quota').html(`AUX Normal Dibuat: <span class="badge badge-danger">${existingNormalAuxCount} / ${qtyAux} (Kuota Penuh)</span>`);
+                    } else {
+                        $('#info-aux-quota').html(`AUX Normal Dibuat: <span class="badge badge-success">${existingNormalAuxCount} / ${qtyAux} (Sisa ${qtyAux - existingNormalAuxCount}x)</span>`);
+                    }
                 }
+
+                const selectedTipe = $('#tipe').val() || (qtyAux === 0 || !canCreateNormalAux ? 'addition' : 'normal');
+
+                // Auto-determine Jenis Aux (Normal, Perbaikan BDP, Reproses FG)
+                const jenisProses = (data.jenis_proses || '').toLowerCase();
+                const modeProses = (data.mode_proses || '').toLowerCase();
+                let autoJenis = 'normal';
+                if (jenisProses === 'produksi') {
+                    if (selectedTipe === 'addition' || selectedTipe === 'additional') {
+                        autoJenis = 'perbaikan';
+                    } else {
+                        autoJenis = 'normal';
+                    }
+                } else if (jenisProses === 'reproses') {
+                    if (modeProses === 'finish') {
+                        autoJenis = 'reproses';
+                    } else {
+                        autoJenis = 'perbaikan';
+                    }
+                }
+                $('#jenis').val(autoJenis);
 
                 const $stepSelect = $('#step_proses');
                 const prevVal = $stepSelect.data('initial-val') || $stepSelect.val();
@@ -413,7 +458,7 @@
                     const isAdditionFull = usedAdditionAuxSteps.includes(1) && usedAdditionAuxSteps.includes(2);
 
                     if (isAdditionFull && (!prevVal || !usedAdditionAuxSteps.includes(parseInt(prevVal)))) {
-                        $('#tipe-warning-text').text(`AUX Type Addition (Topping) untuk proses ini sudah mencapai batas maksimum (2x: Reactive & Dispers). Silakan pilih Tipe Normal atau pilih proses lain.`);
+                        $('#tipe-warning-text').text(`AUX Type Addition (Topping) untuk proses ini sudah mencapai batas maksimum (2x: Reactive & Dispers). Silakan pilih proses lain.`);
                         $('#tipe-warning-alert').slideDown(200);
                         $('#btn-submit-form').prop('disabled', true).addClass('disabled');
                     } else {

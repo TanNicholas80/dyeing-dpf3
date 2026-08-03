@@ -150,7 +150,7 @@ Route::middleware(['auth', 'prevent-back-history'])->group(function () {
     });
 });
 
-Route::get('/api/proses-info/{id}', [\App\Http\Controllers\DyeStuffController::class, 'getProsesInfo']);
+Route::get('/api/proses-info/{id}', [\App\Http\Controllers\AuxlController::class, 'getProsesInfo']);
 
 // Tambahkan di luar middleware auth agar bisa diakses select2
 Route::post('/api/proxy-op', [ProsesController::class, 'proxyOpSearch']);

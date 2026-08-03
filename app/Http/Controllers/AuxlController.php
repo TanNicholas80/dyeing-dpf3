@@ -104,6 +104,23 @@ class AuxlController extends Controller
         ]);
 
         $proses = Proses::findOrFail($data['proses_id']);
+        $jenisProses = strtolower($proses->jenis ?? '');
+        $modeProses = strtolower($proses->mode ?? 'greige');
+
+        if ($jenisProses === 'produksi') {
+            if ($data['tipe'] === 'addition') {
+                $data['jenis'] = 'perbaikan'; // Perbaikan BDP (Topping Aux pada Produksi)
+            } else {
+                $data['jenis'] = 'normal';
+            }
+        } elseif ($jenisProses === 'reproses') {
+            if ($modeProses === 'finish') {
+                $data['jenis'] = 'reproses'; // Reproses FG
+            } else {
+                $data['jenis'] = 'perbaikan'; // Perbaikan BDP (Reproses Greige)
+            }
+        }
+
         $maxQty = (int) ($proses->qty_aux ?? 0);
         if ($data['tipe'] === 'normal' && $maxQty < 1) {
             return back()->withInput()->withErrors([
@@ -249,6 +266,23 @@ class AuxlController extends Controller
 
         $auxl = Auxl::findOrFail($id);
         $proses = Proses::findOrFail($data['proses_id']);
+        $jenisProses = strtolower($proses->jenis ?? '');
+        $modeProses = strtolower($proses->mode ?? 'greige');
+
+        if ($jenisProses === 'produksi') {
+            if ($data['tipe'] === 'addition') {
+                $data['jenis'] = 'perbaikan'; // Perbaikan BDP (Topping Aux pada Produksi)
+            } else {
+                $data['jenis'] = 'normal';
+            }
+        } elseif ($jenisProses === 'reproses') {
+            if ($modeProses === 'finish') {
+                $data['jenis'] = 'reproses'; // Reproses FG
+            } else {
+                $data['jenis'] = 'perbaikan'; // Perbaikan BDP (Reproses Greige)
+            }
+        }
+
         $maxQty = (int) ($proses->qty_aux ?? 0);
         if ($data['tipe'] === 'normal' && $maxQty < 1) {
             return back()->withInput()->withErrors([
@@ -528,5 +562,86 @@ class AuxlController extends Controller
         } catch (\Exception $e) {
             return response()->json(['results' => []]);
         }
+    }
+
+    public function getProsesInfo(Request $request, $id)
+    {
+        $proses = Proses::with(['details', 'mesin', 'auxls'])->find($id);
+
+        if (!$proses) {
+            return response()->json(['error' => 'Proses tidak ditemukan'], 404);
+        }
+
+        $details = $proses->details;
+
+        $excludeAuxId = $request->query('exclude_aux_id');
+
+        $auxlsQuery = $proses->auxls;
+        if ($excludeAuxId) {
+            $auxlsQuery = $auxlsQuery->where('id', '!=', $excludeAuxId);
+        }
+
+        $usedNormalSteps = $auxlsQuery->where('tipe', 'normal')
+            ->pluck('step_proses')
+            ->filter()
+            ->map(fn($v) => (int) $v)
+            ->values()
+            ->toArray();
+
+        $usedAdditionSteps = $auxlsQuery->where('tipe', 'addition')
+            ->pluck('step_proses')
+            ->filter()
+            ->map(fn($v) => (int) $v)
+            ->values()
+            ->toArray();
+
+        $existingNormalCount = count($usedNormalSteps);
+        $qtyAux = (int) ($proses->qty_aux ?? 0);
+
+        $customer = $details->pluck('customer')->filter()->unique()->implode(', ');
+        $marketing = $details->pluck('marketing')->filter()->unique()->implode(', ');
+        $material = $details->pluck('konstruksi')->filter()->unique()->implode(', ');
+        $color = $details->pluck('warna')->filter()->unique()->implode(', ');
+        $noOp = $details->pluck('no_op')->filter()->unique()->implode(', ');
+        $noPartai = $details->pluck('no_partai')->filter()->unique()->implode(', ');
+        $jenisProses = strtolower($proses->jenis ?? '');
+        $modeProses = strtolower($proses->mode ?? 'greige');
+        $tipeAux = strtolower($request->query('tipe', 'normal'));
+        $autoJenis = 'normal';
+
+        if ($jenisProses === 'produksi') {
+            if ($tipeAux === 'addition') {
+                $autoJenis = 'perbaikan'; // Perbaikan BDP (Topping Aux pada Produksi)
+            } else {
+                $autoJenis = 'normal';
+            }
+        } elseif ($jenisProses === 'reproses') {
+            if ($modeProses === 'finish') {
+                $autoJenis = 'reproses'; // Reproses FG
+            } else {
+                $autoJenis = 'perbaikan'; // Perbaikan BDP (Reproses Greige)
+            }
+        }
+
+        return response()->json([
+            'id' => $proses->id,
+            'status_proses' => !is_null($proses->mulai) ? 'Sedang Berjalan' : 'Belum Berjalan',
+            'no_jo' => $noOp ?: '-',
+            'no_partai' => $noPartai ?: '-',
+            'customer' => $customer ?: '-',
+            'material' => $material ?: '-',
+            'color' => $color ?: '-',
+            'marketing' => $marketing ?: '-',
+            'mesin' => $proses->mesin->jenis_mesin ?? $proses->mesin->nama ?? '-',
+            'total_wt' => 0,
+            'qty_aux' => $qtyAux,
+            'existing_normal_aux_count' => $existingNormalCount,
+            'used_normal_aux_steps' => $usedNormalSteps,
+            'used_addition_aux_steps' => $usedAdditionSteps,
+            'can_create_normal_aux' => $existingNormalCount < $qtyAux,
+            'jenis_proses' => $jenisProses,
+            'mode_proses' => $modeProses,
+            'auto_jenis' => $autoJenis,
+        ]);
     }
 }

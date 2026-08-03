@@ -25,7 +25,7 @@ class DyeStuffController extends Controller
                 DB::raw('COUNT(*) as items_count'),
                 DB::raw('SUM(target_wt) as total_target_wt'),
                 DB::raw('SUM(actual_wt) as total_actual_wt'),
-                DB::raw("MAX(CASE WHEN actual_wt > 0 AND comp_date IS NOT NULL AND TRIM(comp_date) != '' THEN 1 ELSE 0 END) as is_weighed"),
+                DB::raw("SUM(CASE WHEN actual_wt > 0 AND comp_date IS NOT NULL AND TRIM(comp_date) != '' THEN 1 ELSE 0 END) as weighed_items_count"),
                 DB::raw('MAX(id) as max_id')
             )
             ->whereNotNull('id_no')
@@ -43,12 +43,14 @@ class DyeStuffController extends Controller
             });
         }
 
-        // Filter Status Penimbangan
+        // Filter Status Penimbangan (sudah, parsial, belum)
         if ($request->filled('status_timbang')) {
             if ($request->status_timbang === 'sudah') {
-                $query->havingRaw("MAX(CASE WHEN actual_wt > 0 AND comp_date IS NOT NULL AND TRIM(comp_date) != '' THEN 1 ELSE 0 END) = 1");
+                $query->havingRaw("SUM(CASE WHEN actual_wt > 0 AND comp_date IS NOT NULL AND TRIM(comp_date) != '' THEN 1 ELSE 0 END) = COUNT(*)");
+            } elseif ($request->status_timbang === 'parsial') {
+                $query->havingRaw("SUM(CASE WHEN actual_wt > 0 AND comp_date IS NOT NULL AND TRIM(comp_date) != '' THEN 1 ELSE 0 END) > 0 AND SUM(CASE WHEN actual_wt > 0 AND comp_date IS NOT NULL AND TRIM(comp_date) != '' THEN 1 ELSE 0 END) < COUNT(*)");
             } elseif ($request->status_timbang === 'belum') {
-                $query->havingRaw("MAX(CASE WHEN actual_wt > 0 AND comp_date IS NOT NULL AND TRIM(comp_date) != '' THEN 1 ELSE 0 END) = 0");
+                $query->havingRaw("SUM(CASE WHEN actual_wt > 0 AND comp_date IS NOT NULL AND TRIM(comp_date) != '' THEN 1 ELSE 0 END) = 0");
             }
         }
 
@@ -81,7 +83,19 @@ class DyeStuffController extends Controller
             $item->barcode = $item->id_no;
             $item->isUsedByProses = $usedCount > 0;
             $item->usedCount = $usedCount;
-            $item->is_weighed = ((int) $item->is_weighed) === 1;
+
+            $itemsCount = (int) $item->items_count;
+            $weighedCount = (int) $item->weighed_items_count;
+
+            if ($weighedCount === $itemsCount && $itemsCount > 0) {
+                $item->status_timbang = 'sudah';
+            } elseif ($weighedCount > 0 && $weighedCount < $itemsCount) {
+                $item->status_timbang = 'parsial';
+            } else {
+                $item->status_timbang = 'belum';
+            }
+            $item->is_weighed = $item->status_timbang === 'sudah';
+            $item->weighed_count = $weighedCount;
             return $item;
         });
 
@@ -102,6 +116,19 @@ class DyeStuffController extends Controller
         $first = $ticketDetails->first();
         $usedCount = BarcodeLa::where('barcode', $id)->where('cancel', false)->count();
 
+        $itemsCount = $ticketDetails->count();
+        $weighedCount = $ticketDetails->filter(function ($item) {
+            return !empty($item->actual_wt) && ((float) $item->actual_wt > 0) && !empty($item->comp_date) && trim($item->comp_date) !== '';
+        })->count();
+
+        if ($weighedCount === $itemsCount && $itemsCount > 0) {
+            $statusTimbang = 'sudah';
+        } elseif ($weighedCount > 0 && $weighedCount < $itemsCount) {
+            $statusTimbang = 'parsial';
+        } else {
+            $statusTimbang = 'belum';
+        }
+
         $summary = (object) [
             'id_no'           => $id,
             'barcode'         => $id,
@@ -112,9 +139,23 @@ class DyeStuffController extends Controller
             'comp_time'       => $first->comp_time ?? '-',
             'total_target_wt' => $ticketDetails->sum('target_wt'),
             'total_actual_wt' => $ticketDetails->sum('actual_wt'),
-            'items_count'     => $ticketDetails->count(),
+            'items_count'     => $itemsCount,
+            'weighed_count'   => $weighedCount,
+            'status_timbang'  => $statusTimbang,
             'isUsedByProses'  => $usedCount > 0,
             'usedCount'       => $usedCount,
+            // Field Tambahan Sesuai Layout Tiket fisik
+            'batch_no'        => $first->batch_no ?? '-',
+            'no_jo'           => $first->res_string1 ?? '-',
+            'fabric_name'     => $first->product_lot ?? '-',
+            'customer_name'   => $first->res_string2 ?? '-',
+            'total_wt_kg'     => $first->fabric_weight ?? 0,
+            'color_name'      => $first->res_string3 ?? '-',
+            'order_no'        => $first->res_string4 ?? '-',
+            'volume'          => $first->volume ?? 0,
+            'lr'              => $first->lr ?? '6.0',
+            'type_name'       => $first->recipe_type ?: ($first->id_type ?: 'Normal'),
+            'print_time'      => now()->format('Y-m-d H:i:s'),
         ];
 
         return view('dye_stuff.show', compact('summary', 'ticketDetails'));
@@ -143,6 +184,18 @@ class DyeStuffController extends Controller
             'total_target_wt' => $ticketDetails->sum('target_wt'),
             'total_actual_wt' => $ticketDetails->sum('actual_wt'),
             'items_count'     => $ticketDetails->count(),
+            // Field Tambahan Sesuai Layout Tiket fisik
+            'batch_no'        => $first->batch_no ?? '-',
+            'no_jo'           => $first->res_string1 ?? '-',
+            'fabric_name'     => $first->product_lot ?? '-',
+            'customer_name'   => $first->res_string2 ?? '-',
+            'total_wt_kg'     => $first->fabric_weight ?? 0,
+            'color_name'      => $first->res_string3 ?? '-',
+            'order_no'        => $first->res_string4 ?? '-',
+            'volume'          => $first->volume ?? 0,
+            'lr'              => $first->lr ?? '6.0',
+            'type_name'       => $first->recipe_type ?: ($first->id_type ?: 'Normal'),
+            'print_time'      => now()->format('Y-m-d H:i:s'),
         ];
 
         return view('dye_stuff.print', compact('summary', 'ticketDetails'));
@@ -178,6 +231,18 @@ class DyeStuffController extends Controller
                 'total_actual_wt' => $items->sum('actual_wt'),
                 'items_count'     => $items->count(),
                 'items'           => $items,
+                // Field Tambahan Sesuai Layout Tiket fisik
+                'batch_no'        => $first->batch_no ?? '-',
+                'no_jo'           => $first->res_string1 ?? '-',
+                'fabric_name'     => $first->product_lot ?? '-',
+                'customer_name'   => $first->res_string2 ?? '-',
+                'total_wt_kg'     => $first->fabric_weight ?? 0,
+                'color_name'      => $first->res_string3 ?? '-',
+                'order_no'        => $first->res_string4 ?? '-',
+                'volume'          => $first->volume ?? 0,
+                'lr'              => $first->lr ?? '6.0',
+                'type_name'       => $first->recipe_type ?: ($first->id_type ?: 'Normal'),
+                'print_time'      => now()->format('Y-m-d H:i:s'),
             ];
         })->values();
 

@@ -44,40 +44,64 @@
                             <div class="col-md-9">
                                 <div class="row">
                                     <div class="col-md-4 mb-3">
-                                        <strong>Kode Resep:</strong><br>
-                                        <span class="badge badge-secondary p-2">{{ $summary->recipe_code }}</span>
+                                        <strong>Batch / No JO:</strong><br>
+                                        <span>{{ $summary->batch_no }}</span>
+                                        @if($summary->no_jo && $summary->no_jo !== '-')
+                                            <small class="text-muted d-block">(JO: {{ $summary->no_jo }})</small>
+                                        @endif
                                     </div>
                                     <div class="col-md-4 mb-3">
-                                        <strong>Mesin:</strong><br>
+                                        <strong>Fabric Name (Konstruksi):</strong><br>
+                                        <span class="text-bold">{{ $summary->fabric_name }}</span>
+                                    </div>
+                                    <div class="col-md-4 mb-3">
+                                        <strong>Customer Name:</strong><br>
+                                        <span>{{ $summary->customer_name }}</span>
+                                    </div>
+                                    <div class="col-md-4 mb-3">
+                                        <strong>Color Name (Warna):</strong><br>
+                                        <span>{{ $summary->color_name }}</span>
+                                    </div>
+                                    <div class="col-md-4 mb-3">
+                                        <strong>Order No / No Partai:</strong><br>
+                                        <span>{{ $summary->order_no }}</span>
+                                    </div>
+                                    <div class="col-md-4 mb-3">
+                                        <strong>Mesin (M/C):</strong><br>
                                         <span class="text-bold">{{ $summary->machine }}</span>
                                     </div>
                                     <div class="col-md-4 mb-3">
-                                        <strong>Product Lot:</strong><br>
-                                        <span>{{ $summary->product_lot }}</span>
+                                        <strong>Total Wt. (Kg):</strong><br>
+                                        <span>{{ number_format((float) $summary->total_wt_kg, 1) }} Kg</span>
+                                    </div>
+                                    <div class="col-md-4 mb-3">
+                                        <strong>Volume (Litres):</strong><br>
+                                        <span>{{ number_format((float) $summary->volume, 1) }} L</span>
+                                    </div>
+                                    <div class="col-md-4 mb-3">
+                                        <strong>Kode Resep & LR:</strong><br>
+                                        <span class="badge badge-secondary p-2">{{ $summary->recipe_code }} (LR 1:{{ $summary->lr }})</span>
                                     </div>
                                     <div class="col-md-4 mb-3">
                                         <strong>Tgl & Jam Timbang:</strong><br>
-                                        <span><i class="far fa-calendar-alt text-muted mr-1"></i>{{ $summary->comp_date }}
-                                            {{ $summary->comp_time }}</span>
+                                        <span><i class="far fa-calendar-alt text-muted mr-1"></i>{{ $summary->comp_date }} {{ $summary->comp_time }}</span>
                                     </div>
                                     <div class="col-md-4 mb-3">
-                                        <strong>Total Target Wt (Gram):</strong><br>
-                                        <span>{{ number_format($summary->total_target_wt, 2) }} g</span>
-                                    </div>
-                                    <div class="col-md-4 mb-3">
-                                        <strong>Total Actual Wt (Gram):</strong><br>
-                                        <span class="text-success font-weight-bold"
-                                            style="font-size: 1.1rem;">{{ number_format($summary->total_actual_wt, 2) }}
-                                            g</span>
+                                        <strong>Status Penimbangan:</strong><br>
+                                        @if ($summary->status_timbang === 'sudah')
+                                            <span class="badge badge-success p-2"><i class="fas fa-check-circle mr-1"></i>Sudah Ditimbang</span>
+                                        @elseif ($summary->status_timbang === 'parsial')
+                                            <span class="badge badge-warning text-dark p-2"><i class="fas fa-exclamation-triangle mr-1"></i>Sebagian Ditimbang ({{ $summary->weighed_count }}/{{ $summary->items_count }} Item)</span>
+                                        @else
+                                            <span class="badge badge-danger p-2"><i class="fas fa-hourglass-half mr-1"></i>Belum Ditimbang</span>
+                                        @endif
                                     </div>
                                     <div class="col-md-4 mb-3">
                                         <strong>Status Pemakaian OP:</strong><br>
                                         @if ($summary->isUsedByProses)
-                                            <span class="badge badge-success p-2"><i class="fas fa-check-circle mr-1"></i>Sudah
-                                                Dipakai ({{ $summary->usedCount }}x)</span>
+                                            <span class="badge badge-success p-2"><i class="fas fa-check-circle mr-1"></i>Sudah Dipakai ({{ $summary->usedCount }}x)</span>
                                         @else
-                                            <span class="badge badge-secondary p-2"><i
-                                                    class="fas fa-times-circle mr-1"></i>Belum Dipakai</span>
+                                            <span class="badge badge-secondary p-2"><i class="fas fa-times-circle mr-1"></i>Belum Dipakai</span>
                                         @endif
                                     </div>
                                 </div>

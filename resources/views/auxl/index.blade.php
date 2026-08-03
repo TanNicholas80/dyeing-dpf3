@@ -44,144 +44,139 @@
                                 </div>
                             </div>
                             <div class="card-body">
-                                <form id="bulkPrintForm">
-                                    <table id="auxl" class="table table-head-fixed text-nowrap table-hover table-striped">
-                                        <thead>
-                                            <tr>
-                                                <th style="width: 30px;"><input type="checkbox" id="selectAll"></th>
-                                                <th>Barcode</th>
-                                                <th>Jenis</th>
-                                                <th>Tipe</th>
-                                                <th>Step Process</th>
-                                                <th>Total Wt (Kg)</th>
-                                                <th>Volume (L)</th>
-                                                <th>Code</th>
-                                                <th>Konstruksi</th>
-                                                <th>Customer</th>
-                                                <th>Marketing</th>
-                                                <th>Date</th>
-                                                <th>Color</th>
-                                                <th>Dipakai Proses</th>
-                                                <th>Aksi</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            @foreach ($auxls->sortBy('barcode') as $auxl)
-                                                @php
-                                                    $pendingApproval = $auxl->pendingApproval ?? null;
-                                                    $waitingLabel = $pendingApproval
-                                                        ? strtoupper($pendingApproval->type)
-                                                        : null;
-                                                @endphp
-                                                <tr class="{{ $pendingApproval ? 'table-warning' : '' }}">
-                                                    <td><input type="checkbox" class="barcode-checkbox"
-                                                            value="{{ $auxl->barcode }}" data-id="{{ $auxl->id }}"
-                                                            data-code="{{ $auxl->code }}" data-customer="{{ $auxl->customer }}"
-                                                            data-marketing="{{ $auxl->marketing }}"></td>
-                                                    <td><strong>{{ $auxl->barcode }}</strong></td>
-                                                    <td>{{ \App\Models\Auxl::getJenisOptions()[$auxl->jenis] ?? ucfirst($auxl->jenis ?? '-') }}
-                                                    </td>
-                                                    <td>
+                                <table id="auxl" class="table table-head-fixed text-nowrap table-hover table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th style="width: 30px;"><input type="checkbox" id="selectAll"></th>
+                                            <th>Barcode</th>
+                                            <th>Jenis</th>
+                                            <th>Tipe</th>
+                                            <th>Step Process</th>
+                                            <th>Total Wt (Kg)</th>
+                                            <th>Volume (L)</th>
+                                            <th>Code</th>
+                                            <th>Konstruksi</th>
+                                            <th>Customer</th>
+                                            <th>Marketing</th>
+                                            <th>Date</th>
+                                            <th>Color</th>
+                                            <th>Dipakai Proses</th>
+                                            <th>Aksi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach ($auxls->sortBy('barcode') as $auxl)
+                                            @php
+                                                $pendingApproval = $auxl->pendingApproval ?? null;
+                                                $waitingLabel = $pendingApproval
+                                                    ? strtoupper($pendingApproval->type)
+                                                    : null;
+                                            @endphp
+                                            <tr class="{{ $pendingApproval ? 'table-warning' : '' }}">
+                                                <td><input type="checkbox" class="barcode-checkbox"
+                                                        value="{{ $auxl->barcode }}" data-id="{{ $auxl->id }}"
+                                                        data-code="{{ $auxl->code }}" data-customer="{{ $auxl->customer }}"
+                                                        data-marketing="{{ $auxl->marketing }}"></td>
+                                                <td><strong>{{ $auxl->barcode }}</strong></td>
+                                                <td>{{ \App\Models\Auxl::getJenisOptions()[$auxl->jenis] ?? ucfirst($auxl->jenis ?? '-') }}
+                                                </td>
+                                                <td>
+                                                    @if(($auxl->tipe ?? 'normal') === 'addition')
+                                                        <span class="badge badge-warning">Addition (Topping)</span>
+                                                    @else
+                                                        <span class="badge badge-info">Normal (Utama)</span>
+                                                    @endif
+                                                </td>
+                                                <td>
+                                                    @if($auxl->step_proses)
                                                         @if(($auxl->tipe ?? 'normal') === 'addition')
-                                                            <span class="badge badge-warning">Addition (Topping)</span>
+                                                            <span
+                                                                class="badge badge-secondary">{{ $auxl->step_proses == 1 ? 'Reactive' : ($auxl->step_proses == 2 ? 'Dispers' : 'Step ' . $auxl->step_proses) }}</span>
                                                         @else
-                                                            <span class="badge badge-info">Normal (Utama)</span>
+                                                            <span class="badge badge-secondary">Step {{ $auxl->step_proses }}</span>
                                                         @endif
-                                                    </td>
-                                                    <td>
-                                                        @if($auxl->step_proses)
-                                                            @if(($auxl->tipe ?? 'normal') === 'addition')
-                                                                <span
-                                                                    class="badge badge-secondary">{{ $auxl->step_proses == 1 ? 'Reactive' : ($auxl->step_proses == 2 ? 'Dispers' : 'Step ' . $auxl->step_proses) }}</span>
-                                                            @else
-                                                                <span class="badge badge-secondary">Step {{ $auxl->step_proses }}</span>
-                                                            @endif
-                                                        @else
-                                                            -
-                                                        @endif
-                                                    </td>
-                                                    <td>{{ number_format($auxl->total_wt, 1) }} kg</td>
-                                                    <td><span
-                                                            class="text-primary font-weight-bold">{{ number_format($auxl->volume_litres, 1) }}
-                                                            L</span></td>
-                                                    <td>{{ $auxl->code }}</td>
-                                                    <td>{{ $auxl->konstruksi }}</td>
-                                                    <td>{{ $auxl->customer }}</td>
-                                                    <td>{{ $auxl->marketing }}</td>
-                                                    <td>{{ $auxl->date }}</td>
-                                                    <td>{{ $auxl->color }}</td>
-                                                    <td>
-                                                        @if ($auxl->isUsedByProses ?? false)
-                                                            <span class="badge badge-success">Sudah dipakai
-                                                                ({{ $auxl->usedCount ?? 0 }})</span>
-                                                        @else
-                                                            <span class="badge badge-secondary">Belum dipakai</span>
-                                                        @endif
-                                                    </td>
-                                                    <td>
-                                                        @if ($pendingApproval)
-                                                            <span class="badge badge-warning text-dark">
-                                                                Menunggu approval {{ $waitingLabel }}
-                                                            </span>
-                                                        @else
-                                                            <a href="{{ route('aux.show', $auxl->id) }}"
-                                                                class="btn btn-info btn-sm mr-1">
-                                                                <i class="fas fa-eye"></i> Detail
+                                                    @else
+                                                        -
+                                                    @endif
+                                                </td>
+                                                <td>{{ number_format($auxl->total_wt, 1) }} kg</td>
+                                                <td><span
+                                                        class="text-primary font-weight-bold">{{ number_format($auxl->volume_litres, 1) }}
+                                                        L</span></td>
+                                                <td>{{ $auxl->code }}</td>
+                                                <td>{{ $auxl->konstruksi }}</td>
+                                                <td>{{ $auxl->customer }}</td>
+                                                <td>{{ $auxl->marketing }}</td>
+                                                <td>{{ $auxl->date }}</td>
+                                                <td>{{ $auxl->color }}</td>
+                                                <td>
+                                                    @if ($auxl->isUsedByProses ?? false)
+                                                        <span class="badge badge-success">Sudah dipakai
+                                                            ({{ $auxl->usedCount ?? 0 }})</span>
+                                                    @else
+                                                        <span class="badge badge-secondary">Belum dipakai</span>
+                                                    @endif
+                                                </td>
+                                                <td>
+                                                    @if ($pendingApproval)
+                                                        <span class="badge badge-warning text-dark">
+                                                            Menunggu approval {{ $waitingLabel }}
+                                                        </span>
+                                                    @else
+                                                        <a href="{{ route('aux.show', $auxl->id) }}"
+                                                            class="btn btn-info btn-sm mr-1">
+                                                            <i class="fas fa-eye"></i> Detail
+                                                        </a>
+
+                                                        @if ($canManageAuxl)
+                                                            <a href="{{ route('aux.edit', $auxl->id) }}"
+                                                                class="btn btn-warning btn-sm mr-1">
+                                                                <i class="fas fa-pen"></i> Edit
                                                             </a>
-
-                                                            @if ($canManageAuxl)
-                                                                <a href="{{ route('aux.edit', $auxl->id) }}"
-                                                                    class="btn btn-warning btn-sm mr-1">
-                                                                    <i class="fas fa-pen"></i> Edit
-                                                                </a>
-                                                            @endif
-
-                                                            @if ($isSuperAdmin)
-                                                                <a href="#" data-toggle="modal"
-                                                                    data-target="#modal-hapus{{ $auxl->id }}"
-                                                                    class="btn btn-danger btn-sm">
-                                                                    <i class="fas fa-trash-alt"></i> Hapus
-                                                                </a>
-
-                                                                <!-- Modal Hapus -->
-                                                                <div class="modal fade" id="modal-hapus{{ $auxl->id }}">
-                                                                    <div class="modal-dialog">
-                                                                        <div class="modal-content">
-                                                                            <div class="modal-header">
-                                                                                <h4 class="modal-title">Konfirmasi Hapus
-                                                                                    Data</h4>
-                                                                                <button type="button" class="close"
-                                                                                    data-dismiss="modal">
-                                                                                    <span>&times;</span>
-                                                                                </button>
-                                                                            </div>
-                                                                            <div class="modal-body">
-                                                                                <p>Yakin ingin menghapus data auxiliary
-                                                                                    <b>{{ $auxl->barcode }}</b>?
-                                                                                </p>
-                                                                            </div>
-                                                                            <div class="modal-footer justify-content-between">
-                                                                                <button type="button" class="btn btn-secondary"
-                                                                                    data-dismiss="modal">Batal</button>
-                                                                                <form action="{{ route('aux.destroy', $auxl->id) }}"
-                                                                                    method="POST">
-                                                                                    @csrf
-                                                                                    @method('DELETE')
-                                                                                    <button type="submit"
-                                                                                        class="btn btn-danger">Hapus</button>
-                                                                                </form>
-                                                                            </div>
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            @endif
                                                         @endif
-                                                    </td>
-                                                </tr>
-                                            @endforeach
-                                        </tbody>
-                                    </table>
-                                </form>
+
+                                                        @if ($isSuperAdmin)
+                                                            <button type="button" data-toggle="modal"
+                                                                data-target="#modal-hapus{{ $auxl->id }}"
+                                                                class="btn btn-danger btn-sm">
+                                                                <i class="fas fa-trash-alt"></i> Hapus
+                                                            </button>
+                                                        @endif
+                                                    @endif
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+
+                                <!-- Modal Hapus List -->
+                                @if ($isSuperAdmin)
+                                    @foreach ($auxls as $auxl)
+                                        <div class="modal fade" id="modal-hapus{{ $auxl->id }}">
+                                            <div class="modal-dialog">
+                                                <div class="modal-content">
+                                                    <div class="modal-header">
+                                                        <h4 class="modal-title">Konfirmasi Hapus Data</h4>
+                                                        <button type="button" class="close" data-dismiss="modal">
+                                                            <span>&times;</span>
+                                                        </button>
+                                                    </div>
+                                                    <div class="modal-body text-left" style="white-space: normal;">
+                                                        <p>Yakin ingin menghapus data auxiliary <b>{{ $auxl->barcode }}</b>?</p>
+                                                    </div>
+                                                    <div class="modal-footer justify-content-between">
+                                                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Batal</button>
+                                                        <form action="{{ route('aux.destroy', $auxl->id) }}" method="POST">
+                                                            @csrf
+                                                            @method('DELETE')
+                                                            <button type="submit" class="btn btn-danger">Hapus</button>
+                                                        </form>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    @endforeach
+                                @endif
                             </div>
                         </div>
                         <!-- /.card -->

@@ -8,7 +8,7 @@ return new class extends Migration {
     public function up(): void
     {
         Schema::table('auxls', function (Blueprint $table) {
-            $table->enum('tipe', ['normal', 'additional'])->default('normal')->after('jenis');
+            $table->string('tipe', 30)->default('normal')->after('jenis');
         });
     }
 

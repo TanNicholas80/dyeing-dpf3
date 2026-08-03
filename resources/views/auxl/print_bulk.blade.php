@@ -159,6 +159,12 @@
             $color = $auxl->color ?? ($firstDetail->warna ?? $firstDetail->color ?? '-');
             $mesin = optional(optional($auxl->proses)->mesin)->jenis_mesin ?? '-';
             $tipeLabel = ($auxl->tipe ?? 'normal') === 'addition' ? 'Type Addition' : 'Type Normal';
+            if (($auxl->tipe ?? 'normal') === 'addition') {
+                $stepNum = (int) ($auxl->step_proses ?? 1);
+                $stepLabel = ($stepNum === 2) ? 'Step 2 - Dispers' : 'Step 1 - Reactive';
+            } else {
+                $stepLabel = 'Step ' . ($auxl->step_proses ?? 1);
+            }
         @endphp
 
         <div class="ticket-container">
@@ -202,17 +208,14 @@
                     <td class="info-label">Volume(Litres):</td>
                     <td class="info-val">{{ number_format($auxl->volume_litres, 1) }}</td>
                 </tr>
-                <tr>
-                    <td class="info-label">Liquor Ratio:</td>
-                    <td class="info-val" colspan="3">1 : {{ round($auxl->liquor_ratio ?? 10) }}</td>
-                </tr>
             </table>
 
             <div class="divider"></div>
 
             <!-- Step Header -->
             <div class="step-header">
-                <span>Step {{ $auxl->step_proses ?? 1 }}</span>
+                <span>{{ $stepLabel }}</span>
+                <span>Liquor Ratio: 1 : {{ round($auxl->liquor_ratio ?? 10) }}</span>
             </div>
 
             <!-- Detail Table Auxiliary List (Without Conc & Remark) -->

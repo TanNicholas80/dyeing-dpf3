@@ -1676,15 +1676,19 @@ class ProsesController extends Controller
         $jenisOp = $proses->jenis_op ?? 'Single';
         $isMultipleOp = $jenisOp === 'Multiple' && $detailList->count() > 1;
 
-        // Constraint: minimal 1 barcode LA dan 1 barcode AUX (cancel=false) di proses
-        // Untuk Multiple OP: 1 barcode LA/AUX dipakai bersama untuk beberapa OP, cukup cek ada di minimal 1 detail
-        $hasLa = false;
-        $hasAux = false;
+        // Constraint: minimal 1 barcode LA (jika qty_dye_stuff > 0) dan 1 barcode AUX (jika qty_aux > 0) (cancel=false) di proses.
+        // Jika qty_dye_stuff == 0 atau qty_aux == 0, maka tidak memerlukan barcode awal (hasLa/hasAux otomatis true).
+        $qtyDyeStuff = (int) ($proses->qty_dye_stuff ?? 0);
+        $qtyAux = (int) ($proses->qty_aux ?? 0);
+
+        $hasLa = ($qtyDyeStuff === 0);
+        $hasAux = ($qtyAux === 0);
+
         foreach ($detailList as $detail) {
-            if (BarcodeLa::where('detail_proses_id', $detail->id)->where('cancel', false)->exists()) {
+            if (!$hasLa && BarcodeLa::where('detail_proses_id', $detail->id)->where('cancel', false)->exists()) {
                 $hasLa = true;
             }
-            if (BarcodeAux::where('detail_proses_id', $detail->id)->where('cancel', false)->exists()) {
+            if (!$hasAux && BarcodeAux::where('detail_proses_id', $detail->id)->where('cancel', false)->exists()) {
                 $hasAux = true;
             }
         }
