@@ -101,6 +101,7 @@ class AuxlController extends Controller
             'details'     => 'required|array|min:1',
             'details.*.auxiliary'   => 'required|string',
             'details.*.konsentrasi' => 'required|numeric|min:0',
+            'details.*.unit'        => 'nullable|string',
         ]);
 
         $proses = Proses::findOrFail($data['proses_id']);
@@ -194,7 +195,14 @@ class AuxlController extends Controller
 
             $auxl = Auxl::create($data);
             foreach ($data['details'] as $detail) {
-                $auxl->details()->create($detail);
+                $konsentrasi = floatval($detail['konsentrasi']);
+                if (isset($detail['unit']) && strtolower($detail['unit']) === 'gram') {
+                    $konsentrasi = $konsentrasi / 1000;
+                }
+                $auxl->details()->create([
+                    'auxiliary'   => $detail['auxiliary'],
+                    'konsentrasi' => $konsentrasi,
+                ]);
             }
 
             // Jika jenis reproses / perbaikan, trigger approval 2 step (FM lalu VP)
@@ -357,7 +365,14 @@ class AuxlController extends Controller
             // Hapus detail lama, simpan ulang
             $auxl->details()->delete();
             foreach ($data['details'] as $detail) {
-                $auxl->details()->create($detail);
+                $konsentrasi = floatval($detail['konsentrasi']);
+                if (isset($detail['unit']) && strtolower($detail['unit']) === 'gram') {
+                    $konsentrasi = $konsentrasi / 1000;
+                }
+                $auxl->details()->create([
+                    'auxiliary'   => $detail['auxiliary'],
+                    'konsentrasi' => $konsentrasi,
+                ]);
             }
             return redirect()->route('aux.index')->with('success', 'Data Auxl berhasil diupdate.');
         });
@@ -467,6 +482,7 @@ class AuxlController extends Controller
                 ->map(fn ($item) => [
                     'id' => $item['matnr'],
                     'text' => $item['matnr'],
+                    'extwg' => $item['extwg'] ?? null,
                 ])
                 ->values()
                 ->all();

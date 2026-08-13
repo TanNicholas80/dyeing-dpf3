@@ -299,8 +299,9 @@
                                             @php
                                                 $auxName = is_array($d) ? ($d['auxiliary'] ?? '') : ($d->auxiliary ?? '');
                                                 $weightVal = is_array($d) ? ($d['konsentrasi'] ?? '') : ($d->konsentrasi ?? '');
+                                                $unitVal = is_array($d) ? ($d['unit'] ?? 'kg') : 'kg';
                                             @endphp
-                                            <tr class="detail-row">
+                                            <tr class="detail-row" data-current-unit="{{ $unitVal }}">
                                                 <td>
                                                     <select name="details[{{ $i }}][auxiliary]"
                                                         class="form-control select2-auxiliary" required>
@@ -308,11 +309,17 @@
                                                             <option value="{{ $auxName }}" selected>{{ $auxName }}</option>
                                                         @endif
                                                     </select>
+                                                    <input type="hidden" name="details[{{ $i }}][unit]" class="unit-input" value="{{ $unitVal }}">
                                                 </td>
                                                 <td>
-                                                    <input type="number" step="0.01" name="details[{{ $i }}][konsentrasi]"
-                                                        class="form-control form-control-sm weight-input"
-                                                        placeholder="Weight (kg)" value="{{ $weightVal }}" required>
+                                                    <div class="input-group input-group-sm">
+                                                        <input type="number" step="0.0001" name="details[{{ $i }}][konsentrasi]"
+                                                            class="form-control form-control-sm weight-input"
+                                                            placeholder="Weight (kg)" value="{{ $weightVal }}" readonly required>
+                                                        <div class="input-group-append">
+                                                            <span class="input-group-text unit-label">kg</span>
+                                                        </div>
+                                                    </div>
                                                 </td>
                                                 <td class="text-center">
                                                     <button type="button" class="btn btn-danger btn-sm btn-remove-detail"><i
@@ -341,8 +348,52 @@
         $(document).ready(function () {
             $('.select2').select2({ width: '100%' });
 
+            function updateRowWeightState($tr) {
+                const $select = $tr.find('.select2-auxiliary');
+                const selectedData = $select.select2('data')[0] || {};
+                let extwg = selectedData.extwg;
+                if (typeof extwg === 'undefined' || extwg === null) {
+                    extwg = $select.find('option:selected').data('extwg');
+                }
+
+                const $weightInput = $tr.find('.weight-input');
+                const $unitLabel = $tr.find('.unit-label');
+                const $unitInput = $tr.find('.unit-input');
+                const prevUnit = $tr.data('current-unit') || 'kg';
+
+                if (extwg === 'AUX SPC') {
+                    $weightInput.prop('readonly', false);
+                    $weightInput.attr('placeholder', 'Weight (gram)');
+                    $unitLabel.text('gram');
+                    $unitInput.val('gram');
+
+                    if (prevUnit === 'kg') {
+                        const currentVal = parseFloat($weightInput.val());
+                        if (!isNaN(currentVal) && currentVal > 0) {
+                            $weightInput.val(parseFloat((currentVal * 1000).toFixed(2)));
+                        }
+                        $tr.data('current-unit', 'gram');
+                    }
+                } else {
+                    $weightInput.prop('readonly', true);
+                    $weightInput.attr('placeholder', 'Weight (kg)');
+                    $unitLabel.text('kg');
+                    $unitInput.val('kg');
+
+                    if (prevUnit === 'gram') {
+                        const currentVal = parseFloat($weightInput.val());
+                        if (!isNaN(currentVal) && currentVal > 0) {
+                            $weightInput.val(parseFloat((currentVal / 1000).toFixed(4)));
+                        }
+                        $tr.data('current-unit', 'kg');
+                    }
+                }
+                calcVolume();
+            }
+
             function initAuxiliarySelect2(selector) {
-                $(selector).select2({
+                const $el = $(selector);
+                $el.select2({
                     placeholder: '-- Cari & Pilih Nama Auxiliary (min. 3 karakter) --',
                     minimumInputLength: 3,
                     width: '100%',
@@ -367,11 +418,20 @@
                             return { results: [] };
                         }
                     }
+                }).on('select2:select', function (e) {
+                    const data = e.params.data;
+                    if (data && data.extwg) {
+                        $(this).find('option:selected').attr('data-extwg', data.extwg);
+                    }
+                    updateRowWeightState($(this).closest('.detail-row'));
+                }).on('select2:clear change', function () {
+                    updateRowWeightState($(this).closest('.detail-row'));
                 });
             }
 
             $('.select2-auxiliary').each(function () {
                 initAuxiliarySelect2(this);
+                updateRowWeightState($(this).closest('.detail-row'));
             });
 
             let detailIndex = {{ count($auxl->details) }};
@@ -381,16 +441,20 @@
                 let sumWeight = 0;
                 let hasDetailWeight = false;
 
-                $('.weight-input').each(function () {
-                    const val = parseFloat($(this).val());
+                $('.detail-row').each(function () {
+                    const $row = $(this);
+                    const $input = $row.find('.weight-input');
+                    const val = parseFloat($input.val());
                     if (!isNaN(val) && val > 0) {
-                        sumWeight += val;
+                        const isGram = $row.find('.unit-label').text().trim().toLowerCase() === 'gram';
+                        const weightInKg = isGram ? (val / 1000) : val;
+                        sumWeight += weightInKg;
                         hasDetailWeight = true;
                     }
                 });
 
                 if (hasDetailWeight) {
-                    $('#total_wt').val(sumWeight.toFixed(2));
+                    $('#total_wt').val(sumWeight.toFixed(4));
                 }
 
                 const totalWt = parseFloat($('#total_wt').val()) || 0;
@@ -589,12 +653,18 @@
 
             $('#btn-add-detail').on('click', function () {
                 const tr = `
-                            <tr class="detail-row">
+                            <tr class="detail-row" data-current-unit="kg">
                                 <td>
                                     <select name="details[${detailIndex}][auxiliary]" class="form-control select2-auxiliary" required></select>
+                                    <input type="hidden" name="details[${detailIndex}][unit]" class="unit-input" value="kg">
                                 </td>
                                 <td>
-                                    <input type="number" step="0.01" name="details[${detailIndex}][konsentrasi]" class="form-control form-control-sm weight-input" placeholder="Weight (kg)" required>
+                                    <div class="input-group input-group-sm">
+                                        <input type="number" step="0.0001" name="details[${detailIndex}][konsentrasi]" class="form-control form-control-sm weight-input" placeholder="Weight (kg)" readonly required>
+                                        <div class="input-group-append">
+                                            <span class="input-group-text unit-label">kg</span>
+                                        </div>
+                                    </div>
                                 </td>
                                 <td class="text-center">
                                     <button type="button" class="btn btn-danger btn-sm btn-remove-detail"><i class="fas fa-trash"></i></button>
@@ -602,7 +672,9 @@
                             </tr>
                         `;
                 $('#details-list').append(tr);
-                initAuxiliarySelect2($('#details-list tr:last .select2-auxiliary'));
+                const $newSelect = $('#details-list tr:last .select2-auxiliary');
+                initAuxiliarySelect2($newSelect);
+                updateRowWeightState($newSelect.closest('.detail-row'));
                 detailIndex++;
                 calcVolume();
             });
@@ -627,7 +699,7 @@
 
                     const data = await res.json();
                     if (typeof data.weight !== 'undefined' && !isNaN(parseFloat(data.weight))) {
-                        const weightInputs = document.querySelectorAll('.weight-input');
+                        const weightInputs = document.querySelectorAll('.weight-input[readonly]');
                         if (weightInputs.length > 0) {
                             weightInputs[weightInputs.length - 1].value = parseFloat(data.weight).toFixed(2);
                             calcVolume();
