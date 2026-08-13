@@ -287,8 +287,8 @@ class ProsesController extends Controller
             'jenis' => 'required|in:Produksi,Maintenance,Reproses',
             'mesin_id' => 'required|exists:mesins,id',
             'cycle_time' => 'required',
-            'qty_dye_stuff' => 'nullable|integer|in:1,2,3',
-            'qty_aux' => 'nullable|integer|in:1,2,3',
+            'qty_dye_stuff' => 'nullable|integer|in:0,1,2,3',
+            'qty_aux' => 'nullable|integer|in:0,1,2,3',
         ];
 
         // Finish mode: hanya Reproses
