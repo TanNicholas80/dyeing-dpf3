@@ -186,6 +186,19 @@ class AuxlController extends Controller
             }
         }
 
+        $totalWt = 0;
+        foreach ($data['details'] as $detail) {
+            $konsentrasi = floatval($detail['konsentrasi']);
+            if (isset($detail['unit']) && strtolower($detail['unit']) === 'gram') {
+                $konsentrasi = $konsentrasi / 1000;
+            }
+            $totalWt += $konsentrasi;
+        }
+        if ($totalWt > 0) {
+            $data['total_wt'] = round($totalWt, 4);
+        } else {
+            $data['total_wt'] = round(floatval($data['total_wt']), 4);
+        }
         $data['step_proses'] = $data['step_proses'] ?? 1;
         $data['volume_litres'] = round(floatval($data['total_wt']) * floatval($data['liquor_ratio']), 2);
 
@@ -232,6 +245,49 @@ class AuxlController extends Controller
             abort(403, 'Unauthorized action.');
         }
         $auxl = Auxl::with(['proses.details', 'details'])->findOrFail($id);
+
+        // Cari info extwg untuk setiap auxiliary dari cache/SAP agar dikenali di edit form
+        foreach ($auxl->details as $detail) {
+            $extwg = null;
+            $auxName = $detail->auxiliary;
+            if ($auxName) {
+                // Cek apakah ada di cache proxy sebelumnya
+                $cacheKey = 'proxy_sap:auxiliary:' . md5(substr($auxName, 0, 3));
+                $cached = Cache::get($cacheKey);
+                if ($cached && isset($cached['results'])) {
+                    foreach ($cached['results'] as $res) {
+                        if ($res['id'] === $auxName || $res['text'] === $auxName) {
+                            $extwg = $res['extwg'] ?? null;
+                            break;
+                        }
+                    }
+                }
+
+                // Jika belum ketemu di cache, query ke SAP jika memungkinkan
+                if (!$extwg) {
+                    try {
+                        $client = new \GuzzleHttp\Client();
+                        $response = $client->request(
+                            'POST',
+                            SapApi::url('zterima_zchm'),
+                            SapApi::proxyGuzzleOptions(['body' => '"' . substr($auxName, 0, 10) . '"'])
+                        );
+                        $data = json_decode($response->getBody(), true);
+                        if (is_array($data)) {
+                            foreach ($data as $item) {
+                                if (isset($item['matnr']) && trim($item['matnr']) === trim($auxName)) {
+                                    $extwg = $item['extwg'] ?? null;
+                                    break;
+                                }
+                            }
+                        }
+                    } catch (\Exception $e) {
+                        // ignore error SAP fallback
+                    }
+                }
+            }
+            $detail->extwg = $extwg;
+        }
 
         $allProses = Proses::with(['details', 'mesin'])
             ->withCount(['auxls as normal_aux_count' => function ($q) use ($id) {
@@ -357,6 +413,19 @@ class AuxlController extends Controller
             }
         }
 
+        $totalWt = 0;
+        foreach ($data['details'] as $detail) {
+            $konsentrasi = floatval($detail['konsentrasi']);
+            if (isset($detail['unit']) && strtolower($detail['unit']) === 'gram') {
+                $konsentrasi = $konsentrasi / 1000;
+            }
+            $totalWt += $konsentrasi;
+        }
+        if ($totalWt > 0) {
+            $data['total_wt'] = round($totalWt, 4);
+        } else {
+            $data['total_wt'] = round(floatval($data['total_wt']), 4);
+        }
         $data['step_proses'] = $data['step_proses'] ?? 1;
         $data['volume_litres'] = round(floatval($data['total_wt']) * floatval($data['liquor_ratio']), 2);
 

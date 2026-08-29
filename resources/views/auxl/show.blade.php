@@ -49,9 +49,9 @@
                             <div class="col-md-6 col-lg-4 mb-3"><span class="label">Liquor Ratio</span><span
                                     class="colon">:</span><span class="value font-weight-bold">1 : {{ round($auxl->liquor_ratio ?? 10) }}</span></div>
                             <div class="col-md-6 col-lg-4 mb-3"><span class="label">Total Wt.</span><span
-                                    class="colon">:</span><span class="value font-weight-bold">{{ number_format($auxl->total_wt, 1) }} kg</span></div>
+                                    class="colon">:</span><span class="value font-weight-bold">{{ rtrim(rtrim(number_format($auxl->total_wt, 4, '.', ''), '0'), '.') }} kg</span></div>
                             <div class="col-md-6 col-lg-4 mb-3"><span class="label">Volume</span><span
-                                    class="colon">:</span><span class="value font-weight-bold text-primary">{{ number_format($auxl->volume_litres, 1) }} L</span></div>
+                                    class="colon">:</span><span class="value font-weight-bold text-primary">{{ rtrim(rtrim(number_format($auxl->volume_litres, 2, '.', ''), '0'), '.') }} L</span></div>
                             <div class="col-md-6 col-lg-4 mb-3"><span class="label">Code</span><span
                                     class="colon">:</span><span class="value">{{ $auxl->code }}</span></div>
                             <div class="col-md-6 col-lg-4 mb-3"><span class="label">Konstruksi</span><span
@@ -84,7 +84,7 @@
                                     @forelse($auxl->details as $detail)
                                         <tr>
                                             <td class="align-middle">{{ $detail->auxiliary }}</td>
-                                            <td class="align-middle">{{ $detail->konsentrasi }}</td>
+                                            <td class="align-middle">{{ rtrim(rtrim(number_format($detail->konsentrasi, 4, '.', ''), '0'), '.') }} kg</td>
                                         </tr>
                                     @empty
                                         <tr>

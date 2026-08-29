@@ -353,8 +353,8 @@
                 const $select = $tr.find('.select2-auxiliary');
                 const selectedData = $select.select2('data')[0] || {};
                 let extwg = selectedData.extwg;
-                if (typeof extwg === 'undefined' || extwg === null) {
-                    extwg = $select.find('option:selected').data('extwg');
+                if (typeof extwg === 'undefined' || extwg === null || extwg === '') {
+                    extwg = $select.find('option:selected').attr('data-extwg') || $select.find('option:selected').data('extwg');
                 }
 
                 const $weightInput = $tr.find('.weight-input');
@@ -365,6 +365,7 @@
                 if (extwg === 'AUX SPC') {
                     $weightInput.prop('readonly', false);
                     $weightInput.attr('placeholder', 'Weight (gram)');
+                    $weightInput.attr('step', '0.01');
                     $unitLabel.text('gram');
                     $unitInput.val('gram');
 
@@ -378,6 +379,7 @@
                 } else {
                     $weightInput.prop('readonly', true);
                     $weightInput.attr('placeholder', 'Weight (kg)');
+                    $weightInput.attr('step', '0.0001');
                     $unitLabel.text('kg');
                     $unitInput.val('kg');
 

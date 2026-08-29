@@ -299,25 +299,40 @@
                                             @php
                                                 $auxName = is_array($d) ? ($d['auxiliary'] ?? '') : ($d->auxiliary ?? '');
                                                 $weightVal = is_array($d) ? ($d['konsentrasi'] ?? '') : ($d->konsentrasi ?? '');
-                                                $unitVal = is_array($d) ? ($d['unit'] ?? 'kg') : 'kg';
+                                                $extwgVal = is_array($d) ? ($d['extwg'] ?? '') : ($d->extwg ?? '');
+                                                
+                                                // Jika belum ada old unit, cek dari extwg
+                                                if (is_array($d) && isset($d['unit'])) {
+                                                    $unitVal = $d['unit'];
+                                                } else {
+                                                    $unitVal = ($extwgVal === 'AUX SPC') ? 'gram' : 'kg';
+                                                }
+                                                
+                                                // Jika unit gram dan nilai berasal dari database (kg), konversi ke gram untuk tampilan input
+                                                if ($unitVal === 'gram' && !is_array($d) && is_numeric($weightVal)) {
+                                                    $displayWeight = floatval($weightVal) * 1000;
+                                                } else {
+                                                    $displayWeight = $weightVal;
+                                                }
+                                                $isSpc = ($unitVal === 'gram' || $extwgVal === 'AUX SPC');
                                             @endphp
                                             <tr class="detail-row" data-current-unit="{{ $unitVal }}">
                                                 <td>
                                                     <select name="details[{{ $i }}][auxiliary]"
                                                         class="form-control select2-auxiliary" required>
                                                         @if(!empty($auxName))
-                                                            <option value="{{ $auxName }}" selected>{{ $auxName }}</option>
+                                                            <option value="{{ $auxName }}" data-extwg="{{ $extwgVal }}" selected>{{ $auxName }}</option>
                                                         @endif
                                                     </select>
                                                     <input type="hidden" name="details[{{ $i }}][unit]" class="unit-input" value="{{ $unitVal }}">
                                                 </td>
                                                 <td>
                                                     <div class="input-group input-group-sm">
-                                                        <input type="number" step="0.0001" name="details[{{ $i }}][konsentrasi]"
+                                                        <input type="number" step="{{ $isSpc ? '0.01' : '0.0001' }}" name="details[{{ $i }}][konsentrasi]"
                                                             class="form-control form-control-sm weight-input"
-                                                            placeholder="Weight (kg)" value="{{ $weightVal }}" readonly required>
+                                                            placeholder="Weight ({{ $unitVal }})" value="{{ $displayWeight }}" {{ $isSpc ? '' : 'readonly' }} required>
                                                         <div class="input-group-append">
-                                                            <span class="input-group-text unit-label">kg</span>
+                                                            <span class="input-group-text unit-label">{{ $unitVal }}</span>
                                                         </div>
                                                     </div>
                                                 </td>
@@ -348,12 +363,12 @@
         $(document).ready(function () {
             $('.select2').select2({ width: '100%' });
 
-            function updateRowWeightState($tr) {
+            function updateRowWeightState($tr, isInitialLoad = false) {
                 const $select = $tr.find('.select2-auxiliary');
                 const selectedData = $select.select2('data')[0] || {};
                 let extwg = selectedData.extwg;
-                if (typeof extwg === 'undefined' || extwg === null) {
-                    extwg = $select.find('option:selected').data('extwg');
+                if (typeof extwg === 'undefined' || extwg === null || extwg === '') {
+                    extwg = $select.find('option:selected').attr('data-extwg') || $select.find('option:selected').data('extwg');
                 }
 
                 const $weightInput = $tr.find('.weight-input');
@@ -364,29 +379,31 @@
                 if (extwg === 'AUX SPC') {
                     $weightInput.prop('readonly', false);
                     $weightInput.attr('placeholder', 'Weight (gram)');
+                    $weightInput.attr('step', '0.01');
                     $unitLabel.text('gram');
                     $unitInput.val('gram');
 
-                    if (prevUnit === 'kg') {
+                    if (!isInitialLoad && prevUnit === 'kg') {
                         const currentVal = parseFloat($weightInput.val());
                         if (!isNaN(currentVal) && currentVal > 0) {
                             $weightInput.val(parseFloat((currentVal * 1000).toFixed(2)));
                         }
-                        $tr.data('current-unit', 'gram');
                     }
+                    $tr.data('current-unit', 'gram');
                 } else {
                     $weightInput.prop('readonly', true);
                     $weightInput.attr('placeholder', 'Weight (kg)');
+                    $weightInput.attr('step', '0.0001');
                     $unitLabel.text('kg');
                     $unitInput.val('kg');
 
-                    if (prevUnit === 'gram') {
+                    if (!isInitialLoad && prevUnit === 'gram') {
                         const currentVal = parseFloat($weightInput.val());
                         if (!isNaN(currentVal) && currentVal > 0) {
                             $weightInput.val(parseFloat((currentVal / 1000).toFixed(4)));
                         }
-                        $tr.data('current-unit', 'kg');
                     }
+                    $tr.data('current-unit', 'kg');
                 }
                 calcVolume();
             }
@@ -423,15 +440,15 @@
                     if (data && data.extwg) {
                         $(this).find('option:selected').attr('data-extwg', data.extwg);
                     }
-                    updateRowWeightState($(this).closest('.detail-row'));
+                    updateRowWeightState($(this).closest('.detail-row'), false);
                 }).on('select2:clear change', function () {
-                    updateRowWeightState($(this).closest('.detail-row'));
+                    updateRowWeightState($(this).closest('.detail-row'), false);
                 });
             }
 
             $('.select2-auxiliary').each(function () {
                 initAuxiliarySelect2(this);
-                updateRowWeightState($(this).closest('.detail-row'));
+                updateRowWeightState($(this).closest('.detail-row'), true);
             });
 
             let detailIndex = {{ count($auxl->details) }};

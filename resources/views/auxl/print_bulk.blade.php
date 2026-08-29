@@ -204,9 +204,9 @@
                 </tr>
                 <tr>
                     <td class="info-label">Total Wt.(Kg):</td>
-                    <td class="info-val">{{ number_format($auxl->total_wt, 1) }}</td>
+                    <td class="info-val">{{ rtrim(rtrim(number_format($auxl->total_wt, 4, '.', ''), '0'), '.') }}</td>
                     <td class="info-label">Volume(Litres):</td>
-                    <td class="info-val">{{ number_format($auxl->volume_litres, 1) }}</td>
+                    <td class="info-val">{{ rtrim(rtrim(number_format($auxl->volume_litres, 2, '.', ''), '0'), '.') }}</td>
                 </tr>
             </table>
 
@@ -230,7 +230,7 @@
                     @forelse($auxl->details as $detail)
                         <tr>
                             <td>{{ $detail->auxiliary }}</td>
-                            <td class="text-right" style="text-align: right;">{{ number_format($detail->konsentrasi, 2) }} kg</td>
+                            <td class="text-right" style="text-align: right;">{{ rtrim(rtrim(number_format($detail->konsentrasi, 4, '.', ''), '0'), '.') }} kg</td>
                         </tr>
                     @empty
                         <tr>

@@ -398,31 +398,26 @@
     </style>
     <div class="content-wrapper">
         <!-- Content Header -->
-        <div class="content-header">
+        <div class="content-header pb-1">
             <div class="container-fluid">
                 <div class="row mb-2 align-items-center">
-                    <div class="col-sm-4">
-                        <h1 class="m-0">Dashboard</h1>
+                    <div class="col-sm-6 d-flex align-items-center mb-2 mb-sm-0">
+                        <h1 class="m-0 font-weight-bold" style="font-size: 1.6rem; letter-spacing: 0.5px;">Dashboard</h1>
+                        <button type="button" class="btn btn-sm btn-outline-primary ml-3 d-flex align-items-center shadow-sm"
+                            data-toggle="modal" data-target="#modalFilterDashboard" style="font-weight: 600; border-radius: 20px; padding: 4px 14px;">
+                            <i class="fas fa-filter mr-1"></i> Filter
+                            @if(($activeFilterCount ?? 0) > 0)
+                                <span class="badge badge-danger ml-2 px-2 py-1" style="border-radius: 10px; font-size: 0.75rem;">{{ $activeFilterCount }}</span>
+                            @endif
+                        </button>
+                        @if(($activeFilterCount ?? 0) > 0)
+                            <a href="{{ url('dashboard') }}" class="btn btn-sm btn-link text-danger ml-2 p-0" title="Reset Semua Filter" style="font-size: 0.85rem; text-decoration: underline;">
+                                <i class="fas fa-times-circle"></i> Reset Semua Filter
+                            </a>
+                        @endif
                     </div>
-                    <div class="col-sm-4 d-flex justify-content-center">
-                        <form id="filter-mesin-form" method="get" action="{{ url('dashboard') }}"
-                            style="width:100%; display: flex; align-items: center; gap: 6px;">
-                            <select name="mesin[]" id="filter-mesin" class="form-control select2" multiple
-                                style="width:100%;" data-placeholder="Semua Mesin">
-                                @foreach ($mesins as $mesin)
-                                    <option value="{{ $mesin->id }}" {{ in_array($mesin->id, $selectedMesinArr ?? []) ? 'selected' : '' }}>
-                                        {{ $mesin->jenis_mesin }}
-                                    </option>
-                                @endforeach
-                            </select>
-                            <button type="button" id="clear-mesin-btn" class="btn btn-outline-secondary" title="Reset Mesin"
-                                style="margin-left:4px; font-weight:bold; padding: 0 10px; height:38px; line-height:1;">
-                                &times;
-                            </button>
-                        </form>
-                    </div>
-                    <div class="col-sm-4 d-flex justify-content-end align-items-center">
-                        <div class="btn-group btn-group-sm mr-2" role="group" id="dashboard-mode-toggle"
+                    <div class="col-sm-6 d-flex justify-content-end align-items-center">
+                        <div class="btn-group btn-group-sm mr-2 shadow-sm" role="group" id="dashboard-mode-toggle"
                             title="Mode tampilan">
                             <button type="button" class="btn btn-outline-primary" data-mode="produksi"
                                 id="mode-produksi-btn">
@@ -435,7 +430,7 @@
                         </div>
                         <div id="dashboard-controls" style="display: flex; justify-content: flex-end; gap: 10px;">
                             @if ($canAddProses ?? true)
-                                <button type="button" id="add-card-btn" class="btn btn-success" style="font-weight:bold;"
+                                <button type="button" id="add-card-btn" class="btn btn-success shadow-sm" style="font-weight:bold;"
                                     data-toggle="modal" data-target="#modalProses">
                                     + Tambah Proses
                                 </button>
@@ -443,6 +438,78 @@
                         </div>
                     </div>
                 </div>
+
+                {{-- Active Filter Pills / Chips --}}
+                @if(($activeFilterCount ?? 0) > 0)
+                    <div class="row mt-1 mb-2">
+                        <div class="col-12 d-flex align-items-center flex-wrap" style="gap: 6px; font-size: 0.85rem;">
+                            <span class="text-muted mr-1 font-weight-bold"><i class="fas fa-tags mr-1"></i> Filter Aktif:</span>
+                            @if(!empty($selectedMesinArr))
+                                @php
+                                    $mesinNames = $mesins->whereIn('id', $selectedMesinArr)->pluck('jenis_mesin')->implode(', ');
+                                @endphp
+                                <span class="badge badge-light border border-primary text-primary px-2 py-1" style="font-size: 0.82rem;">
+                                    <strong>Mesin:</strong> {{ Str::limit($mesinNames, 30) }}
+                                </span>
+                            @endif
+                            @if(!empty($selectedCustomerArr))
+                                <span class="badge badge-light border border-info text-info px-2 py-1" style="font-size: 0.82rem;">
+                                    <strong>Customer:</strong> {{ Str::limit(implode(', ', $selectedCustomerArr), 30) }}
+                                </span>
+                            @endif
+                            @if(!empty($selectedMarketingArr))
+                                <span class="badge badge-light border border-info text-info px-2 py-1" style="font-size: 0.82rem;">
+                                    <strong>Marketing:</strong> {{ Str::limit(implode(', ', $selectedMarketingArr), 30) }}
+                                </span>
+                            @endif
+                            @if(!empty($selectedWarnaArr))
+                                <span class="badge badge-light border border-success text-success px-2 py-1" style="font-size: 0.82rem;">
+                                    <strong>Warna:</strong> {{ Str::limit(implode(', ', $selectedWarnaArr), 30) }}
+                                </span>
+                            @endif
+                            @if(!empty($selectedKategoriWarnaArr))
+                                <span class="badge badge-light border border-success text-success px-2 py-1" style="font-size: 0.82rem;">
+                                    <strong>Kategori Warna:</strong> {{ Str::limit(implode(', ', $selectedKategoriWarnaArr), 30) }}
+                                </span>
+                            @endif
+                            @if(!empty($selectedKodeWarnaArr))
+                                <span class="badge badge-light border border-success text-success px-2 py-1" style="font-size: 0.82rem;">
+                                    <strong>Kode Warna:</strong> {{ Str::limit(implode(', ', $selectedKodeWarnaArr), 30) }}
+                                </span>
+                            @endif
+                            @if(!empty($selectedHfeelArr))
+                                <span class="badge badge-light border border-secondary text-dark px-2 py-1" style="font-size: 0.82rem;">
+                                    <strong>Handfeel:</strong> {{ Str::limit(implode(', ', $selectedHfeelArr), 30) }}
+                                </span>
+                            @endif
+                            @if(!empty($selectedGramasiArr))
+                                <span class="badge badge-light border border-secondary text-dark px-2 py-1" style="font-size: 0.82rem;">
+                                    <strong>Gramasi:</strong> {{ Str::limit(implode(', ', $selectedGramasiArr), 30) }}
+                                </span>
+                            @endif
+                            @if(!empty($selectedNoOpArr))
+                                <span class="badge badge-light border border-warning text-dark px-2 py-1" style="font-size: 0.82rem;">
+                                    <strong>No OP:</strong> {{ Str::limit(implode(', ', $selectedNoOpArr), 30) }}
+                                </span>
+                            @endif
+                            @if(!empty($selectedNoPartaiArr))
+                                <span class="badge badge-light border border-warning text-dark px-2 py-1" style="font-size: 0.82rem;">
+                                    <strong>No Partai:</strong> {{ Str::limit(implode(', ', $selectedNoPartaiArr), 30) }}
+                                </span>
+                            @endif
+                            @if(!empty($selectedKonstruksiArr))
+                                <span class="badge badge-light border border-dark text-dark px-2 py-1" style="font-size: 0.82rem;">
+                                    <strong>Konstruksi:</strong> {{ Str::limit(implode(', ', $selectedKonstruksiArr), 30) }}
+                                </span>
+                            @endif
+                            @if(!empty($selectedKodeMaterialArr))
+                                <span class="badge badge-light border border-dark text-dark px-2 py-1" style="font-size: 0.82rem;">
+                                    <strong>Kode Material:</strong> {{ Str::limit(implode(', ', $selectedKodeMaterialArr), 30) }}
+                                </span>
+                            @endif
+                        </div>
+                    </div>
+                @endif
             </div>
         </div>
 
@@ -1189,6 +1256,368 @@
                 </div>
             </div>
         </section>
+        <!-- Modal Filter Dashboard (12 Kriteria) -->
+        <div class="modal fade" id="modalFilterDashboard" tabindex="-1" aria-labelledby="modalFilterDashboardLabel" aria-hidden="true">
+            <div class="modal-dialog modal-xl modal-dialog-centered" style="max-width: 1250px;">
+                <div class="modal-content shadow-lg border-0 rounded-3">
+                    <form id="formFilterDashboard" action="{{ url('dashboard') }}" method="GET">
+                        <!-- Header -->
+                        <div class="modal-header bg-gradient-primary text-white py-3 px-4" style="background: linear-gradient(135deg, #0052cc 0%, #002b80 100%);">
+                            <div class="d-flex align-items-center">
+                                <i class="fas fa-sliders-h mr-2" style="font-size: 1.4rem;"></i>
+                                <div>
+                                    <h5 class="modal-title fw-bold mb-0" id="modalFilterDashboardLabel" style="font-weight: 700;">Filter Pencarian Dashboard</h5>
+                                    <small class="text-white-50">Filter otomatis menyesuaikan dengan data proses pada tab yang sedang aktif</small>
+                                </div>
+                            </div>
+                            <div class="d-flex align-items-center">
+                                <span class="badge badge-light px-3 py-2 text-primary font-weight-bold shadow-sm rounded-pill mr-3" id="filter-modal-active-badge" style="font-size: 0.85rem;">
+                                    <i class="fas fa-industry mr-1"></i> Mode Production
+                                </span>
+                                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close" style="opacity: 0.85;">
+                                    <span aria-hidden="true">&times;</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Body -->
+                        <div class="modal-body py-4 px-4" style="background: #f8fafc; max-height: 75vh; overflow-y: auto;">
+                            <!-- Action Quick Bar -->
+                            <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
+                                <div class="text-muted" style="font-size: 0.9rem;">
+                                    <i class="fas fa-info-circle text-primary mr-1"></i> Menampilkan opsi filter untuk: <strong id="filter-modal-current-mode-label" class="text-primary">Mode Production (Proses Berjalan / Belum Selesai)</strong>
+                                </div>
+                                <div>
+                                    <button type="button" class="btn btn-xs btn-outline-secondary" id="btn-clear-all-filter-inputs">
+                                        <i class="fas fa-eraser mr-1"></i> Kosongkan Semua Pilihan
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <!-- 1. Mesin -->
+                                <div class="col-lg-3 col-md-6 mb-3">
+                                    <div class="card h-100 border-0 shadow-sm" style="border-radius: 8px;">
+                                        <div class="card-body p-3">
+                                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                                <label class="font-weight-bold text-dark mb-0" style="font-size: 0.88rem;">
+                                                    <i class="fas fa-cogs text-primary mr-1"></i> Mesin
+                                                </label>
+                                                <div>
+                                                    <a href="javascript:void(0)" class="btn-filter-select-all text-primary" data-target="#filter_modal_mesin" style="font-size: 0.75rem;">Semua</a>
+                                                    <span class="text-muted" style="font-size: 0.75rem;">|</span>
+                                                    <a href="javascript:void(0)" class="btn-filter-clear text-danger" data-target="#filter_modal_mesin" style="font-size: 0.75rem;">Clear</a>
+                                                </div>
+                                            </div>
+                                            <select name="mesin[]" id="filter_modal_mesin" class="form-control select2-dashboard-filter" multiple style="width:100%;" data-placeholder="Semua Mesin">
+                                                @foreach ($mesins as $m)
+                                                    <option value="{{ $m->id }}" {{ in_array($m->id, $selectedMesinArr ?? []) ? 'selected' : '' }}>
+                                                        {{ $m->jenis_mesin }}
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 2. Customer -->
+                                <div class="col-lg-3 col-md-6 mb-3">
+                                    <div class="card h-100 border-0 shadow-sm" style="border-radius: 8px;">
+                                        <div class="card-body p-3">
+                                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                                <label class="font-weight-bold text-dark mb-0" style="font-size: 0.88rem;">
+                                                    <i class="fas fa-building text-info mr-1"></i> Customer
+                                                </label>
+                                                <div>
+                                                    <a href="javascript:void(0)" class="btn-filter-select-all text-primary" data-target="#filter_modal_customer" style="font-size: 0.75rem;">Semua</a>
+                                                    <span class="text-muted" style="font-size: 0.75rem;">|</span>
+                                                    <a href="javascript:void(0)" class="btn-filter-clear text-danger" data-target="#filter_modal_customer" style="font-size: 0.75rem;">Clear</a>
+                                                </div>
+                                            </div>
+                                            <select name="customer[]" id="filter_modal_customer" class="form-control select2-dashboard-filter" multiple style="width:100%;" data-placeholder="Semua Customer">
+                                                @foreach ($filterOptions['customers'] ?? [] as $cust)
+                                                    <option value="{{ $cust }}" {{ in_array($cust, $selectedCustomerArr ?? []) ? 'selected' : '' }}>
+                                                        {{ $cust }}
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 3. Marketing -->
+                                <div class="col-lg-3 col-md-6 mb-3">
+                                    <div class="card h-100 border-0 shadow-sm" style="border-radius: 8px;">
+                                        <div class="card-body p-3">
+                                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                                <label class="font-weight-bold text-dark mb-0" style="font-size: 0.88rem;">
+                                                    <i class="fas fa-user-tie text-info mr-1"></i> Marketing
+                                                </label>
+                                                <div>
+                                                    <a href="javascript:void(0)" class="btn-filter-select-all text-primary" data-target="#filter_modal_marketing" style="font-size: 0.75rem;">Semua</a>
+                                                    <span class="text-muted" style="font-size: 0.75rem;">|</span>
+                                                    <a href="javascript:void(0)" class="btn-filter-clear text-danger" data-target="#filter_modal_marketing" style="font-size: 0.75rem;">Clear</a>
+                                                </div>
+                                            </div>
+                                            <select name="marketing[]" id="filter_modal_marketing" class="form-control select2-dashboard-filter" multiple style="width:100%;" data-placeholder="Semua Marketing">
+                                                @foreach ($filterOptions['marketings'] ?? [] as $mkt)
+                                                    <option value="{{ $mkt }}" {{ in_array($mkt, $selectedMarketingArr ?? []) ? 'selected' : '' }}>
+                                                        {{ $mkt }}
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 4. Warna -->
+                                <div class="col-lg-3 col-md-6 mb-3">
+                                    <div class="card h-100 border-0 shadow-sm" style="border-radius: 8px;">
+                                        <div class="card-body p-3">
+                                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                                <label class="font-weight-bold text-dark mb-0" style="font-size: 0.88rem;">
+                                                    <i class="fas fa-palette text-success mr-1"></i> Warna
+                                                </label>
+                                                <div>
+                                                    <a href="javascript:void(0)" class="btn-filter-select-all text-primary" data-target="#filter_modal_warna" style="font-size: 0.75rem;">Semua</a>
+                                                    <span class="text-muted" style="font-size: 0.75rem;">|</span>
+                                                    <a href="javascript:void(0)" class="btn-filter-clear text-danger" data-target="#filter_modal_warna" style="font-size: 0.75rem;">Clear</a>
+                                                </div>
+                                            </div>
+                                            <select name="warna[]" id="filter_modal_warna" class="form-control select2-dashboard-filter" multiple style="width:100%;" data-placeholder="Semua Warna">
+                                                @foreach ($filterOptions['warnas'] ?? [] as $wrn)
+                                                    <option value="{{ $wrn }}" {{ in_array($wrn, $selectedWarnaArr ?? []) ? 'selected' : '' }}>
+                                                        {{ $wrn }}
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 5. Kategori Warna -->
+                                <div class="col-lg-3 col-md-6 mb-3">
+                                    <div class="card h-100 border-0 shadow-sm" style="border-radius: 8px;">
+                                        <div class="card-body p-3">
+                                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                                <label class="font-weight-bold text-dark mb-0" style="font-size: 0.88rem;">
+                                                    <i class="fas fa-swatchbook text-success mr-1"></i> Kategori Warna
+                                                </label>
+                                                <div>
+                                                    <a href="javascript:void(0)" class="btn-filter-select-all text-primary" data-target="#filter_modal_kategori_warna" style="font-size: 0.75rem;">Semua</a>
+                                                    <span class="text-muted" style="font-size: 0.75rem;">|</span>
+                                                    <a href="javascript:void(0)" class="btn-filter-clear text-danger" data-target="#filter_modal_kategori_warna" style="font-size: 0.75rem;">Clear</a>
+                                                </div>
+                                            </div>
+                                            <select name="kategori_warna[]" id="filter_modal_kategori_warna" class="form-control select2-dashboard-filter" multiple style="width:100%;" data-placeholder="Semua Kategori Warna">
+                                                @foreach ($filterOptions['kategori_warnas'] ?? [] as $kat)
+                                                    <option value="{{ $kat }}" {{ in_array($kat, $selectedKategoriWarnaArr ?? []) ? 'selected' : '' }}>
+                                                        {{ $kat }}
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 6. Kode Warna -->
+                                <div class="col-lg-3 col-md-6 mb-3">
+                                    <div class="card h-100 border-0 shadow-sm" style="border-radius: 8px;">
+                                        <div class="card-body p-3">
+                                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                                <label class="font-weight-bold text-dark mb-0" style="font-size: 0.88rem;">
+                                                    <i class="fas fa-barcode text-success mr-1"></i> Kode Warna
+                                                </label>
+                                                <div>
+                                                    <a href="javascript:void(0)" class="btn-filter-select-all text-primary" data-target="#filter_modal_kode_warna" style="font-size: 0.75rem;">Semua</a>
+                                                    <span class="text-muted" style="font-size: 0.75rem;">|</span>
+                                                    <a href="javascript:void(0)" class="btn-filter-clear text-danger" data-target="#filter_modal_kode_warna" style="font-size: 0.75rem;">Clear</a>
+                                                </div>
+                                            </div>
+                                            <select name="kode_warna[]" id="filter_modal_kode_warna" class="form-control select2-dashboard-filter" multiple style="width:100%;" data-placeholder="Semua Kode Warna">
+                                                @foreach ($filterOptions['kode_warnas'] ?? [] as $kdw)
+                                                    <option value="{{ $kdw }}" {{ in_array($kdw, $selectedKodeWarnaArr ?? []) ? 'selected' : '' }}>
+                                                        {{ $kdw }}
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 7. Handfeel -->
+                                <div class="col-lg-3 col-md-6 mb-3">
+                                    <div class="card h-100 border-0 shadow-sm" style="border-radius: 8px;">
+                                        <div class="card-body p-3">
+                                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                                <label class="font-weight-bold text-dark mb-0" style="font-size: 0.88rem;">
+                                                    <i class="fas fa-hand-paper text-secondary mr-1"></i> Handfeel
+                                                </label>
+                                                <div>
+                                                    <a href="javascript:void(0)" class="btn-filter-select-all text-primary" data-target="#filter_modal_hfeel" style="font-size: 0.75rem;">Semua</a>
+                                                    <span class="text-muted" style="font-size: 0.75rem;">|</span>
+                                                    <a href="javascript:void(0)" class="btn-filter-clear text-danger" data-target="#filter_modal_hfeel" style="font-size: 0.75rem;">Clear</a>
+                                                </div>
+                                            </div>
+                                            <select name="hfeel[]" id="filter_modal_hfeel" class="form-control select2-dashboard-filter" multiple style="width:100%;" data-placeholder="Semua Handfeel">
+                                                @foreach ($filterOptions['hfeels'] ?? [] as $hf)
+                                                    <option value="{{ $hf }}" {{ in_array($hf, $selectedHfeelArr ?? []) ? 'selected' : '' }}>
+                                                        {{ $hf }}
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 8. Gramasi -->
+                                <div class="col-lg-3 col-md-6 mb-3">
+                                    <div class="card h-100 border-0 shadow-sm" style="border-radius: 8px;">
+                                        <div class="card-body p-3">
+                                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                                <label class="font-weight-bold text-dark mb-0" style="font-size: 0.88rem;">
+                                                    <i class="fas fa-weight-hanging text-secondary mr-1"></i> Gramasi
+                                                </label>
+                                                <div>
+                                                    <a href="javascript:void(0)" class="btn-filter-select-all text-primary" data-target="#filter_modal_gramasi" style="font-size: 0.75rem;">Semua</a>
+                                                    <span class="text-muted" style="font-size: 0.75rem;">|</span>
+                                                    <a href="javascript:void(0)" class="btn-filter-clear text-danger" data-target="#filter_modal_gramasi" style="font-size: 0.75rem;">Clear</a>
+                                                </div>
+                                            </div>
+                                            <select name="gramasi[]" id="filter_modal_gramasi" class="form-control select2-dashboard-filter" multiple style="width:100%;" data-placeholder="Semua Gramasi">
+                                                @foreach ($filterOptions['gramasis'] ?? [] as $grm)
+                                                    <option value="{{ $grm }}" {{ in_array($grm, $selectedGramasiArr ?? []) ? 'selected' : '' }}>
+                                                        {{ $grm }}
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 9. No OP -->
+                                <div class="col-lg-3 col-md-6 mb-3">
+                                    <div class="card h-100 border-0 shadow-sm" style="border-radius: 8px;">
+                                        <div class="card-body p-3">
+                                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                                <label class="font-weight-bold text-dark mb-0" style="font-size: 0.88rem;">
+                                                    <i class="fas fa-file-invoice text-warning mr-1"></i> No OP
+                                                </label>
+                                                <div>
+                                                    <a href="javascript:void(0)" class="btn-filter-select-all text-primary" data-target="#filter_modal_no_op" style="font-size: 0.75rem;">Semua</a>
+                                                    <span class="text-muted" style="font-size: 0.75rem;">|</span>
+                                                    <a href="javascript:void(0)" class="btn-filter-clear text-danger" data-target="#filter_modal_no_op" style="font-size: 0.75rem;">Clear</a>
+                                                </div>
+                                            </div>
+                                            <select name="no_op[]" id="filter_modal_no_op" class="form-control select2-dashboard-filter" multiple style="width:100%;" data-placeholder="Semua No OP">
+                                                @foreach ($filterOptions['no_ops'] ?? [] as $op)
+                                                    <option value="{{ $op }}" {{ in_array($op, $selectedNoOpArr ?? []) ? 'selected' : '' }}>
+                                                        {{ $op }}
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 10. No Partai -->
+                                <div class="col-lg-3 col-md-6 mb-3">
+                                    <div class="card h-100 border-0 shadow-sm" style="border-radius: 8px;">
+                                        <div class="card-body p-3">
+                                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                                <label class="font-weight-bold text-dark mb-0" style="font-size: 0.88rem;">
+                                                    <i class="fas fa-layer-group text-warning mr-1"></i> No Partai
+                                                </label>
+                                                <div>
+                                                    <a href="javascript:void(0)" class="btn-filter-select-all text-primary" data-target="#filter_modal_no_partai" style="font-size: 0.75rem;">Semua</a>
+                                                    <span class="text-muted" style="font-size: 0.75rem;">|</span>
+                                                    <a href="javascript:void(0)" class="btn-filter-clear text-danger" data-target="#filter_modal_no_partai" style="font-size: 0.75rem;">Clear</a>
+                                                </div>
+                                            </div>
+                                            <select name="no_partai[]" id="filter_modal_no_partai" class="form-control select2-dashboard-filter" multiple style="width:100%;" data-placeholder="Semua No Partai">
+                                                @foreach ($filterOptions['no_partais'] ?? [] as $npr)
+                                                    <option value="{{ $npr }}" {{ in_array($npr, $selectedNoPartaiArr ?? []) ? 'selected' : '' }}>
+                                                        {{ $npr }}
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 11. Konstruksi -->
+                                <div class="col-lg-3 col-md-6 mb-3">
+                                    <div class="card h-100 border-0 shadow-sm" style="border-radius: 8px;">
+                                        <div class="card-body p-3">
+                                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                                <label class="font-weight-bold text-dark mb-0" style="font-size: 0.88rem;">
+                                                    <i class="fas fa-th text-dark mr-1"></i> Konstruksi
+                                                </label>
+                                                <div>
+                                                    <a href="javascript:void(0)" class="btn-filter-select-all text-primary" data-target="#filter_modal_konstruksi" style="font-size: 0.75rem;">Semua</a>
+                                                    <span class="text-muted" style="font-size: 0.75rem;">|</span>
+                                                    <a href="javascript:void(0)" class="btn-filter-clear text-danger" data-target="#filter_modal_konstruksi" style="font-size: 0.75rem;">Clear</a>
+                                                </div>
+                                            </div>
+                                            <select name="konstruksi[]" id="filter_modal_konstruksi" class="form-control select2-dashboard-filter" multiple style="width:100%;" data-placeholder="Semua Konstruksi">
+                                                @foreach ($filterOptions['konstruksis'] ?? [] as $kst)
+                                                    <option value="{{ $kst }}" {{ in_array($kst, $selectedKonstruksiArr ?? []) ? 'selected' : '' }}>
+                                                        {{ $kst }}
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 12. Kode Material -->
+                                <div class="col-lg-3 col-md-6 mb-3">
+                                    <div class="card h-100 border-0 shadow-sm" style="border-radius: 8px;">
+                                        <div class="card-body p-3">
+                                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                                <label class="font-weight-bold text-dark mb-0" style="font-size: 0.88rem;">
+                                                    <i class="fas fa-cubes text-dark mr-1"></i> Kode Material
+                                                </label>
+                                                <div>
+                                                    <a href="javascript:void(0)" class="btn-filter-select-all text-primary" data-target="#filter_modal_kode_material" style="font-size: 0.75rem;">Semua</a>
+                                                    <span class="text-muted" style="font-size: 0.75rem;">|</span>
+                                                    <a href="javascript:void(0)" class="btn-filter-clear text-danger" data-target="#filter_modal_kode_material" style="font-size: 0.75rem;">Clear</a>
+                                                </div>
+                                            </div>
+                                            <select name="kode_material[]" id="filter_modal_kode_material" class="form-control select2-dashboard-filter" multiple style="width:100%;" data-placeholder="Semua Kode Material">
+                                                @foreach ($filterOptions['kode_materials'] ?? [] as $kdm)
+                                                    <option value="{{ $kdm }}" {{ in_array($kdm, $selectedKodeMaterialArr ?? []) ? 'selected' : '' }}>
+                                                        {{ $kdm }}
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Footer -->
+                        <div class="modal-footer d-flex justify-content-between bg-light py-3 px-4">
+                            <div>
+                                <a href="{{ url('dashboard') }}" class="btn btn-outline-danger" style="font-weight: 600;">
+                                    <i class="fas fa-trash-alt mr-1"></i> Reset Semua Filter
+                                </a>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <button type="button" class="btn btn-secondary mr-2" data-dismiss="modal" style="font-weight: 600;">
+                                    Batal
+                                </button>
+                                <button type="submit" class="btn btn-primary px-4 shadow-sm" style="font-weight: 700;">
+                                    <i class="fas fa-check-circle mr-1"></i> Terapkan Filter
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
         <!-- Modal Tambah Proses -->
         <div class="modal fade" id="modalProses" tabindex="-1" aria-labelledby="modalProsesLabel" aria-hidden="true">
             <div class="modal-dialog modal-xl modal-dialog-centered" style="max-width: 1200px;">
@@ -7372,18 +7801,130 @@
             }
         });
 
-        $(document).ready(function () {
-            // Submit form filter mesin otomatis saat select berubah
-            $('#filter-mesin').on('change', function () {
-                if (window.isRefreshingSelect2) return;
-                $('#filter-mesin-form').submit();
+        window.filterOptionsByMode = @json($filterOptions ?? []);
+        window.allMesins = @json($mesins ?? []);
+
+        function updateFilterModalDropdowns(mode) {
+            const currentMode = mode || window.dashboardViewMode || 'produksi';
+            const isProd = currentMode === 'produksi';
+            const optionsData = (window.filterOptionsByMode && window.filterOptionsByMode[currentMode]) ? window.filterOptionsByMode[currentMode] : (window.filterOptionsByMode ? window.filterOptionsByMode.produksi : {});
+            
+            // Update badge dan label mode otomatis di dalam modal filter
+            if (isProd) {
+                $('#filter-modal-active-badge').html('<i class="fas fa-industry mr-1"></i> Mode Production').removeClass('text-secondary').addClass('text-primary');
+                $('#filter-modal-current-mode-label').removeClass('text-secondary').addClass('text-primary').text('Mode Production (Proses Berjalan / Belum Selesai)');
+            } else {
+                $('#filter-modal-active-badge').html('<i class="fas fa-history mr-1"></i> Mode History').removeClass('text-primary').addClass('text-secondary');
+                $('#filter-modal-current-mode-label').removeClass('text-primary').addClass('text-secondary').text('Mode History (Proses Selesai)');
+            }
+
+            if (!optionsData) return;
+
+            const fieldMapping = {
+                '#filter_modal_customer': optionsData.customers || [],
+                '#filter_modal_marketing': optionsData.marketings || [],
+                '#filter_modal_warna': optionsData.warnas || [],
+                '#filter_modal_kategori_warna': optionsData.kategori_warnas || [],
+                '#filter_modal_kode_warna': optionsData.kode_warnas || [],
+                '#filter_modal_hfeel': optionsData.hfeels || [],
+                '#filter_modal_gramasi': optionsData.gramasis || [],
+                '#filter_modal_no_op': optionsData.no_ops || [],
+                '#filter_modal_no_partai': optionsData.no_partais || [],
+                '#filter_modal_konstruksi': optionsData.konstruksis || [],
+                '#filter_modal_kode_material': optionsData.kode_materials || []
+            };
+
+            // Update dropdown detail proses
+            Object.keys(fieldMapping).forEach(function (selector) {
+                const $sel = $(selector);
+                if (!$sel.length) return;
+                const currentVals = ($sel.val() || []).map(String);
+                const list = (fieldMapping[selector] || []).map(String);
+
+                // Gabungkan list unik dan pastikan nilai yang sedang dipilih user tidak hilang
+                const mergedList = Array.from(new Set([...currentVals, ...list])).filter(Boolean);
+
+                $sel.empty();
+                mergedList.forEach(function (item) {
+                    const isSelected = currentVals.includes(String(item));
+                    $sel.append(new Option(item, item, isSelected, isSelected));
+                });
+
+                if ($sel.hasClass('select2-hidden-accessible')) {
+                    $sel.trigger('change.select2');
+                }
             });
-            // Tombol clear mesin
-            $('#clear-mesin-btn').on('click', function () {
-                $('#filter-mesin').val(null).trigger('change');
-                setTimeout(function () {
-                    $('#filter-mesin-form').submit();
-                }, 100);
+
+            // Update dropdown mesin
+            const $mesinSel = $('#filter_modal_mesin');
+            if ($mesinSel.length && window.allMesins) {
+                const currentMesinVals = ($mesinSel.val() || []).map(String);
+                const activeMesinIds = (optionsData.mesin_ids || []).map(String);
+
+                $mesinSel.empty();
+                window.allMesins.forEach(function (m) {
+                    const mIdStr = String(m.id);
+                    const isSelected = currentMesinVals.includes(mIdStr);
+                    const isRelevant = activeMesinIds.includes(mIdStr);
+                    
+                    const optText = isRelevant ? m.jenis_mesin : `${m.jenis_mesin} (0 proses)`;
+                    $mesinSel.append(new Option(optText, m.id, isSelected, isSelected));
+                });
+
+                if ($mesinSel.hasClass('select2-hidden-accessible')) {
+                    $mesinSel.trigger('change.select2');
+                }
+            }
+        }
+
+        $(document).ready(function () {
+            // Inisialisasi Select2 di dalam Modal Filter Dashboard saat modal dibuka
+            $('#modalFilterDashboard').on('show.bs.modal', function () {
+                const activeMode = window.dashboardViewMode || 'produksi';
+                updateFilterModalDropdowns(activeMode);
+            });
+
+            $('#modalFilterDashboard').on('shown.bs.modal', function () {
+                $(this).find('.select2-dashboard-filter').each(function () {
+                    const $select = $(this);
+                    if (!$select.hasClass('select2-hidden-accessible')) {
+                        $select.select2({
+                            dropdownParent: $('#modalFilterDashboard'),
+                            placeholder: $select.data('placeholder') || '-- Pilih --',
+                            allowClear: true,
+                            width: '100%',
+                            closeOnSelect: false
+                        });
+                    }
+                });
+            });
+
+            // Tombol Pilih Semua per kriteria di Modal Filter
+            $(document).on('click', '.btn-filter-select-all', function (e) {
+                e.preventDefault();
+                const target = $(this).data('target');
+                const $select = $(target);
+                if ($select.length) {
+                    const allVals = $select.find('option').map(function () {
+                        return $(this).val();
+                    }).get();
+                    $select.val(allVals).trigger('change');
+                }
+            });
+
+            // Tombol Clear per kriteria di Modal Filter
+            $(document).on('click', '.btn-filter-clear', function (e) {
+                e.preventDefault();
+                const target = $(this).data('target');
+                const $select = $(target);
+                if ($select.length) {
+                    $select.val(null).trigger('change');
+                }
+            });
+
+            // Tombol Kosongkan Semua Pilihan di Modal Filter
+            $('#btn-clear-all-filter-inputs').on('click', function () {
+                $('#modalFilterDashboard .select2-dashboard-filter').val(null).trigger('change');
             });
         });
 
@@ -7441,6 +7982,10 @@
                     $('#mode-produksi-btn').addClass('active btn-primary').removeClass('btn-outline-secondary');
                 } else {
                     $('#mode-history-btn').addClass('active btn-primary').removeClass('btn-outline-secondary');
+                }
+
+                if (typeof updateFilterModalDropdowns === 'function') {
+                    updateFilterModalDropdowns(mode);
                 }
             }
 
