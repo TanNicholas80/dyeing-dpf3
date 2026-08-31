@@ -285,20 +285,25 @@
     {{-- Header --}}
     <div class="card-header"
         style="display: flex; flex-direction: row; align-items: center; padding: 0 10px 2px 10px; gap: 0; border-bottom: none;">
-        <div style="flex: 1; text-align: left;">
+        <div style="{{ $proses->jenis === 'Maintenance' ? 'flex: 0 0 auto;' : 'flex: 1;' }} text-align: left;">
             <span class="status-type"
                 style="font-weight: bold; font-size: 32px; color: #111; text-shadow: 0 1px 4px #fff8;">
                 {{ $type }}
             </span>
         </div>
-        <div style="flex: 2; text-align: center; display: flex; justify-content: center; gap: 6px;">
-            @foreach ($blocks as $i => $b)
-                @php
-                    $color = $blockColors[$i];
-                    if ($proses->jenis === 'Maintenance') {
-                        $blockBg = '#e0e0e0'; // abu-abu terang
-                        $blockBorder = '#757575'; // abu-abu gelap
-                    } else {
+        <div style="{{ $proses->jenis === 'Maintenance' ? 'flex: 1; padding: 0 8px;' : 'flex: 2;' }} text-align: center; display: flex; justify-content: center; align-items: center; gap: 6px;">
+            @if ($proses->jenis === 'Maintenance')
+                <div class="op-row" data-detail-id=""
+                    style="width: 100%; padding: 4px 12px; margin: 0; display: flex; align-items: center; justify-content: center; border-radius: 8px; cursor: pointer; background: rgba(255,255,255,0.22); border: 1.5px solid rgba(0,0,0,0.18);">
+                    <div class="op-row-noop"
+                        style="font-weight: 800; color: #111; font-size: 20px; letter-spacing: 3px; text-shadow: 0 1px 4px #fff8; margin: 0;">
+                        MAINTENANCE
+                    </div>
+                </div>
+            @else
+                @foreach ($blocks as $i => $b)
+                    @php
+                        $color = $blockColors[$i];
                         $blockBg =
                             $color === 'green'
                             ? '#d4f8e8'
@@ -307,14 +312,12 @@
                             $color === 'green'
                             ? '#43a047'
                             : '#c62828';
-                    }
-                @endphp
-                <span class="gda-block" data-block-type="{{ $b }}"
-                    style="display: inline-block; background: {{ $blockBg }}; color: #111; font-weight: bold; font-size: 22px; padding: 2px 10px; border-radius: 6px; border: 2.5px solid {{ $blockBorder }}; box-shadow: 0 1px 4px rgba(0,0,0,0.10); letter-spacing: 1px; text-shadow: 0 1px 2px #fff8;">
-                    {{ $b }}
-                </span>
-            @endforeach
-            @if($proses->jenis !== 'Maintenance')
+                    @endphp
+                    <span class="gda-block" data-block-type="{{ $b }}"
+                        style="display: inline-block; background: {{ $blockBg }}; color: #111; font-weight: bold; font-size: 22px; padding: 2px 10px; border-radius: 6px; border: 2.5px solid {{ $blockBorder }}; box-shadow: 0 1px 4px rgba(0,0,0,0.10); letter-spacing: 1px; text-shadow: 0 1px 2px #fff8;">
+                        {{ $b }}
+                    </span>
+                @endforeach
                 @php
                     $tdStyle2 = $tdColor === 'yellow' ? 'background:#fff9c4;color:#111;border:2.5px solid #f9a825' : ($tdColor === 'red' ? 'background:#ffb3b3;color:#111;border:2.5px solid #c62828' : ($tdColor === 'green' ? 'background:#d4f8e8;color:#111;border:2.5px solid #43a047' : ($tdColor === 'inactive' ? 'background:#eceff1;color:#555;border:2.5px solid #90a4ae' : '')));
                     $taStyle2 = $taColor === 'yellow' ? 'background:#fff9c4;color:#111;border:2.5px solid #f9a825' : ($taColor === 'red' ? 'background:#ffb3b3;color:#111;border:2.5px solid #c62828' : ($taColor === 'green' ? 'background:#d4f8e8;color:#111;border:2.5px solid #43a047' : ($taColor === 'inactive' ? 'background:#eceff1;color:#555;border:2.5px solid #90a4ae' : '')));
@@ -331,7 +334,7 @@
                 @endif
             @endif
         </div>
-        <div style="flex: 1; text-align: right;">
+        <div style="{{ $proses->jenis === 'Maintenance' ? 'flex: 0 0 auto;' : 'flex: 1;' }} text-align: right;">
             <div class="status-light {{ $light == 'green' ? 'running-light' : ($light == 'yellow' ? 'running-light-yellow' : '') }}"
                 style="width: 24px; height: 24px; border-radius: 50%; background: {{ $light == 'green' ? '#00ff1a' : ($light == 'yellow' ? '#ffeb3b' : '#ff2a2a') }}; display: inline-block; border: 3px solid #fff; box-shadow: 0 0 0 0 transparent; transition: background 0.2s;">
             </div>
@@ -345,13 +348,14 @@
                 : ($proses->details ?? collect());
             $isMultipleOp = $detailList->count() > 1;
         @endphp
+        @if ($proses->jenis !== 'Maintenance')
         <div class="op-list">
-            @if ($proses->jenis === 'Maintenance' || $detailList->isEmpty())
-                {{-- Maintenance atau tidak ada detail --}}
+            @if ($detailList->isEmpty())
+                {{-- Tidak ada detail --}}
                 <div class="op-row" data-detail-id="">
                     <div class="op-row-noop"
                         style="font-weight: bold; color: #111; font-size: 22px; letter-spacing: 2px; text-shadow: 0 1px 4px #fff8;">
-                        MAINTENANCE
+                        -
                     </div>
                 </div>
             @elseif ($isMultipleOp)
@@ -487,6 +491,7 @@
                 </div>
             @endif
         </div>
+        @endif
         <div class="card-time"
             style="display: flex; justify-content: space-between; font-size: 12px; margin: 2px 0; color: #fff; text-shadow: 0 1px 2px #0008;">
             <span>

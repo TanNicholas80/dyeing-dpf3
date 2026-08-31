@@ -100,6 +100,7 @@ class ApiCheckStatusBarcodeController extends Controller
 
             if ($prosesAktif) {
                 // KEMBALIKAN KE ASAL: Jika OFF disengaja dari IoT, berarti SELESAI (Masuk History)
+                Cache::forget("iot:proses:{$prosesAktif->id}:kain_latched");
                 $prosesAktif->selesai = now();
                 $prosesAktif->is_paused = false;
                 $prosesAktif->save();
@@ -298,18 +299,6 @@ class ApiCheckStatusBarcodeController extends Controller
             ]);
         }
 
-        // Optimasi: early exit saat mesin ON dan alarm latched - skip semua query DB
-        if ($isOn) {
-            $isLatched = (bool) Cache::get($latchKey, false);
-            if ($isLatched) {
-                $minimal = ['mesin_id' => $mesin->id, 'alarm_on' => true];
-                if (!$full) {
-                    Cache::put($alarmCacheKey, $minimal, now()->addSeconds(3));
-                    return response()->json($minimal);
-                }
-            }
-        }
-
         // Pilih proses yang "runnable" untuk alarm:
         // - prioritas proses aktif (mulai != null, selesai null)
         // - fallback ke proses antri yang TIDAK terblokir pending create_reprocess (FM/VP)
@@ -357,15 +346,21 @@ class ApiCheckStatusBarcodeController extends Controller
         $noPlanOrProses = $isOn && !$proses;
         $pendingReprocessWithoutPlanning = $isOn && $hasPendingReprocessApproval && !$hasNextPlanning && is_null($prosesAktif);
 
-        $alarmOn = false;
-        $barcodeIncomplete = false;
+        // 1. Cek Barcode Kain untuk Proses Aktif & Antrean
+        $kainIncompleteAktif = $this->checkBarcodeKainIncomplete($prosesAktif);
+        $kainIncompleteRunnable = $this->checkBarcodeKainIncomplete($prosesAntriRunnable);
 
-        // Cek barcode proses aktif (jika ada dan bukan Maintenance)
-        $barcodeIncompleteAktif = $this->checkProsesBarcodeIncomplete($proses);
-        // Cek barcode proses sebelumnya yang sudah selesai (kecuali Maintenance)
-        $barcodeIncompleteSelesai = $this->checkProsesBarcodeIncomplete($prosesSelesai);
+        // Jika proses sedang berjalan (prosesAktif) dan barcode kain tidak lengkap,
+        // maka latch alarm kain untuk proses ini sampai proses selesai.
+        $prosesKainLatchedKey = $prosesAktif ? "iot:proses:{$prosesAktif->id}:kain_latched" : null;
+        if ($prosesAktif && $kainIncompleteAktif) {
+            Cache::put($prosesKainLatchedKey, true, now()->addDays(7));
+        }
+        $isKainLatched = $prosesKainLatchedKey ? (bool) Cache::get($prosesKainLatchedKey, false) : false;
 
-        $barcodeIncomplete = $barcodeIncompleteAktif || $barcodeIncompleteSelesai;
+        // 2. Cek Jadwal Breakdown Dye Stuff & AUX untuk proses yang sedang aktif/berjalan
+        $scheduleStatus = $this->checkProsesScheduleAlarm($prosesAktif);
+        $isScheduleLate = $scheduleStatus['is_schedule_late'] ?? false;
 
         // Simpan progress untuk response full (dari proses aktif) - hanya saat full=1
         $laRequired = null;
@@ -378,32 +373,77 @@ class ApiCheckStatusBarcodeController extends Controller
             [$laRequired, $laScanned, $laComplete, $auxRequired, $auxScanned, $auxComplete] = $this->getProsesBarcodeProgress($proses);
         }
 
-        // Logic alarm baru:
-        // - Mesin ON + barcode incomplete -> Alarm ON, latch (tetap ON walau barcode nanti lengkap, sampai mesin OFF)
-        // - Mesin OFF -> Alarm mati HANYA jika barcode complete; jika barcode incomplete tetap berbunyi
+        // 3. Logic Alarm:
+        // - Mesin OFF: Alarm ON jika barcode kain belum lengkap pada proses aktif/antrean.
+        // - Mesin ON:
+        //   * Jika Barcode Kain tidak lengkap saat berjalan -> Alarm ON (latched) sampai proses selesai/history.
+        //   * Jika Barcode Kain lengkap -> Alarm mengikuti breakdown Dye Stuff & AUX (ON jika terlambat, OTOMATIS PADAM saat barcode di-scan).
+        $alarmOn = false;
+        $reason = '';
+
         if (!$isOn) {
-            Cache::forget($latchKey);
-            $alarmOn = $barcodeIncomplete;
+            // Mesin OFF:
+            if ($isKainLatched || $kainIncompleteAktif || $kainIncompleteRunnable) {
+                $alarmOn = true;
+                $reason = 'Mesin OFF, Barcode Kain belum lengkap';
+            } else {
+                $alarmOn = false;
+                $reason = 'Mesin OFF';
+            }
         } else {
+            // Mesin ON:
             $operationalAlarm = $noPlanOrProses || $pendingReprocessWithoutPlanning;
             if ($operationalAlarm) {
                 $alarmOn = true;
-            } else {
-                $isLatched = (bool) Cache::get($latchKey, false);
-                if ($isLatched) {
-                    $alarmOn = true;
-                } elseif ($barcodeIncomplete) {
-                    $alarmOn = true;
-                    Cache::put($latchKey, true, now()->addHours(24));
-                } else {
-                    $alarmOn = false;
+                $reason = $noPlanOrProses
+                    ? 'Mesin ON tetapi tidak ada plan/proses'
+                    : 'Mesin ON dan Reproses masih menunggu approval FM/VP';
+            } elseif ($isKainLatched) {
+                // Barcode kain tidak lengkap saat proses berjalan -> ALARM NYALA TERUS SAMPAI PROSES SELESAI
+                $alarmOn = true;
+                $reason = 'Proses berjalan dengan Barcode Kain tidak lengkap (Alarm aktif hingga proses selesai/history)';
+            } elseif ($isScheduleLate) {
+                // Barcode kain lengkap, tetapi Dye Stuff atau AUX terlambat di-input sesuai breakdown cycle time atau topping belum dilengkapi (> 30 menit)
+                $alarmOn = true;
+                $reasons = [];
+                if (!empty($scheduleStatus['la_initial_late'])) {
+                    $reasons[] = "Dye Stuff terlambat (Dibutuhkan: {$scheduleStatus['la_due_count']}, Ter-scan: {$scheduleStatus['la_scanned']})";
                 }
+                if (!empty($scheduleStatus['la_topping_overdue'])) {
+                    $reasons[] = "Topping Dye Stuff belum dilengkapi (> 30 menit setelah approval Kashift)";
+                }
+                if (!empty($scheduleStatus['aux_initial_late'])) {
+                    $reasons[] = "AUX terlambat (Dibutuhkan: {$scheduleStatus['aux_due_count']}, Ter-scan: {$scheduleStatus['aux_scanned']})";
+                }
+                if (!empty($scheduleStatus['aux_topping_overdue'])) {
+                    $reasons[] = "Topping AUX belum dilengkapi (> 30 menit setelah approval Kashift)";
+                }
+                $reason = 'Jadwal input / Topping terlambat: ' . implode(' & ', $reasons);
+            } else {
+                $alarmOn = false;
+                $reason = (!$proses)
+                    ? 'Tidak ada proses aktif'
+                    : (($proses->jenis ?? null) === 'Maintenance'
+                        ? 'Maintenance'
+                        : 'Barcode Kain lengkap & Dye Stuff/AUX sesuai jadwal breakdown');
             }
         }
 
+        // Sinyal Modbus Address 103 & 105:
+        $signal103 = $this->checkSignal103($mesin, $prosesAktif, $prosesSelesai);
+        $signal105 = $this->checkSignal105($mesin, $prosesAktif, $prosesAntriRunnable);
+
         $minimal = [
             'mesin_id' => $mesin->id,
-            'alarm_on' => $alarmOn,
+            'alarm_on' => (bool) $alarmOn,
+            'address_100' => $alarmOn ? 1 : 0,
+            'address_103' => $signal103 ? 1 : 0,
+            'address_105' => $signal105 ? 1 : 0,
+            'signals' => [
+                '100' => $alarmOn ? 1 : 0,
+                '103' => $signal103 ? 1 : 0,
+                '105' => $signal105 ? 1 : 0,
+            ],
         ];
         Cache::put($this->alarmStateKey((int) $mesin->id), (bool) $alarmOn, now()->addMinutes(5));
 
@@ -420,18 +460,6 @@ class ApiCheckStatusBarcodeController extends Controller
             'db' => ['status' => $dbIsOn],
         ];
 
-        $reason = !$isOn
-            ? ($alarmOn ? 'Mesin OFF, barcode belum lengkap' : 'Mesin OFF')
-            : ($alarmOn
-                ? ($noPlanOrProses
-                    ? 'Mesin ON tetapi tidak ada plan/proses'
-                    : ($pendingReprocessWithoutPlanning
-                        ? 'Mesin ON dan Reproses masih menunggu approval FM/VP'
-                        : ($barcodeIncompleteSelesai && !$barcodeIncompleteAktif
-                            ? 'Proses sebelumnya belum lengkap barcode / alarm latched'
-                            : 'Barcode belum lengkap / alarm latched')))
-                : (!$proses ? 'Tidak ada proses aktif' : (($proses->jenis ?? null) === 'Maintenance' ? 'Maintenance' : 'Barcode lengkap')));
-
         $fullPayload = array_merge($minimal, [
             'status' => 'success',
             'mesin' => $mesin->jenis_mesin,
@@ -444,6 +472,18 @@ class ApiCheckStatusBarcodeController extends Controller
             'has_pending_reprocess_approval' => $hasPendingReprocessApproval,
             'has_next_planning' => $hasNextPlanning,
             'pending_reprocess_without_planning' => $pendingReprocessWithoutPlanning,
+            'is_kain_latched' => $isKainLatched,
+            'schedule_status' => $scheduleStatus,
+            'signal_103_detail' => [
+                'value' => $signal103 ? 1 : 0,
+                'is_active' => $signal103,
+                'description' => '1 jika maintenance selesai manual atau semua barcode (kain, LA, AUX, topping) lengkap',
+            ],
+            'signal_105_detail' => [
+                'value' => $signal105 ? 1 : 0,
+                'is_active' => $signal105,
+                'description' => '1 jika proses memiliki status / flag pinjam mesin',
+            ],
         ]);
 
         if ($proses && ($proses->jenis ?? null) !== 'Maintenance' && isset($laComplete, $auxComplete)) {
@@ -463,13 +503,30 @@ class ApiCheckStatusBarcodeController extends Controller
     }
 
     /**
-     * Cek apakah barcode proses belum lengkap (GDA/FDA + TD/TA).
-     * Kecuali Maintenance: selalu false (tidak perlu barcode).
-     *
-     * @param Proses|null $proses
-     * @return bool true jika barcode incomplete
+     * Helper konversi string jam (JJ:MM:DD / JJ:MM / detik) ke Total Detik.
      */
-    private function checkProsesBarcodeIncomplete(?Proses $proses): bool
+    private function parseScheduleTimeToSeconds($val): int
+    {
+        if (empty($val)) {
+            return 0;
+        }
+        if (is_numeric($val)) {
+            return (int) $val;
+        }
+        $parts = explode(':', trim((string) $val));
+        if (count($parts) === 3) {
+            return ((int) $parts[0]) * 3600 + ((int) $parts[1]) * 60 + ((int) $parts[2]);
+        }
+        if (count($parts) === 2) {
+            return ((int) $parts[0]) * 3600 + ((int) $parts[1]) * 60;
+        }
+        return (int) $val;
+    }
+
+    /**
+     * Cek apakah Barcode Kain (G/F) belum lengkap pada proses tertentu.
+     */
+    private function checkBarcodeKainIncomplete(?Proses $proses): bool
     {
         if (!$proses || ($proses->jenis ?? null) === 'Maintenance') {
             return false;
@@ -479,7 +536,7 @@ class ApiCheckStatusBarcodeController extends Controller
         $mode = $proses->mode ?? 'greige';
         $jenis = $proses->jenis ?? null;
 
-        // Apakah barcode kain (G/F) wajib untuk alarm?
+        // Apakah barcode kain (G/F) wajib?
         $requireKain = true;
         if ($jenis === 'Reproses' && $mode === 'greige') {
             $requireKain = false;
@@ -508,62 +565,349 @@ class ApiCheckStatusBarcodeController extends Controller
             $requireKain = !$allDetailSecondOrMore;
         }
 
-        $kainIncomplete = false;
-        if ($requireKain) {
-            $detailIds = $details->pluck('id');
-            $scannedCounts = BarcodeKain::whereIn('detail_proses_id', $detailIds)
-                ->where('cancel', false)
-                ->selectRaw('detail_proses_id, COUNT(*) as cnt')
-                ->groupBy('detail_proses_id')
-                ->pluck('cnt', 'detail_proses_id');
-            foreach ($details as $d) {
-                $roll = (int) ($d->roll ?? 0);
-                $scanned = (int) ($scannedCounts[$d->id] ?? 0);
-                $isComplete = ($roll > 0) ? ($scanned >= $roll) : true;
-                if (!$isComplete) {
-                    $kainIncomplete = true;
-                    break;
-                }
+        if (!$requireKain) {
+            return false;
+        }
+
+        $detailIds = $details->pluck('id');
+        $scannedCounts = BarcodeKain::whereIn('detail_proses_id', $detailIds)
+            ->where('cancel', false)
+            ->selectRaw('detail_proses_id, COUNT(*) as cnt')
+            ->groupBy('detail_proses_id')
+            ->pluck('cnt', 'detail_proses_id');
+
+        foreach ($details as $d) {
+            $roll = (int) ($d->roll ?? 0);
+            $scanned = (int) ($scannedCounts[$d->id] ?? 0);
+            $isComplete = ($roll > 0) ? ($scanned >= $roll) : true;
+            if (!$isComplete) {
+                return true; // Kain belum lengkap
             }
         }
 
-        // Validasi LA & AUX: kebutuhan awal + topping yang sudah di-approve (TD/TA)
+        return false;
+    }
+
+    /**
+     * Cek status untuk sinyal Modbus Address 103:
+     * 1. Maintenance dihentikan/diselesaikan manual oleh Kashift/Super Admin.
+     * 2. Atau Proses (Single OP/Multiple OP) seluruh barcode-nya sudah LENGKAP di-scan (Kain + Dye Stuff + AUX + Topping).
+     */
+    private function checkSignal103(Mesin $mesin, ?Proses $prosesAktif, ?Proses $prosesSelesai): bool
+    {
+        // 1. Cek Maintenance
+        if ($prosesAktif && ($prosesAktif->jenis ?? null) === 'Maintenance') {
+            // Jika proses aktif adalah Maintenance dan sudah diselesaikan:
+            if ($prosesAktif->selesai !== null) {
+                return true;
+            }
+        }
+
+        // Cek jika proses selesai terakhir adalah Maintenance yang diselesaikan secara manual
+        if (!$prosesAktif && $prosesSelesai && ($prosesSelesai->jenis ?? null) === 'Maintenance') {
+            if ($prosesSelesai->selesai && \Carbon\Carbon::parse($prosesSelesai->selesai)->isToday()) {
+                return true;
+            }
+        }
+
+        // 2. Cek Proses Produksi / Reproses (Single OP & Multiple OP)
+        if ($prosesAktif && ($prosesAktif->jenis ?? null) !== 'Maintenance') {
+            // A. Cek Barcode Kain
+            $kainIncomplete = $this->checkBarcodeKainIncomplete($prosesAktif);
+            if ($kainIncomplete) {
+                return false;
+            }
+
+            // B. Cek Barcode Dye Stuff (Initial + Topping)
+            $qtyDyeStuff = (int) ($prosesAktif->qty_dye_stuff ?? 0);
+            $laInitialScanned = BarcodeLa::whereHas('detailProses', fn($q) => $q->where('proses_id', $prosesAktif->id))
+                ->whereNull('approval_id')
+                ->where('cancel', false)
+                ->distinct('barcode')
+                ->count('barcode');
+            $laInitialComplete = ($qtyDyeStuff > 0) ? ($laInitialScanned >= $qtyDyeStuff) : true;
+            if (!$laInitialComplete) {
+                return false;
+            }
+
+            $approvedToppingLa = Approval::where('proses_id', $prosesAktif->id)
+                ->where('type', 'KEPALA_SHIFT')
+                ->where('action', 'topping_la')
+                ->where('status', 'approved')
+                ->get();
+            $laToppingAllScanned = $approvedToppingLa->every(function ($appr) {
+                return BarcodeLa::where('approval_id', $appr->id)->where('cancel', false)->exists();
+            });
+            if (!$laToppingAllScanned) {
+                return false;
+            }
+
+            // C. Cek Barcode AUX (Initial + Topping)
+            $qtyAux = (int) ($prosesAktif->qty_aux ?? 0);
+            $auxInitialScanned = BarcodeAux::whereHas('detailProses', fn($q) => $q->where('proses_id', $prosesAktif->id))
+                ->whereNull('approval_id')
+                ->where('cancel', false)
+                ->count();
+            $auxInitialComplete = ($qtyAux > 0) ? ($auxInitialScanned >= $qtyAux) : true;
+            if (!$auxInitialComplete) {
+                return false;
+            }
+
+            $approvedToppingAux = Approval::where('proses_id', $prosesAktif->id)
+                ->where('type', 'KEPALA_SHIFT')
+                ->where('action', 'topping_aux')
+                ->where('status', 'approved')
+                ->get();
+            $auxToppingAllScanned = $approvedToppingAux->every(function ($appr) {
+                return BarcodeAux::where('approval_id', $appr->id)->where('cancel', false)->exists();
+            });
+            if (!$auxToppingAllScanned) {
+                return false;
+            }
+
+            // Semua barcode (Kain, Dye Stuff, AUX, Topping) sudah LENGKAP
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Cek status untuk sinyal Modbus Address 105:
+     * Bernilai true (1) ketika proses memiliki flag/status Pinjam Mesin (pending maupun approved).
+     */
+    private function checkSignal105(Mesin $mesin, ?Proses $prosesAktif, ?Proses $prosesAntriRunnable): bool
+    {
+        // 1. Cek pada proses aktif
+        if ($prosesAktif) {
+            $hasPinjamAktif = Approval::where('proses_id', $prosesAktif->id)
+                ->where('action', 'pinjam_mesin')
+                ->whereIn('status', ['pending', 'approved'])
+                ->exists();
+            if ($hasPinjamAktif) {
+                return true;
+            }
+        }
+
+        // 2. Cek pada proses antrean berikutnya yang runnable
+        if ($prosesAntriRunnable) {
+            $hasPinjamAntri = Approval::where('proses_id', $prosesAntriRunnable->id)
+                ->where('action', 'pinjam_mesin')
+                ->whereIn('status', ['pending', 'approved'])
+                ->exists();
+            if ($hasPinjamAntri) {
+                return true;
+            }
+        }
+
+        // 3. Cek apakah ada pengajuan pinjam mesin yang melibatkan mesin ini
+        $hasPinjamMesin = Approval::where('action', 'pinjam_mesin')
+            ->where('status', 'pending')
+            ->where(function ($q) use ($mesin) {
+                $q->whereJsonContains('history_data->old_mesin_id', (int) $mesin->id)
+                  ->orWhereJsonContains('history_data->new_mesin_id', (int) $mesin->id);
+            })
+            ->exists();
+
+        return $hasPinjamMesin;
+    }
+
+    /**
+     * Cek status keterlambatan jadwal input Dye Stuff & AUX berdasarkan Breakdown Cycle Time.
+     * Alarm otomatis ON jika waktu breakdown sudah terlewat dan barcode belum di-scan,
+     * dan otomatis PADAM (OFF) saat barcode sudah di-input.
+     */
+    private function checkProsesScheduleAlarm(?Proses $proses): array
+    {
+        $default = [
+            'elapsed_seconds' => 0,
+            'la_due_count' => 0,
+            'la_required_now' => 0,
+            'la_scanned' => 0,
+            'la_late' => false,
+            'aux_due_count' => 0,
+            'aux_required_now' => 0,
+            'aux_scanned' => 0,
+            'aux_late' => false,
+            'is_schedule_late' => false,
+        ];
+
+        if (!$proses || ($proses->jenis ?? null) === 'Maintenance') {
+            return $default;
+        }
+
+        // Hitung durasi proses yang sudah berjalan (elapsed seconds)
+        $elapsedSeconds = 0;
+        if ($proses->mulai) {
+            if ($proses->is_paused) {
+                $elapsedSeconds = max(0, \Carbon\Carbon::parse($proses->updated_at)->diffInSeconds($proses->mulai));
+            } else {
+                $elapsedSeconds = max(0, now()->diffInSeconds($proses->mulai));
+            }
+        }
+
+        // 1. Evaluasi Jadwal Breakdown Dye Stuff (LA)
+        $qtyDyeStuff = (int) ($proses->qty_dye_stuff ?? 0);
+        $schedulesDs = $proses->dye_stuff_schedules;
+        if (is_string($schedulesDs)) {
+            $schedulesDs = json_decode($schedulesDs, true);
+        }
+
+        $laDueCount = 0;
+        if ($qtyDyeStuff > 0) {
+            if (is_array($schedulesDs) && count($schedulesDs) > 0) {
+                foreach ($schedulesDs as $sch) {
+                    $schSec = $this->parseScheduleTimeToSeconds($sch);
+                    if ($elapsedSeconds >= $schSec) {
+                        $laDueCount++;
+                    }
+                }
+                $laDueCount = min($laDueCount, $qtyDyeStuff);
+            } else {
+                // Jika tidak ada jadwal breakdown, jatuh tempo sejak proses mulai berjalan
+                $laDueCount = $proses->mulai ? $qtyDyeStuff : 0;
+            }
+        }
+
+        // Cek initial barcode LA (tanpa approval_id)
         $laInitialScanned = BarcodeLa::whereHas('detailProses', fn($q) => $q->where('proses_id', $proses->id))
             ->whereNull('approval_id')
             ->where('cancel', false)
             ->distinct('barcode')
             ->count('barcode');
-        $laToppingRequired = Approval::where('proses_id', $proses->id)
-            ->where('type', 'KEPALA_SHIFT')
-            ->where('action', 'topping_la')
-            ->where('status', 'approved')
-            ->count();
-        $laToppingScanned = Approval::where('proses_id', $proses->id)
-            ->where('type', 'KEPALA_SHIFT')
-            ->where('action', 'topping_la')
-            ->where('status', 'approved')
-            ->whereHas('barcodeLas', fn($q) => $q->where('cancel', false))
-            ->count();
-        $laComplete = ($laInitialScanned + $laToppingScanned) >= (($proses->qty_dye_stuff ?? 0) + $laToppingRequired);
+        $laInitialLate = $laInitialScanned < $laDueCount;
 
+        // Cek topping LA: Berikan spare waktu 30 menit (1800 detik) sejak approval Kashift
+        $approvedToppingLa = Approval::where('proses_id', $proses->id)
+            ->where('type', 'KEPALA_SHIFT')
+            ->where('action', 'topping_la')
+            ->where('status', 'approved')
+            ->get();
+
+        $laToppingOverdue = false;
+        $laToppingOverdueCount = 0;
+        $laToppingScannedCount = 0;
+
+        foreach ($approvedToppingLa as $appr) {
+            $isScanned = BarcodeLa::where('approval_id', $appr->id)
+                ->where('cancel', false)
+                ->exists();
+
+            if ($isScanned) {
+                $laToppingScannedCount++;
+            } else {
+                $approvedAt = $appr->updated_at ?: $appr->created_at;
+                $secondsSinceApproved = $approvedAt ? now()->diffInSeconds($approvedAt) : 0;
+                // Jika sudah melewati spare waktu 30 menit (1800 detik) dan belum di-scan
+                if ($secondsSinceApproved >= 1800) {
+                    $laToppingOverdue = true;
+                    $laToppingOverdueCount++;
+                }
+            }
+        }
+
+        $laLate = $laInitialLate || $laToppingOverdue;
+        $laRequiredNow = $laDueCount + $approvedToppingLa->count();
+        $laScannedTotal = $laInitialScanned + $laToppingScannedCount;
+
+        // 2. Evaluasi Jadwal Breakdown AUX
+        $qtyAux = (int) ($proses->qty_aux ?? 0);
+        $schedulesAux = $proses->aux_schedules;
+        if (is_string($schedulesAux)) {
+            $schedulesAux = json_decode($schedulesAux, true);
+        }
+
+        $auxDueCount = 0;
+        if ($qtyAux > 0) {
+            if (is_array($schedulesAux) && count($schedulesAux) > 0) {
+                foreach ($schedulesAux as $sch) {
+                    $schSec = $this->parseScheduleTimeToSeconds($sch);
+                    if ($elapsedSeconds >= $schSec) {
+                        $auxDueCount++;
+                    }
+                }
+                $auxDueCount = min($auxDueCount, $qtyAux);
+            } else {
+                // Jika tidak ada jadwal breakdown, jatuh tempo sejak proses mulai berjalan
+                $auxDueCount = $proses->mulai ? $qtyAux : 0;
+            }
+        }
+
+        // Cek initial barcode AUX (tanpa approval_id)
         $auxInitialScanned = BarcodeAux::whereHas('detailProses', fn($q) => $q->where('proses_id', $proses->id))
             ->whereNull('approval_id')
             ->where('cancel', false)
             ->count();
-        $auxToppingRequired = Approval::where('proses_id', $proses->id)
-            ->where('type', 'KEPALA_SHIFT')
-            ->where('action', 'topping_aux')
-            ->where('status', 'approved')
-            ->count();
-        $auxToppingScanned = Approval::where('proses_id', $proses->id)
-            ->where('type', 'KEPALA_SHIFT')
-            ->where('action', 'topping_aux')
-            ->where('status', 'approved')
-            ->whereHas('barcodeAuxs', fn($q) => $q->where('cancel', false))
-            ->count();
-        $auxComplete = ($auxInitialScanned + $auxToppingScanned) >= (($proses->qty_aux ?? 0) + $auxToppingRequired);
+        $auxInitialLate = $auxInitialScanned < $auxDueCount;
 
-        return $kainIncomplete || !$laComplete || !$auxComplete;
+        // Cek topping AUX: Berikan spare waktu 30 menit (1800 detik) sejak approval Kashift
+        $approvedToppingAux = Approval::where('proses_id', $proses->id)
+            ->where('type', 'KEPALA_SHIFT')
+            ->where('action', 'topping_aux')
+            ->where('status', 'approved')
+            ->get();
+
+        $auxToppingOverdue = false;
+        $auxToppingOverdueCount = 0;
+        $auxToppingScannedCount = 0;
+
+        foreach ($approvedToppingAux as $appr) {
+            $isScanned = BarcodeAux::where('approval_id', $appr->id)
+                ->where('cancel', false)
+                ->exists();
+
+            if ($isScanned) {
+                $auxToppingScannedCount++;
+            } else {
+                $approvedAt = $appr->updated_at ?: $appr->created_at;
+                $secondsSinceApproved = $approvedAt ? now()->diffInSeconds($approvedAt) : 0;
+                // Jika sudah melewati spare waktu 30 menit (1800 detik) dan belum di-scan
+                if ($secondsSinceApproved >= 1800) {
+                    $auxToppingOverdue = true;
+                    $auxToppingOverdueCount++;
+                }
+            }
+        }
+
+        $auxLate = $auxInitialLate || $auxToppingOverdue;
+        $auxRequiredNow = $auxDueCount + $approvedToppingAux->count();
+        $auxScannedTotal = $auxInitialScanned + $auxToppingScannedCount;
+
+        return [
+            'elapsed_seconds' => $elapsedSeconds,
+            'la_due_count' => $laDueCount,
+            'la_required_now' => $laRequiredNow,
+            'la_scanned' => $laScannedTotal,
+            'la_late' => $laLate,
+            'la_initial_late' => $laInitialLate,
+            'la_topping_overdue' => $laToppingOverdue,
+            'aux_due_count' => $auxDueCount,
+            'aux_required_now' => $auxRequiredNow,
+            'aux_scanned' => $auxScannedTotal,
+            'aux_late' => $auxLate,
+            'aux_initial_late' => $auxInitialLate,
+            'aux_topping_overdue' => $auxToppingOverdue,
+            'is_schedule_late' => ($laLate || $auxLate),
+        ];
+    }
+
+    /**
+     * Cek apakah barcode proses belum lengkap (Kain incomplete atau Dye Stuff/AUX terlambat).
+     * Kecuali Maintenance: selalu false (tidak perlu barcode).
+     *
+     * @param Proses|null $proses
+     * @return bool true jika barcode incomplete atau late
+     */
+    private function checkProsesBarcodeIncomplete(?Proses $proses): bool
+    {
+        if (!$proses || ($proses->jenis ?? null) === 'Maintenance') {
+            return false;
+        }
+
+        $kainIncomplete = $this->checkBarcodeKainIncomplete($proses);
+        $scheduleStatus = $this->checkProsesScheduleAlarm($proses);
+
+        return $kainIncomplete || ($scheduleStatus['is_schedule_late'] ?? false);
     }
 
     /**
@@ -613,6 +957,29 @@ class ApiCheckStatusBarcodeController extends Controller
         $auxComplete = $auxScanned >= $auxRequired;
 
         return [$laRequired, $laScanned, $laComplete, $auxRequired, $auxScanned, $auxComplete];
+    }
+
+    /**
+     * Polling semua sinyal Modbus (Address 100, 103, 105) untuk semua mesin sekaligus.
+     * GET /api/iot/signals
+     */
+    public function getAllSignals(Request $request)
+    {
+        $this->assertDeviceToken($request);
+        $mesins = Mesin::orderBy('id')->get();
+        $results = [];
+
+        foreach ($mesins as $mesin) {
+            $signalResponse = $this->getAlarmStatus($request, $mesin);
+            $results[] = $signalResponse->getData(true);
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'timestamp' => now()->toIso8601String(),
+            'total_mesin' => count($results),
+            'data' => $results,
+        ]);
     }
 
     /**

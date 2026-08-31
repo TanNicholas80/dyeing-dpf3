@@ -923,21 +923,26 @@
                                                                 {{-- Header --}}
                                                                 <div class="card-header"
                                                                     style="display: flex; flex-direction: row; align-items: center; padding: 0 10px 2px 10px; gap: 0; border-bottom: none;">
-                                                                    <div style="flex: 1; text-align: left;">
+                                                                    <div style="{{ $proses->jenis === 'Maintenance' ? 'flex: 0 0 auto;' : 'flex: 1;' }} text-align: left;">
                                                                         <span class="status-type"
                                                                             style="font-weight: bold; font-size: 32px; color: #111; text-shadow: 0 1px 4px #fff8;">
                                                                             {{ $type }}
                                                                         </span>
                                                                     </div>
                                                                     <div
-                                                                        style="flex: 2; text-align: center; display: flex; justify-content: center; gap: 6px;">
-                                                                        @foreach ($blocks as $i => $b)
-                                                                            @php
-                                                                                $color = $blockColors[$i];
-                                                                                if ($proses->jenis === 'Maintenance') {
-                                                                                    $blockBg = '#e0e0e0';
-                                                                                    $blockBorder = '#757575';
-                                                                                } else {
+                                                                        style="{{ $proses->jenis === 'Maintenance' ? 'flex: 1; padding: 0 8px;' : 'flex: 2;' }} text-align: center; display: flex; justify-content: center; align-items: center; gap: 6px;">
+                                                                        @if ($proses->jenis === 'Maintenance')
+                                                                            <div class="op-row" data-detail-id=""
+                                                                                style="width: 100%; padding: 4px 12px; margin: 0; display: flex; align-items: center; justify-content: center; border-radius: 8px; cursor: pointer; background: rgba(255,255,255,0.22); border: 1.5px solid rgba(0,0,0,0.18);">
+                                                                                <div class="op-row-noop"
+                                                                                    style="font-weight: 800; color: #111; font-size: 20px; letter-spacing: 3px; text-shadow: 0 1px 4px #fff8; margin: 0;">
+                                                                                    MAINTENANCE
+                                                                                </div>
+                                                                            </div>
+                                                                        @else
+                                                                            @foreach ($blocks as $i => $b)
+                                                                                @php
+                                                                                    $color = $blockColors[$i];
                                                                                     $blockBg =
                                                                                         $color === 'green'
                                                                                         ? '#d4f8e8'
@@ -946,14 +951,12 @@
                                                                                         $color === 'green'
                                                                                         ? '#43a047'
                                                                                         : '#c62828';
-                                                                                }
-                                                                            @endphp
-                                                                            <span class="gda-block" data-block-type="{{ $b }}"
-                                                                                style="display: inline-block; background: {{ $blockBg }}; color: #111; font-weight: bold; font-size: 22px; padding: 2px 10px; border-radius: 6px; border: 2.5px solid {{ $blockBorder }}; box-shadow: 0 1px 4px rgba(0,0,0,0.10); letter-spacing: 1px; text-shadow: 0 1px 2px #fff8;">
-                                                                                {{ $b }}
-                                                                            </span>
-                                                                        @endforeach
-                                                                        @if($proses->jenis !== 'Maintenance')
+                                                                                @endphp
+                                                                                <span class="gda-block" data-block-type="{{ $b }}"
+                                                                                    style="display: inline-block; background: {{ $blockBg }}; color: #111; font-weight: bold; font-size: 22px; padding: 2px 10px; border-radius: 6px; border: 2.5px solid {{ $blockBorder }}; box-shadow: 0 1px 4px rgba(0,0,0,0.10); letter-spacing: 1px; text-shadow: 0 1px 2px #fff8;">
+                                                                                    {{ $b }}
+                                                                                </span>
+                                                                            @endforeach
                                                                             @php
                                                                                 $tdStyle = $tdColor === 'yellow' ? 'background:#fff9c4;color:#111;border:2.5px solid #f9a825' : ($tdColor === 'red' ? 'background:#ffb3b3;color:#111;border:2.5px solid #c62828' : ($tdColor === 'green' ? 'background:#d4f8e8;color:#111;border:2.5px solid #43a047' : ($tdColor === 'inactive' ? 'background:#eceff1;color:#555;border:2.5px solid #90a4ae' : '')));
                                                                                 $taStyle = $taColor === 'yellow' ? 'background:#fff9c4;color:#111;border:2.5px solid #f9a825' : ($taColor === 'red' ? 'background:#ffb3b3;color:#111;border:2.5px solid #c62828' : ($taColor === 'green' ? 'background:#d4f8e8;color:#111;border:2.5px solid #43a047' : ($taColor === 'inactive' ? 'background:#eceff1;color:#555;border:2.5px solid #90a4ae' : '')));
@@ -970,7 +973,7 @@
                                                                             @endif
                                                                         @endif
                                                                     </div>
-                                                                    <div style="flex: 1; text-align: right;">
+                                                                    <div style="{{ $proses->jenis === 'Maintenance' ? 'flex: 0 0 auto;' : 'flex: 1;' }} text-align: right;">
                                                                         <div class="status-light {{ $light == 'green' ? 'running-light' : ($light == 'yellow' ? 'running-light-yellow' : '') }}"
                                                                             style="width: 24px; height: 24px; border-radius: 50%; background: {{ $light == 'green' ? '#00ff1a' : ($light == 'yellow' ? '#ffeb3b' : '#ff2a2a') }}; display: inline-block; border: 3px solid #fff; box-shadow: 0 0 0 0 transparent; transition: background 0.2s;">
                                                                         </div>
@@ -985,13 +988,14 @@
                                                                             : ($proses->details ?? collect());
                                                                         $isMultipleOp = $detailList->count() > 1;
                                                                     @endphp
+                                                                    @if ($proses->jenis !== 'Maintenance')
                                                                     <div class="op-list">
-                                                                        @if ($proses->jenis === 'Maintenance' || $detailList->isEmpty())
-                                                                            {{-- Maintenance atau tidak ada detail --}}
+                                                                        @if ($detailList->isEmpty())
+                                                                            {{-- Tidak ada detail --}}
                                                                             <div class="op-row" data-detail-id="">
                                                                                 <div class="op-row-noop"
                                                                                     style="font-weight: bold; color: #111; font-size: 22px; letter-spacing: 2px; text-shadow: 0 1px 4px #fff8;">
-                                                                                    MAINTENANCE
+                                                                                    -
                                                                                 </div>
                                                                             </div>
                                                                         @elseif ($isMultipleOp)
@@ -1128,7 +1132,8 @@
                                                                                 </div>
                                                                             </div>
                                                                         @endif
-                                                                    </div>
+                                                                        </div>
+                                                                    @endif
                                                                     <div class="card-time"
                                                                         style="display: flex; justify-content: space-between; font-size: 12px; margin: 2px 0; color: #fff; text-shadow: 0 1px 2px #0008;">
                                                                         <span>
@@ -1737,6 +1742,16 @@
                                             <option value="3">3</option>
                                         </select>
                                     </div>
+                                    <!-- Container Breakdown Jam Dye Stuff -->
+                                    <div id="dye_stuff_schedule_container" class="mt-2 mb-3 p-3 bg-light rounded border" style="display: none;">
+                                        <label class="form-label fw-semibold text-primary mb-2" style="font-size: 13px;">
+                                            <i class="fas fa-clock mr-1"></i> Breakdown Jam Input Dye Stuff
+                                        </label>
+                                        <div id="dye_stuff_schedule_inputs"></div>
+                                        <small class="text-muted d-block mt-1" style="font-size: 11px;">
+                                            * Format: <code>JJ:MM:DD</code> (Contoh: <code>03:00:00</code>), tidak boleh melebihi Cycle Time.
+                                        </small>
+                                    </div>
                                 </div>
 
                                 <!-- AUX -->
@@ -1749,6 +1764,16 @@
                                             <option value="2">2</option>
                                             <option value="3">3</option>
                                         </select>
+                                    </div>
+                                    <!-- Container Breakdown Jam AUX -->
+                                    <div id="aux_schedule_container" class="mt-2 mb-3 p-3 bg-light rounded border" style="display: none;">
+                                        <label class="form-label fw-semibold text-success mb-2" style="font-size: 13px;">
+                                            <i class="fas fa-clock mr-1"></i> Breakdown Jam Input AUX
+                                        </label>
+                                        <div id="aux_schedule_inputs"></div>
+                                        <small class="text-muted d-block mt-1" style="font-size: 11px;">
+                                            * Format: <code>JJ:MM:DD</code> (Contoh: <code>01:30:00</code>), tidak boleh melebihi Cycle Time.
+                                        </small>
                                     </div>
                                 </div>
 
@@ -1963,6 +1988,16 @@
                             @if ($canEditProses ?? true)
                                 <button type="button" class="btn btn-primary btn-edit-proses mr-2">
                                     <i class="fas fa-edit mr-1"></i>Edit
+                                </button>
+                            @endif
+                            @if ($canFinishMaintenance ?? in_array($userRole ?? '', ['super_admin', 'kepala_shift']))
+                                <button type="button" class="btn btn-success btn-finish-maintenance d-none mr-2">
+                                    <i class="fas fa-check mr-1"></i>Proses Selesai
+                                </button>
+                            @endif
+                            @if ($canPinjamMesin ?? in_array($userRole ?? '', ['super_admin', 'operator', 'ppic']))
+                                <button type="button" class="btn btn-info btn-pinjam-mesin d-none mr-2 text-white">
+                                    <i class="fas fa-exchange-alt mr-1"></i>Pinjam Mesin
                                 </button>
                             @endif
                             @if ($canMoveProses ?? true)
@@ -2244,6 +2279,60 @@
             </div>
         </div>
 
+        <!-- Modal Pinjam Mesin -->
+        <div class="modal fade" id="modalPinjamMesin" tabindex="-1" aria-labelledby="modalPinjamMesinLabel"
+            aria-hidden="true">
+            <div class="modal-dialog modal-md modal-dialog-centered">
+                <div class="modal-content shadow-lg border-0 rounded-3">
+                    <form id="formPinjamMesin" method="POST" action="">
+                        @csrf
+                        <input type="hidden" name="proses_id" id="pinjamProsesId">
+                        <div class="modal-header bg-info text-white">
+                            <h5 class="modal-title fw-bold" id="modalPinjamMesinLabel">
+                                <i class="fas fa-exchange-alt mr-2"></i>Pinjam Mesin
+                            </h5>
+                            <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>
+                        <div class="modal-body py-3 px-4">
+                            <div class="alert alert-warning py-2 mb-3" style="font-size: 13px;">
+                                <i class="fas fa-info-circle mr-1"></i>Permintaan pinjam mesin akan diajukan ke <strong>Kepala Shift</strong> untuk disetujui.
+                            </div>
+                            <div class="form-group mb-2">
+                                <label class="form-label fw-semibold mb-1" style="font-size: 13px;">Informasi Proses</label>
+                                <div id="pinjamProsesInfo" class="p-2 bg-light rounded border text-muted" style="font-size: 13px;">
+                                    -
+                                </div>
+                            </div>
+                            <div class="form-group mb-2">
+                                <label class="form-label fw-semibold mb-1" style="font-size: 13px;">Mesin Asal Saat Ini</label>
+                                <input type="text" id="pinjamMesinAsal" class="form-control form-control-sm bg-light" readonly>
+                            </div>
+                            <div class="form-group mb-2">
+                                <label class="form-label fw-semibold mb-1" style="font-size: 13px;">Pilih Mesin Tujuan <span class="text-danger">*</span></label>
+                                <select name="mesin_id" id="pinjamMesinId" class="form-control" required>
+                                    <option value="" disabled selected>-- Pilih Mesin Tujuan --</option>
+                                </select>
+                            </div>
+                            <div class="form-group mb-0">
+                                <label class="form-label fw-semibold mb-1" style="font-size: 13px;">Alasan Pinjam Mesin (Opsional)</label>
+                                <textarea name="alasan" id="pinjamAlasan" class="form-control" rows="2" placeholder="Masukkan alasan peminjaman mesin jika ada..."></textarea>
+                            </div>
+                        </div>
+                        <div class="modal-footer d-flex justify-content-between px-4">
+                            <button type="button" class="btn btn-secondary" data-dismiss="modal">
+                                <i class="fas fa-times mr-1"></i>Batal
+                            </button>
+                            <button type="submit" class="btn btn-info text-white">
+                                <i class="fas fa-paper-plane mr-1"></i>Kirim Permintaan
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
         <!-- Modal Konfirmasi Pindah Mesin (Drag & Drop) -->
         <div class="modal fade" id="modalConfirmMoveDragDrop" tabindex="-1" aria-labelledby="modalConfirmMoveDragDropLabel"
             aria-hidden="true">
@@ -2340,6 +2429,8 @@
         window.canMoveProses = @json($canMoveProses ?? true);
         window.canSwapProses = @json($canSwapProses ?? true);
         window.canScanBarcode = @json($canScanBarcode ?? true);
+        window.canFinishMaintenance = @json($canFinishMaintenance ?? in_array($userRole ?? '', ['super_admin', 'kepala_shift']));
+        window.canPinjamMesin = @json($canPinjamMesin ?? in_array($userRole ?? '', ['super_admin', 'operator', 'ppic']));
 
         // Toast mixin global: Error = close button (tanpa timer), Success = timer 8 detik (tanpa close button)
         window.ToastError = Swal.mixin({
@@ -3592,12 +3683,14 @@
                 'move_machine': 'Pindah Mesin',
                 'swap_position': 'Tukar Posisi',
                 'create_reprocess': 'Buat Reproses',
-                'pause_proses': 'Pause Proses'
+                'pause_proses': 'Pause Proses',
+                'pinjam_mesin': 'Pinjam Mesin'
             };
 
             const typeLabels = {
                 'FM': 'Factory Manager (FM)',
-                'VP': 'Vice President (VP)'
+                'VP': 'Vice President (VP)',
+                'KEPALA_SHIFT': 'Kepala Shift'
             };
 
             // PRIORITAS: Gunakan pending_approvals dari update real-time jika tersedia
@@ -3641,8 +3734,8 @@
         // Map pending_approvals dari API/WebSocket (array of {type, action}) ke format tampilan
         function mapPendingApprovalsFromStatus(pendingApprovals) {
             if (!Array.isArray(pendingApprovals) || pendingApprovals.length === 0) return [];
-            const actionLabels = { 'edit_cycle_time': 'Edit Cycle Time', 'delete_proses': 'Hapus Proses', 'move_machine': 'Pindah Mesin', 'swap_position': 'Tukar Posisi', 'create_reprocess': 'Buat Reproses', 'pause_proses': 'Pause Proses' };
-            const typeLabels = { 'FM': 'Factory Manager (FM)', 'VP': 'Vice President (VP)' };
+            const actionLabels = { 'edit_cycle_time': 'Edit Cycle Time', 'delete_proses': 'Hapus Proses', 'move_machine': 'Pindah Mesin', 'swap_position': 'Tukar Posisi', 'create_reprocess': 'Buat Reproses', 'pause_proses': 'Pause Proses', 'pinjam_mesin': 'Pinjam Mesin' };
+            const typeLabels = { 'FM': 'Factory Manager (FM)', 'VP': 'Vice President (VP)', 'KEPALA_SHIFT': 'Kepala Shift' };
             function toStr(v) { return (v != null && typeof v === 'string') ? v : ''; }
             return pendingApprovals.map(function (a) {
                 if (!a || (a.type == null && a.action == null)) return null;
@@ -3776,10 +3869,11 @@
                 }
 
                 // Format detail proses tanpa barcode
-                const hiddenFields = ['id', 'created_at', 'updated_at', 'deleted_at', 'mesin_id'];
+                const hiddenFields = ['id', 'created_at', 'updated_at', 'deleted_at', 'mesin_id', 'barcode_kain_optional'];
                 const maintenanceFields = [
                     'no_op', 'item_op', 'customer', 'marketing', 'kode_material', 'konstruksi', 'no_partai',
-                    'gramasi', 'lebar', 'hfeel', 'warna', 'kode_warna', 'kategori_warna', 'qty', 'roll'
+                    'gramasi', 'lebar', 'hfeel', 'warna', 'kode_warna', 'kategori_warna', 'qty', 'roll',
+                    'mode', 'jenis_op', 'qty_dye_stuff', 'qty_aux', 'dye_stuff_schedules', 'aux_schedules', 'barcode_kain_optional'
                 ];
 
                 function formatDetikToHMS(val) {
@@ -3824,6 +3918,34 @@
                         if (key === 'cycle_time' || key === 'cycle_time_actual') return [key.replace(/_/g, ' ')
                             .toUpperCase(), formatDetikToHMS(val)
                         ];
+                        if (key === 'dye_stuff_schedules') {
+                            let dsFormatted = '-';
+                            if (Array.isArray(val) && val.length > 0) {
+                                dsFormatted = val.map((t, idx) => `DS ${idx + 1}: ${t}`).join(', ');
+                            } else if (typeof val === 'string' && val) {
+                                try {
+                                    const parsed = JSON.parse(val);
+                                    if (Array.isArray(parsed) && parsed.length > 0) {
+                                        dsFormatted = parsed.map((t, idx) => `DS ${idx + 1}: ${t}`).join(', ');
+                                    }
+                                } catch(e) { dsFormatted = val; }
+                            }
+                            return ['JADWAL DYE STUFF', dsFormatted];
+                        }
+                        if (key === 'aux_schedules') {
+                            let auxFormatted = '-';
+                            if (Array.isArray(val) && val.length > 0) {
+                                auxFormatted = val.map((t, idx) => `AUX ${idx + 1}: ${t}`).join(', ');
+                            } else if (typeof val === 'string' && val) {
+                                try {
+                                    const parsed = JSON.parse(val);
+                                    if (Array.isArray(parsed) && parsed.length > 0) {
+                                        auxFormatted = parsed.map((t, idx) => `AUX ${idx + 1}: ${t}`).join(', ');
+                                    }
+                                } catch(e) { auxFormatted = val; }
+                            }
+                            return ['JADWAL AUX', auxFormatted];
+                        }
                         return [key.replace(/_/g, ' ').toUpperCase(), val];
                     });
                 entries.unshift(['JENIS MESIN', jenisMesin]);
@@ -3874,6 +3996,44 @@
             const $btnMove = $('.btn-move-proses');
             const $btnDelete = $('.btn-delete-proses');
             const $btnPause = $('.btn-pause-proses');
+            const $btnFinishMaintenance = $('.btn-finish-maintenance');
+            const $btnPinjam = $('.btn-pinjam-mesin');
+
+            // Logic untuk tombol Pinjam Mesin (Super Admin, Operator, PPIC)
+            // Muncul saat:
+            // 1. Jenis proses bukan Maintenance (Produksi, Reproses Greige, Reproses Finish)
+            // 2. Status proses: Sedang berjalan (isStarted) ATAU antrian berikutnya (order == 1)
+            $btnPinjam.addClass('d-none');
+            if (proses.jenis !== 'Maintenance' && !proses.selesai) {
+                const isNextInQueue = !isStarted && (parseInt(proses.order) === 1);
+                if (isStarted || isNextInQueue) {
+                    const userRoleStr = (window.userRole || '').toLowerCase();
+                    const isAuthorizedPinjam = window.canPinjamMesin === true || ['super_admin', 'operator', 'ppic'].includes(userRoleStr);
+                    if (isAuthorizedPinjam) {
+                        $btnPinjam.removeClass('d-none');
+                        if (hasPending || hasPendingReprocess) {
+                            $btnPinjam.prop('disabled', true).addClass('disabled').css('cursor', 'not-allowed');
+                        } else {
+                            $btnPinjam.prop('disabled', false).removeClass('disabled').css('cursor', 'pointer');
+                        }
+                    }
+                }
+            }
+
+            // Logic untuk tombol Selesai Proses Maintenance (hanya Super Admin dan Kepala Shift)
+            $btnFinishMaintenance.addClass('d-none');
+            if (proses.jenis === 'Maintenance' && isStarted && !proses.selesai) {
+                const userRoleStr = (window.userRole || '').toLowerCase();
+                const isAuthorized = window.canFinishMaintenance === true || userRoleStr === 'super_admin' || userRoleStr === 'kepala_shift';
+                if (isAuthorized) {
+                    $btnFinishMaintenance.removeClass('d-none');
+                    if (hasPending || hasPendingReprocess) {
+                        $btnFinishMaintenance.prop('disabled', true).addClass('disabled').css('cursor', 'not-allowed');
+                    } else {
+                        $btnFinishMaintenance.prop('disabled', false).removeClass('disabled').css('cursor', 'pointer');
+                    }
+                }
+            }
 
             // Logic untuk tombol Pause Proses
             $btnPause.addClass('d-none');
@@ -3963,11 +4123,12 @@
                     $btnDelete.tooltip('dispose');
                 }
             }
-            const hiddenFields = ['id', 'created_at', 'updated_at', 'deleted_at', 'mesin_id'];
+            const hiddenFields = ['id', 'created_at', 'updated_at', 'deleted_at', 'mesin_id', 'barcode_kain_optional'];
             // Daftar field yang harus disembunyikan jika Maintenance
             const maintenanceFields = [
                 'no_op', 'item_op', 'customer', 'marketing', 'kode_material', 'konstruksi', 'no_partai',
-                'gramasi', 'lebar', 'hfeel', 'warna', 'kode_warna', 'kategori_warna', 'qty', 'roll'
+                'gramasi', 'lebar', 'hfeel', 'warna', 'kode_warna', 'kategori_warna', 'qty', 'roll',
+                'mode', 'jenis_op', 'qty_dye_stuff', 'qty_aux', 'dye_stuff_schedules', 'aux_schedules', 'barcode_kain_optional'
             ];
 
             function formatDetikToHMS(val) {
@@ -4011,11 +4172,42 @@
                     if (key === 'cycle_time' || key === 'cycle_time_actual') return [key.replace(/_/g, ' ')
                         .toUpperCase(), formatDetikToHMS(val)
                     ];
+                    if (key === 'dye_stuff_schedules') {
+                        let dsFormatted = '-';
+                        if (Array.isArray(val) && val.length > 0) {
+                            dsFormatted = val.map((t, idx) => `DS ${idx + 1}: ${t}`).join(', ');
+                        } else if (typeof val === 'string' && val) {
+                            try {
+                                const parsed = JSON.parse(val);
+                                if (Array.isArray(parsed) && parsed.length > 0) {
+                                    dsFormatted = parsed.map((t, idx) => `DS ${idx + 1}: ${t}`).join(', ');
+                                }
+                            } catch(e) { dsFormatted = val; }
+                        }
+                        return ['JADWAL DYE STUFF', dsFormatted];
+                    }
+                    if (key === 'aux_schedules') {
+                        let auxFormatted = '-';
+                        if (Array.isArray(val) && val.length > 0) {
+                            auxFormatted = val.map((t, idx) => `AUX ${idx + 1}: ${t}`).join(', ');
+                        } else if (typeof val === 'string' && val) {
+                            try {
+                                const parsed = JSON.parse(val);
+                                if (Array.isArray(parsed) && parsed.length > 0) {
+                                    auxFormatted = parsed.map((t, idx) => `AUX ${idx + 1}: ${t}`).join(', ');
+                                }
+                            } catch(e) { auxFormatted = val; }
+                        }
+                        return ['JADWAL AUX', auxFormatted];
+                    }
                     return [key.replace(/_/g, ' ').toUpperCase(), val];
                 });
             entries.unshift(['JENIS MESIN', jenisMesin]);
             function formatCellValueNormal(val) {
-                if (val === null || val === undefined) return '-';
+                if (val === null || val === undefined || val === '') return '-';
+                if (Array.isArray(val)) {
+                    return val.length ? val.join(', ') : '-';
+                }
                 if (typeof val === 'object') return '-';
                 return val;
             }
@@ -4598,6 +4790,149 @@
             });
         });
 
+        // Handler tombol Pinjam Mesin (buka modal pinjam mesin)
+        $(document).on('click', '.btn-pinjam-mesin', function (e) {
+            e.preventDefault();
+            if ($(this).prop('disabled') || $(this).hasClass('disabled')) {
+                return false;
+            }
+            const proses = $('#modalDetailProses').data('proses');
+            if (!proses) return;
+
+            if (proses.jenis === 'Maintenance') {
+                ToastError.fire({
+                    title: 'Fitur Pinjam Mesin tidak tersedia untuk proses Maintenance.'
+                });
+                return false;
+            }
+
+            if (hasPendingApprovalFM(proses) || hasPendingReprocessApproval(proses)) {
+                ToastError.fire({
+                    title: 'Tidak dapat mengajukan pinjam mesin. Masih ada persetujuan yang menunggu.'
+                });
+                return false;
+            }
+
+            const id = proses.id;
+            const pinjamUrl = "{{ url('proses') }}/" + id + "/pinjam-mesin";
+
+            $('#formPinjamMesin').attr('action', pinjamUrl);
+            $('#pinjamProsesId').val(id);
+            $('#pinjamAlasan').val('');
+
+            // Set info proses
+            const firstDetail = getFirstDetailProses(proses);
+            const noOpStr = firstDetail ? (firstDetail.no_op || '-') : '-';
+            const noPartaiStr = firstDetail ? (firstDetail.no_partai || '-') : '-';
+            const jenisStr = proses.jenis || '-';
+            $('#pinjamProsesInfo').html(`<strong>Jenis:</strong> ${jenisStr} | <strong>No OP:</strong> ${noOpStr} | <strong>No Partai:</strong> ${noPartaiStr}`);
+
+            const currentMesinId = proses.mesin_id ? parseInt(proses.mesin_id) : null;
+            let currentMesinNama = 'Mesin ' + currentMesinId;
+            if (proses.mesin && (proses.mesin.nama || proses.mesin.jenis_mesin)) {
+                currentMesinNama = proses.mesin.nama || proses.mesin.jenis_mesin;
+            } else if (window.mesinsData && Array.isArray(window.mesinsData)) {
+                const found = window.mesinsData.find(m => parseInt(m.id || m.mesin_id) === currentMesinId);
+                if (found) currentMesinNama = found.nama || found.jenis_mesin || ('Mesin ' + currentMesinId);
+            }
+            $('#pinjamMesinAsal').val(currentMesinNama);
+
+            function populatePinjamMesinOptions(mesinsList) {
+                $('#pinjamMesinId').empty().append('<option value="" disabled selected>-- Pilih Mesin Tujuan --</option>');
+                if (Array.isArray(mesinsList)) {
+                    mesinsList.forEach(function (mesin) {
+                        const mId = parseInt(mesin.id || mesin.mesin_id);
+                        if (mId !== currentMesinId) {
+                            const mNama = mesin.nama || mesin.jenis_mesin || ('Mesin ' + mId);
+                            $('#pinjamMesinId').append(`<option value="${mId}">${mNama}</option>`);
+                        }
+                    });
+                }
+            }
+
+            if (window.mesinsData && Array.isArray(window.mesinsData) && window.mesinsData.length > 0) {
+                populatePinjamMesinOptions(window.mesinsData);
+            } else {
+                fetch("{{ route('proses.create') }}")
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data && data.mesins) {
+                            window.mesinsData = data.mesins;
+                            populatePinjamMesinOptions(data.mesins);
+                        }
+                    })
+                    .catch(err => console.error('Error fetching mesins data:', err));
+            }
+
+            $('#modalDetailProses').modal('hide').one('hidden.bs.modal', function () {
+                $('#modalPinjamMesin').modal('show');
+                $('body').addClass('modal-open');
+            });
+        });
+
+        // Handler submit form pinjam mesin
+        $('#formPinjamMesin').on('submit', function (e) {
+            e.preventDefault();
+            const form = $(this);
+            const url = form.attr('action');
+            const targetMesinId = $('#pinjamMesinId').val();
+            const alasan = $('#pinjamAlasan').val();
+
+            if (!targetMesinId) {
+                ToastError.fire({
+                    title: 'Silakan pilih mesin tujuan terlebih dahulu.'
+                });
+                return;
+            }
+
+            const $submitBtn = form.find('button[type="submit"]');
+            $submitBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin mr-1"></i>Mengirim...');
+
+            $.ajax({
+                url: url,
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+                },
+                data: {
+                    _token: $('meta[name="csrf-token"]').attr('content'),
+                    mesin_id: targetMesinId,
+                    alasan: alasan
+                },
+                success: function (response) {
+                    $('#modalPinjamMesin').modal('hide');
+                    if (response && response.status === 'success' && response.message) {
+                        ToastSuccess.fire({
+                            title: response.message
+                        });
+                    }
+                    setTimeout(function () {
+                        if (response && response.redirect) {
+                            window.location.href = response.redirect;
+                        } else {
+                            window.location.reload();
+                        }
+                    }, 500);
+                },
+                error: function (xhr) {
+                    let errorMsg = 'Gagal mengirim permintaan pinjam mesin.';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        errorMsg = xhr.responseJSON.message;
+                    } else if (xhr.responseJSON && xhr.responseJSON.errors) {
+                        errorMsg = Object.values(xhr.responseJSON.errors).flat().join(', ');
+                    }
+                    ToastError.fire({
+                        title: errorMsg
+                    });
+                },
+                complete: function () {
+                    $submitBtn.prop('disabled', false).html('<i class="fas fa-paper-plane mr-1"></i>Kirim Permintaan');
+                }
+            });
+        });
+
         // Handler tombol Hapus Proses (kirim permintaan delete ke approval FM)
         $(document).on('click', '.btn-delete-proses', function (e) {
             e.preventDefault();
@@ -4671,6 +5006,75 @@
             $('#modalDetailProses').modal('hide').one('hidden.bs.modal', function () {
                 $('#modalPauseProses').modal('show');
                 $('body').addClass('modal-open');
+            });
+        });
+
+        // Handler tombol Selesai Proses Maintenance (manual end maintenance)
+        $(document).on('click', '.btn-finish-maintenance', function (e) {
+            e.preventDefault();
+            if ($(this).prop('disabled') || $(this).hasClass('disabled')) {
+                return false;
+            }
+            const proses = $('#modalDetailProses').data('proses');
+            if (!proses) return;
+
+            Swal.fire({
+                title: 'Selesaikan Maintenance?',
+                text: 'Apakah Anda yakin ingin menyelesaikan proses Maintenance ini?',
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#28a745',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: '<i class="fas fa-check mr-1"></i>Ya, Selesaikan',
+                cancelButtonText: 'Batal',
+                reverseButtons: true
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    Swal.fire({
+                        title: 'Menyelesaikan proses...',
+                        text: 'Mohon tunggu sebentar',
+                        allowOutsideClick: false,
+                        allowEscapeKey: false,
+                        didOpen: () => {
+                            Swal.showLoading();
+                        }
+                    });
+
+                    $.ajax({
+                        url: `{{ url('proses') }}/${proses.id}/selesai`,
+                        method: 'POST',
+                        data: {
+                            _token: '{{ csrf_token() }}'
+                        },
+                        success: function (res) {
+                            $('#modalDetailProses').modal('hide');
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Berhasil',
+                                text: res.message || 'Proses Maintenance berhasil diselesaikan!',
+                                timer: 1500,
+                                showConfirmButton: false
+                            }).then(() => {
+                                if (typeof loadDashboardData === 'function') {
+                                    loadDashboardData();
+                                } else {
+                                    window.location.reload();
+                                }
+                            });
+                        },
+                        error: function (xhr) {
+                            let errMsg = 'Gagal menyelesaikan proses Maintenance.';
+                            if (xhr.responseJSON && xhr.responseJSON.message) {
+                                errMsg = xhr.responseJSON.message;
+                            }
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Gagal',
+                                text: errMsg
+                            });
+                        }
+                    });
+                }
             });
         });
 
@@ -5640,8 +6044,8 @@
 
             // Bangun HTML body tabel detail proses (entries saja, untuk modal pending) dari objek proses
             function buildDetailProsesPendingBodyHtml(proses, selectedDetailId) {
-                const hiddenFields = ['id', 'created_at', 'updated_at', 'deleted_at', 'mesin_id'];
-                const maintenanceFields = ['no_op', 'item_op', 'customer', 'marketing', 'kode_material', 'konstruksi', 'no_partai', 'gramasi', 'lebar', 'hfeel', 'warna', 'kode_warna', 'kategori_warna', 'qty', 'roll'];
+                const hiddenFields = ['id', 'created_at', 'updated_at', 'deleted_at', 'mesin_id', 'barcode_kain_optional'];
+                const maintenanceFields = ['no_op', 'item_op', 'customer', 'marketing', 'kode_material', 'konstruksi', 'no_partai', 'gramasi', 'lebar', 'hfeel', 'warna', 'kode_warna', 'kategori_warna', 'qty', 'roll', 'mode', 'jenis_op', 'qty_dye_stuff', 'qty_aux', 'dye_stuff_schedules', 'aux_schedules', 'barcode_kain_optional'];
                 const firstDetail = getDetailProsesById(proses, selectedDetailId) || getFirstDetailProses(proses);
                 const prosesData = { ...proses };
                 if (firstDetail) {
@@ -5667,6 +6071,34 @@
                         if (key === 'hfeel') return ['HAND FEEL', val];
                         if (key === 'matdok') return ['MATERIAL DOKUMEN', val];
                         if (key === 'cycle_time' || key === 'cycle_time_actual') return [key.replace(/_/g, ' ').toUpperCase(), formatDetikToHMS(val)];
+                        if (key === 'dye_stuff_schedules') {
+                            let dsFormatted = '-';
+                            if (Array.isArray(val) && val.length > 0) {
+                                dsFormatted = val.map((t, idx) => `DS ${idx + 1}: ${t}`).join(', ');
+                            } else if (typeof val === 'string' && val) {
+                                try {
+                                    const parsed = JSON.parse(val);
+                                    if (Array.isArray(parsed) && parsed.length > 0) {
+                                        dsFormatted = parsed.map((t, idx) => `DS ${idx + 1}: ${t}`).join(', ');
+                                    }
+                                } catch(e) { dsFormatted = val; }
+                            }
+                            return ['JADWAL DYE STUFF', dsFormatted];
+                        }
+                        if (key === 'aux_schedules') {
+                            let auxFormatted = '-';
+                            if (Array.isArray(val) && val.length > 0) {
+                                auxFormatted = val.map((t, idx) => `AUX ${idx + 1}: ${t}`).join(', ');
+                            } else if (typeof val === 'string' && val) {
+                                try {
+                                    const parsed = JSON.parse(val);
+                                    if (Array.isArray(parsed) && parsed.length > 0) {
+                                        auxFormatted = parsed.map((t, idx) => `AUX ${idx + 1}: ${t}`).join(', ');
+                                    }
+                                } catch(e) { auxFormatted = val; }
+                            }
+                            return ['JADWAL AUX', auxFormatted];
+                        }
                         return [key.replace(/_/g, ' ').toUpperCase(), val];
                     });
                 entries.unshift(['JENIS MESIN', jenisMesin]);
@@ -5685,8 +6117,8 @@
 
             // Bangun HTML body tabel detail proses LENGKAP (entries + section Barcode Kain, LA, AUX) untuk modal normal
             function buildDetailProsesBodyHtml(proses, selectedDetailId) {
-                const hiddenFields = ['id', 'created_at', 'updated_at', 'deleted_at', 'mesin_id'];
-                const maintenanceFields = ['no_op', 'item_op', 'customer', 'marketing', 'kode_material', 'konstruksi', 'no_partai', 'gramasi', 'lebar', 'hfeel', 'warna', 'kode_warna', 'kategori_warna', 'qty', 'roll'];
+                const hiddenFields = ['id', 'created_at', 'updated_at', 'deleted_at', 'mesin_id', 'barcode_kain_optional'];
+                const maintenanceFields = ['no_op', 'item_op', 'customer', 'marketing', 'kode_material', 'konstruksi', 'no_partai', 'gramasi', 'lebar', 'hfeel', 'warna', 'kode_warna', 'kategori_warna', 'qty', 'roll', 'mode', 'jenis_op', 'qty_dye_stuff', 'qty_aux', 'dye_stuff_schedules', 'aux_schedules', 'barcode_kain_optional'];
                 const firstDetail = getDetailProsesById(proses, selectedDetailId) || getFirstDetailProses(proses);
                 const prosesData = { ...proses };
                 if (firstDetail) {
@@ -5712,6 +6144,34 @@
                         if (key === 'hfeel') return ['HAND FEEL', val];
                         if (key === 'matdok') return ['MATERIAL DOKUMEN', val];
                         if (key === 'cycle_time' || key === 'cycle_time_actual') return [key.replace(/_/g, ' ').toUpperCase(), formatDetikToHMS(val)];
+                        if (key === 'dye_stuff_schedules') {
+                            let dsFormatted = '-';
+                            if (Array.isArray(val) && val.length > 0) {
+                                dsFormatted = val.map((t, idx) => `DS ${idx + 1}: ${t}`).join(', ');
+                            } else if (typeof val === 'string' && val) {
+                                try {
+                                    const parsed = JSON.parse(val);
+                                    if (Array.isArray(parsed) && parsed.length > 0) {
+                                        dsFormatted = parsed.map((t, idx) => `DS ${idx + 1}: ${t}`).join(', ');
+                                    }
+                                } catch(e) { dsFormatted = val; }
+                            }
+                            return ['JADWAL DYE STUFF', dsFormatted];
+                        }
+                        if (key === 'aux_schedules') {
+                            let auxFormatted = '-';
+                            if (Array.isArray(val) && val.length > 0) {
+                                auxFormatted = val.map((t, idx) => `AUX ${idx + 1}: ${t}`).join(', ');
+                            } else if (typeof val === 'string' && val) {
+                                try {
+                                    const parsed = JSON.parse(val);
+                                    if (Array.isArray(parsed) && parsed.length > 0) {
+                                        auxFormatted = parsed.map((t, idx) => `AUX ${idx + 1}: ${t}`).join(', ');
+                                    }
+                                } catch(e) { auxFormatted = val; }
+                            }
+                            return ['JADWAL AUX', auxFormatted];
+                        }
                         return [key.replace(/_/g, ' ').toUpperCase(), val];
                     });
                 entries.unshift(['JENIS MESIN', jenisMesin]);
@@ -7337,6 +7797,74 @@
 
                 // Reset jenis_op ke Single
                 $('#jenis_op').val('Single').trigger('change');
+
+                // Reset breakdown schedule container
+                $('#dye_stuff_schedule_container').hide();
+                $('#aux_schedule_container').hide();
+                $('#dye_stuff_schedule_inputs').empty();
+                $('#aux_schedule_inputs').empty();
+            });
+
+            // Helper konversi format JJ:MM:DD atau format durasi ke Total Detik
+            function parseTimeToSeconds(timeStr) {
+                if (!timeStr) return 0;
+                const parts = timeStr.trim().split(':');
+                if (parts.length === 3) {
+                    return parseInt(parts[0], 10) * 3600 + parseInt(parts[1], 10) * 60 + parseInt(parts[2], 10);
+                } else if (parts.length === 2) {
+                    return parseInt(parts[0], 10) * 3600 + parseInt(parts[1], 10) * 60;
+                } else if (parts.length === 1 && !isNaN(parts[0])) {
+                    return parseInt(parts[0], 10) * 3600;
+                }
+                return 0;
+            }
+
+            // Fungsi Render Input Breakdown Waktu (Dye Stuff & AUX)
+            function renderScheduleInputs(type, qty) {
+                const container = $(`#${type}_schedule_container`);
+                const inputsWrapper = $(`#${type}_schedule_inputs`);
+                inputsWrapper.empty();
+
+                const count = parseInt(qty, 10);
+                if (count > 0) {
+                    const labelName = type === 'dye_stuff' ? 'Dye Stuff' : 'AUX';
+                    const badgeColor = type === 'dye_stuff' ? 'badge-primary' : 'badge-success';
+
+                    for (let i = 1; i <= count; i++) {
+                        const defaultHour = String(i * 2).padStart(2, '0');
+                        const inputHtml = `
+                            <div class="form-group mb-2">
+                                <div class="input-group input-group-sm">
+                                    <div class="input-group-prepend">
+                                        <span class="input-group-text font-weight-bold" style="font-size: 12px; min-width: 110px;">
+                                            <span class="badge ${badgeColor} mr-1">${i}</span> ${labelName} #${i}
+                                        </span>
+                                    </div>
+                                    <input type="text" 
+                                           name="${type}_schedules[${i - 1}]" 
+                                           class="form-control form-control-sm schedule-time-input" 
+                                           placeholder="Contoh: ${defaultHour}:00:00 (Jam ke-${i * 2})" 
+                                           pattern="^[0-9]{2}:[0-9]{2}:[0-9]{2}$" 
+                                           title="Format durasi Jam:Menit:Detik (JJ:MM:DD)" 
+                                           required>
+                                </div>
+                            </div>
+                        `;
+                        inputsWrapper.append(inputHtml);
+                    }
+                    container.slideDown(200);
+                } else {
+                    container.slideUp(200);
+                }
+            }
+
+            // Event Listener Perubahan Qty Dye Stuff & AUX
+            $('#qty_dye_stuff').on('change', function () {
+                renderScheduleInputs('dye_stuff', $(this).val());
+            });
+
+            $('#qty_aux').on('change', function () {
+                renderScheduleInputs('aux', $(this).val());
             });
 
             // Trigger di awal
@@ -7345,8 +7873,9 @@
 
             // Validasi tambahan saat submit form:
             // 1. Jika jenis_op = Multiple maka jumlah Detail OP harus >= 2
-            // 2. Cek duplikasi (no_op, no_partai) dalam 1 proses
-            // 3. Cek (no_op, no_partai) sudah terpakai di proses lain via API
+            // 2. Validasi breakdown jam input Dye Stuff & AUX terhadap Cycle Time
+            // 3. Cek duplikasi (no_op, no_partai) dalam 1 proses
+            // 4. Cek (no_op, no_partai) sudah terpakai di proses lain via API
             $('#formProses').on('submit', async function (e) {
                 if (window._formProsesSkipValidation) {
                     window._formProsesSkipValidation = false;
@@ -7370,6 +7899,106 @@
                             confirmButtonText: 'OK'
                         });
                         return false;
+                    }
+                }
+
+                // Validasi Breakdown Waktu terhadap Cycle Time
+                if (jenisProses !== 'Maintenance') {
+                    const cycleTimeStr = $('input[name="cycle_time"]').val();
+                    const cycleTimeSec = parseTimeToSeconds(cycleTimeStr);
+
+                    if (cycleTimeSec <= 0) {
+                        Swal.fire({
+                            icon: 'warning',
+                            title: 'Cycle Time Tidak Valid',
+                            text: 'Harap isi Cycle Time terlebih dahulu dengan format Jam:Menit:Detik (JJ:MM:DD).',
+                            confirmButtonText: 'OK'
+                        });
+                        return false;
+                    }
+
+                    // Validasi Breakdown Dye Stuff
+                    const qtyDs = parseInt($('#qty_dye_stuff').val(), 10);
+                    if (qtyDs > 0) {
+                        let lastSec = -1;
+                        for (let i = 0; i < qtyDs; i++) {
+                            const $input = $(`input[name="dye_stuff_schedules[${i}]"]`);
+                            const val = $input.val() ? $input.val().trim() : '';
+                            if (!val || !/^[0-9]{2}:[0-9]{2}:[0-9]{2}$/.test(val)) {
+                                Swal.fire({
+                                    icon: 'warning',
+                                    title: 'Format Waktu Belum Tepat',
+                                    text: `Jam input Dye Stuff #${i + 1} harus diisi dengan format JJ:MM:DD (contoh: 03:00:00).`,
+                                    confirmButtonText: 'OK'
+                                });
+                                $input.focus();
+                                return false;
+                            }
+                            const curSec = parseTimeToSeconds(val);
+                            if (curSec > cycleTimeSec) {
+                                Swal.fire({
+                                    icon: 'error',
+                                    title: 'Waktu Input Melebihi Cycle Time',
+                                    text: `Jam input Dye Stuff #${i + 1} (${val}) melebihi total durasi Cycle Time (${cycleTimeStr}).`,
+                                    confirmButtonText: 'OK'
+                                });
+                                $input.focus();
+                                return false;
+                            }
+                            if (curSec <= lastSec) {
+                                Swal.fire({
+                                    icon: 'warning',
+                                    title: 'Urutan Waktu Tidak Tepat',
+                                    text: `Jam input Dye Stuff #${i + 1} harus lebih besar dari Dye Stuff #${i}.`,
+                                    confirmButtonText: 'OK'
+                                });
+                                $input.focus();
+                                return false;
+                            }
+                            lastSec = curSec;
+                        }
+                    }
+
+                    // Validasi Breakdown AUX
+                    const qtyAux = parseInt($('#qty_aux').val(), 10);
+                    if (qtyAux > 0) {
+                        let lastSec = -1;
+                        for (let i = 0; i < qtyAux; i++) {
+                            const $input = $(`input[name="aux_schedules[${i}]"]`);
+                            const val = $input.val() ? $input.val().trim() : '';
+                            if (!val || !/^[0-9]{2}:[0-9]{2}:[0-9]{2}$/.test(val)) {
+                                Swal.fire({
+                                    icon: 'warning',
+                                    title: 'Format Waktu Belum Tepat',
+                                    text: `Jam input AUX #${i + 1} harus diisi dengan format JJ:MM:DD (contoh: 01:30:00).`,
+                                    confirmButtonText: 'OK'
+                                });
+                                $input.focus();
+                                return false;
+                            }
+                            const curSec = parseTimeToSeconds(val);
+                            if (curSec > cycleTimeSec) {
+                                Swal.fire({
+                                    icon: 'error',
+                                    title: 'Waktu Input Melebihi Cycle Time',
+                                    text: `Jam input AUX #${i + 1} (${val}) melebihi total durasi Cycle Time (${cycleTimeStr}).`,
+                                    confirmButtonText: 'OK'
+                                });
+                                $input.focus();
+                                return false;
+                            }
+                            if (curSec <= lastSec) {
+                                Swal.fire({
+                                    icon: 'warning',
+                                    title: 'Urutan Waktu Tidak Tepat',
+                                    text: `Jam input AUX #${i + 1} harus lebih besar dari AUX #${i}.`,
+                                    confirmButtonText: 'OK'
+                                });
+                                $input.focus();
+                                return false;
+                            }
+                            lastSec = curSec;
+                        }
                     }
                 }
 

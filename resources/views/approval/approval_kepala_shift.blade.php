@@ -24,14 +24,16 @@
         $actionLabels = [
             'topping_la' => 'Topping LA',
             'topping_aux' => 'Topping AUX',
+            'pinjam_mesin' => 'Pinjam Mesin',
         ];
+        $allMesins = \App\Models\Mesin::all()->keyBy('id');
         @endphp
         <div class="container-fluid">
             <div class="row">
                 <div class="col-12">
                     <div class="card">
                         <div class="card-header">
-                            <h3 class="card-title">Daftar Request Topping LA / AUX</h3>
+                            <h3 class="card-title">Daftar Request Approval Kepala Shift</h3>
                         </div>
                         <div class="card-body">
                             <table id="approval_kepala_shift" class="table table-head-fixed text-nowrap table-striped table-hover">
@@ -39,6 +41,7 @@
                                     <tr>
                                         <th>No OP</th>
                                         <th>Jenis</th>
+                                        <th>Keterangan / Mesin</th>
                                         <th>Dilakukan Oleh</th>
                                         <th>Status</th>
                                         <th>Tanggal Request</th>
@@ -59,10 +62,23 @@
                                         }
                                     }
                                     $actionLabel = $actionLabels[$approval->action] ?? ucfirst(str_replace('_', ' ', $approval->action));
+                                    $isPinjamMesin = $approval->action === 'pinjam_mesin';
+                                    $oldMesin = isset($approval->history_data['old_mesin_id']) ? ($allMesins[$approval->history_data['old_mesin_id']] ?? null) : null;
+                                    $newMesin = isset($approval->history_data['new_mesin_id']) ? ($allMesins[$approval->history_data['new_mesin_id']] ?? null) : null;
                                     @endphp
                                     <tr>
                                         <td><strong>{{ $noOpDisplay }}</strong></td>
-                                        <td><span class="badge bg-info">{{ $actionLabel }}</span></td>
+                                        <td><span class="badge {{ $isPinjamMesin ? 'bg-primary' : 'bg-info' }}">{{ $actionLabel }}</span></td>
+                                        <td>
+                                            @if($isPinjamMesin)
+                                                <span>{{ $oldMesin->nama ?? ('Mesin ' . ($approval->history_data['old_mesin_id'] ?? '-')) }} <i class="fas fa-arrow-right text-muted mx-1"></i> <strong>{{ $newMesin->nama ?? ('Mesin ' . ($approval->history_data['new_mesin_id'] ?? '-')) }}</strong></span>
+                                                @if(!empty($approval->history_data['alasan']))
+                                                    <br><small class="text-muted"><i class="fas fa-comment-dots mr-1"></i>{{ Str::limit($approval->history_data['alasan'], 40) }}</small>
+                                                @endif
+                                            @else
+                                                <span class="text-muted">-</span>
+                                            @endif
+                                        </td>
                                         <td>
                                             {{ $approval->requester->nama ?? '-' }}<br>
                                             <small class="text-muted">{{ $approval->requester->username ?? '' }}</small>
@@ -123,7 +139,14 @@
                                                     <div class="modal-body">
                                                         <p>Apakah Anda yakin ingin <strong>meng-approve</strong> request {{ $actionLabel }} ini?</p>
                                                         <p><strong>No OP:</strong> {{ $noOpDisplay }}</p>
-                                                        @if($approval->proses && $approval->proses->details->count() > 1)
+                                                        @if($isPinjamMesin)
+                                                        <p><strong>Mesin Asal:</strong> {{ $oldMesin->nama ?? '-' }}</p>
+                                                        <p><strong>Mesin Tujuan:</strong> {{ $newMesin->nama ?? '-' }}</p>
+                                                        @if(!empty($approval->history_data['alasan']))
+                                                        <p><strong>Alasan Pengajuan:</strong> {{ $approval->history_data['alasan'] }}</p>
+                                                        @endif
+                                                        @endif
+                                                        @if($approval->proses && $approval->proses->details->count() > 1 && !$isPinjamMesin)
                                                         <p class="text-muted small mb-0"><i class="fas fa-info-circle"></i> Multiple OP: 1 kali approval berlaku untuk semua OP. Barcode topping cukup di-scan sekali dan akan ditambahkan ke setiap OP.</p>
                                                         @endif
                                                         <div class="form-group">
@@ -161,7 +184,14 @@
                                                     <div class="modal-body">
                                                         <p>Apakah Anda yakin ingin <strong>menolak</strong> request {{ $actionLabel }} ini?</p>
                                                         <p><strong>No OP:</strong> {{ $noOpDisplay }}</p>
-                                                        @if($approval->proses && $approval->proses->details->count() > 1)
+                                                        @if($isPinjamMesin)
+                                                        <p><strong>Mesin Asal:</strong> {{ $oldMesin->nama ?? '-' }}</p>
+                                                        <p><strong>Mesin Tujuan:</strong> {{ $newMesin->nama ?? '-' }}</p>
+                                                        @if(!empty($approval->history_data['alasan']))
+                                                        <p><strong>Alasan Pengajuan:</strong> {{ $approval->history_data['alasan'] }}</p>
+                                                        @endif
+                                                        @endif
+                                                        @if($approval->proses && $approval->proses->details->count() > 1 && !$isPinjamMesin)
                                                         <p class="text-muted small mb-0"><i class="fas fa-info-circle"></i> Multiple OP: 1 kali approval berlaku untuk semua OP.</p>
                                                         @endif
                                                         <div class="form-group">
@@ -203,8 +233,8 @@
                                     @endif
                                     @empty
                                     <tr>
-                                        <td colspan="6" class="text-center">
-                                            <p class="text-muted py-3">Tidak ada data approval topping LA/AUX.</p>
+                                        <td colspan="7" class="text-center">
+                                            <p class="text-muted py-3">Tidak ada data approval Kepala Shift.</p>
                                         </td>
                                     </tr>
                                     @endforelse

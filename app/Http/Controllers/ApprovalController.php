@@ -88,7 +88,7 @@ class ApprovalController extends Controller
     {
         $approvals = Approval::with(['proses.details', 'requester', 'approver'])
             ->where('type', 'KEPALA_SHIFT')
-            ->whereIn('action', ['topping_la', 'topping_aux'])
+            ->whereIn('action', ['topping_la', 'topping_aux', 'pinjam_mesin'])
             ->orderByRaw(
                 'CASE WHEN status = ? THEN 1 WHEN status = ? THEN 2 WHEN status = ? THEN 3 ELSE 4 END',
                 ['pending', 'approved', 'rejected']
@@ -568,6 +568,44 @@ class ApprovalController extends Controller
                 event(new ProsesStatusUpdated($proses->id, $statusData));
                 break;
 
+            case 'pinjam_mesin':
+                if (!isset($history['new_mesin_id']) || !isset($history['old_mesin_id'])) {
+                    throw new \Exception("Data 'old_mesin_id' atau 'new_mesin_id' tidak ditemukan dalam history_data.");
+                }
+
+                $oldMesinId = (int) $history['old_mesin_id'];
+                $newMesinId = (int) $history['new_mesin_id'];
+
+                DB::transaction(function () use ($proses, $oldMesinId, $newMesinId) {
+                    $isStarted = $proses->mulai !== null;
+                    $proses->mesin_id = $newMesinId;
+
+                    if (!$isStarted) {
+                        // Jika belum mulai, tempatkan di urutan antrian terakhir di mesin target
+                        $maxOrder = (int) Proses::where('mesin_id', $newMesinId)
+                            ->whereNull('mulai')
+                            ->whereNull('selesai')
+                            ->max('order');
+                        $proses->order = $maxOrder + 1;
+                    }
+                    $proses->save();
+
+                    // Normalisasi ulang order di mesin asal dan mesin tujuan jika belum mulai
+                    $this->reorderPendingProcessesForMachine($oldMesinId);
+                    if (!$isStarted) {
+                        $this->reorderPendingProcessesForMachine($newMesinId);
+                    }
+                });
+
+                // Broadcast event untuk update real-time
+                $proses->refresh();
+                $proses->load(['approvals', 'details.barcodeKains', 'details.barcodeLas', 'details.barcodeAuxs']);
+                $statusService = new ProsesStatusService();
+                $affectedProsesIds = $statusService->getAffectedProsesIds();
+                $statusData = $statusService->generateProsesStatus($proses, $affectedProsesIds);
+                event(new ProsesMoved($proses->id, $oldMesinId, $newMesinId, $statusData));
+                break;
+
             default:
                 // Action tidak dikenali, throw exception
                 throw new \Exception("Action '{$approval->action}' tidak dikenali.");
@@ -623,7 +661,8 @@ class ApprovalController extends Controller
 
             case 'topping_la':
             case 'topping_aux':
-                // Broadcast agar indikator TD/TA update (approval rejected, bukan pending lagi)
+            case 'pinjam_mesin':
+                // Broadcast agar status update (approval rejected, bukan pending lagi)
                 $proses = $approval->proses;
                 if ($proses) {
                     $proses->refresh();

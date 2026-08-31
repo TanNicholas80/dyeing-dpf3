@@ -298,7 +298,11 @@ class ProsesController extends Controller
 
         if ($request->jenis !== 'Maintenance') {
             $rules['qty_dye_stuff'] = 'nullable|integer|in:0,1,2,3';
+            $rules['dye_stuff_schedules'] = 'nullable|array';
+            $rules['dye_stuff_schedules.*'] = 'nullable|string';
             $rules['qty_aux'] = 'nullable|integer|in:0,1,2,3';
+            $rules['aux_schedules'] = 'nullable|array';
+            $rules['aux_schedules.*'] = 'nullable|string';
             $rules += [
                 'jenis_op' => 'required|in:Single,Multiple',
                 // Default: minimal 1 detail OP
@@ -517,14 +521,31 @@ class ProsesController extends Controller
 
             $validated['order'] = $maxOrder + 1;
 
+            $qtyDyeStuff = isset($validated['qty_dye_stuff']) ? (int) $validated['qty_dye_stuff'] : 0;
+            $qtyAux = isset($validated['qty_aux']) ? (int) $validated['qty_aux'] : 0;
+
+            $dyeStuffSchedules = null;
+            if ($qtyDyeStuff > 0 && !empty($request->input('dye_stuff_schedules'))) {
+                $rawDs = (array) $request->input('dye_stuff_schedules');
+                $dyeStuffSchedules = array_values(array_slice(array_filter($rawDs, fn($v) => !is_null($v) && trim($v) !== ''), 0, $qtyDyeStuff));
+            }
+
+            $auxSchedules = null;
+            if ($qtyAux > 0 && !empty($request->input('aux_schedules'))) {
+                $rawAux = (array) $request->input('aux_schedules');
+                $auxSchedules = array_values(array_slice(array_filter($rawAux, fn($v) => !is_null($v) && trim($v) !== ''), 0, $qtyAux));
+            }
+
             // Buat Proses (hanya field yang ada di model Proses)
             $prosesData = [
                 'jenis' => $validated['jenis'],
                 'mode' => $validated['mode'] ?? 'greige',
                 'jenis_op' => $validated['jenis_op'] ?? null,
                 'cycle_time' => $validated['cycle_time'],
-                'qty_dye_stuff' => isset($validated['qty_dye_stuff']) ? (int) $validated['qty_dye_stuff'] : 0,
-                'qty_aux' => isset($validated['qty_aux']) ? (int) $validated['qty_aux'] : 0,
+                'qty_dye_stuff' => $qtyDyeStuff,
+                'dye_stuff_schedules' => $dyeStuffSchedules,
+                'qty_aux' => $qtyAux,
+                'aux_schedules' => $auxSchedules,
                 'mesin_id' => $validated['mesin_id'],
                 'order' => $validated['order'],
             ];
@@ -2476,6 +2497,145 @@ class ProsesController extends Controller
             ->with('success', $successMessage);
     }
 
+    /**
+     * Pengajuan Pinjam Mesin oleh Super Admin, Operator, PPIC (memerlukan approval Kepala Shift).
+     * Dapat diajukan pada proses yang sedang berjalan atau antrian berikutnya (order == 1).
+     */
+    public function pinjamMesin(Request $request, $id)
+    {
+        $userRole = Auth::user() ? Auth::user()->role : null;
+        if (!in_array($userRole, ['super_admin', 'operator', 'ppic'], true)) {
+            $errorMessage = 'Anda tidak memiliki hak akses untuk mengajukan pinjam mesin.';
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json(['status' => 'error', 'message' => $errorMessage], 403);
+            }
+            return back()->with('error', $errorMessage);
+        }
+
+        $proses = Proses::findOrFail($id);
+
+        // Tidak boleh Maintenance
+        if ($proses->jenis === 'Maintenance') {
+            $errorMessage = 'Fitur Pinjam Mesin tidak tersedia untuk proses Maintenance.';
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json(['status' => 'error', 'message' => $errorMessage], 400);
+            }
+            return back()->with('error', $errorMessage);
+        }
+
+        // Sudah selesai tidak bisa diajukan
+        if ($proses->selesai !== null) {
+            $errorMessage = 'Tidak dapat mengajukan pinjam mesin. Proses sudah selesai.';
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json(['status' => 'error', 'message' => $errorMessage], 400);
+            }
+            return back()->with('error', $errorMessage);
+        }
+
+        // Validasi kondisi: Harus sedang berjalan ATAU antrian berikutnya (order == 1)
+        $isStarted = $proses->mulai !== null;
+        $isNextInQueue = $proses->mulai === null && (int) $proses->order === 1;
+
+        if (!$isStarted && !$isNextInQueue) {
+            $errorMessage = 'Pinjam Mesin hanya dapat diajukan untuk proses yang sedang berjalan atau proses antrian berikutnya (urutan ke-1).';
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json(['status' => 'error', 'message' => $errorMessage], 400);
+            }
+            return back()->with('error', $errorMessage);
+        }
+
+        // Validasi mesin_id tujuan
+        $request->validate([
+            'mesin_id' => 'required|exists:mesins,id',
+            'alasan' => 'nullable|string|max:500',
+        ]);
+
+        $newMesinId = (int) $request->mesin_id;
+        if ($newMesinId === (int) $proses->mesin_id) {
+            $errorMessage = 'Mesin tujuan harus berbeda dari mesin saat ini.';
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json(['status' => 'error', 'message' => $errorMessage], 400);
+            }
+            return back()->with('error', $errorMessage);
+        }
+
+        // Cek pending approval yang sudah ada untuk proses ini
+        $existingPending = Approval::where('proses_id', $proses->id)
+            ->where('status', 'pending')
+            ->first();
+
+        if ($existingPending) {
+            $actionLabels = [
+                'edit_cycle_time' => 'Edit Cycle Time',
+                'delete_proses'   => 'Hapus Proses',
+                'move_machine'    => 'Pindah Mesin',
+                'swap_position'   => 'Tukar Posisi',
+                'create_reprocess'=> 'Buat Reproses',
+                'pause_proses'    => 'Pause Proses',
+                'pinjam_mesin'    => 'Pinjam Mesin',
+            ];
+            $actionLabel = $actionLabels[$existingPending->action] ?? $existingPending->action;
+            $errorMessage = "Tidak dapat mengajukan permintaan baru. Masih ada permintaan {$actionLabel} yang menunggu persetujuan.";
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json(['status' => 'error', 'message' => $errorMessage], 400);
+            }
+            return back()->with('error', $errorMessage);
+        }
+
+        // Ambil halaman asal dari referer jika ada
+        $referer = $request->headers->get('referer');
+        $page = 1;
+        if ($referer) {
+            $parsed = parse_url($referer);
+            if (isset($parsed['query'])) {
+                parse_str($parsed['query'], $queryArr);
+                if (isset($queryArr['page']) && is_numeric($queryArr['page'])) {
+                    $page = (int) $queryArr['page'];
+                }
+            }
+        }
+
+        // Buat record approval untuk Kepala Shift (pinjam_mesin)
+        Approval::create([
+            'proses_id' => $proses->id,
+            'status' => 'pending',
+            'type' => 'KEPALA_SHIFT',
+            'action' => 'pinjam_mesin',
+            'history_data' => [
+                'old_mesin_id' => $proses->mesin_id,
+                'new_mesin_id' => $newMesinId,
+                'alasan' => $request->alasan,
+                'proses_snapshot' => $proses->toArray(),
+            ],
+            'note' => $request->alasan,
+            'requested_by' => Auth::id(),
+            'approved_by' => null,
+        ]);
+
+        // Broadcast event realtime
+        event(new ApprovalPendingCreated([$proses->id]));
+
+        $proses->refresh();
+        $proses->load(['approvals', 'details.barcodeKains', 'details.barcodeLas', 'details.barcodeAuxs']);
+        $statusService = new \App\Services\ProsesStatusService();
+        $affectedProsesIds = $statusService->getAffectedProsesIds();
+        $statusData = $statusService->generateProsesStatus($proses, $affectedProsesIds);
+        event(new \App\Events\ProsesStatusUpdated($proses->id, $statusData));
+
+        $successMessage = 'Permintaan pinjam mesin telah dikirim dan menunggu persetujuan Kepala Shift.';
+
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json([
+                'status' => 'success',
+                'message' => $successMessage,
+                'redirect' => route('dashboard', ['page' => $page])
+            ]);
+        }
+
+        return redirect()->route('dashboard', ['page' => $page])
+            ->with('success', $successMessage);
+    }
+
     // Swap posisi dua proses di mesin yang sama
     public function swap(Request $request, $id)
     {
@@ -2918,5 +3078,85 @@ class ProsesController extends Controller
         }
         return redirect()->route('dashboard', ['page' => $page])
             ->with('success', $successMessage);
+    }
+
+    /**
+     * Selesaikan proses Maintenance secara manual dari Dashboard modal Detail Proses.
+     */
+    public function finishMaintenance($id)
+    {
+        $userRole = Auth::user() ? Auth::user()->role : null;
+        if (!in_array($userRole, ['super_admin', 'kepala_shift'], true)) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Hanya Super Admin dan Kepala Shift yang memiliki hak akses untuk menyelesaikan proses Maintenance.'
+            ], 403);
+        }
+
+        $proses = Proses::findOrFail($id);
+
+        if ($proses->jenis !== 'Maintenance') {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Hanya proses berjenis Maintenance yang dapat diselesaikan secara manual.'
+            ], 400);
+        }
+
+        if ($proses->selesai !== null) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Proses Maintenance ini sudah selesai.'
+            ], 400);
+        }
+
+        if ($proses->mulai === null) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Proses Maintenance belum dimulai.'
+            ], 400);
+        }
+
+        DB::beginTransaction();
+        try {
+            $now = now();
+            $proses->selesai = $now;
+            $proses->is_paused = false;
+            if ($proses->mulai) {
+                $mulai = \Carbon\Carbon::parse($proses->mulai);
+                $proses->cycle_time_actual = max(0, $mulai->diffInSeconds($now, false));
+            }
+            $proses->save();
+
+            Cache::forget("iot:proses:{$proses->id}:kain_latched");
+            Cache::forget("iot:mesin:{$proses->mesin_id}:alarm_result");
+
+            // Mulai proses antrian berikutnya jika mesin hidup / ON
+            $started = $this->startNextProsesIfMesinOn((int) $proses->mesin_id);
+
+            DB::commit();
+
+            // Broadcast update status ke semua client dashboard
+            $statusService = new \App\Services\ProsesStatusService();
+            $affectedProsesIds = $statusService->getAffectedProsesIds();
+            $statusData = $statusService->generateProsesStatus($proses, $affectedProsesIds);
+            event(new \App\Events\ProsesStatusUpdated($proses->id, $statusData));
+
+            if ($started) {
+                $startedStatusData = $statusService->generateProsesStatus($started, $affectedProsesIds);
+                event(new \App\Events\ProsesStatusUpdated($started->id, $startedStatusData));
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Proses Maintenance berhasil diselesaikan.',
+                'data' => $proses
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Gagal menyelesaikan proses Maintenance: ' . $e->getMessage()
+            ], 500);
+        }
     }
 }

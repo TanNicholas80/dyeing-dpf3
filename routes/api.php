@@ -49,8 +49,11 @@ Route::prefix('iot')->group(function () {
     // Arduino kirim status PLC ON/OFF
     Route::post('/mesin/{mesin}/state', [ApiCheckStatusBarcodeController::class, 'updateMesinState']);
 
-    // Arduino polling status alarm (ON/OFF) berdasarkan kelengkapan barcode
+    // Arduino/Modbus polling status alarm & sinyal 100, 103, 105 per mesin
     Route::get('/mesin/{mesin}/alarm', [ApiCheckStatusBarcodeController::class, 'getAlarmStatus']);
+
+    // Polling semua sinyal (100, 103, 105) untuk semua mesin sekaligus
+    Route::get('/signals', [ApiCheckStatusBarcodeController::class, 'getAllSignals']);
 
     // Endpoint Legacy untuk firmware lama (Backward Compatibility) - jika user memanggil via /api/iot/checkStatus
     Route::match(['get', 'post'], '/checkStatus', [ApiCheckStatusBarcodeController::class, 'checkStatusLegacy']);

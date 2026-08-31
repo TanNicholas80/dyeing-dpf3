@@ -74,6 +74,16 @@ Route::middleware(['auth', 'prevent-back-history'])->group(function () {
         Route::delete('/proses/{id}/delete', [ProsesController::class, 'destroy'])->name('proses.delete');
     });
 
+    // Selesai Maintenance: SuperAdmin, Kepala Shift
+    Route::middleware('role:super_admin,kepala_shift')->group(function () {
+        Route::post('/proses/{id}/selesai', [ProsesController::class, 'finishMaintenance'])->name('proses.selesai');
+    });
+
+    // Pinjam Mesin: SuperAdmin, PPIC, Operator
+    Route::middleware('role:super_admin,ppic,operator')->group(function () {
+        Route::post('/proses/{id}/pinjam-mesin', [ProsesController::class, 'pinjamMesin'])->name('proses.pinjam-mesin');
+    });
+
     Route::middleware('role:super_admin,mesin,ppic,operator')->group(function () {
         // Tambah barcode (mesin hanya barcode kain; LA/AUX: ppic, super_admin, kepala_ruangan)
         Route::post('/proses/{id}/barcode/kain', [ProsesController::class, 'barcodeKain'])->name('proses.barcode.kain');
