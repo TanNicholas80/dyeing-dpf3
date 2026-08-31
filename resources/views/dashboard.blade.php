@@ -2429,8 +2429,8 @@
         window.canMoveProses = @json($canMoveProses ?? true);
         window.canSwapProses = @json($canSwapProses ?? true);
         window.canScanBarcode = @json($canScanBarcode ?? true);
-        window.canFinishMaintenance = @json($canFinishMaintenance ?? in_array($userRole ?? '', ['super_admin', 'kepala_shift']));
-        window.canPinjamMesin = @json($canPinjamMesin ?? in_array($userRole ?? '', ['super_admin', 'operator', 'ppic']));
+        window.canFinishMaintenance = {{ ($canFinishMaintenance ?? in_array($userRole ?? '', ['super_admin', 'kepala_shift'])) ? 'true' : 'false' }};
+        window.canPinjamMesin = {{ ($canPinjamMesin ?? in_array($userRole ?? '', ['super_admin', 'operator', 'ppic'])) ? 'true' : 'false' }};
 
         // Toast mixin global: Error = close button (tanpa timer), Success = timer 8 detik (tanpa close button)
         window.ToastError = Swal.mixin({
