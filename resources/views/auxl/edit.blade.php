@@ -23,6 +23,31 @@
             align-items: center;
             justify-content: center;
         }
+
+        /* Styling Lock & Allow Edit */
+        .select2-locked .select2-container .select2-selection--single {
+            background-color: #e9ecef !important;
+            cursor: not-allowed !important;
+            pointer-events: none !important;
+        }
+
+        .input-locked {
+            background-color: #e9ecef !important;
+            cursor: not-allowed !important;
+            color: #495057 !important;
+        }
+
+        .input-unlocked {
+            background-color: #ffffff !important;
+            cursor: text !important;
+            border-color: #28a745 !important;
+            box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.15) !important;
+        }
+
+        .btn-toggle-lock-btn {
+            font-weight: 600;
+            transition: all 0.2s ease-in-out;
+        }
     </style>
 
     <div class="content-wrapper">
@@ -275,21 +300,40 @@
                     <!-- Card Detail List Auxiliary -->
                     <div class="card mt-3">
                         <div
-                            class="card-header bg-secondary text-white d-flex justify-content-between align-items-center w-100">
-                            <h3 class="card-title mb-0"><i class="fas fa-vials"></i> Data Detail List Auxiliary</h3>
-                            <button type="button" class="btn btn-success btn-sm ml-auto" id="btn-add-detail"
-                                title="Tambah List Auxiliary">
-                                <i class="fas fa-plus"></i> Tambah Auxiliary
-                            </button>
+                            class="card-header bg-secondary text-white d-flex justify-content-between align-items-center w-100 flex-wrap">
+                            <div class="d-flex align-items-center">
+                                <h3 class="card-title mb-0"><i class="fas fa-vials"></i> Data Detail List Auxiliary</h3>
+                                <span id="lock-status-badge" class="badge badge-warning ml-2 font-weight-bold">
+                                    <i class="fas fa-lock"></i> Terkunci
+                                </span>
+                            </div>
+                            <div class="ml-auto d-flex align-items-center">
+                                <button type="button" class="btn btn-warning btn-sm mr-2 btn-toggle-lock-btn" id="btn-toggle-lock"
+                                    title="Klik untuk membuka/mengunci input kuantitas kimia">
+                                    <i class="fas fa-unlock" id="lock-btn-icon"></i> <span id="lock-btn-text">Allow Edit</span>
+                                </button>
+                                <button type="button" class="btn btn-success btn-sm" id="btn-add-detail"
+                                    title="Tambah List Auxiliary">
+                                    <i class="fas fa-plus"></i> Tambah Auxiliary
+                                </button>
+                            </div>
                         </div>
                         <div class="card-body">
+                            <!-- Alert info lock status -->
+                            <div id="lock-info-alert" class="alert alert-info py-2 px-3 mb-3 small d-flex align-items-center">
+                                <i class="fas fa-info-circle mr-2 text-info" id="lock-alert-icon" style="font-size: 1.1rem;"></i>
+                                <span id="lock-info-text">
+                                    Kuantitas kimia yang sudah tersimpan dalam keadaan <strong>terkunci</strong>. Klik tombol <strong>"Allow Edit"</strong> jika Anda ingin mengubah kuantitasnya (Gram / KG).
+                                </span>
+                            </div>
+
                             <div class="table-responsive">
                                 <table class="table table-bordered" id="table-details">
                                     <thead class="thead-light">
                                         <tr>
                                             <th style="width: 60%">Nama Auxiliary (List SAP) <span
                                                     class="text-danger">*</span></th>
-                                            <th style="width: 30%">Weight (kg) <span class="text-danger">*</span></th>
+                                            <th style="width: 30%">Weight <span class="text-danger">*</span></th>
                                             <th style="width: 10%">Aksi</th>
                                         </tr>
                                     </thead>
@@ -316,21 +360,23 @@
                                                 }
                                                 $isSpc = ($unitVal === 'gram' || $extwgVal === 'AUX SPC');
                                             @endphp
-                                            <tr class="detail-row" data-current-unit="{{ $unitVal }}">
+                                            <tr class="detail-row existing-row" data-current-unit="{{ $unitVal }}" data-is-existing="true">
                                                 <td>
-                                                    <select name="details[{{ $i }}][auxiliary]"
-                                                        class="form-control select2-auxiliary" required>
-                                                        @if(!empty($auxName))
-                                                            <option value="{{ $auxName }}" data-extwg="{{ $extwgVal }}" selected>{{ $auxName }}</option>
-                                                        @endif
-                                                    </select>
+                                                    <div class="select2-locked">
+                                                        <select name="details[{{ $i }}][auxiliary]"
+                                                            class="form-control select2-auxiliary" required>
+                                                            @if(!empty($auxName))
+                                                                <option value="{{ $auxName }}" data-extwg="{{ $extwgVal }}" selected>{{ $auxName }}</option>
+                                                            @endif
+                                                        </select>
+                                                    </div>
                                                     <input type="hidden" name="details[{{ $i }}][unit]" class="unit-input" value="{{ $unitVal }}">
                                                 </td>
                                                 <td>
                                                     <div class="input-group input-group-sm">
                                                         <input type="number" step="{{ $isSpc ? '0.01' : '0.0001' }}" name="details[{{ $i }}][konsentrasi]"
-                                                            class="form-control form-control-sm weight-input"
-                                                            placeholder="Weight ({{ $unitVal }})" value="{{ $displayWeight }}" {{ $isSpc ? '' : 'readonly' }} required>
+                                                            class="form-control form-control-sm weight-input input-locked"
+                                                            placeholder="Weight ({{ $unitVal }})" value="{{ $displayWeight }}" readonly required>
                                                         <div class="input-group-append">
                                                             <span class="input-group-text unit-label">{{ $unitVal }}</span>
                                                         </div>
@@ -363,6 +409,111 @@
         $(document).ready(function () {
             $('.select2').select2({ width: '100%' });
 
+            let allowEdit = false;
+            let detailIndex = {{ count($auxl->details) }};
+            let currentProsesInfo = null;
+
+            function applyLockState() {
+                if (allowEdit) {
+                    $('#btn-toggle-lock')
+                        .removeClass('btn-warning')
+                        .addClass('btn-secondary')
+                        .attr('title', 'Klik untuk mengunci kembali input kuantitas');
+                    $('#lock-btn-icon').removeClass('fa-unlock').addClass('fa-lock text-warning');
+                    $('#lock-btn-text').text('Kunci Kembali');
+                    
+                    $('#lock-status-badge')
+                        .removeClass('badge-warning')
+                        .addClass('badge-success')
+                        .html('<i class="fas fa-unlock"></i> Mode Edit Aktif');
+                        
+                    $('#lock-info-alert')
+                        .removeClass('alert-info')
+                        .addClass('alert-success');
+                    $('#lock-alert-icon')
+                        .removeClass('fa-info-circle text-info')
+                        .addClass('fa-unlock-alt text-success');
+                    $('#lock-info-text').html(
+                        '<strong>Mode Edit Aktif:</strong> Anda dapat mengedit kuantitas baik <strong>Gram (Aux Special)</strong> maupun <strong>KG (Aux Biasa)</strong>. Pastikan data sudah benar sebelum disimpan.'
+                    );
+
+                    $('.existing-row').each(function () {
+                        const $row = $(this);
+                        const $weightInput = $row.find('.weight-input');
+                        $weightInput.prop('readonly', false)
+                            .removeClass('input-locked')
+                            .addClass('input-unlocked');
+                    });
+                } else {
+                    $('#btn-toggle-lock')
+                        .removeClass('btn-secondary')
+                        .addClass('btn-warning')
+                        .attr('title', 'Klik untuk membuka input kuantitas kimia');
+                    $('#lock-btn-icon').removeClass('fa-lock text-warning').addClass('fa-unlock');
+                    $('#lock-btn-text').text('Allow Edit');
+                    
+                    $('#lock-status-badge')
+                        .removeClass('badge-success')
+                        .addClass('badge-warning')
+                        .html('<i class="fas fa-lock"></i> Terkunci');
+                        
+                    $('#lock-info-alert')
+                        .removeClass('alert-success')
+                        .addClass('alert-info');
+                    $('#lock-alert-icon')
+                        .removeClass('fa-unlock-alt text-success')
+                        .addClass('fa-info-circle text-info');
+                    $('#lock-info-text').html(
+                        'Kuantitas kimia yang sudah tersimpan dalam keadaan <strong>terkunci</strong>. Klik tombol <strong>"Allow Edit"</strong> jika Anda ingin mengubah kuantitasnya (Gram / KG).'
+                    );
+
+                    $('.existing-row').each(function () {
+                        const $row = $(this);
+                        const $weightInput = $row.find('.weight-input');
+                        $weightInput.prop('readonly', true)
+                            .removeClass('input-unlocked')
+                            .addClass('input-locked');
+                    });
+                }
+            }
+
+            $('#btn-toggle-lock').on('click', function () {
+                if (!allowEdit) {
+                    Swal.fire({
+                        title: 'Buka Kunci Pengeditan?',
+                        text: 'Kuantitas kimia (Gram / KG) yang sudah tersimpan akan dapat diedit.',
+                        icon: 'question',
+                        showCancelButton: true,
+                        confirmButtonColor: '#ffc107',
+                        cancelButtonColor: '#6c757d',
+                        confirmButtonText: '<i class="fas fa-unlock"></i> Ya, Allow Edit',
+                        cancelButtonText: 'Batal'
+                    }).then((result) => {
+                        if (result.isConfirmed) {
+                            allowEdit = true;
+                            applyLockState();
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Mode Edit Aktif',
+                                text: 'Silakan edit kuantitas kimia yang diperlukan.',
+                                timer: 1500,
+                                showConfirmButton: false
+                            });
+                        }
+                    });
+                } else {
+                    allowEdit = false;
+                    applyLockState();
+                    Swal.fire({
+                        icon: 'info',
+                        title: 'Input Dikunci',
+                        text: 'Kuantitas kimia telah dikunci kembali.',
+                        timer: 1500,
+                        showConfirmButton: false
+                    });
+                }
+            });
+
             function updateRowWeightState($tr, isInitialLoad = false) {
                 const $select = $tr.find('.select2-auxiliary');
                 const selectedData = $select.select2('data')[0] || {};
@@ -375,9 +526,9 @@
                 const $unitLabel = $tr.find('.unit-label');
                 const $unitInput = $tr.find('.unit-input');
                 const prevUnit = $tr.data('current-unit') || 'kg';
+                const isExisting = $tr.hasClass('existing-row') || $tr.data('is-existing');
 
                 if (extwg === 'AUX SPC') {
-                    $weightInput.prop('readonly', false);
                     $weightInput.attr('placeholder', 'Weight (gram)');
                     $weightInput.attr('step', '0.01');
                     $unitLabel.text('gram');
@@ -390,8 +541,17 @@
                         }
                     }
                     $tr.data('current-unit', 'gram');
+
+                    if (isExisting) {
+                        if (allowEdit) {
+                            $weightInput.prop('readonly', false).removeClass('input-locked').addClass('input-unlocked');
+                        } else {
+                            $weightInput.prop('readonly', true).removeClass('input-unlocked').addClass('input-locked');
+                        }
+                    } else {
+                        $weightInput.prop('readonly', false);
+                    }
                 } else {
-                    $weightInput.prop('readonly', true);
                     $weightInput.attr('placeholder', 'Weight (kg)');
                     $weightInput.attr('step', '0.0001');
                     $unitLabel.text('kg');
@@ -404,6 +564,17 @@
                         }
                     }
                     $tr.data('current-unit', 'kg');
+
+                    if (isExisting) {
+                        if (allowEdit) {
+                            $weightInput.prop('readonly', false).removeClass('input-locked').addClass('input-unlocked');
+                        } else {
+                            $weightInput.prop('readonly', true).removeClass('input-unlocked').addClass('input-locked');
+                        }
+                    } else {
+                        // For new row, editable if allowEdit is active, otherwise readonly (scale)
+                        $weightInput.prop('readonly', !allowEdit);
+                    }
                 }
                 calcVolume();
             }
@@ -450,9 +621,6 @@
                 initAuxiliarySelect2(this);
                 updateRowWeightState($(this).closest('.detail-row'), true);
             });
-
-            let detailIndex = {{ count($auxl->details) }};
-            let currentProsesInfo = null;
 
             function calcVolume() {
                 let sumWeight = 0;
@@ -669,25 +837,28 @@
             }
 
             $('#btn-add-detail').on('click', function () {
+                const isWeightReadonly = allowEdit ? '' : 'readonly';
                 const tr = `
-                            <tr class="detail-row" data-current-unit="kg">
-                                <td>
-                                    <select name="details[${detailIndex}][auxiliary]" class="form-control select2-auxiliary" required></select>
-                                    <input type="hidden" name="details[${detailIndex}][unit]" class="unit-input" value="kg">
-                                </td>
-                                <td>
-                                    <div class="input-group input-group-sm">
-                                        <input type="number" step="0.0001" name="details[${detailIndex}][konsentrasi]" class="form-control form-control-sm weight-input" placeholder="Weight (kg)" readonly required>
-                                        <div class="input-group-append">
-                                            <span class="input-group-text unit-label">kg</span>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td class="text-center">
-                                    <button type="button" class="btn btn-danger btn-sm btn-remove-detail"><i class="fas fa-trash"></i></button>
-                                </td>
-                            </tr>
-                        `;
+                    <tr class="detail-row new-row" data-current-unit="kg" data-is-new="true">
+                        <td>
+                            <div>
+                                <select name="details[${detailIndex}][auxiliary]" class="form-control select2-auxiliary" required></select>
+                            </div>
+                            <input type="hidden" name="details[${detailIndex}][unit]" class="unit-input" value="kg">
+                        </td>
+                        <td>
+                            <div class="input-group input-group-sm">
+                                <input type="number" step="0.0001" name="details[${detailIndex}][konsentrasi]" class="form-control form-control-sm weight-input" placeholder="Weight (kg)" ${isWeightReadonly} required>
+                                <div class="input-group-append">
+                                    <span class="input-group-text unit-label">kg</span>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="text-center">
+                            <button type="button" class="btn btn-danger btn-sm btn-remove-detail"><i class="fas fa-trash"></i></button>
+                        </td>
+                    </tr>
+                `;
                 $('#details-list').append(tr);
                 const $newSelect = $('#details-list tr:last .select2-auxiliary');
                 initAuxiliarySelect2($newSelect);
@@ -697,8 +868,20 @@
             });
 
             $(document).on('click', '.btn-remove-detail', function () {
+                const $row = $(this).closest('tr');
+                const isExisting = $row.hasClass('existing-row') || $row.data('is-existing');
+
+                if (isExisting && !allowEdit) {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Pengeditan Terkunci',
+                        text: 'Silakan klik "Allow Edit" terlebih dahulu jika ingin menghapus baris kimia yang sudah tersimpan.'
+                    });
+                    return;
+                }
+
                 if ($('#details-list .detail-row').length > 1) {
-                    $(this).closest('tr').remove();
+                    $row.remove();
                     calcVolume();
                 } else {
                     Swal.fire({
@@ -716,9 +899,10 @@
 
                     const data = await res.json();
                     if (typeof data.weight !== 'undefined' && !isNaN(parseFloat(data.weight))) {
-                        const weightInputs = document.querySelectorAll('.weight-input[readonly]');
-                        if (weightInputs.length > 0) {
-                            weightInputs[weightInputs.length - 1].value = parseFloat(data.weight).toFixed(2);
+                        // ONLY target new rows that are readonly (waiting for scale), never overwrite existing saved rows!
+                        const newReadonlyInputs = document.querySelectorAll('.new-row .weight-input[readonly]');
+                        if (newReadonlyInputs.length > 0) {
+                            newReadonlyInputs[newReadonlyInputs.length - 1].value = parseFloat(data.weight).toFixed(2);
                             calcVolume();
                         }
                     }

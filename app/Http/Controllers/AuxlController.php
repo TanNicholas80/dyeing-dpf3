@@ -326,6 +326,7 @@ class AuxlController extends Controller
             'details'     => 'required|array|min:1',
             'details.*.auxiliary'   => 'required|string',
             'details.*.konsentrasi' => 'required|numeric|min:0',
+            'details.*.unit'        => 'nullable|string',
         ]);
 
         $auxl = Auxl::findOrFail($id);
