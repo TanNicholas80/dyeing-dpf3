@@ -99,9 +99,20 @@
                                                         -
                                                     @endif
                                                 </td>
-                                                <td>{{ number_format($auxl->total_wt, 1) }} kg</td>
+                                                @php
+                                                    $detailSum = $auxl->details ? $auxl->details->sum('konsentrasi') : 0;
+                                                    $displayTotalWt = ($detailSum > 0) ? $detailSum : ($auxl->total_wt ?? 0);
+                                                    $displayVolume = ($detailSum > 0) ? ($detailSum * ($auxl->liquor_ratio ?? 10)) : ($auxl->volume_litres ?? 0);
+
+                                                    $formattedTotalWt = rtrim(rtrim(number_format($displayTotalWt, 4, '.', ''), '0'), '.');
+                                                    if ($formattedTotalWt === '' || $formattedTotalWt === '0') $formattedTotalWt = '0';
+
+                                                    $formattedVolume = rtrim(rtrim(number_format($displayVolume, 2, '.', ''), '0'), '.');
+                                                    if ($formattedVolume === '' || $formattedVolume === '0') $formattedVolume = '0';
+                                                @endphp
+                                                <td>{{ $formattedTotalWt }} kg</td>
                                                 <td><span
-                                                        class="text-primary font-weight-bold">{{ number_format($auxl->volume_litres, 1) }}
+                                                        class="text-primary font-weight-bold">{{ $formattedVolume }}
                                                         L</span></td>
                                                 <td>{{ $auxl->code }}</td>
                                                 <td>{{ $auxl->konstruksi }}</td>

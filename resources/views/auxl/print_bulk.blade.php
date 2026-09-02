@@ -202,11 +202,16 @@
                     <td class="info-label">M/C:</td>
                     <td class="info-val">{{ $mesin }}</td>
                 </tr>
+                @php
+                    $detailSum = $auxl->details ? $auxl->details->sum('konsentrasi') : 0;
+                    $displayTotalWt = ($detailSum > 0) ? $detailSum : ($auxl->total_wt ?? 0);
+                    $displayVolume = ($detailSum > 0) ? ($detailSum * ($auxl->liquor_ratio ?? 10)) : ($auxl->volume_litres ?? 0);
+                @endphp
                 <tr>
                     <td class="info-label">Total Wt.(Kg):</td>
-                    <td class="info-val">{{ rtrim(rtrim(number_format($auxl->total_wt, 4, '.', ''), '0'), '.') }}</td>
+                    <td class="info-val">{{ rtrim(rtrim(number_format($displayTotalWt, 4, '.', ''), '0'), '.') }}</td>
                     <td class="info-label">Volume(Litres):</td>
-                    <td class="info-val">{{ rtrim(rtrim(number_format($auxl->volume_litres, 2, '.', ''), '0'), '.') }}</td>
+                    <td class="info-val">{{ rtrim(rtrim(number_format($displayVolume, 2, '.', ''), '0'), '.') }}</td>
                 </tr>
             </table>
 

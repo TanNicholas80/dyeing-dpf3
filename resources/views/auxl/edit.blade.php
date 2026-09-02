@@ -44,9 +44,31 @@
             box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.15) !important;
         }
 
-        .btn-toggle-lock-btn {
+        .input-weighing-active {
+            background-color: #e8f4fd !important;
+            border-color: #17a2b8 !important;
+            box-shadow: 0 0 0 0.2rem rgba(23, 162, 184, 0.25) !important;
+            color: #0c5460 !important;
             font-weight: 600;
-            transition: all 0.2s ease-in-out;
+        }
+
+        .btn-toggle-row-lock, .btn-remove-detail {
+            height: 31px;
+            width: 34px;
+            padding: 0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+        }
+
+        .btn-toggle-row-lock {
+            border-color: #ced4da;
+        }
+
+        .row-status-text {
+            font-size: 0.78rem;
+            line-height: 1.2;
         }
     </style>
 
@@ -70,6 +92,20 @@
 
         <section class="content">
             <div class="container-fluid">
+                @if ($errors->any())
+                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                        <h5><i class="icon fas fa-ban"></i> Terjadi Kesalahan Validasi!</h5>
+                        <ul class="mb-0">
+                            @foreach ($errors->all() as $error)
+                                <li>{{ $error }}</li>
+                            @endforeach
+                        </ul>
+                        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                @endif
+
                 <form action="{{ route('aux.update', $auxl->id) }}" method="POST" id="form-aux">
                     @csrf
                     @method('PUT')
@@ -303,15 +339,8 @@
                             class="card-header bg-secondary text-white d-flex justify-content-between align-items-center w-100 flex-wrap">
                             <div class="d-flex align-items-center">
                                 <h3 class="card-title mb-0"><i class="fas fa-vials"></i> Data Detail List Auxiliary</h3>
-                                <span id="lock-status-badge" class="badge badge-warning ml-2 font-weight-bold">
-                                    <i class="fas fa-lock"></i> Terkunci
-                                </span>
                             </div>
                             <div class="ml-auto d-flex align-items-center">
-                                <button type="button" class="btn btn-warning btn-sm mr-2 btn-toggle-lock-btn" id="btn-toggle-lock"
-                                    title="Klik untuk membuka/mengunci input kuantitas kimia">
-                                    <i class="fas fa-unlock" id="lock-btn-icon"></i> <span id="lock-btn-text">Allow Edit</span>
-                                </button>
                                 <button type="button" class="btn btn-success btn-sm" id="btn-add-detail"
                                     title="Tambah List Auxiliary">
                                     <i class="fas fa-plus"></i> Tambah Auxiliary
@@ -319,22 +348,14 @@
                             </div>
                         </div>
                         <div class="card-body">
-                            <!-- Alert info lock status -->
-                            <div id="lock-info-alert" class="alert alert-info py-2 px-3 mb-3 small d-flex align-items-center">
-                                <i class="fas fa-info-circle mr-2 text-info" id="lock-alert-icon" style="font-size: 1.1rem;"></i>
-                                <span id="lock-info-text">
-                                    Kuantitas kimia yang sudah tersimpan dalam keadaan <strong>terkunci</strong>. Klik tombol <strong>"Allow Edit"</strong> jika Anda ingin mengubah kuantitasnya (Gram / KG).
-                                </span>
-                            </div>
-
                             <div class="table-responsive">
                                 <table class="table table-bordered" id="table-details">
                                     <thead class="thead-light">
                                         <tr>
-                                            <th style="width: 60%">Nama Auxiliary (List SAP) <span
+                                            <th style="width: 50%">Nama Auxiliary (List SAP) <span
                                                     class="text-danger">*</span></th>
-                                            <th style="width: 30%">Weight <span class="text-danger">*</span></th>
-                                            <th style="width: 10%">Aksi</th>
+                                            <th style="width: 35%">Weight <span class="text-danger">*</span></th>
+                                            <th style="width: 15%" class="text-center">Aksi</th>
                                         </tr>
                                     </thead>
                                     <tbody id="details-list">
@@ -360,9 +381,9 @@
                                                 }
                                                 $isSpc = ($unitVal === 'gram' || $extwgVal === 'AUX SPC');
                                             @endphp
-                                            <tr class="detail-row existing-row" data-current-unit="{{ $unitVal }}" data-is-existing="true">
+                                            <tr class="detail-row existing-row row-locked" data-current-unit="{{ $unitVal }}" data-locked="true" data-is-existing="true">
                                                 <td>
-                                                    <div class="select2-locked">
+                                                    <div class="select2-wrapper select2-locked">
                                                         <select name="details[{{ $i }}][auxiliary]"
                                                             class="form-control select2-auxiliary" required>
                                                             @if(!empty($auxName))
@@ -381,10 +402,20 @@
                                                             <span class="input-group-text unit-label">{{ $unitVal }}</span>
                                                         </div>
                                                     </div>
+                                                    <small class="row-status-text text-muted d-block mt-1">
+                                                        <i class="fas fa-lock text-secondary"></i> Data terkunci (Fix)
+                                                    </small>
                                                 </td>
                                                 <td class="text-center">
-                                                    <button type="button" class="btn btn-danger btn-sm btn-remove-detail"><i
-                                                            class="fas fa-trash"></i></button>
+                                                    <div class="d-flex justify-content-center align-items-center" style="gap: 6px;">
+                                                        <button type="button" class="btn btn-sm btn-outline-warning btn-toggle-row-lock"
+                                                            title="Baris Terkunci (Fix). Klik untuk Buka Kunci / Edit">
+                                                            <i class="fas fa-lock"></i>
+                                                        </button>
+                                                        <button type="button" class="btn btn-danger btn-sm btn-remove-detail" title="Hapus Baris">
+                                                            <i class="fas fa-trash"></i>
+                                                        </button>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         @endforeach
@@ -409,107 +440,122 @@
         $(document).ready(function () {
             $('.select2').select2({ width: '100%' });
 
-            let allowEdit = false;
             let detailIndex = {{ count($auxl->details) }};
             let currentProsesInfo = null;
 
-            function applyLockState() {
-                if (allowEdit) {
-                    $('#btn-toggle-lock')
-                        .removeClass('btn-warning')
-                        .addClass('btn-secondary')
-                        .attr('title', 'Klik untuk mengunci kembali input kuantitas');
-                    $('#lock-btn-icon').removeClass('fa-unlock').addClass('fa-lock text-warning');
-                    $('#lock-btn-text').text('Kunci Kembali');
-                    
-                    $('#lock-status-badge')
-                        .removeClass('badge-warning')
-                        .addClass('badge-success')
-                        .html('<i class="fas fa-unlock"></i> Mode Edit Aktif');
-                        
-                    $('#lock-info-alert')
-                        .removeClass('alert-info')
-                        .addClass('alert-success');
-                    $('#lock-alert-icon')
-                        .removeClass('fa-info-circle text-info')
-                        .addClass('fa-unlock-alt text-success');
-                    $('#lock-info-text').html(
-                        '<strong>Mode Edit Aktif:</strong> Anda dapat mengedit kuantitas baik <strong>Gram (Aux Special)</strong> maupun <strong>KG (Aux Biasa)</strong>. Pastikan data sudah benar sebelum disimpan.'
-                    );
+            // Fungsi penerapan status Lock/Unlock per Baris
+            function applyRowLockState($row) {
+                const isLocked = $row.attr('data-locked') === 'true';
+                const $selectWrapper = $row.find('.select2-wrapper');
+                const $weightInput = $row.find('.weight-input');
+                const $lockBtn = $row.find('.btn-toggle-row-lock');
+                const $lockIcon = $lockBtn.find('i');
+                const $statusText = $row.find('.row-status-text');
+                const unit = $row.find('.unit-input').val() || $row.data('current-unit') || 'kg';
+                const isSpecial = (unit === 'gram');
 
-                    $('.existing-row').each(function () {
-                        const $row = $(this);
-                        const $weightInput = $row.find('.weight-input');
-                        $weightInput.prop('readonly', false)
-                            .removeClass('input-locked')
-                            .addClass('input-unlocked');
-                    });
+                if (isLocked) {
+                    // --- KEADAAN TERKUNCI (FIX / TIDAK BISA BERUBAH) ---
+                    // 1. Dropdown Auxiliary dikunci
+                    $selectWrapper.addClass('select2-locked');
+
+                    // 2. Input Weight dikunci readonly
+                    $weightInput.prop('readonly', true)
+                        .removeClass('input-unlocked input-weighing-active')
+                        .addClass('input-locked');
+
+                    // 3. Tombol Lock kuning (Terkunci)
+                    $lockBtn.removeClass('btn-outline-success btn-success')
+                        .addClass('btn-outline-warning')
+                        .attr('title', 'Baris terkunci (Fix). Klik untuk Buka Kunci / Edit');
+                    $lockIcon.removeClass('fa-unlock').addClass('fa-lock');
+
+                    // 4. Status Text
+                    $statusText.html('<span class="text-muted"><i class="fas fa-lock text-secondary"></i> Data terkunci (Fix)</span>');
                 } else {
-                    $('#btn-toggle-lock')
-                        .removeClass('btn-secondary')
-                        .addClass('btn-warning')
-                        .attr('title', 'Klik untuk membuka input kuantitas kimia');
-                    $('#lock-btn-icon').removeClass('fa-lock text-warning').addClass('fa-unlock');
-                    $('#lock-btn-text').text('Allow Edit');
-                    
-                    $('#lock-status-badge')
-                        .removeClass('badge-success')
-                        .addClass('badge-warning')
-                        .html('<i class="fas fa-lock"></i> Terkunci');
-                        
-                    $('#lock-info-alert')
-                        .removeClass('alert-success')
-                        .addClass('alert-info');
-                    $('#lock-alert-icon')
-                        .removeClass('fa-unlock-alt text-success')
-                        .addClass('fa-info-circle text-info');
-                    $('#lock-info-text').html(
-                        'Kuantitas kimia yang sudah tersimpan dalam keadaan <strong>terkunci</strong>. Klik tombol <strong>"Allow Edit"</strong> jika Anda ingin mengubah kuantitasnya (Gram / KG).'
-                    );
+                    // --- KEADAAN TERBUKA (MODE EDIT AKTIF) ---
+                    // 1. Dropdown Auxiliary dibuka (bisa diganti-ganti baik Special maupun Biasa)
+                    $selectWrapper.removeClass('select2-locked');
 
-                    $('.existing-row').each(function () {
-                        const $row = $(this);
-                        const $weightInput = $row.find('.weight-input');
+                    // 2. Tombol Lock hijau (Terbuka)
+                    $lockBtn.removeClass('btn-outline-warning')
+                        .addClass('btn-outline-success')
+                        .attr('title', 'Mode Edit Aktif. Klik untuk Mengunci Kembali (Fix)');
+                    $lockIcon.removeClass('fa-lock').addClass('fa-unlock');
+
+                    if (isSpecial) {
+                        // AUX Special (Gram): input terbuka manual untuk diketik
+                        $weightInput.prop('readonly', false)
+                            .removeClass('input-locked input-weighing-active')
+                            .addClass('input-unlocked')
+                            .focus();
+                        $statusText.html('<span class="text-success font-weight-bold"><i class="fas fa-edit"></i> AUX Special: Input Gram Manual</span>');
+                    } else {
+                        // AUX Biasa (KG): input tetap readonly dari ketikan, aktif menerima live timbangan digital
                         $weightInput.prop('readonly', true)
-                            .removeClass('input-unlocked')
-                            .addClass('input-locked');
-                    });
+                            .removeClass('input-locked input-unlocked')
+                            .addClass('input-weighing-active');
+                        $statusText.html('<span class="text-info font-weight-bold"><i class="fas fa-satellite-dish fa-spin mr-1"></i> Timbangan Digital Aktif (KG)</span>');
+                    }
                 }
             }
 
-            $('#btn-toggle-lock').on('click', function () {
-                if (!allowEdit) {
+            // Toggle Lock/Unlock per Baris dengan Modal Konfirmasi
+            $(document).on('click', '.btn-toggle-row-lock', function () {
+                const $btn = $(this);
+                const $row = $btn.closest('.detail-row');
+                const isCurrentlyLocked = $row.attr('data-locked') === 'true' || $row.hasClass('row-locked');
+
+                if (isCurrentlyLocked) {
+                    const auxName = $row.find('.select2-auxiliary option:selected').text().trim() || 'baris ini';
+
                     Swal.fire({
-                        title: 'Buka Kunci Pengeditan?',
-                        text: 'Kuantitas kimia (Gram / KG) yang sudah tersimpan akan dapat diedit.',
+                        title: 'Buka Kunci Baris Ini?',
+                        html: `Apakah Anda yakin ingin membuka kunci untuk mengubah data / bobot auxiliary <b>${auxName}</b>?`,
                         icon: 'question',
                         showCancelButton: true,
-                        confirmButtonColor: '#ffc107',
+                        confirmButtonColor: '#28a745',
                         cancelButtonColor: '#6c757d',
-                        confirmButtonText: '<i class="fas fa-unlock"></i> Ya, Allow Edit',
+                        confirmButtonText: '<i class="fas fa-unlock"></i> Ya, Buka Kunci',
                         cancelButtonText: 'Batal'
                     }).then((result) => {
                         if (result.isConfirmed) {
-                            allowEdit = true;
-                            applyLockState();
-                            Swal.fire({
+                            $row.attr('data-locked', 'false').removeClass('row-locked').addClass('row-unlocked');
+                            applyRowLockState($row);
+
+                            const unit = $row.find('.unit-input').val() || $row.data('current-unit') || 'kg';
+                            const toastMsg = (unit === 'gram') 
+                                ? 'Kunci dibuka. Silakan ubah kimia atau ketik gram secara manual.' 
+                                : 'Kunci dibuka. Silakan ubah kimia atau timbang kembali dari timbangan digital.';
+
+                            const Toast = Swal.mixin({
+                                toast: true,
+                                position: 'top-end',
+                                showConfirmButton: false,
+                                timer: 2500,
+                                timerProgressBar: true
+                            });
+                            Toast.fire({
                                 icon: 'success',
-                                title: 'Mode Edit Aktif',
-                                text: 'Silakan edit kuantitas kimia yang diperlukan.',
-                                timer: 1500,
-                                showConfirmButton: false
+                                title: toastMsg
                             });
                         }
                     });
                 } else {
-                    allowEdit = false;
-                    applyLockState();
-                    Swal.fire({
+                    // Kunci Kembali (Fix)
+                    $row.attr('data-locked', 'true').removeClass('row-unlocked').addClass('row-locked');
+                    applyRowLockState($row);
+
+                    const Toast = Swal.mixin({
+                        toast: true,
+                        position: 'top-end',
+                        showConfirmButton: false,
+                        timer: 2000,
+                        timerProgressBar: true
+                    });
+                    Toast.fire({
                         icon: 'info',
-                        title: 'Input Dikunci',
-                        text: 'Kuantitas kimia telah dikunci kembali.',
-                        timer: 1500,
-                        showConfirmButton: false
+                        title: 'Baris auxiliary berhasil dikunci (Fix).'
                     });
                 }
             });
@@ -526,9 +572,9 @@
                 const $unitLabel = $tr.find('.unit-label');
                 const $unitInput = $tr.find('.unit-input');
                 const prevUnit = $tr.data('current-unit') || 'kg';
-                const isExisting = $tr.hasClass('existing-row') || $tr.data('is-existing');
+                const isSpecial = (extwg === 'AUX SPC') || (isInitialLoad && (prevUnit === 'gram' || $unitInput.val() === 'gram'));
 
-                if (extwg === 'AUX SPC') {
+                if (isSpecial) {
                     $weightInput.attr('placeholder', 'Weight (gram)');
                     $weightInput.attr('step', '0.01');
                     $unitLabel.text('gram');
@@ -541,16 +587,6 @@
                         }
                     }
                     $tr.data('current-unit', 'gram');
-
-                    if (isExisting) {
-                        if (allowEdit) {
-                            $weightInput.prop('readonly', false).removeClass('input-locked').addClass('input-unlocked');
-                        } else {
-                            $weightInput.prop('readonly', true).removeClass('input-unlocked').addClass('input-locked');
-                        }
-                    } else {
-                        $weightInput.prop('readonly', false);
-                    }
                 } else {
                     $weightInput.attr('placeholder', 'Weight (kg)');
                     $weightInput.attr('step', '0.0001');
@@ -564,18 +600,9 @@
                         }
                     }
                     $tr.data('current-unit', 'kg');
-
-                    if (isExisting) {
-                        if (allowEdit) {
-                            $weightInput.prop('readonly', false).removeClass('input-locked').addClass('input-unlocked');
-                        } else {
-                            $weightInput.prop('readonly', true).removeClass('input-unlocked').addClass('input-locked');
-                        }
-                    } else {
-                        // For new row, editable if allowEdit is active, otherwise readonly (scale)
-                        $weightInput.prop('readonly', !allowEdit);
-                    }
                 }
+
+                applyRowLockState($tr);
                 calcVolume();
             }
 
@@ -640,6 +667,8 @@
 
                 if (hasDetailWeight) {
                     $('#total_wt').val(sumWeight.toFixed(4));
+                } else {
+                    $('#total_wt').val('0.0000');
                 }
 
                 const totalWt = parseFloat($('#total_wt').val()) || 0;
@@ -821,10 +850,6 @@
                             $('#marketing').val(data.marketing || '-');
                         }
 
-                        if (typeof data.total_wt !== 'undefined' && parseFloat(data.total_wt) > 0) {
-                            $('#total_wt').val(parseFloat(data.total_wt).toFixed(2));
-                        }
-
                         calcVolume();
 
                         updateStepAndQuotaState();
@@ -837,59 +862,87 @@
             }
 
             $('#btn-add-detail').on('click', function () {
-                const isWeightReadonly = allowEdit ? '' : 'readonly';
                 const tr = `
-                    <tr class="detail-row new-row" data-current-unit="kg" data-is-new="true">
+                    <tr class="detail-row new-row row-unlocked" data-current-unit="kg" data-locked="false" data-is-new="true">
                         <td>
-                            <div>
+                            <div class="select2-wrapper">
                                 <select name="details[${detailIndex}][auxiliary]" class="form-control select2-auxiliary" required></select>
                             </div>
                             <input type="hidden" name="details[${detailIndex}][unit]" class="unit-input" value="kg">
                         </td>
                         <td>
                             <div class="input-group input-group-sm">
-                                <input type="number" step="0.0001" name="details[${detailIndex}][konsentrasi]" class="form-control form-control-sm weight-input" placeholder="Weight (kg)" ${isWeightReadonly} required>
+                                <input type="number" step="0.0001" name="details[${detailIndex}][konsentrasi]"
+                                    class="form-control form-control-sm weight-input input-weighing-active"
+                                    placeholder="Weight (kg)" readonly required>
                                 <div class="input-group-append">
                                     <span class="input-group-text unit-label">kg</span>
                                 </div>
                             </div>
+                            <small class="row-status-text text-muted d-block mt-1">
+                                <span class="text-info font-weight-bold"><i class="fas fa-satellite-dish fa-spin mr-1"></i> Timbangan Digital Aktif (KG)</span>
+                            </small>
                         </td>
                         <td class="text-center">
-                            <button type="button" class="btn btn-danger btn-sm btn-remove-detail"><i class="fas fa-trash"></i></button>
+                            <div class="d-flex justify-content-center align-items-center" style="gap: 6px;">
+                                <button type="button" class="btn btn-sm btn-outline-success btn-toggle-row-lock" title="Mode Edit Aktif. Klik untuk Mengunci (Fix)">
+                                    <i class="fas fa-unlock"></i>
+                                </button>
+                                <button type="button" class="btn btn-danger btn-sm btn-remove-detail" title="Hapus Baris">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
                         </td>
                     </tr>
                 `;
                 $('#details-list').append(tr);
-                const $newSelect = $('#details-list tr:last .select2-auxiliary');
+                const $newRow = $('#details-list tr:last');
+                const $newSelect = $newRow.find('.select2-auxiliary');
                 initAuxiliarySelect2($newSelect);
-                updateRowWeightState($newSelect.closest('.detail-row'));
+                updateRowWeightState($newRow, false);
                 detailIndex++;
                 calcVolume();
             });
 
             $(document).on('click', '.btn-remove-detail', function () {
                 const $row = $(this).closest('tr');
-                const isExisting = $row.hasClass('existing-row') || $row.data('is-existing');
-
-                if (isExisting && !allowEdit) {
-                    Swal.fire({
-                        icon: 'warning',
-                        title: 'Pengeditan Terkunci',
-                        text: 'Silakan klik "Allow Edit" terlebih dahulu jika ingin menghapus baris kimia yang sudah tersimpan.'
-                    });
-                    return;
-                }
-
-                if ($('#details-list .detail-row').length > 1) {
-                    $row.remove();
-                    calcVolume();
-                } else {
+                if ($('#details-list .detail-row').length <= 1) {
                     Swal.fire({
                         icon: 'warning',
                         title: 'Peringatan',
                         text: 'Minimal harus ada 1 detail list auxiliary.'
                     });
+                    return;
                 }
+
+                const auxName = $row.find('.select2-auxiliary option:selected').text().trim() || 'baris ini';
+
+                Swal.fire({
+                    title: 'Hapus Baris Auxiliary?',
+                    html: `Apakah Anda yakin ingin menghapus <b>${auxName}</b> dari detail list?`,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#d33',
+                    cancelButtonColor: '#6c757d',
+                    confirmButtonText: '<i class="fas fa-trash"></i> Ya, Hapus',
+                    cancelButtonText: 'Batal'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        $row.remove();
+                        calcVolume();
+                        const Toast = Swal.mixin({
+                            toast: true,
+                            position: 'top-end',
+                            showConfirmButton: false,
+                            timer: 2000,
+                            timerProgressBar: true
+                        });
+                        Toast.fire({
+                            icon: 'success',
+                            title: 'Baris auxiliary berhasil dihapus.'
+                        });
+                    }
+                });
             });
 
             async function fetchWeight() {
@@ -899,10 +952,11 @@
 
                     const data = await res.json();
                     if (typeof data.weight !== 'undefined' && !isNaN(parseFloat(data.weight))) {
-                        // ONLY target new rows that are readonly (waiting for scale), never overwrite existing saved rows!
-                        const newReadonlyInputs = document.querySelectorAll('.new-row .weight-input[readonly]');
-                        if (newReadonlyInputs.length > 0) {
-                            newReadonlyInputs[newReadonlyInputs.length - 1].value = parseFloat(data.weight).toFixed(2);
+                        // HANYA isi baris AUX KG yang sedang UNLOCKED (aktif menerima timbangan digital)
+                        // Baris yang terkunci (Fix) dan AUX Special (Gram) TIDAK AKAN PERNAH ditimpa!
+                        const activeWeighingInputs = document.querySelectorAll('.detail-row.row-unlocked .weight-input.input-weighing-active');
+                        if (activeWeighingInputs.length > 0) {
+                            activeWeighingInputs[activeWeighingInputs.length - 1].value = parseFloat(data.weight).toFixed(2);
                             calcVolume();
                         }
                     }
@@ -912,6 +966,14 @@
             }
 
             setInterval(fetchWeight, 1000);
+
+            // Saat submit, pastikan semua baris terkunci (Fix)
+            $('#form-aux').on('submit', function () {
+                $('.detail-row').each(function () {
+                    $(this).attr('data-locked', 'true').removeClass('row-unlocked').addClass('row-locked');
+                    applyRowLockState($(this));
+                });
+            });
         });
     </script>
 @endsection

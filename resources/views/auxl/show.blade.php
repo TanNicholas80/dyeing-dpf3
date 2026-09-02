@@ -48,10 +48,15 @@
                                     </span></div>
                             <div class="col-md-6 col-lg-4 mb-3"><span class="label">Liquor Ratio</span><span
                                     class="colon">:</span><span class="value font-weight-bold">1 : {{ round($auxl->liquor_ratio ?? 10) }}</span></div>
+                            @php
+                                $detailSum = $auxl->details ? $auxl->details->sum('konsentrasi') : 0;
+                                $displayTotalWt = ($detailSum > 0) ? $detailSum : ($auxl->total_wt ?? 0);
+                                $displayVolume = ($detailSum > 0) ? ($detailSum * ($auxl->liquor_ratio ?? 10)) : ($auxl->volume_litres ?? 0);
+                            @endphp
                             <div class="col-md-6 col-lg-4 mb-3"><span class="label">Total Wt.</span><span
-                                    class="colon">:</span><span class="value font-weight-bold">{{ rtrim(rtrim(number_format($auxl->total_wt, 4, '.', ''), '0'), '.') }} kg</span></div>
+                                    class="colon">:</span><span class="value font-weight-bold">{{ rtrim(rtrim(number_format($displayTotalWt, 4, '.', ''), '0'), '.') }} kg</span></div>
                             <div class="col-md-6 col-lg-4 mb-3"><span class="label">Volume</span><span
-                                    class="colon">:</span><span class="value font-weight-bold text-primary">{{ rtrim(rtrim(number_format($auxl->volume_litres, 2, '.', ''), '0'), '.') }} L</span></div>
+                                    class="colon">:</span><span class="value font-weight-bold text-primary">{{ rtrim(rtrim(number_format($displayVolume, 2, '.', ''), '0'), '.') }} L</span></div>
                             <div class="col-md-6 col-lg-4 mb-3"><span class="label">Code</span><span
                                     class="colon">:</span><span class="value">{{ $auxl->code }}</span></div>
                             <div class="col-md-6 col-lg-4 mb-3"><span class="label">Konstruksi</span><span

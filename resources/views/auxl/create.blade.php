@@ -459,6 +459,8 @@
 
                 if (hasDetailWeight) {
                     $('#total_wt').val(sumWeight.toFixed(4));
+                } else {
+                    $('#total_wt').val('0.0000');
                 }
 
                 const totalWt = parseFloat($('#total_wt').val()) || 0;
@@ -639,11 +641,6 @@
                         }
                         if (typeof data.marketing !== 'undefined') {
                             $('#marketing').val(data.marketing || '-');
-                        }
-
-                        // Total WT (Kg)
-                        if (typeof data.total_wt !== 'undefined' && parseFloat(data.total_wt) > 0) {
-                            $('#total_wt').val(parseFloat(data.total_wt).toFixed(2));
                         }
 
                         calcVolume();
