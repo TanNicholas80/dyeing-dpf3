@@ -274,29 +274,6 @@ class ApiCheckStatusBarcodeController extends Controller
         if ($forceAlarmOff) {
             Cache::forget($latchKey);
             Cache::put($this->alarmStateKey((int) $mesin->id), false, now()->addMinutes(5));
-            $minimal = ['mesin_id' => $mesin->id, 'alarm_on' => false];
-            if (!$full) {
-                Cache::put($alarmCacheKey, $minimal, now()->addSeconds(3));
-                return response()->json($minimal);
-            }
-
-            $stateSource = ($cacheIsOn !== null) ? 'cache' : 'db';
-            return response()->json([
-                'status' => 'success',
-                'mesin_id' => $mesin->id,
-                'mesin' => $mesin->jenis_mesin,
-                'alarm_on' => false,
-                'is_on' => $isOn,
-                'reason' => 'Alarm dipaksa OFF oleh Super Admin',
-                'state' => [
-                    'source' => $stateSource,
-                    'cache' => $cacheState,
-                    'db' => ['status' => $dbIsOn],
-                ],
-                'force_alarm_off' => true,
-                'proses_id' => null,
-                'proses_selesai_id' => null,
-            ]);
         }
 
         // Pilih proses yang "runnable" untuk alarm:
@@ -381,7 +358,10 @@ class ApiCheckStatusBarcodeController extends Controller
         $alarmOn = false;
         $reason = '';
 
-        if (!$isOn) {
+        if ($forceAlarmOff) {
+            $alarmOn = false;
+            $reason = 'Alarm dipaksa OFF oleh Super Admin';
+        } elseif (!$isOn) {
             // Mesin OFF:
             if ($isKainLatched || $kainIncompleteAktif || $kainIncompleteRunnable) {
                 $alarmOn = true;
@@ -466,6 +446,7 @@ class ApiCheckStatusBarcodeController extends Controller
             'is_on' => $isOn,
             'reason' => $reason,
             'state' => $state,
+            'force_alarm_off' => $forceAlarmOff,
             'proses_id' => $proses?->id,
             'proses_selesai_id' => $prosesSelesai?->id,
             'no_plan_or_proses' => $noPlanOrProses,

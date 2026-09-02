@@ -1119,7 +1119,14 @@ class ProsesController extends Controller
                 return redirect()->route('dashboard', ['page' => $page])->with('error', $msg);
             }
 
-            // Validasi penimbangan: Harus memuat ACTUAL_WT, COMP_DATE, dan COMP_TIME
+            /*
+            |--------------------------------------------------------------------------
+            | [DINONAKTIFKAN SEMENTARA] Validasi Penimbangan Mesin LA
+            |--------------------------------------------------------------------------
+            | Validasi ini dinonaktifkan sementara sesuai kebutuhan operasional.
+            | Jangan dihapus! Untuk mengaktifkan kembali di masa mendatang, cukup
+            | hapus tanda komentar block (/* ... * /) pada blok kode di bawah ini.
+            |
             $unweighed = $ticketDetails->filter(function ($item) {
                 return empty($item->actual_wt) || ((float) $item->actual_wt <= 0) || empty($item->comp_date) || empty($item->comp_time);
             });
@@ -1135,6 +1142,7 @@ class ProsesController extends Controller
                 }
                 return redirect()->route('dashboard', ['page' => $page])->with('error', $msg);
             }
+            */
 
             $validationResult = $this->validateBarcodeKainCompleteness($id);
             if ($validationResult !== null) {
@@ -1229,7 +1237,8 @@ class ProsesController extends Controller
 
             $details = $ticketDetails->map(function ($row) {
                 $chemName = $row->product_name ?: $row->product_code;
-                $wt = (float) ($row->actual_wt ?? 0);
+                // Gunakan actual_wt jika ada dan > 0; jika belum ditimbang gunakan target_wt sebagai fallback
+                $wt = (float) ((!empty($row->actual_wt) && (float) $row->actual_wt > 0) ? $row->actual_wt : ($row->target_wt ?? 0));
                 return $chemName . '/' . $wt;
             })->implode('|');
             $body = '"' . $allNoOps . ';' . $details . '"';
