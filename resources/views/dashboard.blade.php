@@ -2306,18 +2306,12 @@
                                 </div>
                             </div>
                             <div class="form-group mb-2">
-                                <label class="form-label fw-semibold mb-1" style="font-size: 13px;">Mesin Asal Saat Ini</label>
-                                <input type="text" id="pinjamMesinAsal" class="form-control form-control-sm bg-light" readonly>
-                            </div>
-                            <div class="form-group mb-2">
-                                <label class="form-label fw-semibold mb-1" style="font-size: 13px;">Pilih Mesin Tujuan <span class="text-danger">*</span></label>
-                                <select name="mesin_id" id="pinjamMesinId" class="form-control" required>
-                                    <option value="" disabled selected>-- Pilih Mesin Tujuan --</option>
-                                </select>
+                                <label class="form-label fw-semibold mb-1" style="font-size: 13px;">Mesin</label>
+                                <input type="text" id="pinjamMesinAsal" class="form-control form-control-sm bg-light font-weight-bold" readonly>
                             </div>
                             <div class="form-group mb-0">
                                 <label class="form-label fw-semibold mb-1" style="font-size: 13px;">Alasan Pinjam Mesin (Opsional)</label>
-                                <textarea name="alasan" id="pinjamAlasan" class="form-control" rows="2" placeholder="Masukkan alasan peminjaman mesin jika ada..."></textarea>
+                                <textarea name="alasan" id="pinjamAlasan" class="form-control" rows="3" placeholder="Masukkan alasan peminjaman mesin jika ada..."></textarea>
                             </div>
                         </div>
                         <div class="modal-footer d-flex justify-content-between px-4">
@@ -4837,33 +4831,6 @@
             }
             $('#pinjamMesinAsal').val(currentMesinNama);
 
-            function populatePinjamMesinOptions(mesinsList) {
-                $('#pinjamMesinId').empty().append('<option value="" disabled selected>-- Pilih Mesin Tujuan --</option>');
-                if (Array.isArray(mesinsList)) {
-                    mesinsList.forEach(function (mesin) {
-                        const mId = parseInt(mesin.id || mesin.mesin_id);
-                        if (mId !== currentMesinId) {
-                            const mNama = mesin.nama || mesin.jenis_mesin || ('Mesin ' + mId);
-                            $('#pinjamMesinId').append(`<option value="${mId}">${mNama}</option>`);
-                        }
-                    });
-                }
-            }
-
-            if (window.mesinsData && Array.isArray(window.mesinsData) && window.mesinsData.length > 0) {
-                populatePinjamMesinOptions(window.mesinsData);
-            } else {
-                fetch("{{ route('proses.create') }}")
-                    .then(res => res.json())
-                    .then(data => {
-                        if (data && data.mesins) {
-                            window.mesinsData = data.mesins;
-                            populatePinjamMesinOptions(data.mesins);
-                        }
-                    })
-                    .catch(err => console.error('Error fetching mesins data:', err));
-            }
-
             $('#modalDetailProses').modal('hide').one('hidden.bs.modal', function () {
                 $('#modalPinjamMesin').modal('show');
                 $('body').addClass('modal-open');
@@ -4875,15 +4842,7 @@
             e.preventDefault();
             const form = $(this);
             const url = form.attr('action');
-            const targetMesinId = $('#pinjamMesinId').val();
             const alasan = $('#pinjamAlasan').val();
-
-            if (!targetMesinId) {
-                ToastError.fire({
-                    title: 'Silakan pilih mesin tujuan terlebih dahulu.'
-                });
-                return;
-            }
 
             const $submitBtn = form.find('button[type="submit"]');
             $submitBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin mr-1"></i>Mengirim...');
@@ -4898,7 +4857,6 @@
                 },
                 data: {
                     _token: $('meta[name="csrf-token"]').attr('content'),
-                    mesin_id: targetMesinId,
                     alasan: alasan
                 },
                 success: function (response) {

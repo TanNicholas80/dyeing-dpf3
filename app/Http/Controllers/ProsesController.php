@@ -2553,20 +2553,9 @@ class ProsesController extends Controller
             return back()->with('error', $errorMessage);
         }
 
-        // Validasi mesin_id tujuan
         $request->validate([
-            'mesin_id' => 'required|exists:mesins,id',
             'alasan' => 'nullable|string|max:500',
         ]);
-
-        $newMesinId = (int) $request->mesin_id;
-        if ($newMesinId === (int) $proses->mesin_id) {
-            $errorMessage = 'Mesin tujuan harus berbeda dari mesin saat ini.';
-            if ($request->ajax() || $request->wantsJson()) {
-                return response()->json(['status' => 'error', 'message' => $errorMessage], 400);
-            }
-            return back()->with('error', $errorMessage);
-        }
 
         // Cek pending approval yang sudah ada untuk proses ini
         $existingPending = Approval::where('proses_id', $proses->id)
@@ -2604,15 +2593,16 @@ class ProsesController extends Controller
             }
         }
 
-        // Buat record approval untuk Kepala Shift (pinjam_mesin)
+        // Buat record approval untuk Kepala Shift (pinjam_mesin pada mesin tersebut)
         Approval::create([
             'proses_id' => $proses->id,
             'status' => 'pending',
             'type' => 'KEPALA_SHIFT',
             'action' => 'pinjam_mesin',
             'history_data' => [
+                'mesin_id' => $proses->mesin_id,
                 'old_mesin_id' => $proses->mesin_id,
-                'new_mesin_id' => $newMesinId,
+                'new_mesin_id' => $proses->mesin_id,
                 'alasan' => $request->alasan,
                 'proses_snapshot' => $proses->toArray(),
             ],

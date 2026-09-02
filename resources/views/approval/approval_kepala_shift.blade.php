@@ -71,7 +71,7 @@
                                         <td><span class="badge {{ $isPinjamMesin ? 'bg-primary' : 'bg-info' }}">{{ $actionLabel }}</span></td>
                                         <td>
                                             @if($isPinjamMesin)
-                                                <span>{{ $oldMesin->nama ?? ('Mesin ' . ($approval->history_data['old_mesin_id'] ?? '-')) }} <i class="fas fa-arrow-right text-muted mx-1"></i> <strong>{{ $newMesin->nama ?? ('Mesin ' . ($approval->history_data['new_mesin_id'] ?? '-')) }}</strong></span>
+                                                <span><strong>{{ $oldMesin->nama ?? ('Mesin ' . ($approval->history_data['old_mesin_id'] ?? $approval->proses->mesin_id ?? '-')) }}</strong></span>
                                                 @if(!empty($approval->history_data['alasan']))
                                                     <br><small class="text-muted"><i class="fas fa-comment-dots mr-1"></i>{{ Str::limit($approval->history_data['alasan'], 40) }}</small>
                                                 @endif
@@ -140,8 +140,7 @@
                                                         <p>Apakah Anda yakin ingin <strong>meng-approve</strong> request {{ $actionLabel }} ini?</p>
                                                         <p><strong>No OP:</strong> {{ $noOpDisplay }}</p>
                                                         @if($isPinjamMesin)
-                                                        <p><strong>Mesin Asal:</strong> {{ $oldMesin->nama ?? '-' }}</p>
-                                                        <p><strong>Mesin Tujuan:</strong> {{ $newMesin->nama ?? '-' }}</p>
+                                                        <p><strong>Mesin:</strong> {{ $oldMesin->nama ?? ('Mesin ' . ($approval->history_data['old_mesin_id'] ?? $approval->proses->mesin_id ?? '-')) }}</p>
                                                         @if(!empty($approval->history_data['alasan']))
                                                         <p><strong>Alasan Pengajuan:</strong> {{ $approval->history_data['alasan'] }}</p>
                                                         @endif
@@ -185,8 +184,7 @@
                                                         <p>Apakah Anda yakin ingin <strong>menolak</strong> request {{ $actionLabel }} ini?</p>
                                                         <p><strong>No OP:</strong> {{ $noOpDisplay }}</p>
                                                         @if($isPinjamMesin)
-                                                        <p><strong>Mesin Asal:</strong> {{ $oldMesin->nama ?? '-' }}</p>
-                                                        <p><strong>Mesin Tujuan:</strong> {{ $newMesin->nama ?? '-' }}</p>
+                                                        <p><strong>Mesin:</strong> {{ $oldMesin->nama ?? ('Mesin ' . ($approval->history_data['old_mesin_id'] ?? $approval->proses->mesin_id ?? '-')) }}</p>
                                                         @if(!empty($approval->history_data['alasan']))
                                                         <p><strong>Alasan Pengajuan:</strong> {{ $approval->history_data['alasan'] }}</p>
                                                         @endif

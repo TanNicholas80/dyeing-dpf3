@@ -569,33 +569,31 @@ class ApprovalController extends Controller
                 break;
 
             case 'pinjam_mesin':
-                if (!isset($history['new_mesin_id']) || !isset($history['old_mesin_id'])) {
-                    throw new \Exception("Data 'old_mesin_id' atau 'new_mesin_id' tidak ditemukan dalam history_data.");
+                $oldMesinId = (int) ($history['old_mesin_id'] ?? $proses->mesin_id);
+                $newMesinId = (int) ($history['new_mesin_id'] ?? $proses->mesin_id);
+
+                if ($oldMesinId !== $newMesinId) {
+                    DB::transaction(function () use ($proses, $oldMesinId, $newMesinId) {
+                        $isStarted = $proses->mulai !== null;
+                        $proses->mesin_id = $newMesinId;
+
+                        if (!$isStarted) {
+                            // Jika belum mulai, tempatkan di urutan antrian terakhir di mesin target
+                            $maxOrder = (int) Proses::where('mesin_id', $newMesinId)
+                                ->whereNull('mulai')
+                                ->whereNull('selesai')
+                                ->max('order');
+                            $proses->order = $maxOrder + 1;
+                        }
+                        $proses->save();
+
+                        // Normalisasi ulang order di mesin asal dan mesin tujuan jika belum mulai
+                        $this->reorderPendingProcessesForMachine($oldMesinId);
+                        if (!$isStarted) {
+                            $this->reorderPendingProcessesForMachine($newMesinId);
+                        }
+                    });
                 }
-
-                $oldMesinId = (int) $history['old_mesin_id'];
-                $newMesinId = (int) $history['new_mesin_id'];
-
-                DB::transaction(function () use ($proses, $oldMesinId, $newMesinId) {
-                    $isStarted = $proses->mulai !== null;
-                    $proses->mesin_id = $newMesinId;
-
-                    if (!$isStarted) {
-                        // Jika belum mulai, tempatkan di urutan antrian terakhir di mesin target
-                        $maxOrder = (int) Proses::where('mesin_id', $newMesinId)
-                            ->whereNull('mulai')
-                            ->whereNull('selesai')
-                            ->max('order');
-                        $proses->order = $maxOrder + 1;
-                    }
-                    $proses->save();
-
-                    // Normalisasi ulang order di mesin asal dan mesin tujuan jika belum mulai
-                    $this->reorderPendingProcessesForMachine($oldMesinId);
-                    if (!$isStarted) {
-                        $this->reorderPendingProcessesForMachine($newMesinId);
-                    }
-                });
 
                 // Broadcast event untuk update real-time
                 $proses->refresh();
@@ -603,7 +601,11 @@ class ApprovalController extends Controller
                 $statusService = new ProsesStatusService();
                 $affectedProsesIds = $statusService->getAffectedProsesIds();
                 $statusData = $statusService->generateProsesStatus($proses, $affectedProsesIds);
-                event(new ProsesMoved($proses->id, $oldMesinId, $newMesinId, $statusData));
+                if ($oldMesinId !== $newMesinId) {
+                    event(new ProsesMoved($proses->id, $oldMesinId, $newMesinId, $statusData));
+                } else {
+                    event(new ProsesStatusUpdated($proses->id, $statusData));
+                }
                 break;
 
             default:
