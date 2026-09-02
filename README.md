@@ -163,7 +163,7 @@ graph TD
 ### 6. Alur Maintenance & Selesai Manual
 1. Proses berjenis `Maintenance` digunakan untuk perawatan/perbaikan mesin.
 2. Informasi GDA, mode, jenis OP, qty dye stuff/aux disembunyikan secara otomatis pada proses maintenance.
-3. Tombol **Proses Selesai (End Maintenance Manual)** hanya dapat diakses oleh **Super Admin** dan **Kepala Shift**.
+3. Tombol **Proses Selesai (End Maintenance Manual)** hanya dapat diakses oleh **Super Admin**, **Kepala Shift**, dan **Kepala Ruangan (KARU)**.
 4. Saat diselesaikan manual:
    - Sinyal **Address 103** bernilai `1` dikirim ke PLC.
    - Proses antrian berikutnya otomatis dijalankan jika mesin dalam kondisi ON.

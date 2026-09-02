@@ -139,7 +139,7 @@ class ProsesStatusService
             if (!$cycle_time_actual && $proses->mulai && $proses->selesai) {
                 $mulai = \Carbon\Carbon::parse($proses->mulai);
                 $selesai = \Carbon\Carbon::parse($proses->selesai);
-                $cycle_time_actual = max(0, $mulai->diffInSeconds($selesai, false));
+                $cycle_time_actual = max(0, (int) round($mulai->diffInSeconds($selesai, false)));
             }
             $cycle_time = $proses->cycle_time ? (int)$proses->cycle_time : 0;
             $cycle_time_actual = $cycle_time_actual ? (int)$cycle_time_actual : 0;

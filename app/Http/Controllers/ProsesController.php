@@ -3086,10 +3086,10 @@ class ProsesController extends Controller
     public function finishMaintenance($id)
     {
         $userRole = Auth::user() ? Auth::user()->role : null;
-        if (!in_array($userRole, ['super_admin', 'kepala_shift'], true)) {
+        if (!in_array($userRole, ['super_admin', 'kepala_shift', 'kepala_ruangan'], true)) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Hanya Super Admin dan Kepala Shift yang memiliki hak akses untuk menyelesaikan proses Maintenance.'
+                'message' => 'Hanya Super Admin, Kepala Shift, dan Kepala Ruangan (KARU) yang memiliki hak akses untuk menyelesaikan proses Maintenance.'
             ], 403);
         }
 
@@ -3123,7 +3123,7 @@ class ProsesController extends Controller
             $proses->is_paused = false;
             if ($proses->mulai) {
                 $mulai = \Carbon\Carbon::parse($proses->mulai);
-                $proses->cycle_time_actual = max(0, $mulai->diffInSeconds($now, false));
+                $proses->cycle_time_actual = max(0, (int) round($mulai->diffInSeconds($now, false)));
             }
             $proses->save();
 

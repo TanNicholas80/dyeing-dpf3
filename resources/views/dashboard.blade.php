@@ -1990,7 +1990,7 @@
                                     <i class="fas fa-edit mr-1"></i>Edit
                                 </button>
                             @endif
-                            @if ($canFinishMaintenance ?? in_array($userRole ?? '', ['super_admin', 'kepala_shift']))
+                            @if ($canFinishMaintenance ?? in_array($userRole ?? '', ['super_admin', 'kepala_shift', 'kepala_ruangan']))
                                 <button type="button" class="btn btn-success btn-finish-maintenance d-none mr-2">
                                     <i class="fas fa-check mr-1"></i>Proses Selesai
                                 </button>
@@ -2429,7 +2429,7 @@
         window.canMoveProses = @json($canMoveProses ?? true);
         window.canSwapProses = @json($canSwapProses ?? true);
         window.canScanBarcode = @json($canScanBarcode ?? true);
-        window.canFinishMaintenance = {{ ($canFinishMaintenance ?? in_array($userRole ?? '', ['super_admin', 'kepala_shift'])) ? 'true' : 'false' }};
+        window.canFinishMaintenance = {{ ($canFinishMaintenance ?? in_array($userRole ?? '', ['super_admin', 'kepala_shift', 'kepala_ruangan'])) ? 'true' : 'false' }};
         window.canPinjamMesin = {{ ($canPinjamMesin ?? in_array($userRole ?? '', ['super_admin', 'operator', 'ppic'])) ? 'true' : 'false' }};
 
         // Toast mixin global: Error = close button (tanpa timer), Success = timer 8 detik (tanpa close button)
@@ -4020,11 +4020,11 @@
                 }
             }
 
-            // Logic untuk tombol Selesai Proses Maintenance (hanya Super Admin dan Kepala Shift)
+            // Logic untuk tombol Selesai Proses Maintenance (Super Admin, Kepala Shift, dan Kepala Ruangan / KARU)
             $btnFinishMaintenance.addClass('d-none');
             if (proses.jenis === 'Maintenance' && isStarted && !proses.selesai) {
                 const userRoleStr = (window.userRole || '').toLowerCase();
-                const isAuthorized = window.canFinishMaintenance === true || userRoleStr === 'super_admin' || userRoleStr === 'kepala_shift';
+                const isAuthorized = window.canFinishMaintenance === true || userRoleStr === 'super_admin' || userRoleStr === 'kepala_shift' || userRoleStr === 'kepala_ruangan';
                 if (isAuthorized) {
                     $btnFinishMaintenance.removeClass('d-none');
                     if (hasPending || hasPendingReprocess) {

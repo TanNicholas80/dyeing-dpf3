@@ -74,8 +74,8 @@ Route::middleware(['auth', 'prevent-back-history'])->group(function () {
         Route::delete('/proses/{id}/delete', [ProsesController::class, 'destroy'])->name('proses.delete');
     });
 
-    // Selesai Maintenance: SuperAdmin, Kepala Shift
-    Route::middleware('role:super_admin,kepala_shift')->group(function () {
+    // Selesai Maintenance: SuperAdmin, Kepala Shift, Kepala Ruangan (KARU)
+    Route::middleware('role:super_admin,kepala_shift,kepala_ruangan')->group(function () {
         Route::post('/proses/{id}/selesai', [ProsesController::class, 'finishMaintenance'])->name('proses.selesai');
     });
 
