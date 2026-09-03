@@ -1119,14 +1119,7 @@ class ProsesController extends Controller
                 return redirect()->route('dashboard', ['page' => $page])->with('error', $msg);
             }
 
-            /*
-            |--------------------------------------------------------------------------
-            | [DINONAKTIFKAN SEMENTARA] Validasi Penimbangan Mesin LA
-            |--------------------------------------------------------------------------
-            | Validasi ini dinonaktifkan sementara sesuai kebutuhan operasional.
-            | Jangan dihapus! Untuk mengaktifkan kembali di masa mendatang, cukup
-            | hapus tanda komentar block (/* ... * /) pada blok kode di bawah ini.
-            |
+            // Validasi Penimbangan Mesin LA: Barcode wajib sudah ditimbang di mesin LA
             $unweighed = $ticketDetails->filter(function ($item) {
                 return empty($item->actual_wt) || ((float) $item->actual_wt <= 0) || empty($item->comp_date) || empty($item->comp_time);
             });
@@ -1142,7 +1135,6 @@ class ProsesController extends Controller
                 }
                 return redirect()->route('dashboard', ['page' => $page])->with('error', $msg);
             }
-            */
 
             $validationResult = $this->validateBarcodeKainCompleteness($id);
             if ($validationResult !== null) {
