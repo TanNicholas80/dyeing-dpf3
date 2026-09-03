@@ -3879,6 +3879,22 @@
                     return `${jam.toString().padStart(2, '0')}:${menit.toString().padStart(2, '0')}:${detik.toString().padStart(2, '0')}`;
                 }
 
+                function formatDateTimeDisplay(val) {
+                    if (val === null || val === undefined || val === '') return '-';
+                    try {
+                        let str = typeof val === 'string' ? val.trim() : val;
+                        if (typeof str === 'string' && /^\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}(:\d{2})?$/.test(str)) {
+                            str = str.replace(' ', 'T');
+                        }
+                        const d = new Date(str);
+                        if (isNaN(d.getTime())) return val;
+                        const pad = n => String(n).padStart(2, '0');
+                        return `${pad(d.getDate())}-${pad(d.getMonth() + 1)}-${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+                    } catch (e) {
+                        return val;
+                    }
+                }
+
                 let jenisMesin = '-';
                 try {
                     const mesinSelect = document.getElementById('mesin_id');
@@ -3912,6 +3928,7 @@
                         if (key === 'cycle_time' || key === 'cycle_time_actual') return [key.replace(/_/g, ' ')
                             .toUpperCase(), formatDetikToHMS(val)
                         ];
+                        if (key === 'mulai' || key === 'selesai') return [key.toUpperCase(), formatDateTimeDisplay(val)];
                         if (key === 'dye_stuff_schedules') {
                             let dsFormatted = '-';
                             if (Array.isArray(val) && val.length > 0) {
@@ -4133,6 +4150,22 @@
                 const detik = val % 60;
                 return `${jam.toString().padStart(2, '0')}:${menit.toString().padStart(2, '0')}:${detik.toString().padStart(2, '0')}`;
             }
+
+            function formatDateTimeDisplay(val) {
+                if (val === null || val === undefined || val === '') return '-';
+                try {
+                    let str = typeof val === 'string' ? val.trim() : val;
+                    if (typeof str === 'string' && /^\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}(:\d{2})?$/.test(str)) {
+                        str = str.replace(' ', 'T');
+                    }
+                    const d = new Date(str);
+                    if (isNaN(d.getTime())) return val;
+                    const pad = n => String(n).padStart(2, '0');
+                    return `${pad(d.getDate())}-${pad(d.getMonth() + 1)}-${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+                } catch (e) {
+                    return val;
+                }
+            }
             let jenisMesin = '-';
             try {
                 const mesinSelect = document.getElementById('mesin_id');
@@ -4166,6 +4199,7 @@
                     if (key === 'cycle_time' || key === 'cycle_time_actual') return [key.replace(/_/g, ' ')
                         .toUpperCase(), formatDetikToHMS(val)
                     ];
+                    if (key === 'mulai' || key === 'selesai') return [key.toUpperCase(), formatDateTimeDisplay(val)];
                     if (key === 'dye_stuff_schedules') {
                         let dsFormatted = '-';
                         if (Array.isArray(val) && val.length > 0) {
@@ -6000,6 +6034,22 @@
                 return jam + ':' + menit + ':' + d;
             }
 
+            function formatDateTimeDisplay(val) {
+                if (val === null || val === undefined || val === '') return '-';
+                try {
+                    let str = typeof val === 'string' ? val.trim() : val;
+                    if (typeof str === 'string' && /^\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}(:\d{2})?$/.test(str)) {
+                        str = str.replace(' ', 'T');
+                    }
+                    const d = new Date(str);
+                    if (isNaN(d.getTime())) return val;
+                    const pad = n => String(n).padStart(2, '0');
+                    return `${pad(d.getDate())}-${pad(d.getMonth() + 1)}-${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+                } catch (e) {
+                    return val;
+                }
+            }
+
             // Bangun HTML body tabel detail proses (entries saja, untuk modal pending) dari objek proses
             function buildDetailProsesPendingBodyHtml(proses, selectedDetailId) {
                 const hiddenFields = ['id', 'created_at', 'updated_at', 'deleted_at', 'mesin_id', 'barcode_kain_optional'];
@@ -6029,6 +6079,7 @@
                         if (key === 'hfeel') return ['HAND FEEL', val];
                         if (key === 'matdok') return ['MATERIAL DOKUMEN', val];
                         if (key === 'cycle_time' || key === 'cycle_time_actual') return [key.replace(/_/g, ' ').toUpperCase(), formatDetikToHMS(val)];
+                        if (key === 'mulai' || key === 'selesai') return [key.toUpperCase(), formatDateTimeDisplay(val)];
                         if (key === 'dye_stuff_schedules') {
                             let dsFormatted = '-';
                             if (Array.isArray(val) && val.length > 0) {
@@ -6102,6 +6153,7 @@
                         if (key === 'hfeel') return ['HAND FEEL', val];
                         if (key === 'matdok') return ['MATERIAL DOKUMEN', val];
                         if (key === 'cycle_time' || key === 'cycle_time_actual') return [key.replace(/_/g, ' ').toUpperCase(), formatDetikToHMS(val)];
+                        if (key === 'mulai' || key === 'selesai') return [key.toUpperCase(), formatDateTimeDisplay(val)];
                         if (key === 'dye_stuff_schedules') {
                             let dsFormatted = '-';
                             if (Array.isArray(val) && val.length > 0) {
@@ -6375,6 +6427,9 @@
                         const thText = $(this).text().trim();
                         const $td = $(this).next('td');
                         if (thText === 'CYCLE TIME' && $td.length) $td.text(formatDetikToHMS(prosesFromCard.cycle_time));
+                        if (thText === 'CYCLE TIME ACTUAL' && $td.length) $td.text(formatDetikToHMS(prosesFromCard.cycle_time_actual));
+                        if (thText === 'MULAI' && $td.length) $td.text(formatDateTimeDisplay(prosesFromCard.mulai));
+                        if (thText === 'SELESAI' && $td.length) $td.text(formatDateTimeDisplay(prosesFromCard.selesai));
                         if (thText === 'ORDER' && $td.length) $td.text(prosesFromCard.order != null ? prosesFromCard.order : '-');
                         if (thText === 'JENIS MESIN' && $td.length) {
                             let jenisMesin = '-';
