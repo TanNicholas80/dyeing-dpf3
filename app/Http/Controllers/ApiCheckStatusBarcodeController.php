@@ -101,8 +101,13 @@ class ApiCheckStatusBarcodeController extends Controller
             if ($prosesAktif) {
                 // KEMBALIKAN KE ASAL: Jika OFF disengaja dari IoT, berarti SELESAI (Masuk History)
                 Cache::forget("iot:proses:{$prosesAktif->id}:kain_latched");
-                $prosesAktif->selesai = now();
+                $now = now();
+                $prosesAktif->selesai = $now;
                 $prosesAktif->is_paused = false;
+                if ($prosesAktif->mulai) {
+                    $mulai = \Carbon\Carbon::parse($prosesAktif->mulai);
+                    $prosesAktif->cycle_time_actual = max(0, (int) round(abs($now->diffInSeconds($mulai))));
+                }
                 $prosesAktif->save();
 
                 // Broadcast ProsesStatusUpdated agar UI langsung hilang / update ke history
@@ -130,7 +135,7 @@ class ApiCheckStatusBarcodeController extends Controller
                     $hasPendingPause = $p->approvals()
                         ->where('action', 'pause_proses')
                         ->where('status', 'pending')
-                        ->where('created_at', '>=', $mesin->last_off_at ?? '1970-01-01')
+                        ->where('created_at', '>=', $mesin->last_off_at ?? '1970-01-01 00:00:00')
                         ->exists();
 
                     if (!$hasPendingPause) {
@@ -139,7 +144,8 @@ class ApiCheckStatusBarcodeController extends Controller
                         // Geser 'mulai' maju sebesar durasi pause agar perhitungan elapsed time akurat
                         if ($p->is_paused && $p->mulai) {
                             // Waktu mulai pause tepat saat proses diset is_paused = true (yaitu pada $p->updated_at)
-                            $pauseDuration = abs(now()->diffInSeconds($p->updated_at));
+                            $updatedAt = $p->updated_at ? \Carbon\Carbon::parse($p->updated_at) : now();
+                            $pauseDuration = abs(now()->diffInSeconds($updatedAt));
                             if ($pauseDuration > 0) {
                                 $p->mulai = \Carbon\Carbon::parse($p->mulai)->addSeconds($pauseDuration);
                             }
@@ -174,17 +180,20 @@ class ApiCheckStatusBarcodeController extends Controller
                     ->first();
 
                 if ($prosesSelanjutnya) {
-                    // Auto reject pending approvals lama
+                    // Auto reject pending approvals lama (kompatibel untuk MySQL & PostgreSQL)
                     Approval::where('proses_id', $prosesSelanjutnya->id)
                         ->where('status', 'pending')
                         ->where('type', 'FM')
                         ->whereIn('action', ['edit_cycle_time', 'delete_proses', 'move_machine', 'swap_position'])
-                        ->update([
-                            'status' => 'rejected',
-                            'note' => \DB::raw("CASE WHEN note IS NULL OR note = '' THEN 'Auto rejected by system: proses otomatis berjalan saat mesin ON.' ELSE CONCAT(note, ' | Auto rejected by system: proses otomatis berjalan saat mesin ON.') END"),
-                            'approved_by' => null,
-                            'updated_at' => now()
-                        ]);
+                        ->get()
+                        ->each(function ($approval) {
+                            $prefix = $approval->note ? $approval->note . ' | ' : '';
+                            $approval->update([
+                                'status' => 'rejected',
+                                'note' => $prefix . 'Auto rejected by system: proses otomatis berjalan saat mesin ON.',
+                                'approved_by' => null,
+                            ]);
+                        });
 
                     // Jalankan proses
                     $prosesSelanjutnya->mulai = now();
@@ -336,7 +345,7 @@ class ApiCheckStatusBarcodeController extends Controller
         $isKainLatched = $prosesKainLatchedKey ? (bool) Cache::get($prosesKainLatchedKey, false) : false;
 
         // 2. Cek Jadwal Breakdown Dye Stuff & AUX untuk proses yang sedang aktif/berjalan
-        $scheduleStatus = $this->checkProsesScheduleAlarm($prosesAktif);
+        $scheduleStatus = $this->checkProsesScheduleAlarm($proses ?: $prosesAktif);
         $isScheduleLate = $scheduleStatus['is_schedule_late'] ?? false;
 
         // Simpan progress untuk response full (dari proses aktif) - hanya saat full=1
@@ -491,6 +500,11 @@ class ApiCheckStatusBarcodeController extends Controller
         if (empty($val)) {
             return 0;
         }
+        if (is_array($val) && isset($val['time'])) {
+            $val = $val['time'];
+        } elseif (is_object($val) && isset($val->time)) {
+            $val = $val->time;
+        }
         if (is_numeric($val)) {
             return (int) $val;
         }
@@ -604,7 +618,7 @@ class ApiCheckStatusBarcodeController extends Controller
             $laInitialScanned = BarcodeLa::whereHas('detailProses', fn($q) => $q->where('proses_id', $prosesAktif->id))
                 ->whereNull('approval_id')
                 ->where('cancel', false)
-                ->distinct('barcode')
+                ->distinct()
                 ->count('barcode');
             $laInitialComplete = ($qtyDyeStuff > 0) ? ($laInitialScanned >= $qtyDyeStuff) : true;
             if (!$laInitialComplete) {
@@ -628,7 +642,8 @@ class ApiCheckStatusBarcodeController extends Controller
             $auxInitialScanned = BarcodeAux::whereHas('detailProses', fn($q) => $q->where('proses_id', $prosesAktif->id))
                 ->whereNull('approval_id')
                 ->where('cancel', false)
-                ->count();
+                ->distinct()
+                ->count('barcode');
             $auxInitialComplete = ($qtyAux > 0) ? ($auxInitialScanned >= $qtyAux) : true;
             if (!$auxInitialComplete) {
                 return false;
@@ -681,12 +696,14 @@ class ApiCheckStatusBarcodeController extends Controller
             }
         }
 
-        // 3. Cek apakah ada pengajuan pinjam mesin yang melibatkan mesin ini
+        // 3. Cek apakah ada pengajuan pinjam mesin yang melibatkan mesin ini (kompatibel MySQL & Postgres)
         $hasPinjamMesin = Approval::where('action', 'pinjam_mesin')
             ->where('status', 'pending')
             ->where(function ($q) use ($mesin) {
-                $q->whereJsonContains('history_data->old_mesin_id', (int) $mesin->id)
-                  ->orWhereJsonContains('history_data->new_mesin_id', (int) $mesin->id);
+                $q->where('history_data->old_mesin_id', $mesin->id)
+                  ->orWhere('history_data->new_mesin_id', $mesin->id)
+                  ->orWhere('history_data->old_mesin_id', (string) $mesin->id)
+                  ->orWhere('history_data->new_mesin_id', (string) $mesin->id);
             })
             ->exists();
 
@@ -720,10 +737,12 @@ class ApiCheckStatusBarcodeController extends Controller
         // Hitung durasi proses yang sudah berjalan (elapsed seconds)
         $elapsedSeconds = 0;
         if ($proses->mulai) {
+            $mulaiCarbon = \Carbon\Carbon::parse($proses->mulai);
             if ($proses->is_paused) {
-                $elapsedSeconds = max(0, \Carbon\Carbon::parse($proses->updated_at)->diffInSeconds($proses->mulai));
+                $pausedAt = $proses->updated_at ? \Carbon\Carbon::parse($proses->updated_at) : now();
+                $elapsedSeconds = max(0, abs($pausedAt->diffInSeconds($mulaiCarbon)));
             } else {
-                $elapsedSeconds = max(0, now()->diffInSeconds($proses->mulai));
+                $elapsedSeconds = max(0, abs(now()->diffInSeconds($mulaiCarbon)));
             }
         }
 
@@ -754,7 +773,7 @@ class ApiCheckStatusBarcodeController extends Controller
         $laInitialScanned = BarcodeLa::whereHas('detailProses', fn($q) => $q->where('proses_id', $proses->id))
             ->whereNull('approval_id')
             ->where('cancel', false)
-            ->distinct('barcode')
+            ->distinct()
             ->count('barcode');
         $laInitialLate = $laInitialScanned < $laDueCount;
 
@@ -778,7 +797,7 @@ class ApiCheckStatusBarcodeController extends Controller
                 $laToppingScannedCount++;
             } else {
                 $approvedAt = $appr->updated_at ?: $appr->created_at;
-                $secondsSinceApproved = $approvedAt ? now()->diffInSeconds($approvedAt) : 0;
+                $secondsSinceApproved = $approvedAt ? max(0, abs(now()->diffInSeconds(\Carbon\Carbon::parse($approvedAt)))) : 0;
                 // Jika sudah melewati spare waktu 30 menit (1800 detik) dan belum di-scan
                 if ($secondsSinceApproved >= 1800) {
                     $laToppingOverdue = true;
@@ -818,7 +837,8 @@ class ApiCheckStatusBarcodeController extends Controller
         $auxInitialScanned = BarcodeAux::whereHas('detailProses', fn($q) => $q->where('proses_id', $proses->id))
             ->whereNull('approval_id')
             ->where('cancel', false)
-            ->count();
+            ->distinct()
+            ->count('barcode');
         $auxInitialLate = $auxInitialScanned < $auxDueCount;
 
         // Cek topping AUX: Berikan spare waktu 30 menit (1800 detik) sejak approval Kashift
@@ -841,7 +861,7 @@ class ApiCheckStatusBarcodeController extends Controller
                 $auxToppingScannedCount++;
             } else {
                 $approvedAt = $appr->updated_at ?: $appr->created_at;
-                $secondsSinceApproved = $approvedAt ? now()->diffInSeconds($approvedAt) : 0;
+                $secondsSinceApproved = $approvedAt ? max(0, abs(now()->diffInSeconds(\Carbon\Carbon::parse($approvedAt)))) : 0;
                 // Jika sudah melewati spare waktu 30 menit (1800 detik) dan belum di-scan
                 if ($secondsSinceApproved >= 1800) {
                     $auxToppingOverdue = true;
@@ -901,7 +921,7 @@ class ApiCheckStatusBarcodeController extends Controller
         $laInitialScanned = BarcodeLa::whereHas('detailProses', fn($q) => $q->where('proses_id', $proses->id))
             ->whereNull('approval_id')
             ->where('cancel', false)
-            ->distinct('barcode')
+            ->distinct()
             ->count('barcode');
         $laToppingRequired = Approval::where('proses_id', $proses->id)
             ->where('type', 'KEPALA_SHIFT')
@@ -921,7 +941,8 @@ class ApiCheckStatusBarcodeController extends Controller
         $auxInitialScanned = BarcodeAux::whereHas('detailProses', fn($q) => $q->where('proses_id', $proses->id))
             ->whereNull('approval_id')
             ->where('cancel', false)
-            ->count();
+            ->distinct()
+            ->count('barcode');
         $auxToppingRequired = Approval::where('proses_id', $proses->id)
             ->where('type', 'KEPALA_SHIFT')
             ->where('action', 'topping_aux')
