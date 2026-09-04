@@ -2499,14 +2499,14 @@ class ProsesController extends Controller
     }
 
     /**
-     * Pengajuan Pinjam Mesin oleh Super Admin, Operator, PPIC (memerlukan approval Kepala Shift).
-     * Dapat diajukan pada proses yang sedang berjalan atau antrian berikutnya (order == 1).
+     * Toggle Pinjam Mesin oleh Super Admin, Kepala Ruangan, Kepala Shift, Operator.
+     * Mengaktifkan/menonaktifkan sinyal pinjam mesin (Modbus Address 105).
      */
     public function pinjamMesin(Request $request, $id)
     {
         $userRole = Auth::user() ? Auth::user()->role : null;
-        if (!in_array($userRole, ['super_admin', 'operator', 'ppic'], true)) {
-            $errorMessage = 'Anda tidak memiliki hak akses untuk mengajukan pinjam mesin.';
+        if (!in_array($userRole, ['super_admin', 'kepala_ruangan', 'kepala_shift', 'operator'], true)) {
+            $errorMessage = 'Anda tidak memiliki hak akses untuk mengelola pinjam mesin.';
             if ($request->ajax() || $request->wantsJson()) {
                 return response()->json(['status' => 'error', 'message' => $errorMessage], 403);
             }
@@ -2526,46 +2526,7 @@ class ProsesController extends Controller
 
         // Sudah selesai tidak bisa diajukan
         if ($proses->selesai !== null) {
-            $errorMessage = 'Tidak dapat mengajukan pinjam mesin. Proses sudah selesai.';
-            if ($request->ajax() || $request->wantsJson()) {
-                return response()->json(['status' => 'error', 'message' => $errorMessage], 400);
-            }
-            return back()->with('error', $errorMessage);
-        }
-
-        // Validasi kondisi: Harus sedang berjalan ATAU antrian berikutnya (order == 1)
-        $isStarted = $proses->mulai !== null;
-        $isNextInQueue = $proses->mulai === null && (int) $proses->order === 1;
-
-        if (!$isStarted && !$isNextInQueue) {
-            $errorMessage = 'Pinjam Mesin hanya dapat diajukan untuk proses yang sedang berjalan atau proses antrian berikutnya (urutan ke-1).';
-            if ($request->ajax() || $request->wantsJson()) {
-                return response()->json(['status' => 'error', 'message' => $errorMessage], 400);
-            }
-            return back()->with('error', $errorMessage);
-        }
-
-        $request->validate([
-            'alasan' => 'nullable|string|max:500',
-        ]);
-
-        // Cek pending approval yang sudah ada untuk proses ini
-        $existingPending = Approval::where('proses_id', $proses->id)
-            ->where('status', 'pending')
-            ->first();
-
-        if ($existingPending) {
-            $actionLabels = [
-                'edit_cycle_time' => 'Edit Cycle Time',
-                'delete_proses'   => 'Hapus Proses',
-                'move_machine'    => 'Pindah Mesin',
-                'swap_position'   => 'Tukar Posisi',
-                'create_reprocess'=> 'Buat Reproses',
-                'pause_proses'    => 'Pause Proses',
-                'pinjam_mesin'    => 'Pinjam Mesin',
-            ];
-            $actionLabel = $actionLabels[$existingPending->action] ?? $existingPending->action;
-            $errorMessage = "Tidak dapat mengajukan permintaan baru. Masih ada permintaan {$actionLabel} yang menunggu persetujuan.";
+            $errorMessage = 'Tidak dapat mengubah pinjam mesin. Proses sudah selesai.';
             if ($request->ajax() || $request->wantsJson()) {
                 return response()->json(['status' => 'error', 'message' => $errorMessage], 400);
             }
@@ -2585,26 +2546,66 @@ class ProsesController extends Controller
             }
         }
 
-        // Buat record approval untuk Kepala Shift (pinjam_mesin pada mesin tersebut)
-        Approval::create([
-            'proses_id' => $proses->id,
-            'status' => 'pending',
-            'type' => 'KEPALA_SHIFT',
-            'action' => 'pinjam_mesin',
-            'history_data' => [
-                'mesin_id' => $proses->mesin_id,
-                'old_mesin_id' => $proses->mesin_id,
-                'new_mesin_id' => $proses->mesin_id,
-                'alasan' => $request->alasan,
-                'proses_snapshot' => $proses->toArray(),
-            ],
-            'note' => $request->alasan,
-            'requested_by' => Auth::id(),
-            'approved_by' => null,
+        $requestedAction = $request->input('action');
+        $isDeactivate = ($requestedAction === 'deactivate') || ($proses->is_pinjam_mesin && $requestedAction !== 'activate');
+
+        if ($isDeactivate) {
+            // Nonaktifkan Pinjam Mesin (Sinyal Address 105 -> 0)
+            $proses->is_pinjam_mesin = false;
+            $proses->pinjam_mesin_alasan = null;
+            $proses->pinjam_mesin_at = null;
+            $proses->pinjam_mesin_by = null;
+            $proses->save();
+
+            // Batalkan approval pending pinjam mesin jika ada
+            Approval::where('proses_id', $proses->id)
+                ->where('action', 'pinjam_mesin')
+                ->where('status', 'pending')
+                ->update([
+                    'status' => 'rejected',
+                    'note' => 'Dinonaktifkan oleh ' . (Auth::user()->name ?? 'User')
+                ]);
+
+            Cache::forget("iot:mesin:{$proses->mesin_id}:alarm_result");
+            Cache::forget("iot:mesin:{$proses->mesin_id}:alarm_on_state");
+
+            $proses->refresh();
+            $proses->load(['approvals', 'details.barcodeKains', 'details.barcodeLas', 'details.barcodeAuxs']);
+            $statusService = new \App\Services\ProsesStatusService();
+            $affectedProsesIds = $statusService->getAffectedProsesIds();
+            $statusData = $statusService->generateProsesStatus($proses, $affectedProsesIds);
+            event(new \App\Events\ProsesStatusUpdated($proses->id, $statusData));
+
+            $successMessage = 'Pinjam mesin berhasil dinonaktifkan (Sinyal Address 105: 0).';
+
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json([
+                    'status' => 'success',
+                    'is_pinjam_mesin' => false,
+                    'message' => $successMessage,
+                    'redirect' => route('dashboard', ['page' => $page])
+                ]);
+            }
+
+            return redirect()->route('dashboard', ['page' => $page])->with('success', $successMessage);
+        }
+
+        // Aktifkan Pinjam Mesin: Alasan Wajib Diisi! (Sinyal Address 105 -> 1)
+        $request->validate([
+            'alasan' => 'required|string|max:500',
+        ], [
+            'alasan.required' => 'Alasan pinjam mesin wajib diisi.',
+            'alasan.max' => 'Alasan pinjam mesin maksimal 500 karakter.',
         ]);
 
-        // Broadcast event realtime
-        event(new ApprovalPendingCreated([$proses->id]));
+        $proses->is_pinjam_mesin = true;
+        $proses->pinjam_mesin_alasan = $request->alasan;
+        $proses->pinjam_mesin_at = now();
+        $proses->pinjam_mesin_by = Auth::id();
+        $proses->save();
+
+        Cache::forget("iot:mesin:{$proses->mesin_id}:alarm_result");
+        Cache::forget("iot:mesin:{$proses->mesin_id}:alarm_on_state");
 
         $proses->refresh();
         $proses->load(['approvals', 'details.barcodeKains', 'details.barcodeLas', 'details.barcodeAuxs']);
@@ -2613,11 +2614,12 @@ class ProsesController extends Controller
         $statusData = $statusService->generateProsesStatus($proses, $affectedProsesIds);
         event(new \App\Events\ProsesStatusUpdated($proses->id, $statusData));
 
-        $successMessage = 'Permintaan pinjam mesin telah dikirim dan menunggu persetujuan Kepala Shift.';
+        $successMessage = 'Pinjam mesin berhasil diaktifkan (Sinyal Address 105: 1).';
 
         if ($request->ajax() || $request->wantsJson()) {
             return response()->json([
                 'status' => 'success',
+                'is_pinjam_mesin' => true,
                 'message' => $successMessage,
                 'redirect' => route('dashboard', ['page' => $page])
             ]);

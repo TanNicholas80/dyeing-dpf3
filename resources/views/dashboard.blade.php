@@ -884,8 +884,13 @@
                                                                     }
                                                                     $barcodeKainOptionalLocal = $barcodeKainOptional ?? false;
                                                                     if ($proses->jenis !== 'Maintenance') {
-                                                                        $incomplete = (!$barcodeKainOptionalLocal && !$hasBarcodeKain) || !$laComplete || !$auxComplete;
-                                                                        $bg = $incomplete ? '#ef9a9a' : '#002b80'; // merah muda jika belum lengkap, biru jika lengkap
+                                                                        $kainComplete = $barcodeKainOptionalLocal || $hasBarcodeKain;
+                                                                        if (!$kainComplete) {
+                                                                            $bg = '#ef9a9a';
+                                                                        } else {
+                                                                            $isLate = \App\Http\Controllers\ApiCheckStatusBarcodeController::isProsesScheduleLate($proses);
+                                                                            $bg = $isLate ? '#ef9a9a' : '#002b80';
+                                                                        }
                                                                     } else {
                                                                         $bg = '#002b80';
                                                                     }
@@ -1995,7 +2000,7 @@
                                     <i class="fas fa-check mr-1"></i>Proses Selesai
                                 </button>
                             @endif
-                            @if ($canPinjamMesin ?? in_array($userRole ?? '', ['super_admin', 'operator', 'ppic']))
+                            @if ($canPinjamMesin ?? in_array($userRole ?? '', ['super_admin', 'kepala_ruangan', 'kepala_shift', 'operator']))
                                 <button type="button" class="btn btn-info btn-pinjam-mesin d-none mr-2 text-white">
                                     <i class="fas fa-exchange-alt mr-1"></i>Pinjam Mesin
                                 </button>
@@ -2296,8 +2301,8 @@
                             </button>
                         </div>
                         <div class="modal-body py-3 px-4">
-                            <div class="alert alert-warning py-2 mb-3" style="font-size: 13px;">
-                                <i class="fas fa-info-circle mr-1"></i>Permintaan pinjam mesin akan diajukan ke <strong>Kepala Shift</strong> untuk disetujui.
+                            <div class="alert alert-info py-2 mb-3" style="font-size: 13px;">
+                                <i class="fas fa-info-circle mr-1"></i>Status pinjam mesin akan <strong>langsung diaktifkan</strong> (Sinyal Address 105 = 1) tanpa perlu approval.
                             </div>
                             <div class="form-group mb-2">
                                 <label class="form-label fw-semibold mb-1" style="font-size: 13px;">Informasi Proses</label>
@@ -2310,8 +2315,8 @@
                                 <input type="text" id="pinjamMesinAsal" class="form-control form-control-sm bg-light font-weight-bold" readonly>
                             </div>
                             <div class="form-group mb-0">
-                                <label class="form-label fw-semibold mb-1" style="font-size: 13px;">Alasan Pinjam Mesin (Opsional)</label>
-                                <textarea name="alasan" id="pinjamAlasan" class="form-control" rows="3" placeholder="Masukkan alasan peminjaman mesin jika ada..."></textarea>
+                                <label class="form-label fw-semibold mb-1" style="font-size: 13px;">Alasan Pinjam Mesin <span class="text-danger">*</span></label>
+                                <textarea name="alasan" id="pinjamAlasan" class="form-control" rows="3" placeholder="Masukkan alasan peminjaman mesin (wajib diisi)..." required></textarea>
                             </div>
                         </div>
                         <div class="modal-footer d-flex justify-content-between px-4">
@@ -2319,7 +2324,7 @@
                                 <i class="fas fa-times mr-1"></i>Batal
                             </button>
                             <button type="submit" class="btn btn-info text-white">
-                                <i class="fas fa-paper-plane mr-1"></i>Kirim Permintaan
+                                <i class="fas fa-check-circle mr-1"></i>Aktifkan Pinjam Mesin
                             </button>
                         </div>
                     </form>
@@ -2424,7 +2429,7 @@
         window.canSwapProses = @json($canSwapProses ?? true);
         window.canScanBarcode = @json($canScanBarcode ?? true);
         window.canFinishMaintenance = {{ ($canFinishMaintenance ?? in_array($userRole ?? '', ['super_admin', 'kepala_shift', 'kepala_ruangan'])) ? 'true' : 'false' }};
-        window.canPinjamMesin = {{ ($canPinjamMesin ?? in_array($userRole ?? '', ['super_admin', 'operator', 'ppic'])) ? 'true' : 'false' }};
+        window.canPinjamMesin = {{ ($canPinjamMesin ?? in_array($userRole ?? '', ['super_admin', 'kepala_ruangan', 'kepala_shift', 'operator'])) ? 'true' : 'false' }};
 
         // Toast mixin global: Error = close button (tanpa timer), Success = timer 8 detik (tanpa close button)
         window.ToastError = Swal.mixin({
@@ -4010,7 +4015,7 @@
             const $btnFinishMaintenance = $('.btn-finish-maintenance');
             const $btnPinjam = $('.btn-pinjam-mesin');
 
-            // Logic untuk tombol Pinjam Mesin (Super Admin, Operator, PPIC)
+            // Logic untuk tombol Pinjam Mesin (Super Admin, Kepala Ruangan, Kepala Shift, Operator)
             // Muncul saat:
             // 1. Jenis proses bukan Maintenance (Produksi, Reproses Greige, Reproses Finish)
             // 2. Status proses: Sedang berjalan (isStarted) ATAU antrian berikutnya (order == 1)
@@ -4019,9 +4024,21 @@
                 const isNextInQueue = !isStarted && (parseInt(proses.order) === 1);
                 if (isStarted || isNextInQueue) {
                     const userRoleStr = (window.userRole || '').toLowerCase();
-                    const isAuthorizedPinjam = window.canPinjamMesin === true || ['super_admin', 'operator', 'ppic'].includes(userRoleStr);
+                    const isAuthorizedPinjam = window.canPinjamMesin === true || ['super_admin', 'kepala_ruangan', 'kepala_shift', 'operator'].includes(userRoleStr);
                     if (isAuthorizedPinjam) {
                         $btnPinjam.removeClass('d-none');
+                        const isPinjamActive = proses.is_pinjam_mesin === true || proses.is_pinjam_mesin === 1 || proses.is_pinjam_mesin === '1';
+                        $btnPinjam.data('is-pinjam-active', isPinjamActive);
+                        if (isPinjamActive) {
+                            $btnPinjam.removeClass('btn-info').addClass('btn-danger');
+                            $btnPinjam.html('<i class="fas fa-power-off mr-1"></i>Matikan Pinjam Mesin');
+                            $btnPinjam.attr('title', 'Klik untuk mematikan status Pinjam Mesin (Address 105 = 0)');
+                        } else {
+                            $btnPinjam.removeClass('btn-danger').addClass('btn-info');
+                            $btnPinjam.html('<i class="fas fa-exchange-alt mr-1"></i>Pinjam Mesin');
+                            $btnPinjam.attr('title', 'Klik untuk mengaktifkan status Pinjam Mesin (Address 105 = 1)');
+                        }
+
                         if (hasPending || hasPendingReprocess) {
                             $btnPinjam.prop('disabled', true).addClass('disabled').css('cursor', 'not-allowed');
                         } else {
@@ -4818,7 +4835,7 @@
             });
         });
 
-        // Handler tombol Pinjam Mesin (buka modal pinjam mesin)
+        // Handler tombol Pinjam Mesin (Toggle ON / OFF)
         $(document).on('click', '.btn-pinjam-mesin', function (e) {
             e.preventDefault();
             if ($(this).prop('disabled') || $(this).hasClass('disabled')) {
@@ -4834,15 +4851,78 @@
                 return false;
             }
 
-            if (hasPendingApprovalFM(proses) || hasPendingReprocessApproval(proses)) {
-                ToastError.fire({
-                    title: 'Tidak dapat mengajukan pinjam mesin. Masih ada persetujuan yang menunggu.'
+            const id = proses.id;
+            const pinjamUrl = "{{ url('proses') }}/" + id + "/pinjam-mesin";
+            const isPinjamActive = $(this).data('is-pinjam-active') === true;
+
+            if (isPinjamActive) {
+                // Konfirmasi untuk mematikan Pinjam Mesin
+                Swal.fire({
+                    title: 'Matikan Pinjam Mesin?',
+                    text: 'Status pinjam mesin akan dinonaktifkan dan sinyal Address 105 akan dimatikan (0).',
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#d33',
+                    cancelButtonColor: '#3085d6',
+                    confirmButtonText: 'Ya, Matikan',
+                    cancelButtonText: 'Batal'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        Swal.fire({
+                            title: 'Memproses...',
+                            text: 'Menonaktifkan status pinjam mesin',
+                            allowOutsideClick: false,
+                            didOpen: () => {
+                                Swal.showLoading();
+                            }
+                        });
+
+                        $.ajax({
+                            url: pinjamUrl,
+                            method: 'POST',
+                            headers: {
+                                'X-Requested-With': 'XMLHttpRequest',
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+                            },
+                            data: {
+                                _token: $('meta[name="csrf-token"]').attr('content'),
+                                action: 'deactivate'
+                            },
+                            success: function (response) {
+                                $('#modalDetailProses').modal('hide');
+                                ToastSuccess.fire({
+                                    title: response.message || 'Status pinjam mesin berhasil dimatikan.'
+                                });
+                                setTimeout(function () {
+                                    if (response && response.redirect) {
+                                        window.location.href = response.redirect;
+                                    } else {
+                                        window.location.reload();
+                                    }
+                                }, 500);
+                            },
+                            error: function (xhr) {
+                                let errorMsg = 'Gagal mematikan status pinjam mesin.';
+                                if (xhr.responseJSON && xhr.responseJSON.message) {
+                                    errorMsg = xhr.responseJSON.message;
+                                }
+                                ToastError.fire({
+                                    title: errorMsg
+                                });
+                            }
+                        });
+                    }
                 });
                 return false;
             }
 
-            const id = proses.id;
-            const pinjamUrl = "{{ url('proses') }}/" + id + "/pinjam-mesin";
+            if (hasPendingApprovalFM(proses) || hasPendingReprocessApproval(proses)) {
+                ToastError.fire({
+                    title: 'Tidak dapat mengaktifkan pinjam mesin. Masih ada persetujuan lain yang menunggu.'
+                });
+                return false;
+            }
 
             $('#formPinjamMesin').attr('action', pinjamUrl);
             $('#pinjamProsesId').val(id);
@@ -4876,10 +4956,18 @@
             e.preventDefault();
             const form = $(this);
             const url = form.attr('action');
-            const alasan = $('#pinjamAlasan').val();
+            const alasan = ($('#pinjamAlasan').val() || '').trim();
+
+            if (!alasan) {
+                ToastError.fire({
+                    title: 'Alasan pinjam mesin wajib diisi.'
+                });
+                $('#pinjamAlasan').focus();
+                return false;
+            }
 
             const $submitBtn = form.find('button[type="submit"]');
-            $submitBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin mr-1"></i>Mengirim...');
+            $submitBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin mr-1"></i>Mengaktifkan...');
 
             $.ajax({
                 url: url,
@@ -4909,7 +4997,7 @@
                     }, 500);
                 },
                 error: function (xhr) {
-                    let errorMsg = 'Gagal mengirim permintaan pinjam mesin.';
+                    let errorMsg = 'Gagal mengaktifkan pinjam mesin.';
                     if (xhr.responseJSON && xhr.responseJSON.message) {
                         errorMsg = xhr.responseJSON.message;
                     } else if (xhr.responseJSON && xhr.responseJSON.errors) {
@@ -4920,7 +5008,7 @@
                     });
                 },
                 complete: function () {
-                    $submitBtn.prop('disabled', false).html('<i class="fas fa-paper-plane mr-1"></i>Kirim Permintaan');
+                    $submitBtn.prop('disabled', false).html('<i class="fas fa-check-circle mr-1"></i>Aktifkan Pinjam Mesin');
                 }
             });
         });
@@ -6443,6 +6531,21 @@
                             $td.text(jenisMesin);
                         }
                     });
+
+                    const $btnPinjam = $('.btn-pinjam-mesin');
+                    if ($btnPinjam.length && !$btnPinjam.hasClass('d-none')) {
+                        const isPinjamActive = prosesFromCard.is_pinjam_mesin === true || prosesFromCard.is_pinjam_mesin === 1 || prosesFromCard.is_pinjam_mesin === '1';
+                        $btnPinjam.data('is-pinjam-active', isPinjamActive);
+                        if (isPinjamActive) {
+                            $btnPinjam.removeClass('btn-info').addClass('btn-danger');
+                            $btnPinjam.html('<i class="fas fa-power-off mr-1"></i>Matikan Pinjam Mesin');
+                            $btnPinjam.attr('title', 'Klik untuk mematikan status Pinjam Mesin (Address 105 = 0)');
+                        } else {
+                            $btnPinjam.removeClass('btn-danger').addClass('btn-info');
+                            $btnPinjam.html('<i class="fas fa-exchange-alt mr-1"></i>Pinjam Mesin');
+                            $btnPinjam.attr('title', 'Klik untuk mengaktifkan status Pinjam Mesin (Address 105 = 1)');
+                        }
+                    }
                 }
             }
 
@@ -7166,6 +7269,12 @@
                 // PENTING: Update pending_approvals agar modal sinkron (mis. FM -> VP)
                 if (statusData.pending_approvals) {
                     proses.pending_approvals = statusData.pending_approvals;
+                }
+                if (statusData.is_pinjam_mesin !== undefined) {
+                    proses.is_pinjam_mesin = statusData.is_pinjam_mesin;
+                }
+                if (statusData.pinjam_mesin_alasan !== undefined) {
+                    proses.pinjam_mesin_alasan = statusData.pinjam_mesin_alasan;
                 }
 
                 $card.data('proses', proses);

@@ -240,8 +240,13 @@
         } else {
             $barcodeKainOpt = $barcodeKainOptional ?? false;
             if ($proses->jenis !== 'Maintenance') {
-                $incomplete = (!$barcodeKainOpt && !$allKainComplete) || !$laComplete || !$auxComplete;
-                $bg = $incomplete ? '#ef9a9a' : '#002b80';
+                $kainComplete = $barcodeKainOpt || $allKainComplete;
+                if (!$kainComplete) {
+                    $bg = '#ef9a9a';
+                } else {
+                    $isLate = \App\Http\Controllers\ApiCheckStatusBarcodeController::isProsesScheduleLate($proses);
+                    $bg = $isLate ? '#ef9a9a' : '#002b80';
+                }
             } else {
                 $bg = '#002b80';
             }

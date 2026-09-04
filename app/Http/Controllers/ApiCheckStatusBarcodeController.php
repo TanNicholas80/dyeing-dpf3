@@ -392,20 +392,20 @@ class ApiCheckStatusBarcodeController extends Controller
                 $alarmOn = true;
                 $reason = 'Proses berjalan dengan Barcode Kain tidak lengkap (Alarm aktif hingga proses selesai/history)';
             } elseif ($isScheduleLate) {
-                // Barcode kain lengkap, tetapi Dye Stuff atau AUX terlambat di-input sesuai breakdown cycle time atau topping belum dilengkapi (> 30 menit)
+                // Barcode kain lengkap, tetapi Dye Stuff atau AUX terlambat di-input sesuai breakdown cycle time atau topping belum dilengkapi (> 45 menit)
                 $alarmOn = true;
                 $reasons = [];
                 if (!empty($scheduleStatus['la_initial_late'])) {
                     $reasons[] = "Dye Stuff terlambat (Dibutuhkan: {$scheduleStatus['la_due_count']}, Ter-scan: {$scheduleStatus['la_scanned']})";
                 }
                 if (!empty($scheduleStatus['la_topping_overdue'])) {
-                    $reasons[] = "Topping Dye Stuff belum dilengkapi (> 30 menit setelah approval Kashift)";
+                    $reasons[] = "Topping Dye Stuff belum dilengkapi (> 45 menit setelah approval Kashift)";
                 }
                 if (!empty($scheduleStatus['aux_initial_late'])) {
                     $reasons[] = "AUX terlambat (Dibutuhkan: {$scheduleStatus['aux_due_count']}, Ter-scan: {$scheduleStatus['aux_scanned']})";
                 }
                 if (!empty($scheduleStatus['aux_topping_overdue'])) {
-                    $reasons[] = "Topping AUX belum dilengkapi (> 30 menit setelah approval Kashift)";
+                    $reasons[] = "Topping AUX belum dilengkapi (> 45 menit setelah approval Kashift)";
                 }
                 $reason = 'Jadwal input / Topping terlambat: ' . implode(' & ', $reasons);
             } else {
@@ -670,44 +670,42 @@ class ApiCheckStatusBarcodeController extends Controller
 
     /**
      * Cek status untuk sinyal Modbus Address 105:
-     * Bernilai true (1) ketika proses memiliki flag/status Pinjam Mesin (pending maupun approved).
+     * Bernilai true (1) ketika proses memiliki flag toggle Pinjam Mesin aktif (is_pinjam_mesin = true).
+     * Bernilai false (0) ketika pinjam mesin dimatikan / tidak aktif.
      */
     private function checkSignal105(Mesin $mesin, ?Proses $prosesAktif, ?Proses $prosesAntriRunnable): bool
     {
-        // 1. Cek pada proses aktif
+        // 1. Cek langsung pada proses aktif
+        if ($prosesAktif) {
+            if ($prosesAktif->is_pinjam_mesin) {
+                return true;
+            }
+            // Jika proses aktif secara eksplisit is_pinjam_mesin == false, return false
+            if ($prosesAktif->is_pinjam_mesin === false) {
+                // Jangan override jika dimatikan
+                return false;
+            }
+        }
+
+        // 2. Cek pada proses antrean berikutnya yang runnable jika belum ada proses aktif
+        if (!$prosesAktif && $prosesAntriRunnable) {
+            if ($prosesAntriRunnable->is_pinjam_mesin) {
+                return true;
+            }
+        }
+
+        // Fallback backward-compatibility untuk record approval lama jika kolom is_pinjam_mesin belum diset
         if ($prosesAktif) {
             $hasPinjamAktif = Approval::where('proses_id', $prosesAktif->id)
                 ->where('action', 'pinjam_mesin')
-                ->whereIn('status', ['pending', 'approved'])
+                ->where('status', 'approved')
                 ->exists();
-            if ($hasPinjamAktif) {
+            if ($hasPinjamAktif && $prosesAktif->is_pinjam_mesin !== false) {
                 return true;
             }
         }
 
-        // 2. Cek pada proses antrean berikutnya yang runnable
-        if ($prosesAntriRunnable) {
-            $hasPinjamAntri = Approval::where('proses_id', $prosesAntriRunnable->id)
-                ->where('action', 'pinjam_mesin')
-                ->whereIn('status', ['pending', 'approved'])
-                ->exists();
-            if ($hasPinjamAntri) {
-                return true;
-            }
-        }
-
-        // 3. Cek apakah ada pengajuan pinjam mesin yang melibatkan mesin ini (kompatibel MySQL & Postgres)
-        $hasPinjamMesin = Approval::where('action', 'pinjam_mesin')
-            ->where('status', 'pending')
-            ->where(function ($q) use ($mesin) {
-                $q->where('history_data->old_mesin_id', $mesin->id)
-                  ->orWhere('history_data->new_mesin_id', $mesin->id)
-                  ->orWhere('history_data->old_mesin_id', (string) $mesin->id)
-                  ->orWhere('history_data->new_mesin_id', (string) $mesin->id);
-            })
-            ->exists();
-
-        return $hasPinjamMesin;
+        return false;
     }
 
     /**
@@ -777,7 +775,7 @@ class ApiCheckStatusBarcodeController extends Controller
             ->count('barcode');
         $laInitialLate = $laInitialScanned < $laDueCount;
 
-        // Cek topping LA: Berikan spare waktu 30 menit (1800 detik) sejak approval Kashift
+        // Cek topping LA: Berikan spare waktu 45 menit (2700 detik) sejak approval Kashift
         $approvedToppingLa = Approval::where('proses_id', $proses->id)
             ->where('type', 'KEPALA_SHIFT')
             ->where('action', 'topping_la')
@@ -798,8 +796,8 @@ class ApiCheckStatusBarcodeController extends Controller
             } else {
                 $approvedAt = $appr->updated_at ?: $appr->created_at;
                 $secondsSinceApproved = $approvedAt ? max(0, abs(now()->diffInSeconds(\Carbon\Carbon::parse($approvedAt)))) : 0;
-                // Jika sudah melewati spare waktu 30 menit (1800 detik) dan belum di-scan
-                if ($secondsSinceApproved >= 1800) {
+                // Jika sudah melewati spare waktu 45 menit (2700 detik) dan belum di-scan
+                if ($secondsSinceApproved >= 2700) {
                     $laToppingOverdue = true;
                     $laToppingOverdueCount++;
                 }
@@ -841,7 +839,7 @@ class ApiCheckStatusBarcodeController extends Controller
             ->count('barcode');
         $auxInitialLate = $auxInitialScanned < $auxDueCount;
 
-        // Cek topping AUX: Berikan spare waktu 30 menit (1800 detik) sejak approval Kashift
+        // Cek topping AUX: Berikan spare waktu 45 menit (2700 detik) sejak approval Kashift
         $approvedToppingAux = Approval::where('proses_id', $proses->id)
             ->where('type', 'KEPALA_SHIFT')
             ->where('action', 'topping_aux')
@@ -862,8 +860,8 @@ class ApiCheckStatusBarcodeController extends Controller
             } else {
                 $approvedAt = $appr->updated_at ?: $appr->created_at;
                 $secondsSinceApproved = $approvedAt ? max(0, abs(now()->diffInSeconds(\Carbon\Carbon::parse($approvedAt)))) : 0;
-                // Jika sudah melewati spare waktu 30 menit (1800 detik) dan belum di-scan
-                if ($secondsSinceApproved >= 1800) {
+                // Jika sudah melewati spare waktu 45 menit (2700 detik) dan belum di-scan
+                if ($secondsSinceApproved >= 2700) {
                     $auxToppingOverdue = true;
                     $auxToppingOverdueCount++;
                 }
@@ -909,6 +907,19 @@ class ApiCheckStatusBarcodeController extends Controller
         $scheduleStatus = $this->checkProsesScheduleAlarm($proses);
 
         return $kainIncomplete || ($scheduleStatus['is_schedule_late'] ?? false);
+    }
+
+    /**
+     * Helper publik untuk mengecek apakah jadwal kimia (DS, AUX, atau Topping) untuk proses sedang terlambat.
+     */
+    public static function isProsesScheduleLate(?Proses $proses): bool
+    {
+        if (!$proses || ($proses->jenis ?? null) === 'Maintenance') {
+            return false;
+        }
+        $inst = new self();
+        $status = $inst->checkProsesScheduleAlarm($proses);
+        return (bool) ($status['is_schedule_late'] ?? false);
     }
 
     /**

@@ -29,6 +29,10 @@ class Proses extends Model
         'mesin_id',
         'order',
         'is_paused',
+        'is_pinjam_mesin',
+        'pinjam_mesin_alasan',
+        'pinjam_mesin_at',
+        'pinjam_mesin_by',
     ];
 
     protected $casts = [
@@ -42,6 +46,8 @@ class Proses extends Model
         'aux_schedules' => 'array',
         'order' => 'integer',
         'is_paused' => 'boolean',
+        'is_pinjam_mesin' => 'boolean',
+        'pinjam_mesin_at' => 'datetime',
     ];
 
     public function mesin()

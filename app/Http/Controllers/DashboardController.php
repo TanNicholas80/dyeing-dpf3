@@ -190,7 +190,7 @@ class DashboardController extends Controller
 
         $canScanBarcode = !$cantScan;
         $canFinishMaintenance = in_array($userRole, ['super_admin', 'kepala_shift', 'kepala_ruangan'], true);
-        $canPinjamMesin = in_array($userRole, ['super_admin', 'operator', 'ppic'], true);
+        $canPinjamMesin = in_array($userRole, ['super_admin', 'kepala_ruangan', 'kepala_shift', 'operator'], true);
 
         // Opsi filter
         $filterOptions = $this->getFilterOptions();
@@ -397,7 +397,7 @@ class DashboardController extends Controller
         $canSwapProses = !$cantModifyStructure;
         $canScanBarcode = !$cantScan;
         $canFinishMaintenance = in_array($userRole, ['super_admin', 'kepala_shift', 'kepala_ruangan'], true);
-        $canPinjamMesin = in_array($userRole, ['super_admin', 'operator', 'ppic'], true);
+        $canPinjamMesin = in_array($userRole, ['super_admin', 'kepala_ruangan', 'kepala_shift', 'operator'], true);
 
         $html = view('partials.dashboard.status_card', [
             'proses' => $proses,

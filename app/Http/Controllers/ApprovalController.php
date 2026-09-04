@@ -88,7 +88,7 @@ class ApprovalController extends Controller
     {
         $approvals = Approval::with(['proses.details', 'requester', 'approver'])
             ->where('type', 'KEPALA_SHIFT')
-            ->whereIn('action', ['topping_la', 'topping_aux', 'pinjam_mesin'])
+            ->whereIn('action', ['topping_la', 'topping_aux'])
             ->orderByRaw(
                 'CASE WHEN status = ? THEN 1 WHEN status = ? THEN 2 WHEN status = ? THEN 3 ELSE 4 END',
                 ['pending', 'approved', 'rejected']

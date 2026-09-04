@@ -61,9 +61,6 @@ class ProsesStatusService
                 if ($appr->type === 'FM' && in_array($appr->action, ['edit_cycle_time', 'delete_proses', 'move_machine', 'swap_position', 'pause_proses'])) {
                     return true;
                 }
-                if ($appr->type === 'KEPALA_SHIFT' && $appr->action === 'pinjam_mesin') {
-                    return true;
-                }
                 return false;
             });
             if ($proses->jenis === 'Reproses') {
@@ -156,25 +153,19 @@ class ProsesStatusService
             if ($proses->is_paused) {
                 $bg = '#757575'; // abu-abu
             } else {
-                // Hitung la/aux complete termasuk topping
-                $laToppingRequired = 0;
-                $auxToppingRequired = 0;
-                if ($proses->approvals && $proses->approvals->isNotEmpty()) {
-                    $laToppingRequired = collect($proses->approvals)->where('action', 'topping_la')->where('status', 'approved')->count();
-                    $auxToppingRequired = collect($proses->approvals)->where('action', 'topping_aux')->where('status', 'approved')->count();
-                }
-
-                $laComplete = $proses->details && $proses->details->isNotEmpty()
-                    ? $proses->details->every(fn($d) => ($d->barcodeLas ? $d->barcodeLas->where('cancel', false)->count() : 0) >= (($proses->qty_dye_stuff ?? 0) + $laToppingRequired))
-                    : false;
-
-                $auxComplete = $proses->details && $proses->details->isNotEmpty()
-                    ? $proses->details->every(fn($d) => ($d->barcodeAuxs ? $d->barcodeAuxs->where('cancel', false)->count() : 0) >= (($proses->qty_aux ?? 0) + $auxToppingRequired))
-                    : false;
                 $barcodeKainOptional = $proses->isBarcodeKainOptionalForLaAux();
+                $kainComplete = $barcodeKainOptional || $hasBarcodeKain;
+
                 if ($proses->jenis !== 'Maintenance') {
-                    $incomplete = (!$barcodeKainOptional && !$hasBarcodeKain) || !$laComplete || !$auxComplete;
-                    $bg = $incomplete ? '#ef9a9a' : '#002b80';
+                    if (!$kainComplete) {
+                        // Barcode kain belum lengkap -> Merah
+                        $bg = '#ef9a9a';
+                    } else {
+                        // Barcode kain lengkap -> Proses berjalan dengan warna Biru (#002b80),
+                        // Akan merah (#ef9a9a) ketika proses kimia barcode (Dye Stuff / AUX / Topping) harusnya masuk tetapi telat input
+                        $isLate = \App\Http\Controllers\ApiCheckStatusBarcodeController::isProsesScheduleLate($proses);
+                        $bg = $isLate ? '#ef9a9a' : '#002b80';
+                    }
                 } else {
                     $bg = '#002b80';
                 }
@@ -267,6 +258,8 @@ class ProsesStatusService
             'aux_complete' => $auxComplete,
             'la_initial_complete' => $laInitialComplete ?? $laComplete,
             'aux_initial_complete' => $auxInitialComplete ?? $auxComplete,
+            'is_pinjam_mesin' => (bool) ($proses->is_pinjam_mesin ?? false),
+            'pinjam_mesin_alasan' => $proses->pinjam_mesin_alasan ?? null,
         ];
     }
 
