@@ -33,6 +33,7 @@ class Proses extends Model
         'pinjam_mesin_alasan',
         'pinjam_mesin_at',
         'pinjam_mesin_by',
+        'note',
     ];
 
     protected $casts = [
@@ -71,6 +72,11 @@ class Proses extends Model
     public function auxls()
     {
         return $this->hasMany(Auxl::class, 'proses_id');
+    }
+
+    public function pinjamMesinHistories()
+    {
+        return $this->hasMany(PinjamMesinHistory::class, 'proses_id');
     }
 
     /**

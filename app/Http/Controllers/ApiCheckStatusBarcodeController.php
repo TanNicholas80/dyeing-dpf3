@@ -108,6 +108,16 @@ class ApiCheckStatusBarcodeController extends Controller
                     $mulai = \Carbon\Carbon::parse($prosesAktif->mulai);
                     $prosesAktif->cycle_time_actual = max(0, (int) round(abs($now->diffInSeconds($mulai))));
                 }
+                if ($prosesAktif->is_pinjam_mesin) {
+                    \App\Models\PinjamMesinHistory::where('proses_id', $prosesAktif->id)
+                        ->whereNull('selesai_at')
+                        ->latest('pinjam_at')
+                        ->update([
+                            'selesai_at' => $now,
+                            'selesai_by' => null,
+                        ]);
+                    $prosesAktif->is_pinjam_mesin = false;
+                }
                 $prosesAktif->save();
 
                 // Broadcast ProsesStatusUpdated agar UI langsung hilang / update ke history

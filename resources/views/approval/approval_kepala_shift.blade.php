@@ -75,6 +75,13 @@
                                                 @if(!empty($approval->history_data['alasan']))
                                                     <br><small class="text-muted"><i class="fas fa-comment-dots mr-1"></i>{{ Str::limit($approval->history_data['alasan'], 40) }}</small>
                                                 @endif
+                                            @elseif(in_array($approval->action, ['topping_la', 'topping_aux']))
+                                                @if(isset($approval->history_data['total_delay_seconds']))
+                                                    <div><i class="fas fa-clock text-info mr-1"></i>Durasi: <strong>{{ $approval->history_data['durasi_input'] ?? '-' }}</strong></div>
+                                                    <small class="text-primary font-weight-bold"><i class="fas fa-forward mr-1"></i>Mundur: +{{ \App\Http\Controllers\ApprovalController::formatSecondsToHumRead($approval->history_data['total_delay_seconds']) }}</small>
+                                                @else
+                                                    <span class="text-muted">-</span>
+                                                @endif
                                             @else
                                                 <span class="text-muted">-</span>
                                             @endif
@@ -144,6 +151,15 @@
                                                         @if(!empty($approval->history_data['alasan']))
                                                         <p><strong>Alasan Pengajuan:</strong> {{ $approval->history_data['alasan'] }}</p>
                                                         @endif
+                                                        @endif
+                                                        @if(in_array($approval->action, ['topping_la', 'topping_aux']) && isset($approval->history_data['total_delay_seconds']))
+                                                        <div class="alert alert-info py-2 px-3 mb-2" style="font-size: 13px;">
+                                                            <i class="fas fa-info-circle mr-1"></i>
+                                                            <strong>Kemunduran Jadwal & Cycle Time:</strong><br>
+                                                            Durasi Topping: <strong>{{ $approval->history_data['durasi_input'] ?? '-' }}</strong> (+45 Menit toleransi scan)<br>
+                                                            Total Penambahan: <strong class="text-primary">+{{ \App\Http\Controllers\ApprovalController::formatSecondsToHumRead($approval->history_data['total_delay_seconds']) }}</strong>.<br>
+                                                            <small class="text-muted">Jadwal Dye Stuff/AUX berikutnya dan Cycle Time akan otomatis dimundurkan setelah di-approve.</small>
+                                                        </div>
                                                         @endif
                                                         @if($approval->proses && $approval->proses->details->count() > 1 && !$isPinjamMesin)
                                                         <p class="text-muted small mb-0"><i class="fas fa-info-circle"></i> Multiple OP: 1 kali approval berlaku untuk semua OP. Barcode topping cukup di-scan sekali dan akan ditambahkan ke setiap OP.</p>

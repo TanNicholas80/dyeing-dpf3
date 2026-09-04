@@ -260,6 +260,7 @@ class ProsesStatusService
             'aux_initial_complete' => $auxInitialComplete ?? $auxComplete,
             'is_pinjam_mesin' => (bool) ($proses->is_pinjam_mesin ?? false),
             'pinjam_mesin_alasan' => $proses->pinjam_mesin_alasan ?? null,
+            'note' => $proses->note ?? null,
         ];
     }
 

@@ -340,6 +340,9 @@
             @endif
         </div>
         <div style="{{ $proses->jenis === 'Maintenance' ? 'flex: 0 0 auto;' : 'flex: 1;' }} text-align: right;">
+            @if(!empty($proses->note))
+                <i class="fas fa-sticky-note text-warning mr-1 icon-has-note" title="Catatan: {{ Str::limit($proses->note, 60) }}" style="font-size: 16px; vertical-align: middle; text-shadow: 0 1px 2px #000;"></i>
+            @endif
             <div class="status-light {{ $light == 'green' ? 'running-light' : ($light == 'yellow' ? 'running-light-yellow' : '') }}"
                 style="width: 24px; height: 24px; border-radius: 50%; background: {{ $light == 'green' ? '#00ff1a' : ($light == 'yellow' ? '#ffeb3b' : '#ff2a2a') }}; display: inline-block; border: 3px solid #fff; box-shadow: 0 0 0 0 transparent; transition: background 0.2s;">
             </div>

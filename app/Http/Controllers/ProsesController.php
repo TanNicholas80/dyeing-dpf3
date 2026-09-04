@@ -1661,7 +1661,7 @@ class ProsesController extends Controller
      */
     public function requestToppingLa(Request $request, $id)
     {
-        return $this->requestTopping($id, 'topping_la');
+        return $this->requestTopping($request, $id, 'topping_la');
     }
 
     /**
@@ -1669,13 +1669,13 @@ class ProsesController extends Controller
      */
     public function requestToppingAux(Request $request, $id)
     {
-        return $this->requestTopping($id, 'topping_aux');
+        return $this->requestTopping($request, $id, 'topping_aux');
     }
 
     /**
-     * Helper: buat approval topping (LA atau AUX).
+     * Helper: buat approval topping (LA atau AUX) dengan input durasi penambahan waktu.
      */
-    private function requestTopping($prosesId, string $action)
+    private function requestTopping(Request $request, $prosesId, string $action)
     {
         $user = Auth::user();
         $role = $user->role ?? null;
@@ -1756,13 +1756,40 @@ class ProsesController extends Controller
             }
         }
 
+        // Ambil dan validasi input durasi dari request
+        $durasiInput = $request->input('durasi', 1);
+        $durasiUnit = strtolower((string) $request->input('unit', 'jam'));
+        $durasiSeconds = $this->parseDurationToSeconds($durasiInput, $durasiUnit);
+
+        // Toleransi scan topping adalah 45 menit (2700 detik)
+        $spareSeconds = 2700;
+        $totalDelaySeconds = $durasiSeconds + $spareSeconds;
+
+        $durasiHuman = ($durasiUnit === 'menit')
+            ? ((int) round($durasiSeconds / 60)) . ' Menit'
+            : (round($durasiSeconds / 3600, 2) + 0) . ' Jam';
+
+        $totalDelayHuman = $this->formatSecondsToHumanRead($totalDelaySeconds);
+
         // Satu approval per proses: Kepala Shift hanya perlu approve sekali.
         // Untuk Multiple OP: satu approval berlaku untuk semua OP; saat scan, barcode akan ditambahkan ke setiap OP.
-        $historyData = $isMultipleOp ? [
-            'jenis_op' => 'Multiple',
-            'detail_count' => $detailList->count(),
-            'note' => 'Untuk Multiple OP: 1 approval berlaku untuk semua OP. Barcode topping akan ditambahkan ke setiap OP saat di-scan.',
-        ] : null;
+        $historyData = [
+            'durasi_input' => $durasiHuman,
+            'durasi_seconds' => $durasiSeconds,
+            'spare_seconds' => $spareSeconds,
+            'total_delay_seconds' => $totalDelaySeconds,
+            'total_delay_human' => $totalDelayHuman,
+            'note' => $isMultipleOp
+                ? "Untuk Multiple OP: 1 approval berlaku untuk semua OP. Topping memundurkan jadwal & cycle time sebesar {$totalDelayHuman}."
+                : "Topping memundurkan jadwal & cycle time sebesar {$totalDelayHuman}.",
+        ];
+        if ($isMultipleOp) {
+            $historyData['jenis_op'] = 'Multiple';
+            $historyData['detail_count'] = $detailList->count();
+        }
+
+        $label = $action === 'topping_la' ? 'LA' : 'AUX';
+        $noteMsg = "Request topping {$label} dengan durasi {$durasiHuman} (+45 mnt toleransi scan = +{$totalDelayHuman}).";
 
         Approval::create([
             'proses_id' => $prosesId,
@@ -1770,22 +1797,81 @@ class ProsesController extends Controller
             'type' => 'KEPALA_SHIFT',
             'action' => $action,
             'history_data' => $historyData,
-            'note' => null,
+            'note' => $noteMsg,
             'requested_by' => Auth::id(),
             'approved_by' => null,
         ]);
 
         event(new ApprovalPendingCreated([$prosesId]));
 
-        $label = $action === 'topping_la' ? 'LA' : 'AUX';
         $msg = $isMultipleOp
-            ? "Request topping {$label} berhasil dibuat untuk semua OP. Kepala Shift hanya perlu approve sekali."
-            : "Request topping {$label} berhasil dibuat. Menunggu approval Kepala Shift.";
+            ? "Request topping {$label} ({$durasiHuman}, +{$totalDelayHuman}) berhasil dibuat untuk semua OP. Menunggu approval Kepala Shift."
+            : "Request topping {$label} ({$durasiHuman}, +{$totalDelayHuman}) berhasil dibuat. Menunggu approval Kepala Shift.";
         return response()->json([
             'status' => 'success',
             'message' => $msg,
             'is_multiple_op' => $isMultipleOp,
+            'durasi_human' => $durasiHuman,
+            'total_delay_human' => $totalDelayHuman,
         ]);
+    }
+
+    /**
+     * Helper parsing input durasi ke total detik (support jam, menit, HH:MM, format teks).
+     */
+    private function parseDurationToSeconds($input, ?string $unit = null): int
+    {
+        if (empty($input)) {
+            return 3600; // Default 1 jam
+        }
+
+        $inputStr = strtolower(trim((string) $input));
+
+        // Format HH:MM:SS atau HH:MM
+        if (preg_match('/^(\d+):(\d+)(?::(\d+))?$/', $inputStr, $matches)) {
+            $h = (int) $matches[1];
+            $m = (int) $matches[2];
+            $s = isset($matches[3]) ? (int) $matches[3] : 0;
+            return max(60, ($h * 3600) + ($m * 60) + $s);
+        }
+
+        // Format teks mengandung "jam" atau "hour"
+        if (str_contains($inputStr, 'jam') || str_contains($inputStr, 'hour')) {
+            $num = (float) filter_var($inputStr, FILTER_SANITIZE_NUMBER_FLOAT, FILTER_FLAG_ALLOW_FRACTION);
+            return max(60, (int) round($num * 3600));
+        }
+
+        // Format teks mengandung "menit" atau "min"
+        if (str_contains($inputStr, 'menit') || str_contains($inputStr, 'min')) {
+            $num = (float) filter_var($inputStr, FILTER_SANITIZE_NUMBER_FLOAT, FILTER_FLAG_ALLOW_FRACTION);
+            return max(60, (int) round($num * 60));
+        }
+
+        // Angka murni dengan parameter unit
+        $num = (float) $inputStr;
+        if (strtolower($unit ?? '') === 'menit' || strtolower($unit ?? '') === 'minute') {
+            return max(60, (int) round($num * 60));
+        }
+
+        // Default unit jam
+        return max(60, (int) round($num * 3600));
+    }
+
+    /**
+     * Helper format detik ke teks yang mudah dibaca (misal: "1 Jam 45 Menit").
+     */
+    private function formatSecondsToHumanRead(int $seconds): string
+    {
+        $jam = floor($seconds / 3600);
+        $menit = floor(($seconds % 3600) / 60);
+        $res = [];
+        if ($jam > 0) {
+            $res[] = "{$jam} Jam";
+        }
+        if ($menit > 0) {
+            $res[] = "{$menit} Menit";
+        }
+        return !empty($res) ? implode(' ', $res) : "0 Menit";
     }
 
     private function validateOpByJenis($auxJenis, $noOp, $prosesJenis = null, bool $isToppingAux = false)
@@ -2505,7 +2591,7 @@ class ProsesController extends Controller
     public function pinjamMesin(Request $request, $id)
     {
         $userRole = Auth::user() ? Auth::user()->role : null;
-        if (!in_array($userRole, ['super_admin', 'kepala_ruangan', 'kepala_shift', 'operator'], true)) {
+        if (!in_array($userRole, ['super_admin', 'kepala_ruangan', 'kepala_shift', 'operator', 'ppic'], true)) {
             $errorMessage = 'Anda tidak memiliki hak akses untuk mengelola pinjam mesin.';
             if ($request->ajax() || $request->wantsJson()) {
                 return response()->json(['status' => 'error', 'message' => $errorMessage], 403);
@@ -2557,6 +2643,18 @@ class ProsesController extends Controller
             $proses->pinjam_mesin_by = null;
             $proses->save();
 
+            // Tutup sesi log pinjam mesin yang sedang aktif
+            $openHistory = \App\Models\PinjamMesinHistory::where('proses_id', $proses->id)
+                ->whereNull('selesai_at')
+                ->latest('pinjam_at')
+                ->first();
+            if ($openHistory) {
+                $openHistory->update([
+                    'selesai_at' => now(),
+                    'selesai_by' => Auth::id(),
+                ]);
+            }
+
             // Batalkan approval pending pinjam mesin jika ada
             Approval::where('proses_id', $proses->id)
                 ->where('action', 'pinjam_mesin')
@@ -2598,11 +2696,21 @@ class ProsesController extends Controller
             'alasan.max' => 'Alasan pinjam mesin maksimal 500 karakter.',
         ]);
 
+        $now = now();
         $proses->is_pinjam_mesin = true;
         $proses->pinjam_mesin_alasan = $request->alasan;
-        $proses->pinjam_mesin_at = now();
+        $proses->pinjam_mesin_at = $now;
         $proses->pinjam_mesin_by = Auth::id();
         $proses->save();
+
+        // Buat record baru di tabel riwayat peminjaman mesin
+        \App\Models\PinjamMesinHistory::create([
+            'proses_id' => $proses->id,
+            'mesin_id' => $proses->mesin_id,
+            'alasan' => $request->alasan,
+            'pinjam_at' => $now,
+            'pinjam_by' => Auth::id(),
+        ]);
 
         Cache::forget("iot:mesin:{$proses->mesin_id}:alarm_result");
         Cache::forget("iot:mesin:{$proses->mesin_id}:alarm_on_state");
@@ -3152,4 +3260,353 @@ class ProsesController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Selesaikan proses aktif (Produksi / Reproses) secara paksa oleh Kepala Shift atau Super Admin.
+     * Proses saat ini diselesaikan (masuk history) dan antrian di bawahnya langsung dijalankan.
+     */
+    public function forceFinishProses($id)
+    {
+        $user = Auth::user();
+        $userRole = $user ? $user->role : null;
+        if (!in_array($userRole, ['super_admin', 'kepala_shift'], true)) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Hanya Kepala Shift dan Super Admin (Admin) yang memiliki hak akses untuk menyelesaikan proses ini secara paksa.'
+            ], 403);
+        }
+
+        $proses = Proses::with('details')->findOrFail($id);
+
+        if ($proses->selesai !== null) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Proses ini sudah selesai sebelumnya.'
+            ], 400);
+        }
+
+        if ($proses->mulai === null) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Proses belum dimulai.'
+            ], 400);
+        }
+
+        DB::beginTransaction();
+        try {
+            $now = now();
+            $proses->selesai = $now;
+            $proses->is_paused = false;
+            if ($proses->mulai) {
+                $mulai = \Carbon\Carbon::parse($proses->mulai);
+                $proses->cycle_time_actual = max(0, (int) round($mulai->diffInSeconds($now, false)));
+            }
+            if ($proses->is_pinjam_mesin) {
+                \App\Models\PinjamMesinHistory::where('proses_id', $proses->id)
+                    ->whereNull('selesai_at')
+                    ->latest('pinjam_at')
+                    ->update([
+                        'selesai_at' => $now,
+                        'selesai_by' => $user->id,
+                    ]);
+                $proses->is_pinjam_mesin = false;
+            }
+            $proses->save();
+
+            // Log activity
+            $noOpList = $proses->details ? $proses->details->pluck('no_op')->filter()->implode(', ') : '-';
+            activity('Manajemen Proses')
+                ->performedOn($proses)
+                ->causedBy($user)
+                ->withProperties([
+                    'proses_id' => $proses->id,
+                    'jenis' => $proses->jenis,
+                    'no_op' => $noOpList,
+                    'mesin_id' => $proses->mesin_id,
+                    'cycle_time_actual' => $proses->cycle_time_actual,
+                ])
+                ->log("Proses #{$proses->id} ({$proses->jenis}, OP: {$noOpList}) diselesaikan paksa oleh {$user->nama} ({$userRole}). Antrian berikutnya dijalankan.");
+
+            Cache::forget("iot:proses:{$proses->id}:kain_latched");
+            Cache::forget("iot:mesin:{$proses->mesin_id}:alarm_result");
+
+            // Mulai proses antrian berikutnya jika mesin hidup / ON
+            $started = $this->startNextProsesIfMesinOn((int) $proses->mesin_id);
+
+            DB::commit();
+
+            // Broadcast update status ke semua client dashboard
+            $statusService = new \App\Services\ProsesStatusService();
+            $affectedProsesIds = $statusService->getAffectedProsesIds();
+            $statusData = $statusService->generateProsesStatus($proses, $affectedProsesIds);
+            event(new \App\Events\ProsesStatusUpdated($proses->id, $statusData));
+
+            if ($started) {
+                $startedStatusData = $statusService->generateProsesStatus($started, $affectedProsesIds);
+                event(new \App\Events\ProsesStatusUpdated($started->id, $startedStatusData));
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Proses berhasil diselesaikan dan dialihkan ke antrian berikutnya.',
+                'data' => $proses
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Gagal menyelesaikan proses: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Recovery proses yang telah selesai / masuk history (durasi < 30 menit).
+     * Dapat dipilih untuk tetap di mesin yang sama atau dipindah ke mesin lain.
+     * Mengembalikan proses ke antrian produksi dengan mereset mulai, selesai, dan cycle_time_actual,
+     * tetapi tetap mempertahankan seluruh informasi barcode, OP/Partai, dan cycle_time standar.
+     * Hak akses: PPIC dan Super Admin.
+     */
+    public function recoveryProses(Request $request, $id)
+    {
+        $user = Auth::user();
+        $userRole = $user ? $user->role : null;
+        if (!in_array($userRole, ['super_admin', 'ppic'], true)) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Hanya PPIC dan Super Admin (Admin) yang memiliki hak akses untuk merecovery proses ini.'
+            ], 403);
+        }
+
+        $proses = Proses::with(['details.barcodeKains', 'details.barcodeLas', 'details.barcodeAuxs', 'mesin'])->findOrFail($id);
+
+        if ($proses->selesai === null) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Proses ini belum selesai atau masih dalam tahap produksi / antrian.'
+            ], 400);
+        }
+
+        // Cek durasi berjalan (harus di bawah 30 menit / 1800 detik)
+        $actualDuration = $proses->cycle_time_actual;
+        if ($actualDuration === null && $proses->mulai && $proses->selesai) {
+            $mulai = \Carbon\Carbon::parse($proses->mulai);
+            $selesai = \Carbon\Carbon::parse($proses->selesai);
+            $actualDuration = max(0, (int) round($mulai->diffInSeconds($selesai, false)));
+        }
+        $actualDuration = (int) ($actualDuration ?? 0);
+
+        if ($actualDuration >= 1800) {
+            $menit = floor($actualDuration / 60);
+            $detik = $actualDuration % 60;
+            return response()->json([
+                'status' => 'error',
+                'message' => "Proses tidak dapat di-recovery karena durasi berjalannya 30 menit atau lebih ({$menit} menit {$detik} detik). Fitur recovery hanya untuk proses dengan durasi di bawah 30 menit."
+            ], 400);
+        }
+
+        // Validasi target mesin_id
+        $request->validate([
+            'target_mesin_id' => 'nullable|exists:mesins,id',
+        ]);
+
+        $targetMesinId = (int) ($request->input('target_mesin_id') ?: $proses->mesin_id);
+        $oldMesinId = (int) $proses->mesin_id;
+
+        DB::beginTransaction();
+        try {
+            // Hitung nomor order berikutnya di mesin tujuan (ditaruh di paling belakang antrian aktif)
+            $maxOrder = Proses::where('mesin_id', $targetMesinId)
+                ->whereNull('selesai')
+                ->max('order') ?? 0;
+            $newOrder = $maxOrder + 1;
+
+            $oldDurationFormatted = gmdate('H:i:s', $actualDuration);
+            $proses->mesin_id = $targetMesinId;
+            $proses->order = $newOrder;
+            $proses->mulai = null;
+            $proses->selesai = null;
+            $proses->cycle_time_actual = null;
+            $proses->is_paused = false;
+            $proses->is_pinjam_mesin = false;
+            $proses->pinjam_mesin_alasan = null;
+            $proses->pinjam_mesin_at = null;
+            $proses->pinjam_mesin_by = null;
+
+            // Catat log di field note proses
+            $recoveryNote = "[Recovery dari History ke Mesin ID {$targetMesinId} oleh {$user->nama} ({$userRole}) pada " . now()->format('d/m/Y H:i') . " (Durasi sebelumnya: {$oldDurationFormatted})]";
+            $proses->note = !empty($proses->note) ? $proses->note . "\n" . $recoveryNote : $recoveryNote;
+
+            $proses->save();
+
+            // Log activity
+            $noOpList = $proses->details ? $proses->details->pluck('no_op')->filter()->implode(', ') : '-';
+            activity('Manajemen Proses')
+                ->performedOn($proses)
+                ->causedBy($user)
+                ->withProperties([
+                    'proses_id' => $proses->id,
+                    'jenis' => $proses->jenis,
+                    'no_op' => $noOpList,
+                    'old_mesin_id' => $oldMesinId,
+                    'target_mesin_id' => $targetMesinId,
+                    'durasi_sebelumnya' => $actualDuration,
+                ])
+                ->log("Proses #{$proses->id} ({$proses->jenis}, OP: {$noOpList}) di-recovery oleh {$user->nama} ({$userRole}) dari Mesin #{$oldMesinId} ke Mesin #{$targetMesinId} dengan durasi sebelumnya {$oldDurationFormatted}.");
+
+            // Clear cache alarm & latch
+            Cache::forget("iot:proses:{$proses->id}:kain_latched");
+            Cache::forget("iot:mesin:{$oldMesinId}:alarm_result");
+            Cache::forget("iot:mesin:{$targetMesinId}:alarm_result");
+
+            DB::commit();
+
+            // Broadcast update status ke semua client dashboard
+            $statusService = new \App\Services\ProsesStatusService();
+            $affectedProsesIds = $statusService->getAffectedProsesIds();
+            $statusData = $statusService->generateProsesStatus($proses, $affectedProsesIds);
+            event(new \App\Events\ProsesStatusUpdated($proses->id, $statusData));
+
+            $mesinNama = \App\Models\Mesin::find($targetMesinId)?->nama ?? "Mesin #{$targetMesinId}";
+
+            return response()->json([
+                'status' => 'success',
+                'message' => "Proses berhasil di-recovery dan dikembalikan ke antrian produksi pada {$mesinNama}.",
+                'data' => $proses
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Gagal merecovery proses: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Update catatan opsional (note) pada suatu proses.
+     * Otorisasi: Kepala Ruangan, Kepala Shift, Super Admin.
+     */
+    public function updateNote(Request $request, $id)
+    {
+        $user = Auth::user();
+        $userRole = $user ? $user->role : null;
+        if (!in_array($userRole, ['super_admin', 'kepala_ruangan', 'kepala_shift'], true)) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Hanya Kepala Ruangan, Kepala Shift, dan Super Admin yang memiliki hak akses untuk mengubah catatan proses.'
+            ], 403);
+        }
+
+        $request->validate([
+            'note' => 'nullable|string|max:2000',
+        ], [
+            'note.max' => 'Catatan proses maksimal 2000 karakter.',
+        ]);
+
+        $proses = Proses::findOrFail($id);
+        $proses->note = $request->note;
+        $proses->save();
+
+        // Log activity Spatie
+        activity('Manajemen Proses')
+            ->performedOn($proses)
+            ->causedBy($user)
+            ->withProperties([
+                'proses_id' => $proses->id,
+                'note' => $proses->note,
+            ])
+            ->log("Mengupdate catatan pada proses #{$proses->id} oleh {$user->nama} ({$userRole})");
+
+        // Broadcast update status ke semua client dashboard
+        $statusService = new \App\Services\ProsesStatusService();
+        $affectedProsesIds = $statusService->getAffectedProsesIds();
+        $statusData = $statusService->generateProsesStatus($proses, $affectedProsesIds);
+        event(new \App\Events\ProsesStatusUpdated($proses->id, $statusData));
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Catatan proses berhasil disimpan.',
+            'note' => $proses->note
+        ]);
+    }
+
+    /**
+     * Preview riwayat peminjaman mesin (Pinjam Mesin History) untuk suatu proses.
+     * Otorisasi: Kepala Ruangan, Kepala Shift, Operator, PPIC, Super Admin.
+     */
+    public function getPinjamMesinHistory($id)
+    {
+        $user = Auth::user();
+        $userRole = $user ? $user->role : null;
+        if (!in_array($userRole, ['super_admin', 'kepala_ruangan', 'kepala_shift', 'operator', 'ppic'], true)) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Anda tidak memiliki hak akses untuk melihat riwayat peminjaman mesin.'
+            ], 403);
+        }
+
+        $proses = Proses::findOrFail($id);
+        $histories = \App\Models\PinjamMesinHistory::with(['userPinjam', 'userSelesai'])
+            ->where('proses_id', $proses->id)
+            ->orderBy('pinjam_at', 'asc')
+            ->get();
+
+        $data = $histories->map(function ($item) {
+            $pinjamAt = $item->pinjam_at;
+            $selesaiAt = $item->selesai_at;
+            $durasiFormatted = '-';
+
+            if ($pinjamAt && $selesaiAt) {
+                $diffInSec = $pinjamAt->diffInSeconds($selesaiAt);
+                $hours = floor($diffInSec / 3600);
+                $minutes = floor(($diffInSec % 3600) / 60);
+                $seconds = $diffInSec % 60;
+                if ($hours > 0) {
+                    $durasiFormatted = "{$hours} jam {$minutes} mnt";
+                } elseif ($minutes > 0) {
+                    $durasiFormatted = "{$minutes} mnt {$seconds} dtk";
+                } else {
+                    $durasiFormatted = "{$seconds} dtk";
+                }
+            } elseif ($pinjamAt && !$selesaiAt) {
+                $diffInSec = $pinjamAt->diffInSeconds(now());
+                $hours = floor($diffInSec / 3600);
+                $minutes = floor(($diffInSec % 3600) / 60);
+                if ($hours > 0) {
+                    $durasiFormatted = "{$hours} jam {$minutes} mnt (Berjalan)";
+                } else {
+                    $durasiFormatted = "{$minutes} mnt (Berjalan)";
+                }
+            }
+
+            return [
+                'id' => $item->id,
+                'proses_id' => $item->proses_id,
+                'alasan' => $item->alasan,
+                'pinjam_at' => $pinjamAt?->toIso8601String(),
+                'pinjam_at_formatted' => $pinjamAt?->format('d/m/Y H:i:s'),
+                'selesai_at' => $selesaiAt?->toIso8601String(),
+                'selesai_at_formatted' => $selesaiAt?->format('d/m/Y H:i:s'),
+                'durasi_formatted' => $durasiFormatted,
+                'user_pinjam' => $item->userPinjam ? [
+                    'id' => $item->userPinjam->id,
+                    'nama' => $item->userPinjam->nama,
+                    'role' => $item->userPinjam->role,
+                ] : null,
+                'user_selesai' => $item->userSelesai ? [
+                    'id' => $item->userSelesai->id,
+                    'nama' => $item->userSelesai->nama,
+                    'role' => $item->userSelesai->role,
+                ] : null,
+            ];
+        });
+
+        return response()->json([
+            'status' => 'success',
+            'proses_id' => $proses->id,
+            'data' => $data
+        ]);
+    }
 }
+

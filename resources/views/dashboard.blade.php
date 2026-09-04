@@ -1987,6 +1987,22 @@
                                 <!-- Diisi via JS -->
                             </tbody>
                         </table>
+
+                        <!-- Kotak Catatan Proses (Optional) -->
+                        <div class="mt-3 p-3 bg-light rounded border shadow-sm" id="container-proses-note">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <label for="proses-note-text" class="form-label font-weight-bold mb-0 text-dark">
+                                    <i class="fas fa-sticky-note text-warning mr-1"></i> Catatan Proses (Optional)
+                                </label>
+                                <span class="badge badge-secondary" id="badge-proses-status-note"></span>
+                            </div>
+                            <textarea class="form-control bg-white" id="proses-note-text" rows="3" placeholder="Tambahkan catatan khusus untuk proses ini (opsional)..." maxlength="2000"></textarea>
+                            <div class="mt-2 text-right" id="proses-note-actions">
+                                <button type="button" class="btn btn-sm btn-primary" id="btn-save-proses-note">
+                                    <i class="fas fa-save mr-1"></i>Simpan Catatan
+                                </button>
+                            </div>
+                        </div>
                     </div>
                     <div class="modal-footer d-flex justify-content-between px-4">
                         <div>
@@ -2000,9 +2016,24 @@
                                     <i class="fas fa-check mr-1"></i>Proses Selesai
                                 </button>
                             @endif
+                            @if (in_array($userRole ?? '', ['super_admin', 'kepala_shift']))
+                                <button type="button" class="btn btn-success btn-finish-force d-none mr-2" title="Selesaikan proses saat ini secara paksa dan lanjutkan ke antrian berikutnya">
+                                    <i class="fas fa-check-double mr-1"></i>Proses Selesai
+                                </button>
+                            @endif
                             @if ($canPinjamMesin ?? in_array($userRole ?? '', ['super_admin', 'kepala_ruangan', 'kepala_shift', 'operator']))
                                 <button type="button" class="btn btn-info btn-pinjam-mesin d-none mr-2 text-white">
                                     <i class="fas fa-exchange-alt mr-1"></i>Pinjam Mesin
+                                </button>
+                            @endif
+                            @if (in_array($userRole ?? '', ['super_admin', 'kepala_ruangan', 'kepala_shift', 'operator', 'ppic']))
+                                <button type="button" class="btn btn-outline-info btn-preview-pinjam-mesin d-none mr-2" title="Lihat riwayat peminjaman mesin pada proses ini">
+                                    <i class="fas fa-history mr-1"></i>Riwayat Pinjam Mesin
+                                </button>
+                            @endif
+                            @if (in_array($userRole ?? '', ['super_admin', 'ppic']))
+                                <button type="button" class="btn btn-warning btn-recovery-proses d-none mr-2 font-weight-bold" title="Kembalikan proses dari history ke antrian produksi">
+                                    <i class="fas fa-undo mr-1"></i>Recovery Proses
                                 </button>
                             @endif
                             @if ($canMoveProses ?? true)
@@ -2021,6 +2052,125 @@
                         </div>
                         <button type="button" class="btn btn-secondary" data-dismiss="modal">Tutup</button>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal Riwayat Pinjam Mesin -->
+        <div class="modal fade" id="modalPinjamMesinHistory" tabindex="-1" aria-labelledby="modalPinjamMesinHistoryLabel" aria-hidden="true" style="z-index: 1065;">
+            <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+                <div class="modal-content shadow-lg border-0 rounded-3">
+                    <div class="modal-header bg-info text-white">
+                        <h5 class="modal-title fw-bold" id="modalPinjamMesinHistoryLabel">
+                            <i class="fas fa-history mr-2"></i>Riwayat Peminjaman Mesin
+                        </h5>
+                        <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body p-3">
+                        <div class="alert alert-info py-2 px-3 mb-3 small d-flex justify-content-between align-items-center">
+                            <span id="pinjam-history-proses-info"><i class="fas fa-info-circle mr-1"></i> Memuat info proses...</span>
+                            <span class="badge badge-light" id="pinjam-history-count">0 Sesi</span>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-striped table-hover table-sm mb-0">
+                                <thead class="thead-light">
+                                    <tr>
+                                        <th style="width: 40px;" class="text-center">No</th>
+                                        <th>Mulai Pinjam</th>
+                                        <th>Selesai Pinjam</th>
+                                        <th>Durasi</th>
+                                        <th>Alasan Pinjam</th>
+                                        <th>Dipinjam Oleh</th>
+                                        <th>Dimatikan Oleh</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="pinjam-history-tbody">
+                                    <tr>
+                                        <td colspan="7" class="text-center py-3 text-muted">Memuat riwayat peminjaman mesin...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Tutup</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal Recovery Proses -->
+        <div class="modal fade" id="modalRecoveryProses" tabindex="-1" aria-labelledby="modalRecoveryProsesLabel"
+            aria-hidden="true" style="z-index: 1065;">
+            <div class="modal-dialog modal-md modal-dialog-centered">
+                <div class="modal-content shadow-lg border-0 rounded-3">
+                    <form id="formRecoveryProses" method="POST" action="">
+                        @csrf
+                        <input type="hidden" name="proses_id" id="recoveryProsesId">
+                        <div class="modal-header bg-warning text-dark">
+                            <h5 class="modal-title fw-bold" id="modalRecoveryProsesLabel">
+                                <i class="fas fa-undo mr-2"></i>Recovery Proses ke Produksi
+                            </h5>
+                            <button type="button" class="close text-dark" data-dismiss="modal" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>
+                        <div class="modal-body py-3 px-4">
+                            <div class="alert alert-warning py-2 mb-3" style="font-size: 13px; color: #856404; background-color: #fff3cd; border-color: #ffeeba;">
+                                <i class="fas fa-exclamation-triangle mr-1"></i>
+                                <strong>Perhatian:</strong> Proses yang di-recovery akan dikembalikan ke <strong>antrian produksi</strong>.
+                                Waktu mulai, waktu selesai, dan cycle time actual akan di-<strong>reset</strong>, namun semua data barcode dan informasi OP tetap tersimpan.
+                            </div>
+
+                            <!-- Ringkasan Info Proses -->
+                            <div class="card mb-3 bg-light border-0">
+                                <div class="card-body p-2" style="font-size: 13px;">
+                                    <div class="row no-gutters mb-1">
+                                        <div class="col-4 text-muted">No. OP / Partai:</div>
+                                        <div class="col-8 font-weight-bold" id="recoveryOpPartai">-</div>
+                                    </div>
+                                    <div class="row no-gutters mb-1">
+                                        <div class="col-4 text-muted">Customer:</div>
+                                        <div class="col-8" id="recoveryCustomer">-</div>
+                                    </div>
+                                    <div class="row no-gutters mb-1">
+                                        <div class="col-4 text-muted">Mesin Asal:</div>
+                                        <div class="col-8" id="recoveryMesinAsal">-</div>
+                                    </div>
+                                    <div class="row no-gutters mb-1">
+                                        <div class="col-4 text-muted">Durasi Sebelumnya:</div>
+                                        <div class="col-8 text-danger font-weight-bold" id="recoveryDurasiLama">-</div>
+                                    </div>
+                                    <div class="row no-gutters">
+                                        <div class="col-4 text-muted">Cycle Time:</div>
+                                        <div class="col-8" id="recoveryCycleTime">-</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-group mb-2">
+                                <label class="form-label fw-semibold mb-1" for="recoveryMesinId">
+                                    <i class="fas fa-cogs mr-1"></i>Pilih Mesin Tujuan Produksi
+                                </label>
+                                <select name="target_mesin_id" id="recoveryMesinId" class="form-control" required>
+                                    <option value="" disabled>-- Pilih Mesin --</option>
+                                </select>
+                                <small class="form-text text-muted">
+                                    Pilih tetap di mesin yang sama atau alihkan ke mesin lain yang tersedia.
+                                </small>
+                            </div>
+                        </div>
+                        <div class="modal-footer d-flex justify-content-between px-4">
+                            <button type="button" class="btn btn-secondary" data-dismiss="modal">
+                                <i class="fas fa-times mr-1"></i>Batal
+                            </button>
+                            <button type="submit" class="btn btn-warning font-weight-bold" id="btnSubmitRecovery">
+                                <i class="fas fa-check mr-1"></i>Konfirmasi Recovery
+                            </button>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>
@@ -2302,7 +2452,7 @@
                         </div>
                         <div class="modal-body py-3 px-4">
                             <div class="alert alert-info py-2 mb-3" style="font-size: 13px;">
-                                <i class="fas fa-info-circle mr-1"></i>Status pinjam mesin akan <strong>langsung diaktifkan</strong> (Sinyal Address 105 = 1) tanpa perlu approval.
+                                <i class="fas fa-info-circle mr-1"></i>Peminjaman mesin akan <strong>langsung aktif</strong> secara otomatis tanpa memerlukan persetujuan.
                             </div>
                             <div class="form-group mb-2">
                                 <label class="form-label fw-semibold mb-1" style="font-size: 13px;">Informasi Proses</label>
@@ -4013,18 +4163,20 @@
             const $btnDelete = $('.btn-delete-proses');
             const $btnPause = $('.btn-pause-proses');
             const $btnFinishMaintenance = $('.btn-finish-maintenance');
+            const $btnFinishForce = $('.btn-finish-force');
             const $btnPinjam = $('.btn-pinjam-mesin');
+            const $btnRecoveryProses = $('.btn-recovery-proses');
 
             // Logic untuk tombol Pinjam Mesin (Super Admin, Kepala Ruangan, Kepala Shift, Operator)
             // Muncul saat:
             // 1. Jenis proses bukan Maintenance (Produksi, Reproses Greige, Reproses Finish)
             // 2. Status proses: Sedang berjalan (isStarted) ATAU antrian berikutnya (order == 1)
+            const userRoleStr = (window.userRole || '').toLowerCase();
             $btnPinjam.addClass('d-none');
             if (proses.jenis !== 'Maintenance' && !proses.selesai) {
                 const isNextInQueue = !isStarted && (parseInt(proses.order) === 1);
                 if (isStarted || isNextInQueue) {
-                    const userRoleStr = (window.userRole || '').toLowerCase();
-                    const isAuthorizedPinjam = window.canPinjamMesin === true || ['super_admin', 'kepala_ruangan', 'kepala_shift', 'operator'].includes(userRoleStr);
+                    const isAuthorizedPinjam = window.canPinjamMesin === true || ['super_admin', 'kepala_ruangan', 'kepala_shift', 'operator', 'ppic'].includes(userRoleStr);
                     if (isAuthorizedPinjam) {
                         $btnPinjam.removeClass('d-none');
                         const isPinjamActive = proses.is_pinjam_mesin === true || proses.is_pinjam_mesin === 1 || proses.is_pinjam_mesin === '1';
@@ -4032,11 +4184,11 @@
                         if (isPinjamActive) {
                             $btnPinjam.removeClass('btn-info').addClass('btn-danger');
                             $btnPinjam.html('<i class="fas fa-power-off mr-1"></i>Matikan Pinjam Mesin');
-                            $btnPinjam.attr('title', 'Klik untuk mematikan status Pinjam Mesin (Address 105 = 0)');
+                            $btnPinjam.attr('title', 'Klik untuk mematikan status Pinjam Mesin');
                         } else {
                             $btnPinjam.removeClass('btn-danger').addClass('btn-info');
                             $btnPinjam.html('<i class="fas fa-exchange-alt mr-1"></i>Pinjam Mesin');
-                            $btnPinjam.attr('title', 'Klik untuk mengaktifkan status Pinjam Mesin (Address 105 = 1)');
+                            $btnPinjam.attr('title', 'Klik untuk mengaktifkan status Pinjam Mesin');
                         }
 
                         if (hasPending || hasPendingReprocess) {
@@ -4046,6 +4198,57 @@
                         }
                     }
                 }
+            }
+
+            // Logic untuk tombol Preview Riwayat Pinjam Mesin (Karu, Kashift, Operator, PPIC, Admin)
+            const $btnPreviewPinjam = $('.btn-preview-pinjam-mesin');
+            const canPreviewPinjam = ['super_admin', 'kepala_ruangan', 'kepala_shift', 'operator', 'ppic'].includes(userRoleStr);
+            if (canPreviewPinjam && proses.jenis !== 'Maintenance') {
+                $btnPreviewPinjam.removeClass('d-none');
+            } else {
+                $btnPreviewPinjam.addClass('d-none');
+            }
+
+            // Logic untuk tombol Recovery Proses (PPIC dan Super Admin)
+            // Hanya muncul jika:
+            // 1. Proses sudah selesai (berada di history)
+            // 2. Durasi berjalan di bawah 30 menit (1800 detik)
+            // 3. User role: PPIC atau Super Admin
+            $btnRecoveryProses.addClass('d-none');
+            if (proses.selesai) {
+                let actualDurationSec = proses.cycle_time_actual !== null && proses.cycle_time_actual !== undefined ? parseInt(proses.cycle_time_actual) : null;
+                if (actualDurationSec === null && proses.mulai && proses.selesai) {
+                    const m = new Date(proses.mulai).getTime();
+                    const s = new Date(proses.selesai).getTime();
+                    actualDurationSec = Math.max(0, Math.round((s - m) / 1000));
+                }
+                actualDurationSec = actualDurationSec || 0;
+                const isEligibleRecovery = actualDurationSec < 1800;
+                const isAuthRecovery = ['super_admin', 'ppic'].includes(userRoleStr);
+
+                if (isEligibleRecovery && isAuthRecovery) {
+                    $btnRecoveryProses.removeClass('d-none');
+                    $btnRecoveryProses.data('durasi-detik', actualDurationSec);
+                }
+            }
+
+            // Setup Kotak Catatan Proses (Note)
+            const noteText = proses.note || '';
+            $('#proses-note-text').val(noteText);
+            const canEditNote = ['super_admin', 'kepala_ruangan', 'kepala_shift'].includes(userRoleStr);
+            if (canEditNote) {
+                $('#proses-note-text').prop('readonly', false).attr('placeholder', 'Tambahkan catatan khusus untuk proses ini (opsional)...');
+                $('#proses-note-actions').show();
+            } else {
+                $('#proses-note-text').prop('readonly', true).attr('placeholder', noteText ? '' : 'Tidak ada catatan.');
+                $('#proses-note-actions').hide();
+            }
+            if (proses.selesai) {
+                $('#badge-proses-status-note').text('History / Selesai').removeClass('badge-success badge-info').addClass('badge-secondary');
+            } else if (isStarted) {
+                $('#badge-proses-status-note').text('Sedang Berjalan').removeClass('badge-secondary badge-info').addClass('badge-success');
+            } else {
+                $('#badge-proses-status-note').text('Antrian').removeClass('badge-secondary badge-success').addClass('badge-info');
             }
 
             // Logic untuk tombol Selesai Proses Maintenance (Super Admin, Kepala Shift, dan Kepala Ruangan / KARU)
@@ -4059,6 +4262,21 @@
                         $btnFinishMaintenance.prop('disabled', true).addClass('disabled').css('cursor', 'not-allowed');
                     } else {
                         $btnFinishMaintenance.prop('disabled', false).removeClass('disabled').css('cursor', 'pointer');
+                    }
+                }
+            }
+
+            // Logic untuk tombol Selesai Proses Produksi / Reproses secara Paksa (Super Admin & Kepala Shift)
+            $btnFinishForce.addClass('d-none');
+            if (proses.jenis !== 'Maintenance' && isStarted && !proses.selesai) {
+                const userRoleStr = (window.userRole || '').toLowerCase();
+                const isAuthorizedForce = userRoleStr === 'super_admin' || userRoleStr === 'kepala_shift';
+                if (isAuthorizedForce) {
+                    $btnFinishForce.removeClass('d-none');
+                    if (hasPending || hasPendingReprocess) {
+                        $btnFinishForce.prop('disabled', true).addClass('disabled').css('cursor', 'not-allowed');
+                    } else {
+                        $btnFinishForce.prop('disabled', false).removeClass('disabled').css('cursor', 'pointer');
                     }
                 }
             }
@@ -4585,6 +4803,8 @@
             const $btnEdit = $('.btn-edit-proses');
             const $btnMove = $('.btn-move-proses');
             const $btnDelete = $('.btn-delete-proses');
+            const $btnRecovery = $('.btn-recovery-proses');
+            $btnRecovery.addClass('d-none');
 
             // Reset semua tombol ke state normal
             $btnEdit.prop('disabled', false).removeClass('disabled').css('cursor', 'pointer');
@@ -4835,6 +5055,152 @@
             });
         });
 
+        // Handler tombol Recovery Proses (buka modal recovery proses)
+        $(document).on('click', '.btn-recovery-proses', function (e) {
+            e.preventDefault();
+            const proses = $('#modalDetailProses').data('proses');
+            if (!proses) return;
+
+            // Validasi: hanya proses history yang bisa direcovery
+            if (!proses.selesai) {
+                ToastError.fire({ title: 'Hanya proses yang sudah selesai / history yang dapat di-recovery.' });
+                return false;
+            }
+
+            // Hitung durasi berjalan
+            let actualSec = proses.cycle_time_actual !== null && proses.cycle_time_actual !== undefined ? parseInt(proses.cycle_time_actual) : null;
+            if (actualSec === null && proses.mulai && proses.selesai) {
+                const m = new Date(proses.mulai).getTime();
+                const s = new Date(proses.selesai).getTime();
+                actualSec = Math.max(0, Math.round((s - m) / 1000));
+            }
+            actualSec = actualSec || 0;
+
+            if (actualSec >= 1800) {
+                const menit = Math.floor(actualSec / 60);
+                const detik = actualSec % 60;
+                ToastError.fire({ title: `Proses telah berjalan ${menit} menit ${detik} detik (>= 30 menit). Tidak dapat di-recovery.` });
+                return false;
+            }
+
+            const id = proses.id;
+            const recoveryUrl = "{{ url('proses') }}/" + id + "/recovery";
+
+            $('#formRecoveryProses').attr('action', recoveryUrl);
+            $('#recoveryProsesId').val(id);
+
+            // Tampilkan info proses
+            let noOp = '-';
+            let noPartai = '-';
+            let customer = '-';
+            if (proses.details && Array.isArray(proses.details) && proses.details.length > 0) {
+                noOp = proses.details.map(d => d.no_op).filter(Boolean).join(', ') || '-';
+                noPartai = proses.details.map(d => d.no_partai).filter(Boolean).join(', ') || '-';
+                customer = proses.details[0].customer || '-';
+            } else {
+                noOp = proses.no_op || '-';
+                noPartai = proses.no_partai || '-';
+                customer = proses.customer || '-';
+            }
+
+            let jenisMesin = '-';
+            const currentMesinId = proses.mesin_id ? parseInt(proses.mesin_id) : null;
+            try {
+                const mesinSelect = document.getElementById('mesin_id');
+                if (mesinSelect && currentMesinId) {
+                    const opt = mesinSelect.querySelector(`option[value="${currentMesinId}"]`);
+                    if (opt) jenisMesin = opt.textContent;
+                }
+            } catch (e) { }
+
+            const mnt = Math.floor(actualSec / 60);
+            const dtk = actualSec % 60;
+            const durasiStr = `${mnt} mnt ${dtk} dtk (${formatDetikToHMS(actualSec)})`;
+
+            $('#recoveryOpPartai').text(`${noOp} / ${noPartai}`);
+            $('#recoveryCustomer').text(customer);
+            $('#recoveryMesinAsal').text(jenisMesin);
+            $('#recoveryDurasiLama').text(durasiStr);
+            $('#recoveryCycleTime').text(formatDetikToHMS(proses.cycle_time || 0));
+
+            // Populate select mesin tujuan
+            $('#recoveryMesinId').empty();
+            if (window.mesinsData && Array.isArray(window.mesinsData) && window.mesinsData.length > 0) {
+                window.mesinsData.forEach(function (mesin) {
+                    const mId = parseInt(mesin.id || mesin.mesin_id);
+                    const isCurrent = mId === currentMesinId;
+                    const mNama = (mesin.jenis_mesin || mesin.nama || mesin.text || ('Mesin ' + mId)) + (isCurrent ? ' (Mesin Saat Ini)' : '');
+                    $('#recoveryMesinId').append(`<option value="${mId}" ${isCurrent ? 'selected' : ''}>${mNama}</option>`);
+                });
+            } else {
+                $('#mesin_id option').each(function () {
+                    const val = $(this).val();
+                    if (val) {
+                        const mId = parseInt(val);
+                        const isCurrent = mId === currentMesinId;
+                        const mNama = $(this).text() + (isCurrent ? ' (Mesin Saat Ini)' : '');
+                        $('#recoveryMesinId').append(`<option value="${mId}" ${isCurrent ? 'selected' : ''}>${mNama}</option>`);
+                    }
+                });
+            }
+
+            // Tutup modal detail, lalu buka modal recovery
+            $('#modalDetailProses').modal('hide').one('hidden.bs.modal', function () {
+                $('#modalRecoveryProses').modal('show');
+                $('body').addClass('modal-open');
+            });
+        });
+
+        // Handler submit form recovery proses
+        $('#formRecoveryProses').on('submit', function (e) {
+            e.preventDefault();
+            const form = $(this);
+            const url = form.attr('action');
+            const targetMesinId = $('#recoveryMesinId').val();
+            const $btnSubmit = $('#btnSubmitRecovery');
+
+            if (!targetMesinId) {
+                ToastError.fire({ title: 'Silakan pilih mesin tujuan terlebih dahulu.' });
+                return;
+            }
+
+            $btnSubmit.prop('disabled', true).html('<i class="fas fa-spinner fa-spin mr-1"></i>Memproses Recovery...');
+
+            $.ajax({
+                url: url,
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+                },
+                data: {
+                    target_mesin_id: targetMesinId
+                },
+                success: function (response) {
+                    $('#modalRecoveryProses').modal('hide');
+                    if (response && response.status === 'success') {
+                        ToastSuccess.fire({
+                            title: response.message || 'Proses berhasil di-recovery ke antrian produksi!'
+                        });
+                    }
+                    setTimeout(function () {
+                        window.location.reload();
+                    }, 800);
+                },
+                error: function (xhr) {
+                    let errorMsg = 'Gagal merecovery proses.';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        errorMsg = xhr.responseJSON.message;
+                    }
+                    ToastError.fire({ title: errorMsg });
+                },
+                complete: function () {
+                    $btnSubmit.prop('disabled', false).html('<i class="fas fa-check mr-1"></i>Konfirmasi Recovery');
+                }
+            });
+        });
+
         // Handler tombol Pinjam Mesin (Toggle ON / OFF)
         $(document).on('click', '.btn-pinjam-mesin', function (e) {
             e.preventDefault();
@@ -4859,7 +5225,7 @@
                 // Konfirmasi untuk mematikan Pinjam Mesin
                 Swal.fire({
                     title: 'Matikan Pinjam Mesin?',
-                    text: 'Status pinjam mesin akan dinonaktifkan dan sinyal Address 105 akan dimatikan (0).',
+                    text: 'Status pinjam mesin akan dinonaktifkan.',
                     icon: 'warning',
                     showCancelButton: true,
                     confirmButtonColor: '#d33',
@@ -5013,6 +5379,132 @@
             });
         });
 
+        // Handler Simpan Catatan Proses (Note)
+        $(document).on('click', '#btn-save-proses-note', function (e) {
+            e.preventDefault();
+            const proses = $('#modalDetailProses').data('proses') || {};
+            const prosesId = proses.id || $('#modalDetailProses').data('prosesId');
+            if (!prosesId) return;
+
+            const noteContent = ($('#proses-note-text').val() || '').trim();
+            const $btn = $(this);
+
+            $btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin mr-1"></i>Menyimpan...');
+
+            $.ajax({
+                url: `/proses/${prosesId}/note`,
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+                },
+                data: {
+                    _token: $('meta[name="csrf-token"]').attr('content'),
+                    note: noteContent
+                },
+                success: function (response) {
+                    ToastSuccess.fire({
+                        title: response.message || 'Catatan proses berhasil disimpan.'
+                    });
+
+                    // Update data cache di modal & card
+                    proses.note = noteContent;
+                    $('#modalDetailProses').data('proses', proses);
+
+                    const $card = $(`.status-card[data-proses-id="${prosesId}"]`);
+                    if ($card.length) {
+                        const cardProses = $card.data('proses') || {};
+                        cardProses.note = noteContent;
+                        $card.data('proses', cardProses);
+
+                        // Update indikator icon note di card
+                        const $noteIcon = $card.find('.icon-has-note');
+                        if (noteContent) {
+                            if (!$noteIcon.length) {
+                                $card.find('.status-light').before('<i class="fas fa-sticky-note text-warning mr-1 icon-has-note" title="Catatan proses tersimpan" style="font-size: 15px; vertical-align: middle;"></i>');
+                            }
+                        } else {
+                            $noteIcon.remove();
+                        }
+                    }
+                },
+                error: function (xhr) {
+                    ToastError.fire({
+                        title: xhr.responseJSON?.message || 'Gagal menyimpan catatan proses.'
+                    });
+                },
+                complete: function () {
+                    $btn.prop('disabled', false).html('<i class="fas fa-save mr-1"></i>Simpan Catatan');
+                }
+            });
+        });
+
+        // Handler Preview Riwayat Peminjaman Mesin
+        $(document).on('click', '.btn-preview-pinjam-mesin', function (e) {
+            e.preventDefault();
+            const proses = $('#modalDetailProses').data('proses') || {};
+            const prosesId = proses.id || $('#modalDetailProses').data('prosesId');
+            if (!prosesId) return;
+
+            const jenisText = proses.jenis || 'Produksi';
+            const noOp = proses.details && proses.details.length ? proses.details.map(d => d.no_op).filter(Boolean).join(', ') : (proses.no_op || '-');
+            $('#pinjam-history-proses-info').html(`<i class="fas fa-info-circle mr-1"></i> <strong>Proses #${prosesId}</strong> (${jenisText}) | OP: ${noOp}`);
+            $('#pinjam-history-count').text('Memuat...');
+            $('#pinjam-history-tbody').html('<tr><td colspan="7" class="text-center py-3 text-muted"><i class="fas fa-spinner fa-spin mr-1"></i>Memuat riwayat peminjaman mesin...</td></tr>');
+
+            $('#modalPinjamMesinHistory').modal('show');
+
+            $.ajax({
+                url: `/proses/${prosesId}/pinjam-mesin-history`,
+                method: 'GET',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json'
+                },
+                success: function (response) {
+                    const data = response.data || [];
+                    $('#pinjam-history-count').text(`${data.length} Sesi`);
+
+                    if (!data.length) {
+                        $('#pinjam-history-tbody').html('<tr><td colspan="7" class="text-center py-3 text-muted">Belum ada riwayat peminjaman mesin untuk proses ini.</td></tr>');
+                        return;
+                    }
+
+                    let html = '';
+                    data.forEach((item, idx) => {
+                        const selesaiHtml = item.selesai_at_formatted
+                            ? item.selesai_at_formatted
+                            : '<span class="badge badge-warning"><i class="fas fa-spinner fa-spin mr-1"></i>Sedang Berjalan</span>';
+                        const userPinjam = item.user_pinjam ? `${item.user_pinjam.nama} <small class="text-muted">(${item.user_pinjam.role})</small>` : '-';
+                        const userSelesai = item.user_selesai ? `${item.user_selesai.nama} <small class="text-muted">(${item.user_selesai.role})</small>` : (item.selesai_at_formatted ? '-' : '<span class="text-muted">-</span>');
+
+                        html += `<tr>
+                            <td class="text-center">${idx + 1}</td>
+                            <td>${item.pinjam_at_formatted || '-'}</td>
+                            <td>${selesaiHtml}</td>
+                            <td><span class="badge badge-light border">${item.durasi_formatted || '-'}</span></td>
+                            <td>${item.alasan || '-'}</td>
+                            <td>${userPinjam}</td>
+                            <td>${userSelesai}</td>
+                        </tr>`;
+                    });
+                    $('#pinjam-history-tbody').html(html);
+                },
+                error: function (xhr) {
+                    $('#pinjam-history-count').text('0 Sesi');
+                    $('#pinjam-history-tbody').html(`<tr><td colspan="7" class="text-center py-3 text-danger"><i class="fas fa-exclamation-circle mr-1"></i>${xhr.responseJSON?.message || 'Gagal memuat riwayat peminjaman mesin.'}</td></tr>`);
+                }
+            });
+        });
+
+        // Pastikan backdrop & scroll modalDetailProses tetap aktif saat modalPinjamMesinHistory ditutup
+        $('#modalPinjamMesinHistory').on('hidden.bs.modal', function () {
+            if ($('#modalDetailProses').hasClass('show')) {
+                $('body').addClass('modal-open');
+            }
+        });
+
         // Handler tombol Hapus Proses (kirim permintaan delete ke approval FM)
         $(document).on('click', '.btn-delete-proses', function (e) {
             e.preventDefault();
@@ -5144,6 +5636,75 @@
                         },
                         error: function (xhr) {
                             let errMsg = 'Gagal menyelesaikan proses Maintenance.';
+                            if (xhr.responseJSON && xhr.responseJSON.message) {
+                                errMsg = xhr.responseJSON.message;
+                            }
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Gagal',
+                                text: errMsg
+                            });
+                        }
+                    });
+                }
+            });
+        });
+
+        // Handler tombol Selesai Proses Paksa (Produksi / Reproses untuk Kepala Shift & Super Admin)
+        $(document).on('click', '.btn-finish-force', function (e) {
+            e.preventDefault();
+            if ($(this).prop('disabled') || $(this).hasClass('disabled')) {
+                return false;
+            }
+            const proses = $('#modalDetailProses').data('proses');
+            if (!proses) return;
+
+            Swal.fire({
+                title: 'Selesaikan Proses Sekarang?',
+                text: 'Apakah Anda yakin untuk melanjutkan ke proses selanjutnya? Proses saat ini akan otomatis diselesaikan, masuk ke history, dan dilanjutkan dengan proses antrian di bawahnya.',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#28a745',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: '<i class="fas fa-check mr-1"></i>Ya, Lanjutkan',
+                cancelButtonText: 'Batal',
+                reverseButtons: true
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    Swal.fire({
+                        title: 'Menyelesaikan proses...',
+                        text: 'Mohon tunggu sebentar',
+                        allowOutsideClick: false,
+                        allowEscapeKey: false,
+                        didOpen: () => {
+                            Swal.showLoading();
+                        }
+                    });
+
+                    $.ajax({
+                        url: `{{ url('proses') }}/${proses.id}/force-finish`,
+                        method: 'POST',
+                        data: {
+                            _token: '{{ csrf_token() }}'
+                        },
+                        success: function (res) {
+                            $('#modalDetailProses').modal('hide');
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Berhasil',
+                                text: res.message || 'Proses berhasil diselesaikan dan dialihkan ke antrian berikutnya!',
+                                timer: 1500,
+                                showConfirmButton: false
+                            }).then(() => {
+                                if (typeof loadDashboardData === 'function') {
+                                    loadDashboardData();
+                                } else {
+                                    window.location.reload();
+                                }
+                            });
+                        },
+                        error: function (xhr) {
+                            let errMsg = 'Gagal menyelesaikan proses.';
                             if (xhr.responseJSON && xhr.responseJSON.message) {
                                 errMsg = xhr.responseJSON.message;
                             }
@@ -5542,57 +6103,141 @@
             }
         });
 
-        // Handler klik tombol Request Topping LA/AUX
+        // Handler klik tombol Request Topping LA/AUX dengan input durasi penambahan waktu
         $(document).on('click', '.request-topping-btn', function () {
             const type = $(this).data('type');
             const prosesId = $(this).data('id');
             const url = `/proses/${prosesId}/topping/${type}/request`;
-            const label = type.toUpperCase();
+            const label = type === 'la' ? 'Dye Stuff (LA)' : 'AUX';
             const $btn = $(this);
-            $btn.prop('disabled', true);
-            $.ajax({
-                url: url,
-                method: 'POST',
-                data: {
-                    _token: $('meta[name="csrf-token"]').attr('content')
+
+            Swal.fire({
+                title: `Request Topping ${label}`,
+                html: `
+                    <div class="text-left" style="font-size: 14px;">
+                        <div class="alert alert-info py-2 px-3 mb-3" style="font-size: 13px;">
+                            <i class="fas fa-info-circle mr-1"></i> Request topping membutuhkan approval <strong>Kepala Shift</strong>. Jadwal input Dye Stuff / AUX normal berikutnya dan Cycle Time akan otomatis dimundurkan.
+                        </div>
+                        <div class="form-group mb-2">
+                            <label class="font-weight-bold mb-1">Durasi Topping <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <input type="number" id="swal-topping-durasi" class="form-control" placeholder="Contoh: 1" min="0.1" step="any" value="1" required>
+                                <div class="input-group-append">
+                                    <select id="swal-topping-unit" class="custom-select font-weight-bold" style="min-width: 100px;">
+                                        <option value="jam" selected>Jam</option>
+                                        <option value="menit">Menit</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <small class="form-text text-muted">Menerima format jam (contoh: 1 atau 1.5) maupun menit (contoh: 30, 45, 60).</small>
+                        </div>
+                        <div class="p-2 rounded bg-light border mt-3" id="swal-topping-preview-box">
+                            <div class="text-secondary small font-weight-bold mb-1">Kalkulasi Kemunduran Jadwal & Cycle Time:</div>
+                            <div id="swal-topping-preview-text" class="text-dark font-weight-bold" style="font-size: 13px;">
+                                Durasi: 1 Jam + 45 Menit (toleransi scan) = <span class="text-primary">+1 Jam 45 Menit</span>
+                            </div>
+                        </div>
+                    </div>
+                `,
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#17a2b8',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: '<i class="fas fa-paper-plane mr-1"></i>Kirim Request',
+                cancelButtonText: 'Batal',
+                reverseButtons: true,
+                didOpen: () => {
+                    const updatePreview = () => {
+                        const val = parseFloat($('#swal-topping-durasi').val()) || 0;
+                        const unit = $('#swal-topping-unit').val();
+                        if (val <= 0) {
+                            $('#swal-topping-preview-text').html('<span class="text-danger">Harap masukkan durasi yang valid (> 0).</span>');
+                            return;
+                        }
+                        const durasiSec = unit === 'menit' ? val * 60 : val * 3600;
+                        const spareSec = 2700; // 45 menit
+                        const totalSec = durasiSec + spareSec;
+
+                        const durasiH = Math.floor(durasiSec / 3600);
+                        const durasiM = Math.floor((durasiSec % 3600) / 60);
+                        let durText = [];
+                        if (durasiH > 0) durText.push(durasiH + ' Jam');
+                        if (durasiM > 0) durText.push(durasiM + ' Menit');
+
+                        const totH = Math.floor(totalSec / 3600);
+                        const totM = Math.floor((totalSec % 3600) / 60);
+                        let totText = [];
+                        if (totH > 0) totText.push(totH + ' Jam');
+                        if (totM > 0) totText.push(totM + ' Menit');
+
+                        $('#swal-topping-preview-text').html(`
+                            Durasi: <strong>${durText.join(' ')}</strong> + <strong>45 Menit</strong> (toleransi scan) = <span class="text-primary font-weight-bold" style="font-size: 14px;">+${totText.join(' ')}</span>
+                        `);
+                    };
+                    $('#swal-topping-durasi, #swal-topping-unit').on('input change', updatePreview);
                 },
-                success: function (res) {
-                    if (res.status === 'success') {
-                        ToastSuccess.fire({ title: res.message });
-                        const $modal = $('#modalDetailProses');
-                        if ($modal.length && $modal.data('proses') && $('#modalDetailProses').hasClass('show')) {
-                            const proses = $modal.data('proses');
-                            const selectedDetailId = $('#detail-proses-select').val() || $modal.data('detailProsesId') || '';
-                            if (window.loadBarcodesIntoDetailModal) {
-                                window.loadBarcodesIntoDetailModal(proses.id, selectedDetailId);
-                            }
-                        }
-                        // Inject indikator TD/TA kuning di card dashboard (header + setiap blok per OP untuk multiple)
-                        const $card = $('.status-card[data-proses-id="' + prosesId + '"]');
-                        if ($card.length) {
-                            const $header = $card.find('.card-header > div:nth-child(2)');
-                            const $gdaContainers = $card.find('.op-list > div:has(.gda-block)');
-                            const tdHtml = '<span class="topping-indicator topping-td" data-block-type="TD" title="Topping Dyes - Menunggu approval" style="display: inline-block; background:#fff9c4;color:#111;border:2.5px solid #f9a825; font-weight: bold; font-size: 18px; padding: 2px 8px; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.10); letter-spacing: 1px;">TD</span>';
-                            const taHtml = '<span class="topping-indicator topping-ta" data-block-type="TA" title="Topping Auxiliaries - Menunggu approval" style="display: inline-block; background:#fff9c4;color:#111;border:2.5px solid #f9a825; font-weight: bold; font-size: 18px; padding: 2px 8px; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.10); letter-spacing: 1px;">TA</span>';
-                            if (type === 'la' && !$card.find('.topping-td').length) {
-                                $header.append(tdHtml);
-                                $gdaContainers.each(function () { if (!$(this).find('.topping-td').length) $(this).append(tdHtml); });
-                            } else if (type === 'aux' && !$card.find('.topping-ta').length) {
-                                $header.append(taHtml);
-                                $gdaContainers.each(function () { if (!$(this).find('.topping-ta').length) $(this).append(taHtml); });
-                            }
-                        }
-                    } else {
-                        ToastError.fire({ title: res.message || 'Gagal request topping' });
+                preConfirm: () => {
+                    const val = parseFloat($('#swal-topping-durasi').val());
+                    const unit = $('#swal-topping-unit').val();
+                    if (!val || val <= 0) {
+                        Swal.showValidationMessage('Harap masukkan durasi topping yang valid (> 0).');
+                        return false;
                     }
-                },
-                error: function (xhr) {
-                    const msg = xhr.responseJSON && xhr.responseJSON.message ? xhr.responseJSON.message : 'Gagal request topping ' + label;
-                    ToastError.fire({ title: msg });
-                },
-                complete: function () {
-                    $btn.prop('disabled', false);
+                    return { durasi: val, unit: unit };
                 }
+            }).then((result) => {
+                if (!result.isConfirmed || !result.value) return;
+
+                const durasi = result.value.durasi;
+                const unit = result.value.unit;
+
+                $btn.prop('disabled', true);
+                $.ajax({
+                    url: url,
+                    method: 'POST',
+                    data: {
+                        _token: $('meta[name="csrf-token"]').attr('content'),
+                        durasi: durasi,
+                        unit: unit
+                    },
+                    success: function (res) {
+                        if (res.status === 'success') {
+                            ToastSuccess.fire({ title: res.message });
+                            const $modal = $('#modalDetailProses');
+                            if ($modal.length && $modal.data('proses') && $('#modalDetailProses').hasClass('show')) {
+                                const proses = $modal.data('proses');
+                                const selectedDetailId = $('#detail-proses-select').val() || $modal.data('detailProsesId') || '';
+                                if (window.loadBarcodesIntoDetailModal) {
+                                    window.loadBarcodesIntoDetailModal(proses.id, selectedDetailId);
+                                }
+                            }
+                            // Inject indikator TD/TA kuning di card dashboard (header + setiap blok per OP untuk multiple)
+                            const $card = $('.status-card[data-proses-id="' + prosesId + '"]');
+                            if ($card.length) {
+                                const $header = $card.find('.card-header > div:nth-child(2)');
+                                const $gdaContainers = $card.find('.op-list > div:has(.gda-block)');
+                                const tdHtml = '<span class="topping-indicator topping-td" data-block-type="TD" title="Topping Dyes - Menunggu approval" style="display: inline-block; background:#fff9c4;color:#111;border:2.5px solid #f9a825; font-weight: bold; font-size: 18px; padding: 2px 8px; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.10); letter-spacing: 1px;">TD</span>';
+                                const taHtml = '<span class="topping-indicator topping-ta" data-block-type="TA" title="Topping Auxiliaries - Menunggu approval" style="display: inline-block; background:#fff9c4;color:#111;border:2.5px solid #f9a825; font-weight: bold; font-size: 18px; padding: 2px 8px; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.10); letter-spacing: 1px;">TA</span>';
+                                if (type === 'la' && !$card.find('.topping-td').length) {
+                                    $header.append(tdHtml);
+                                    $gdaContainers.each(function () { if (!$(this).find('.topping-td').length) $(this).append(tdHtml); });
+                                } else if (type === 'aux' && !$card.find('.topping-ta').length) {
+                                    $header.append(taHtml);
+                                    $gdaContainers.each(function () { if (!$(this).find('.topping-ta').length) $(this).append(taHtml); });
+                                }
+                            }
+                        } else {
+                            ToastError.fire({ title: res.message || 'Gagal request topping' });
+                        }
+                    },
+                    error: function (xhr) {
+                        const msg = xhr.responseJSON && xhr.responseJSON.message ? xhr.responseJSON.message : 'Gagal request topping ' + label;
+                        ToastError.fire({ title: msg });
+                    },
+                    complete: function () {
+                        $btn.prop('disabled', false);
+                    }
+                });
             });
         });
 
@@ -6539,11 +7184,11 @@
                         if (isPinjamActive) {
                             $btnPinjam.removeClass('btn-info').addClass('btn-danger');
                             $btnPinjam.html('<i class="fas fa-power-off mr-1"></i>Matikan Pinjam Mesin');
-                            $btnPinjam.attr('title', 'Klik untuk mematikan status Pinjam Mesin (Address 105 = 0)');
+                            $btnPinjam.attr('title', 'Klik untuk mematikan status Pinjam Mesin');
                         } else {
                             $btnPinjam.removeClass('btn-danger').addClass('btn-info');
                             $btnPinjam.html('<i class="fas fa-exchange-alt mr-1"></i>Pinjam Mesin');
-                            $btnPinjam.attr('title', 'Klik untuk mengaktifkan status Pinjam Mesin (Address 105 = 1)');
+                            $btnPinjam.attr('title', 'Klik untuk mengaktifkan status Pinjam Mesin');
                         }
                     }
                 }

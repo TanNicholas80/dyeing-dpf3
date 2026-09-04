@@ -291,10 +291,80 @@ class ApprovalController extends Controller
             return;
         }
 
-        // Topping LA/AUX: cukup broadcast agar Kepala Ruangan bisa input barcode
+        // Topping LA/AUX: Update cycle_time dan geser sisa jadwal breakdown normal, lalu broadcast ke dashboard
         if (in_array($approval->action, ['topping_la', 'topping_aux'])) {
             $proses = $approval->proses;
             if ($proses) {
+                $history = $approval->history_data ?? [];
+                $totalDelaySeconds = (int) ($history['total_delay_seconds'] ?? 0);
+
+                if ($totalDelaySeconds > 0) {
+                    // 1. Tambah cycle_time pada proses
+                    $oldCycleTime = (int) ($proses->cycle_time ?? 0);
+                    $proses->cycle_time = $oldCycleTime + $totalDelaySeconds;
+
+                    // Hitung durasi proses yang sudah berjalan
+                    $elapsed = 0;
+                    if ($proses->mulai) {
+                        $mulaiCarbon = \Carbon\Carbon::parse($proses->mulai);
+                        $elapsed = max(0, abs(now()->diffInSeconds($mulaiCarbon)));
+                    }
+
+                    // 2. Geser jadwal Dye Stuff berikutnya yang belum dijalankan/di-scan
+                    $laScannedCount = \App\Models\BarcodeLa::whereHas('detailProses', fn($q) => $q->where('proses_id', $proses->id))
+                        ->whereNull('approval_id')
+                        ->where('cancel', false)
+                        ->distinct()
+                        ->count('barcode');
+
+                    $dsSchedules = $proses->dye_stuff_schedules;
+                    if (is_string($dsSchedules)) {
+                        $dsSchedules = json_decode($dsSchedules, true);
+                    }
+                    if (is_array($dsSchedules) && count($dsSchedules) > 0) {
+                        $newDs = [];
+                        foreach ($dsSchedules as $idx => $sch) {
+                            $sec = $this->parseScheduleTimeToSeconds($sch);
+                            // Geser jika index step >= jumlah yang sudah di-scan ATAU waktu jadwal >= elapsed time
+                            if ($idx >= $laScannedCount || ($elapsed > 0 && $sec >= $elapsed)) {
+                                $newSec = $sec + $totalDelaySeconds;
+                                $newDs[] = $this->formatSecondsToHms($newSec);
+                            } else {
+                                $newDs[] = is_array($sch) || is_object($sch) ? $this->formatSecondsToHms($sec) : (string) $sch;
+                            }
+                        }
+                        $proses->dye_stuff_schedules = $newDs;
+                    }
+
+                    // 3. Geser jadwal AUX berikutnya yang belum dijalankan/di-scan
+                    $auxScannedCount = \App\Models\BarcodeAux::whereHas('detailProses', fn($q) => $q->where('proses_id', $proses->id))
+                        ->whereNull('approval_id')
+                        ->where('cancel', false)
+                        ->distinct()
+                        ->count('barcode');
+
+                    $auxSchedules = $proses->aux_schedules;
+                    if (is_string($auxSchedules)) {
+                        $auxSchedules = json_decode($auxSchedules, true);
+                    }
+                    if (is_array($auxSchedules) && count($auxSchedules) > 0) {
+                        $newAux = [];
+                        foreach ($auxSchedules as $idx => $sch) {
+                            $sec = $this->parseScheduleTimeToSeconds($sch);
+                            // Geser jika index step >= jumlah yang sudah di-scan ATAU waktu jadwal >= elapsed time
+                            if ($idx >= $auxScannedCount || ($elapsed > 0 && $sec >= $elapsed)) {
+                                $newSec = $sec + $totalDelaySeconds;
+                                $newAux[] = $this->formatSecondsToHms($newSec);
+                            } else {
+                                $newAux[] = is_array($sch) || is_object($sch) ? $this->formatSecondsToHms($sec) : (string) $sch;
+                            }
+                        }
+                        $proses->aux_schedules = $newAux;
+                    }
+
+                    $proses->save();
+                }
+
                 $proses->refresh();
                 $proses->load(['approvals', 'details.barcodeKains', 'details.barcodeLas', 'details.barcodeAuxs']);
                 $statusService = new ProsesStatusService();
@@ -828,5 +898,59 @@ class ApprovalController extends Controller
                 ->withProperties(['note' => $approval->note])
                 ->log("Approval {$approval->action} ditolak otomatis oleh sistem (> 10 menit).");
         }
+    }
+
+    /**
+     * Helper konversi string jam (JJ:MM:DD / JJ:MM / detik) ke total detik.
+     */
+    private function parseScheduleTimeToSeconds($val): int
+    {
+        if (empty($val)) {
+            return 0;
+        }
+        if (is_array($val) && isset($val['time'])) {
+            $val = $val['time'];
+        } elseif (is_object($val) && isset($val->time)) {
+            $val = $val->time;
+        }
+        if (is_numeric($val)) {
+            return (int) $val;
+        }
+        $parts = explode(':', trim((string) $val));
+        if (count($parts) === 3) {
+            return ((int) $parts[0]) * 3600 + ((int) $parts[1]) * 60 + ((int) $parts[2]);
+        }
+        if (count($parts) === 2) {
+            return ((int) $parts[0]) * 3600 + ((int) $parts[1]) * 60;
+        }
+        return (int) $val;
+    }
+
+    /**
+     * Helper konversi total detik ke format JJ:MM:DD.
+     */
+    private function formatSecondsToHms(int $seconds): string
+    {
+        $h = floor($seconds / 3600);
+        $m = floor(($seconds % 3600) / 60);
+        $s = $seconds % 60;
+        return sprintf('%02d:%02d:%02d', $h, $m, $s);
+    }
+
+    /**
+     * Helper publik untuk format total detik ke teks ramah pengguna (misal: "1 Jam 45 Menit").
+     */
+    public static function formatSecondsToHumRead(int $seconds): string
+    {
+        $jam = floor($seconds / 3600);
+        $menit = floor(($seconds % 3600) / 60);
+        $res = [];
+        if ($jam > 0) {
+            $res[] = "{$jam} Jam";
+        }
+        if ($menit > 0) {
+            $res[] = "{$menit} Menit";
+        }
+        return !empty($res) ? implode(' ', $res) : "0 Menit";
     }
 }
