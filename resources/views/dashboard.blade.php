@@ -403,15 +403,19 @@
                 <div class="row mb-2 align-items-center">
                     <div class="col-sm-6 d-flex align-items-center mb-2 mb-sm-0">
                         <h1 class="m-0 font-weight-bold" style="font-size: 1.6rem; letter-spacing: 0.5px;">Dashboard</h1>
-                        <button type="button" class="btn btn-sm btn-outline-primary ml-3 d-flex align-items-center shadow-sm"
-                            data-toggle="modal" data-target="#modalFilterDashboard" style="font-weight: 600; border-radius: 20px; padding: 4px 14px;">
+                        <button type="button"
+                            class="btn btn-sm btn-outline-primary ml-3 d-flex align-items-center shadow-sm"
+                            data-toggle="modal" data-target="#modalFilterDashboard"
+                            style="font-weight: 600; border-radius: 20px; padding: 4px 14px;">
                             <i class="fas fa-filter mr-1"></i> Filter
                             @if(($activeFilterCount ?? 0) > 0)
-                                <span class="badge badge-danger ml-2 px-2 py-1" style="border-radius: 10px; font-size: 0.75rem;">{{ $activeFilterCount }}</span>
+                                <span class="badge badge-danger ml-2 px-2 py-1"
+                                    style="border-radius: 10px; font-size: 0.75rem;">{{ $activeFilterCount }}</span>
                             @endif
                         </button>
                         @if(($activeFilterCount ?? 0) > 0)
-                            <a href="{{ url('dashboard') }}" class="btn btn-sm btn-link text-danger ml-2 p-0" title="Reset Semua Filter" style="font-size: 0.85rem; text-decoration: underline;">
+                            <a href="{{ url('dashboard') }}" class="btn btn-sm btn-link text-danger ml-2 p-0"
+                                title="Reset Semua Filter" style="font-size: 0.85rem; text-decoration: underline;">
                                 <i class="fas fa-times-circle"></i> Reset Semua Filter
                             </a>
                         @endif
@@ -430,8 +434,8 @@
                         </div>
                         <div id="dashboard-controls" style="display: flex; justify-content: flex-end; gap: 10px;">
                             @if ($canAddProses ?? true)
-                                <button type="button" id="add-card-btn" class="btn btn-success shadow-sm" style="font-weight:bold;"
-                                    data-toggle="modal" data-target="#modalProses">
+                                <button type="button" id="add-card-btn" class="btn btn-success shadow-sm"
+                                    style="font-weight:bold;" data-toggle="modal" data-target="#modalProses">
                                     + Tambah Proses
                                 </button>
                             @endif
@@ -448,7 +452,8 @@
                                 @php
                                     $mesinNames = $mesins->whereIn('id', $selectedMesinArr)->pluck('jenis_mesin')->implode(', ');
                                 @endphp
-                                <span class="badge badge-light border border-primary text-primary px-2 py-1" style="font-size: 0.82rem;">
+                                <span class="badge badge-light border border-primary text-primary px-2 py-1"
+                                    style="font-size: 0.82rem;">
                                     <strong>Mesin:</strong> {{ Str::limit($mesinNames, 30) }}
                                 </span>
                             @endif
@@ -463,37 +468,44 @@
                                 </span>
                             @endif
                             @if(!empty($selectedWarnaArr))
-                                <span class="badge badge-light border border-success text-success px-2 py-1" style="font-size: 0.82rem;">
+                                <span class="badge badge-light border border-success text-success px-2 py-1"
+                                    style="font-size: 0.82rem;">
                                     <strong>Warna:</strong> {{ Str::limit(implode(', ', $selectedWarnaArr), 30) }}
                                 </span>
                             @endif
                             @if(!empty($selectedKategoriWarnaArr))
-                                <span class="badge badge-light border border-success text-success px-2 py-1" style="font-size: 0.82rem;">
+                                <span class="badge badge-light border border-success text-success px-2 py-1"
+                                    style="font-size: 0.82rem;">
                                     <strong>Kategori Warna:</strong> {{ Str::limit(implode(', ', $selectedKategoriWarnaArr), 30) }}
                                 </span>
                             @endif
                             @if(!empty($selectedKodeWarnaArr))
-                                <span class="badge badge-light border border-success text-success px-2 py-1" style="font-size: 0.82rem;">
+                                <span class="badge badge-light border border-success text-success px-2 py-1"
+                                    style="font-size: 0.82rem;">
                                     <strong>Kode Warna:</strong> {{ Str::limit(implode(', ', $selectedKodeWarnaArr), 30) }}
                                 </span>
                             @endif
                             @if(!empty($selectedHfeelArr))
-                                <span class="badge badge-light border border-secondary text-dark px-2 py-1" style="font-size: 0.82rem;">
+                                <span class="badge badge-light border border-secondary text-dark px-2 py-1"
+                                    style="font-size: 0.82rem;">
                                     <strong>Handfeel:</strong> {{ Str::limit(implode(', ', $selectedHfeelArr), 30) }}
                                 </span>
                             @endif
                             @if(!empty($selectedGramasiArr))
-                                <span class="badge badge-light border border-secondary text-dark px-2 py-1" style="font-size: 0.82rem;">
+                                <span class="badge badge-light border border-secondary text-dark px-2 py-1"
+                                    style="font-size: 0.82rem;">
                                     <strong>Gramasi:</strong> {{ Str::limit(implode(', ', $selectedGramasiArr), 30) }}
                                 </span>
                             @endif
                             @if(!empty($selectedNoOpArr))
-                                <span class="badge badge-light border border-warning text-dark px-2 py-1" style="font-size: 0.82rem;">
+                                <span class="badge badge-light border border-warning text-dark px-2 py-1"
+                                    style="font-size: 0.82rem;">
                                     <strong>No OP:</strong> {{ Str::limit(implode(', ', $selectedNoOpArr), 30) }}
                                 </span>
                             @endif
                             @if(!empty($selectedNoPartaiArr))
-                                <span class="badge badge-light border border-warning text-dark px-2 py-1" style="font-size: 0.82rem;">
+                                <span class="badge badge-light border border-warning text-dark px-2 py-1"
+                                    style="font-size: 0.82rem;">
                                     <strong>No Partai:</strong> {{ Str::limit(implode(', ', $selectedNoPartaiArr), 30) }}
                                 </span>
                             @endif
@@ -928,7 +940,8 @@
                                                                 {{-- Header --}}
                                                                 <div class="card-header"
                                                                     style="display: flex; flex-direction: row; align-items: center; padding: 0 10px 2px 10px; gap: 0; border-bottom: none;">
-                                                                    <div style="{{ $proses->jenis === 'Maintenance' ? 'flex: 0 0 auto;' : 'flex: 1;' }} text-align: left;">
+                                                                    <div
+                                                                        style="{{ $proses->jenis === 'Maintenance' ? 'flex: 0 0 auto;' : 'flex: 1;' }} text-align: left;">
                                                                         <span class="status-type"
                                                                             style="font-weight: bold; font-size: 32px; color: #111; text-shadow: 0 1px 4px #fff8;">
                                                                             {{ $type }}
@@ -978,9 +991,21 @@
                                                                             @endif
                                                                         @endif
                                                                     </div>
-                                                                    <div style="{{ $proses->jenis === 'Maintenance' ? 'flex: 0 0 auto;' : 'flex: 1;' }} text-align: right;">
-                                                                        <div class="status-light {{ $light == 'green' ? 'running-light' : ($light == 'yellow' ? 'running-light-yellow' : '') }}"
-                                                                            style="width: 24px; height: 24px; border-radius: 50%; background: {{ $light == 'green' ? '#00ff1a' : ($light == 'yellow' ? '#ffeb3b' : '#ff2a2a') }}; display: inline-block; border: 3px solid #fff; box-shadow: 0 0 0 0 transparent; transition: background 0.2s;">
+                                                                    <div class="status-header-right"
+                                                                        style="{{ $proses->jenis === 'Maintenance' ? 'flex: 0 0 auto;' : 'flex: 1;' }} display: flex; flex-direction: column; align-items: flex-end; justify-content: center;">
+                                                                        <div style="display: flex; align-items: center; justify-content: flex-end;">
+                                                                            <div class="status-light {{ $light == 'green' ? 'running-light' : ($light == 'yellow' ? 'running-light-yellow' : '') }}"
+                                                                                style="width: 24px; height: 24px; border-radius: 50%; background: {{ $light == 'green' ? '#00ff1a' : ($light == 'yellow' ? '#ffeb3b' : '#ff2a2a') }}; display: inline-block; border: 3px solid #fff; box-shadow: 0 0 0 0 transparent; transition: background 0.2s;">
+                                                                            </div>
+                                                                        </div>
+                                                                        @php
+                                                                            $isPinjamMesinHist = (bool) ($proses->is_pinjam_mesin ?? false);
+                                                                        @endphp
+                                                                        <div class="pinjam-mesin-indicator" style="{{ $isPinjamMesinHist ? 'display: flex;' : 'display: none;' }} justify-content: center; align-items: center; width: 24px; margin-top: 2px;">
+                                                                            <span class="badge-pinjam-mesin" title="Pinjam Mesin Aktif{{ !empty($proses->pinjam_mesin_alasan) ? ': ' . $proses->pinjam_mesin_alasan : '' }}"
+                                                                                style="font-weight: 800; font-size: 13px; color: #111; text-shadow: 0 1px 3px rgba(255,255,255,0.9), 0 0 4px rgba(255,255,255,0.8); letter-spacing: 0.5px; line-height: 1; text-align: center;">
+                                                                                PM
+                                                                            </span>
                                                                         </div>
                                                                     </div>
                                                                 </div>
@@ -994,149 +1019,149 @@
                                                                         $isMultipleOp = $detailList->count() > 1;
                                                                     @endphp
                                                                     @if ($proses->jenis !== 'Maintenance')
-                                                                    <div class="op-list">
-                                                                        @if ($detailList->isEmpty())
-                                                                            {{-- Tidak ada detail --}}
-                                                                            <div class="op-row" data-detail-id="">
-                                                                                <div class="op-row-noop"
-                                                                                    style="font-weight: bold; color: #111; font-size: 22px; letter-spacing: 2px; text-shadow: 0 1px 4px #fff8;">
-                                                                                    -
-                                                                                </div>
-                                                                            </div>
-                                                                        @elseif ($isMultipleOp)
-                                                                            {{-- Multiple OP: OP pertama dengan header lengkap, OP kedua+
-                                                                            dengan garis pemisah --}}
-                                                                            @php
-                                                                                $firstDetail = $detailList->first();
-                                                                            @endphp
-                                                                            {{-- OP Pertama: Detail lengkap dengan No OP dan Info --}}
-                                                                            <div class="op-row" data-detail-id="{{ $firstDetail->id }}">
-                                                                                <div class="op-row-noop"
-                                                                                    style="font-weight: bold; color: #111; font-size: 22px; letter-spacing: 2px; text-shadow: 0 1px 4px #fff8; margin-bottom: 4px;">
-                                                                                    {{ $firstDetail->no_op ?? '-' }}
-                                                                                </div>
-                                                                                @if($firstDetail->customer)
-                                                                                    <div
-                                                                                        style="font-size: 16px; margin: 2px 0; color: #111; font-weight: bold; text-shadow: 0 1px 2px #fff8;">
-                                                                                        {{ $firstDetail->customer }}
-                                                                                    </div>
-                                                                                @endif
-                                                                                <div class="op-row-info"
-                                                                                    style="margin: 2px 0; color: #fff; text-shadow: 0 1px 2px #0008;">
-                                                                                    <div>
-                                                                                        {{ $firstDetail->warna ?? 'Warna' }} -
-                                                                                        {{ $firstDetail->kategori_warna ?? 'Kategori' }} -
-                                                                                        {{ $firstDetail->kode_warna ?? 'Kode' }}
-                                                                                    </div>
-                                                                                    <div>{{ $firstDetail->konstruksi ?? 'Konstruksi' }}
+                                                                        <div class="op-list">
+                                                                            @if ($detailList->isEmpty())
+                                                                                {{-- Tidak ada detail --}}
+                                                                                <div class="op-row" data-detail-id="">
+                                                                                    <div class="op-row-noop"
+                                                                                        style="font-weight: bold; color: #111; font-size: 22px; letter-spacing: 2px; text-shadow: 0 1px 4px #fff8;">
+                                                                                        -
                                                                                     </div>
                                                                                 </div>
-                                                                            </div>
-
-                                                                            {{-- Loop OP kedua dan seterusnya dengan garis pemisah --}}
-                                                                            @foreach ($detailList->skip(1) as $d)
+                                                                            @elseif ($isMultipleOp)
+                                                                                {{-- Multiple OP: OP pertama dengan header lengkap, OP kedua+
+                                                                                dengan garis pemisah --}}
                                                                                 @php
-                                                                                    // Indikator G: hijau hanya jika jumlah barcode kain >= roll
-                                                                                    $subRoll = $d->roll ?? 0;
-                                                                                    $subBarcodeKainCount = isset($d->barcodeKains)
-                                                                                        ? $d->barcodeKains->where('cancel', false)->count()
-                                                                                        : 0;
-                                                                                    $subHasKain = ($subBarcodeKainCount >= $subRoll && $subRoll > 0);
-                                                                                    $subHasLa = isset($d->barcodeLas)
-                                                                                        ? $d->barcodeLas->where('cancel', false)->count() > 0
-                                                                                        : false;
-                                                                                    $subHasAux = isset($d->barcodeAuxs)
-                                                                                        ? $d->barcodeAuxs->where('cancel', false)->count() > 0
-                                                                                        : false;
-                                                                                    $subMap = $barcodeKainOptional
-                                                                                        ? [$blocks[0] => $subHasLa ? 'green' : 'red', $blocks[1] => $subHasAux ? 'green' : 'red']
-                                                                                        : [$blocks[0] => $subHasKain ? 'green' : 'red', $blocks[1] => $subHasLa ? 'green' : 'red', $blocks[2] => $subHasAux ? 'green' : 'red'];
+                                                                                    $firstDetail = $detailList->first();
                                                                                 @endphp
-                                                                                {{-- Garis pemisah --}}
-                                                                                <div
-                                                                                    style="border-top: 1px solid rgba(255,255,255,0.3); margin: 8px 0; padding-top: 8px;">
-                                                                                </div>
-                                                                                {{-- GDA/FDA + TD/TA per OP (di luar detail OP, ukuran sama
-                                                                                dengan header) --}}
-                                                                                <div
-                                                                                    style="display: flex; justify-content: center; gap: 6px; margin-bottom: 6px;">
-                                                                                    @foreach ($blocks as $b)
-                                                                                        @php
-                                                                                            $color = $subMap[$b] ?? 'red';
-                                                                                            $blockBg = $color === 'green' ? '#d4f8e8' : '#ffb3b3';
-                                                                                            $blockBorder = $color === 'green' ? '#43a047' : '#c62828';
-                                                                                        @endphp
-                                                                                        <span class="gda-block" data-block-type="{{ $b }}"
-                                                                                            style="display: inline-block; background: {{ $blockBg }}; color: #111; font-weight: bold; font-size: 22px; padding: 2px 10px; border-radius: 6px; border: 2.5px solid {{ $blockBorder }}; box-shadow: 0 1px 4px rgba(0,0,0,0.10); letter-spacing: 1px; text-shadow: 0 1px 2px #fff8;">
-                                                                                            {{ $b }}
-                                                                                        </span>
-                                                                                    @endforeach
-                                                                                    @if($proses->jenis !== 'Maintenance' && ($hasToppingLa ?? false))
-                                                                                        <span class="topping-indicator topping-td"
-                                                                                            data-block-type="TD"
-                                                                                            title="Topping Dyes - {{ \App\Services\ProsesStatusService::toppingIndicatorTitle($tdColor, 'td') }}"
-                                                                                            style="display: inline-block; {{ $tdStyle }}; font-weight: bold; font-size: 18px; padding: 2px 8px; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.10); letter-spacing: 1px;">TD</span>
-                                                                                    @endif
-                                                                                    @if($proses->jenis !== 'Maintenance' && ($hasToppingAux ?? false))
-                                                                                        <span class="topping-indicator topping-ta"
-                                                                                            data-block-type="TA"
-                                                                                            title="Topping Auxiliaries - {{ \App\Services\ProsesStatusService::toppingIndicatorTitle($taColor, 'ta') }}"
-                                                                                            style="display: inline-block; {{ $taStyle }}; font-weight: bold; font-size: 18px; padding: 2px 8px; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.10); letter-spacing: 1px;">TA</span>
-                                                                                    @endif
-                                                                                </div>
-                                                                                {{-- Detail OP (No OP + Info) --}}
-                                                                                <div class="op-row" data-detail-id="{{ $d->id }}">
-                                                                                    {{-- No OP --}}
+                                                                                {{-- OP Pertama: Detail lengkap dengan No OP dan Info --}}
+                                                                                <div class="op-row" data-detail-id="{{ $firstDetail->id }}">
                                                                                     <div class="op-row-noop"
                                                                                         style="font-weight: bold; color: #111; font-size: 22px; letter-spacing: 2px; text-shadow: 0 1px 4px #fff8; margin-bottom: 4px;">
-                                                                                        {{ $d->no_op ?? '-' }}
+                                                                                        {{ $firstDetail->no_op ?? '-' }}
                                                                                     </div>
-                                                                                    @if($d->customer)
+                                                                                    @if($firstDetail->customer)
                                                                                         <div
                                                                                             style="font-size: 16px; margin: 2px 0; color: #111; font-weight: bold; text-shadow: 0 1px 2px #fff8;">
-                                                                                            {{ $d->customer }}
+                                                                                            {{ $firstDetail->customer }}
                                                                                         </div>
                                                                                     @endif
-                                                                                    {{-- Info warna/kategori/konstruksi --}}
                                                                                     <div class="op-row-info"
                                                                                         style="margin: 2px 0; color: #fff; text-shadow: 0 1px 2px #0008;">
                                                                                         <div>
-                                                                                            {{ $d->warna ?? 'Warna' }} -
-                                                                                            {{ $d->kategori_warna ?? 'Kategori' }} -
-                                                                                            {{ $d->kode_warna ?? 'Kode' }}
+                                                                                            {{ $firstDetail->warna ?? 'Warna' }} -
+                                                                                            {{ $firstDetail->kategori_warna ?? 'Kategori' }} -
+                                                                                            {{ $firstDetail->kode_warna ?? 'Kode' }}
                                                                                         </div>
-                                                                                        <div>{{ $d->konstruksi ?? 'Konstruksi' }}</div>
+                                                                                        <div>{{ $firstDetail->konstruksi ?? 'Konstruksi' }}
+                                                                                        </div>
                                                                                     </div>
                                                                                 </div>
-                                                                            @endforeach
-                                                                        @else
-                                                                            {{-- Single OP: Tampilan normal dengan semua komponen --}}
-                                                                            @php
-                                                                                $singleDetail = $detailList->first();
-                                                                            @endphp
-                                                                            <div class="op-row" data-detail-id="{{ $singleDetail->id }}">
-                                                                                <div class="op-row-noop"
-                                                                                    style="font-weight: bold; color: #111; font-size: 22px; letter-spacing: 2px; text-shadow: 0 1px 4px #fff8;">
-                                                                                    {{ $singleDetail->no_op ?? '-' }}
-                                                                                </div>
-                                                                                @if($singleDetail->customer)
+
+                                                                                {{-- Loop OP kedua dan seterusnya dengan garis pemisah --}}
+                                                                                @foreach ($detailList->skip(1) as $d)
+                                                                                    @php
+                                                                                        // Indikator G: hijau hanya jika jumlah barcode kain >= roll
+                                                                                        $subRoll = $d->roll ?? 0;
+                                                                                        $subBarcodeKainCount = isset($d->barcodeKains)
+                                                                                            ? $d->barcodeKains->where('cancel', false)->count()
+                                                                                            : 0;
+                                                                                        $subHasKain = ($subBarcodeKainCount >= $subRoll && $subRoll > 0);
+                                                                                        $subHasLa = isset($d->barcodeLas)
+                                                                                            ? $d->barcodeLas->where('cancel', false)->count() > 0
+                                                                                            : false;
+                                                                                        $subHasAux = isset($d->barcodeAuxs)
+                                                                                            ? $d->barcodeAuxs->where('cancel', false)->count() > 0
+                                                                                            : false;
+                                                                                        $subMap = $barcodeKainOptional
+                                                                                            ? [$blocks[0] => $subHasLa ? 'green' : 'red', $blocks[1] => $subHasAux ? 'green' : 'red']
+                                                                                            : [$blocks[0] => $subHasKain ? 'green' : 'red', $blocks[1] => $subHasLa ? 'green' : 'red', $blocks[2] => $subHasAux ? 'green' : 'red'];
+                                                                                    @endphp
+                                                                                    {{-- Garis pemisah --}}
                                                                                     <div
-                                                                                        style="font-size: 16px; margin: 2px 0; color: #111; font-weight: bold; text-shadow: 0 1px 2px #fff8;">
-                                                                                        {{ $singleDetail->customer }}
+                                                                                        style="border-top: 1px solid rgba(255,255,255,0.3); margin: 8px 0; padding-top: 8px;">
                                                                                     </div>
-                                                                                @endif
-                                                                                <div class="op-row-info"
-                                                                                    style="margin: 2px 0; color: #fff; text-shadow: 0 1px 2px #0008;">
-                                                                                    <div>
-                                                                                        {{ $singleDetail->warna ?? 'Warna' }} -
-                                                                                        {{ $singleDetail->kategori_warna ?? 'Kategori' }} -
-                                                                                        {{ $singleDetail->kode_warna ?? 'Kode' }}
+                                                                                    {{-- GDA/FDA + TD/TA per OP (di luar detail OP, ukuran sama
+                                                                                    dengan header) --}}
+                                                                                    <div
+                                                                                        style="display: flex; justify-content: center; gap: 6px; margin-bottom: 6px;">
+                                                                                        @foreach ($blocks as $b)
+                                                                                            @php
+                                                                                                $color = $subMap[$b] ?? 'red';
+                                                                                                $blockBg = $color === 'green' ? '#d4f8e8' : '#ffb3b3';
+                                                                                                $blockBorder = $color === 'green' ? '#43a047' : '#c62828';
+                                                                                            @endphp
+                                                                                            <span class="gda-block" data-block-type="{{ $b }}"
+                                                                                                style="display: inline-block; background: {{ $blockBg }}; color: #111; font-weight: bold; font-size: 22px; padding: 2px 10px; border-radius: 6px; border: 2.5px solid {{ $blockBorder }}; box-shadow: 0 1px 4px rgba(0,0,0,0.10); letter-spacing: 1px; text-shadow: 0 1px 2px #fff8;">
+                                                                                                {{ $b }}
+                                                                                            </span>
+                                                                                        @endforeach
+                                                                                        @if($proses->jenis !== 'Maintenance' && ($hasToppingLa ?? false))
+                                                                                            <span class="topping-indicator topping-td"
+                                                                                                data-block-type="TD"
+                                                                                                title="Topping Dyes - {{ \App\Services\ProsesStatusService::toppingIndicatorTitle($tdColor, 'td') }}"
+                                                                                                style="display: inline-block; {{ $tdStyle }}; font-weight: bold; font-size: 18px; padding: 2px 8px; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.10); letter-spacing: 1px;">TD</span>
+                                                                                        @endif
+                                                                                        @if($proses->jenis !== 'Maintenance' && ($hasToppingAux ?? false))
+                                                                                            <span class="topping-indicator topping-ta"
+                                                                                                data-block-type="TA"
+                                                                                                title="Topping Auxiliaries - {{ \App\Services\ProsesStatusService::toppingIndicatorTitle($taColor, 'ta') }}"
+                                                                                                style="display: inline-block; {{ $taStyle }}; font-weight: bold; font-size: 18px; padding: 2px 8px; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.10); letter-spacing: 1px;">TA</span>
+                                                                                        @endif
                                                                                     </div>
-                                                                                    <div>{{ $singleDetail->konstruksi ?? 'Konstruksi' }}
+                                                                                    {{-- Detail OP (No OP + Info) --}}
+                                                                                    <div class="op-row" data-detail-id="{{ $d->id }}">
+                                                                                        {{-- No OP --}}
+                                                                                        <div class="op-row-noop"
+                                                                                            style="font-weight: bold; color: #111; font-size: 22px; letter-spacing: 2px; text-shadow: 0 1px 4px #fff8; margin-bottom: 4px;">
+                                                                                            {{ $d->no_op ?? '-' }}
+                                                                                        </div>
+                                                                                        @if($d->customer)
+                                                                                            <div
+                                                                                                style="font-size: 16px; margin: 2px 0; color: #111; font-weight: bold; text-shadow: 0 1px 2px #fff8;">
+                                                                                                {{ $d->customer }}
+                                                                                            </div>
+                                                                                        @endif
+                                                                                        {{-- Info warna/kategori/konstruksi --}}
+                                                                                        <div class="op-row-info"
+                                                                                            style="margin: 2px 0; color: #fff; text-shadow: 0 1px 2px #0008;">
+                                                                                            <div>
+                                                                                                {{ $d->warna ?? 'Warna' }} -
+                                                                                                {{ $d->kategori_warna ?? 'Kategori' }} -
+                                                                                                {{ $d->kode_warna ?? 'Kode' }}
+                                                                                            </div>
+                                                                                            <div>{{ $d->konstruksi ?? 'Konstruksi' }}</div>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                @endforeach
+                                                                            @else
+                                                                                {{-- Single OP: Tampilan normal dengan semua komponen --}}
+                                                                                @php
+                                                                                    $singleDetail = $detailList->first();
+                                                                                @endphp
+                                                                                <div class="op-row" data-detail-id="{{ $singleDetail->id }}">
+                                                                                    <div class="op-row-noop"
+                                                                                        style="font-weight: bold; color: #111; font-size: 22px; letter-spacing: 2px; text-shadow: 0 1px 4px #fff8;">
+                                                                                        {{ $singleDetail->no_op ?? '-' }}
+                                                                                    </div>
+                                                                                    @if($singleDetail->customer)
+                                                                                        <div
+                                                                                            style="font-size: 16px; margin: 2px 0; color: #111; font-weight: bold; text-shadow: 0 1px 2px #fff8;">
+                                                                                            {{ $singleDetail->customer }}
+                                                                                        </div>
+                                                                                    @endif
+                                                                                    <div class="op-row-info"
+                                                                                        style="margin: 2px 0; color: #fff; text-shadow: 0 1px 2px #0008;">
+                                                                                        <div>
+                                                                                            {{ $singleDetail->warna ?? 'Warna' }} -
+                                                                                            {{ $singleDetail->kategori_warna ?? 'Kategori' }} -
+                                                                                            {{ $singleDetail->kode_warna ?? 'Kode' }}
+                                                                                        </div>
+                                                                                        <div>{{ $singleDetail->konstruksi ?? 'Konstruksi' }}
+                                                                                        </div>
                                                                                     </div>
                                                                                 </div>
-                                                                            </div>
-                                                                        @endif
+                                                                            @endif
                                                                         </div>
                                                                     @endif
                                                                     <div class="card-time"
@@ -1267,24 +1292,31 @@
             </div>
         </section>
         <!-- Modal Filter Dashboard (12 Kriteria) -->
-        <div class="modal fade" id="modalFilterDashboard" tabindex="-1" aria-labelledby="modalFilterDashboardLabel" aria-hidden="true">
+        <div class="modal fade" id="modalFilterDashboard" tabindex="-1" aria-labelledby="modalFilterDashboardLabel"
+            aria-hidden="true">
             <div class="modal-dialog modal-xl modal-dialog-centered" style="max-width: 1250px;">
                 <div class="modal-content shadow-lg border-0 rounded-3">
                     <form id="formFilterDashboard" action="{{ url('dashboard') }}" method="GET">
                         <!-- Header -->
-                        <div class="modal-header bg-gradient-primary text-white py-3 px-4" style="background: linear-gradient(135deg, #0052cc 0%, #002b80 100%);">
+                        <div class="modal-header bg-gradient-primary text-white py-3 px-4"
+                            style="background: linear-gradient(135deg, #0052cc 0%, #002b80 100%);">
                             <div class="d-flex align-items-center">
                                 <i class="fas fa-sliders-h mr-2" style="font-size: 1.4rem;"></i>
                                 <div>
-                                    <h5 class="modal-title fw-bold mb-0" id="modalFilterDashboardLabel" style="font-weight: 700;">Filter Pencarian Dashboard</h5>
-                                    <small class="text-white-50">Filter otomatis menyesuaikan dengan data proses pada tab yang sedang aktif</small>
+                                    <h5 class="modal-title fw-bold mb-0" id="modalFilterDashboardLabel"
+                                        style="font-weight: 700;">Filter Pencarian Dashboard</h5>
+                                    <small class="text-white-50">Filter otomatis menyesuaikan dengan data proses pada tab
+                                        yang sedang aktif</small>
                                 </div>
                             </div>
                             <div class="d-flex align-items-center">
-                                <span class="badge badge-light px-3 py-2 text-primary font-weight-bold shadow-sm rounded-pill mr-3" id="filter-modal-active-badge" style="font-size: 0.85rem;">
+                                <span
+                                    class="badge badge-light px-3 py-2 text-primary font-weight-bold shadow-sm rounded-pill mr-3"
+                                    id="filter-modal-active-badge" style="font-size: 0.85rem;">
                                     <i class="fas fa-industry mr-1"></i> Mode Production
                                 </span>
-                                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close" style="opacity: 0.85;">
+                                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close"
+                                    style="opacity: 0.85;">
                                     <span aria-hidden="true">&times;</span>
                                 </button>
                             </div>
@@ -1295,10 +1327,13 @@
                             <!-- Action Quick Bar -->
                             <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
                                 <div class="text-muted" style="font-size: 0.9rem;">
-                                    <i class="fas fa-info-circle text-primary mr-1"></i> Menampilkan opsi filter untuk: <strong id="filter-modal-current-mode-label" class="text-primary">Mode Production (Proses Berjalan / Belum Selesai)</strong>
+                                    <i class="fas fa-info-circle text-primary mr-1"></i> Menampilkan opsi filter untuk:
+                                    <strong id="filter-modal-current-mode-label" class="text-primary">Mode Production
+                                        (Proses Berjalan / Belum Selesai)</strong>
                                 </div>
                                 <div>
-                                    <button type="button" class="btn btn-xs btn-outline-secondary" id="btn-clear-all-filter-inputs">
+                                    <button type="button" class="btn btn-xs btn-outline-secondary"
+                                        id="btn-clear-all-filter-inputs">
                                         <i class="fas fa-eraser mr-1"></i> Kosongkan Semua Pilihan
                                     </button>
                                 </div>
@@ -1314,12 +1349,18 @@
                                                     <i class="fas fa-cogs text-primary mr-1"></i> Mesin
                                                 </label>
                                                 <div>
-                                                    <a href="javascript:void(0)" class="btn-filter-select-all text-primary" data-target="#filter_modal_mesin" style="font-size: 0.75rem;">Semua</a>
+                                                    <a href="javascript:void(0)" class="btn-filter-select-all text-primary"
+                                                        data-target="#filter_modal_mesin"
+                                                        style="font-size: 0.75rem;">Semua</a>
                                                     <span class="text-muted" style="font-size: 0.75rem;">|</span>
-                                                    <a href="javascript:void(0)" class="btn-filter-clear text-danger" data-target="#filter_modal_mesin" style="font-size: 0.75rem;">Clear</a>
+                                                    <a href="javascript:void(0)" class="btn-filter-clear text-danger"
+                                                        data-target="#filter_modal_mesin"
+                                                        style="font-size: 0.75rem;">Clear</a>
                                                 </div>
                                             </div>
-                                            <select name="mesin[]" id="filter_modal_mesin" class="form-control select2-dashboard-filter" multiple style="width:100%;" data-placeholder="Semua Mesin">
+                                            <select name="mesin[]" id="filter_modal_mesin"
+                                                class="form-control select2-dashboard-filter" multiple style="width:100%;"
+                                                data-placeholder="Semua Mesin">
                                                 @foreach ($mesins as $m)
                                                     <option value="{{ $m->id }}" {{ in_array($m->id, $selectedMesinArr ?? []) ? 'selected' : '' }}>
                                                         {{ $m->jenis_mesin }}
@@ -1339,12 +1380,18 @@
                                                     <i class="fas fa-building text-info mr-1"></i> Customer
                                                 </label>
                                                 <div>
-                                                    <a href="javascript:void(0)" class="btn-filter-select-all text-primary" data-target="#filter_modal_customer" style="font-size: 0.75rem;">Semua</a>
+                                                    <a href="javascript:void(0)" class="btn-filter-select-all text-primary"
+                                                        data-target="#filter_modal_customer"
+                                                        style="font-size: 0.75rem;">Semua</a>
                                                     <span class="text-muted" style="font-size: 0.75rem;">|</span>
-                                                    <a href="javascript:void(0)" class="btn-filter-clear text-danger" data-target="#filter_modal_customer" style="font-size: 0.75rem;">Clear</a>
+                                                    <a href="javascript:void(0)" class="btn-filter-clear text-danger"
+                                                        data-target="#filter_modal_customer"
+                                                        style="font-size: 0.75rem;">Clear</a>
                                                 </div>
                                             </div>
-                                            <select name="customer[]" id="filter_modal_customer" class="form-control select2-dashboard-filter" multiple style="width:100%;" data-placeholder="Semua Customer">
+                                            <select name="customer[]" id="filter_modal_customer"
+                                                class="form-control select2-dashboard-filter" multiple style="width:100%;"
+                                                data-placeholder="Semua Customer">
                                                 @foreach ($filterOptions['customers'] ?? [] as $cust)
                                                     <option value="{{ $cust }}" {{ in_array($cust, $selectedCustomerArr ?? []) ? 'selected' : '' }}>
                                                         {{ $cust }}
@@ -1364,12 +1411,18 @@
                                                     <i class="fas fa-user-tie text-info mr-1"></i> Marketing
                                                 </label>
                                                 <div>
-                                                    <a href="javascript:void(0)" class="btn-filter-select-all text-primary" data-target="#filter_modal_marketing" style="font-size: 0.75rem;">Semua</a>
+                                                    <a href="javascript:void(0)" class="btn-filter-select-all text-primary"
+                                                        data-target="#filter_modal_marketing"
+                                                        style="font-size: 0.75rem;">Semua</a>
                                                     <span class="text-muted" style="font-size: 0.75rem;">|</span>
-                                                    <a href="javascript:void(0)" class="btn-filter-clear text-danger" data-target="#filter_modal_marketing" style="font-size: 0.75rem;">Clear</a>
+                                                    <a href="javascript:void(0)" class="btn-filter-clear text-danger"
+                                                        data-target="#filter_modal_marketing"
+                                                        style="font-size: 0.75rem;">Clear</a>
                                                 </div>
                                             </div>
-                                            <select name="marketing[]" id="filter_modal_marketing" class="form-control select2-dashboard-filter" multiple style="width:100%;" data-placeholder="Semua Marketing">
+                                            <select name="marketing[]" id="filter_modal_marketing"
+                                                class="form-control select2-dashboard-filter" multiple style="width:100%;"
+                                                data-placeholder="Semua Marketing">
                                                 @foreach ($filterOptions['marketings'] ?? [] as $mkt)
                                                     <option value="{{ $mkt }}" {{ in_array($mkt, $selectedMarketingArr ?? []) ? 'selected' : '' }}>
                                                         {{ $mkt }}
@@ -1389,12 +1442,18 @@
                                                     <i class="fas fa-palette text-success mr-1"></i> Warna
                                                 </label>
                                                 <div>
-                                                    <a href="javascript:void(0)" class="btn-filter-select-all text-primary" data-target="#filter_modal_warna" style="font-size: 0.75rem;">Semua</a>
+                                                    <a href="javascript:void(0)" class="btn-filter-select-all text-primary"
+                                                        data-target="#filter_modal_warna"
+                                                        style="font-size: 0.75rem;">Semua</a>
                                                     <span class="text-muted" style="font-size: 0.75rem;">|</span>
-                                                    <a href="javascript:void(0)" class="btn-filter-clear text-danger" data-target="#filter_modal_warna" style="font-size: 0.75rem;">Clear</a>
+                                                    <a href="javascript:void(0)" class="btn-filter-clear text-danger"
+                                                        data-target="#filter_modal_warna"
+                                                        style="font-size: 0.75rem;">Clear</a>
                                                 </div>
                                             </div>
-                                            <select name="warna[]" id="filter_modal_warna" class="form-control select2-dashboard-filter" multiple style="width:100%;" data-placeholder="Semua Warna">
+                                            <select name="warna[]" id="filter_modal_warna"
+                                                class="form-control select2-dashboard-filter" multiple style="width:100%;"
+                                                data-placeholder="Semua Warna">
                                                 @foreach ($filterOptions['warnas'] ?? [] as $wrn)
                                                     <option value="{{ $wrn }}" {{ in_array($wrn, $selectedWarnaArr ?? []) ? 'selected' : '' }}>
                                                         {{ $wrn }}
@@ -1414,12 +1473,18 @@
                                                     <i class="fas fa-swatchbook text-success mr-1"></i> Kategori Warna
                                                 </label>
                                                 <div>
-                                                    <a href="javascript:void(0)" class="btn-filter-select-all text-primary" data-target="#filter_modal_kategori_warna" style="font-size: 0.75rem;">Semua</a>
+                                                    <a href="javascript:void(0)" class="btn-filter-select-all text-primary"
+                                                        data-target="#filter_modal_kategori_warna"
+                                                        style="font-size: 0.75rem;">Semua</a>
                                                     <span class="text-muted" style="font-size: 0.75rem;">|</span>
-                                                    <a href="javascript:void(0)" class="btn-filter-clear text-danger" data-target="#filter_modal_kategori_warna" style="font-size: 0.75rem;">Clear</a>
+                                                    <a href="javascript:void(0)" class="btn-filter-clear text-danger"
+                                                        data-target="#filter_modal_kategori_warna"
+                                                        style="font-size: 0.75rem;">Clear</a>
                                                 </div>
                                             </div>
-                                            <select name="kategori_warna[]" id="filter_modal_kategori_warna" class="form-control select2-dashboard-filter" multiple style="width:100%;" data-placeholder="Semua Kategori Warna">
+                                            <select name="kategori_warna[]" id="filter_modal_kategori_warna"
+                                                class="form-control select2-dashboard-filter" multiple style="width:100%;"
+                                                data-placeholder="Semua Kategori Warna">
                                                 @foreach ($filterOptions['kategori_warnas'] ?? [] as $kat)
                                                     <option value="{{ $kat }}" {{ in_array($kat, $selectedKategoriWarnaArr ?? []) ? 'selected' : '' }}>
                                                         {{ $kat }}
@@ -1439,12 +1504,18 @@
                                                     <i class="fas fa-barcode text-success mr-1"></i> Kode Warna
                                                 </label>
                                                 <div>
-                                                    <a href="javascript:void(0)" class="btn-filter-select-all text-primary" data-target="#filter_modal_kode_warna" style="font-size: 0.75rem;">Semua</a>
+                                                    <a href="javascript:void(0)" class="btn-filter-select-all text-primary"
+                                                        data-target="#filter_modal_kode_warna"
+                                                        style="font-size: 0.75rem;">Semua</a>
                                                     <span class="text-muted" style="font-size: 0.75rem;">|</span>
-                                                    <a href="javascript:void(0)" class="btn-filter-clear text-danger" data-target="#filter_modal_kode_warna" style="font-size: 0.75rem;">Clear</a>
+                                                    <a href="javascript:void(0)" class="btn-filter-clear text-danger"
+                                                        data-target="#filter_modal_kode_warna"
+                                                        style="font-size: 0.75rem;">Clear</a>
                                                 </div>
                                             </div>
-                                            <select name="kode_warna[]" id="filter_modal_kode_warna" class="form-control select2-dashboard-filter" multiple style="width:100%;" data-placeholder="Semua Kode Warna">
+                                            <select name="kode_warna[]" id="filter_modal_kode_warna"
+                                                class="form-control select2-dashboard-filter" multiple style="width:100%;"
+                                                data-placeholder="Semua Kode Warna">
                                                 @foreach ($filterOptions['kode_warnas'] ?? [] as $kdw)
                                                     <option value="{{ $kdw }}" {{ in_array($kdw, $selectedKodeWarnaArr ?? []) ? 'selected' : '' }}>
                                                         {{ $kdw }}
@@ -1464,12 +1535,18 @@
                                                     <i class="fas fa-hand-paper text-secondary mr-1"></i> Handfeel
                                                 </label>
                                                 <div>
-                                                    <a href="javascript:void(0)" class="btn-filter-select-all text-primary" data-target="#filter_modal_hfeel" style="font-size: 0.75rem;">Semua</a>
+                                                    <a href="javascript:void(0)" class="btn-filter-select-all text-primary"
+                                                        data-target="#filter_modal_hfeel"
+                                                        style="font-size: 0.75rem;">Semua</a>
                                                     <span class="text-muted" style="font-size: 0.75rem;">|</span>
-                                                    <a href="javascript:void(0)" class="btn-filter-clear text-danger" data-target="#filter_modal_hfeel" style="font-size: 0.75rem;">Clear</a>
+                                                    <a href="javascript:void(0)" class="btn-filter-clear text-danger"
+                                                        data-target="#filter_modal_hfeel"
+                                                        style="font-size: 0.75rem;">Clear</a>
                                                 </div>
                                             </div>
-                                            <select name="hfeel[]" id="filter_modal_hfeel" class="form-control select2-dashboard-filter" multiple style="width:100%;" data-placeholder="Semua Handfeel">
+                                            <select name="hfeel[]" id="filter_modal_hfeel"
+                                                class="form-control select2-dashboard-filter" multiple style="width:100%;"
+                                                data-placeholder="Semua Handfeel">
                                                 @foreach ($filterOptions['hfeels'] ?? [] as $hf)
                                                     <option value="{{ $hf }}" {{ in_array($hf, $selectedHfeelArr ?? []) ? 'selected' : '' }}>
                                                         {{ $hf }}
@@ -1489,12 +1566,18 @@
                                                     <i class="fas fa-weight-hanging text-secondary mr-1"></i> Gramasi
                                                 </label>
                                                 <div>
-                                                    <a href="javascript:void(0)" class="btn-filter-select-all text-primary" data-target="#filter_modal_gramasi" style="font-size: 0.75rem;">Semua</a>
+                                                    <a href="javascript:void(0)" class="btn-filter-select-all text-primary"
+                                                        data-target="#filter_modal_gramasi"
+                                                        style="font-size: 0.75rem;">Semua</a>
                                                     <span class="text-muted" style="font-size: 0.75rem;">|</span>
-                                                    <a href="javascript:void(0)" class="btn-filter-clear text-danger" data-target="#filter_modal_gramasi" style="font-size: 0.75rem;">Clear</a>
+                                                    <a href="javascript:void(0)" class="btn-filter-clear text-danger"
+                                                        data-target="#filter_modal_gramasi"
+                                                        style="font-size: 0.75rem;">Clear</a>
                                                 </div>
                                             </div>
-                                            <select name="gramasi[]" id="filter_modal_gramasi" class="form-control select2-dashboard-filter" multiple style="width:100%;" data-placeholder="Semua Gramasi">
+                                            <select name="gramasi[]" id="filter_modal_gramasi"
+                                                class="form-control select2-dashboard-filter" multiple style="width:100%;"
+                                                data-placeholder="Semua Gramasi">
                                                 @foreach ($filterOptions['gramasis'] ?? [] as $grm)
                                                     <option value="{{ $grm }}" {{ in_array($grm, $selectedGramasiArr ?? []) ? 'selected' : '' }}>
                                                         {{ $grm }}
@@ -1514,12 +1597,18 @@
                                                     <i class="fas fa-file-invoice text-warning mr-1"></i> No OP
                                                 </label>
                                                 <div>
-                                                    <a href="javascript:void(0)" class="btn-filter-select-all text-primary" data-target="#filter_modal_no_op" style="font-size: 0.75rem;">Semua</a>
+                                                    <a href="javascript:void(0)" class="btn-filter-select-all text-primary"
+                                                        data-target="#filter_modal_no_op"
+                                                        style="font-size: 0.75rem;">Semua</a>
                                                     <span class="text-muted" style="font-size: 0.75rem;">|</span>
-                                                    <a href="javascript:void(0)" class="btn-filter-clear text-danger" data-target="#filter_modal_no_op" style="font-size: 0.75rem;">Clear</a>
+                                                    <a href="javascript:void(0)" class="btn-filter-clear text-danger"
+                                                        data-target="#filter_modal_no_op"
+                                                        style="font-size: 0.75rem;">Clear</a>
                                                 </div>
                                             </div>
-                                            <select name="no_op[]" id="filter_modal_no_op" class="form-control select2-dashboard-filter" multiple style="width:100%;" data-placeholder="Semua No OP">
+                                            <select name="no_op[]" id="filter_modal_no_op"
+                                                class="form-control select2-dashboard-filter" multiple style="width:100%;"
+                                                data-placeholder="Semua No OP">
                                                 @foreach ($filterOptions['no_ops'] ?? [] as $op)
                                                     <option value="{{ $op }}" {{ in_array($op, $selectedNoOpArr ?? []) ? 'selected' : '' }}>
                                                         {{ $op }}
@@ -1539,12 +1628,18 @@
                                                     <i class="fas fa-layer-group text-warning mr-1"></i> No Partai
                                                 </label>
                                                 <div>
-                                                    <a href="javascript:void(0)" class="btn-filter-select-all text-primary" data-target="#filter_modal_no_partai" style="font-size: 0.75rem;">Semua</a>
+                                                    <a href="javascript:void(0)" class="btn-filter-select-all text-primary"
+                                                        data-target="#filter_modal_no_partai"
+                                                        style="font-size: 0.75rem;">Semua</a>
                                                     <span class="text-muted" style="font-size: 0.75rem;">|</span>
-                                                    <a href="javascript:void(0)" class="btn-filter-clear text-danger" data-target="#filter_modal_no_partai" style="font-size: 0.75rem;">Clear</a>
+                                                    <a href="javascript:void(0)" class="btn-filter-clear text-danger"
+                                                        data-target="#filter_modal_no_partai"
+                                                        style="font-size: 0.75rem;">Clear</a>
                                                 </div>
                                             </div>
-                                            <select name="no_partai[]" id="filter_modal_no_partai" class="form-control select2-dashboard-filter" multiple style="width:100%;" data-placeholder="Semua No Partai">
+                                            <select name="no_partai[]" id="filter_modal_no_partai"
+                                                class="form-control select2-dashboard-filter" multiple style="width:100%;"
+                                                data-placeholder="Semua No Partai">
                                                 @foreach ($filterOptions['no_partais'] ?? [] as $npr)
                                                     <option value="{{ $npr }}" {{ in_array($npr, $selectedNoPartaiArr ?? []) ? 'selected' : '' }}>
                                                         {{ $npr }}
@@ -1564,12 +1659,18 @@
                                                     <i class="fas fa-th text-dark mr-1"></i> Konstruksi
                                                 </label>
                                                 <div>
-                                                    <a href="javascript:void(0)" class="btn-filter-select-all text-primary" data-target="#filter_modal_konstruksi" style="font-size: 0.75rem;">Semua</a>
+                                                    <a href="javascript:void(0)" class="btn-filter-select-all text-primary"
+                                                        data-target="#filter_modal_konstruksi"
+                                                        style="font-size: 0.75rem;">Semua</a>
                                                     <span class="text-muted" style="font-size: 0.75rem;">|</span>
-                                                    <a href="javascript:void(0)" class="btn-filter-clear text-danger" data-target="#filter_modal_konstruksi" style="font-size: 0.75rem;">Clear</a>
+                                                    <a href="javascript:void(0)" class="btn-filter-clear text-danger"
+                                                        data-target="#filter_modal_konstruksi"
+                                                        style="font-size: 0.75rem;">Clear</a>
                                                 </div>
                                             </div>
-                                            <select name="konstruksi[]" id="filter_modal_konstruksi" class="form-control select2-dashboard-filter" multiple style="width:100%;" data-placeholder="Semua Konstruksi">
+                                            <select name="konstruksi[]" id="filter_modal_konstruksi"
+                                                class="form-control select2-dashboard-filter" multiple style="width:100%;"
+                                                data-placeholder="Semua Konstruksi">
                                                 @foreach ($filterOptions['konstruksis'] ?? [] as $kst)
                                                     <option value="{{ $kst }}" {{ in_array($kst, $selectedKonstruksiArr ?? []) ? 'selected' : '' }}>
                                                         {{ $kst }}
@@ -1589,12 +1690,18 @@
                                                     <i class="fas fa-cubes text-dark mr-1"></i> Kode Material
                                                 </label>
                                                 <div>
-                                                    <a href="javascript:void(0)" class="btn-filter-select-all text-primary" data-target="#filter_modal_kode_material" style="font-size: 0.75rem;">Semua</a>
+                                                    <a href="javascript:void(0)" class="btn-filter-select-all text-primary"
+                                                        data-target="#filter_modal_kode_material"
+                                                        style="font-size: 0.75rem;">Semua</a>
                                                     <span class="text-muted" style="font-size: 0.75rem;">|</span>
-                                                    <a href="javascript:void(0)" class="btn-filter-clear text-danger" data-target="#filter_modal_kode_material" style="font-size: 0.75rem;">Clear</a>
+                                                    <a href="javascript:void(0)" class="btn-filter-clear text-danger"
+                                                        data-target="#filter_modal_kode_material"
+                                                        style="font-size: 0.75rem;">Clear</a>
                                                 </div>
                                             </div>
-                                            <select name="kode_material[]" id="filter_modal_kode_material" class="form-control select2-dashboard-filter" multiple style="width:100%;" data-placeholder="Semua Kode Material">
+                                            <select name="kode_material[]" id="filter_modal_kode_material"
+                                                class="form-control select2-dashboard-filter" multiple style="width:100%;"
+                                                data-placeholder="Semua Kode Material">
                                                 @foreach ($filterOptions['kode_materials'] ?? [] as $kdm)
                                                     <option value="{{ $kdm }}" {{ in_array($kdm, $selectedKodeMaterialArr ?? []) ? 'selected' : '' }}>
                                                         {{ $kdm }}
@@ -1615,7 +1722,8 @@
                                 </a>
                             </div>
                             <div class="d-flex gap-2">
-                                <button type="button" class="btn btn-secondary mr-2" data-dismiss="modal" style="font-weight: 600;">
+                                <button type="button" class="btn btn-secondary mr-2" data-dismiss="modal"
+                                    style="font-weight: 600;">
                                     Batal
                                 </button>
                                 <button type="submit" class="btn btn-primary px-4 shadow-sm" style="font-weight: 700;">
@@ -1748,13 +1856,15 @@
                                         </select>
                                     </div>
                                     <!-- Container Breakdown Jam Dye Stuff -->
-                                    <div id="dye_stuff_schedule_container" class="mt-2 mb-3 p-3 bg-light rounded border" style="display: none;">
+                                    <div id="dye_stuff_schedule_container" class="mt-2 mb-3 p-3 bg-light rounded border"
+                                        style="display: none;">
                                         <label class="form-label fw-semibold text-primary mb-2" style="font-size: 13px;">
                                             <i class="fas fa-clock mr-1"></i> Breakdown Jam Input Dye Stuff
                                         </label>
                                         <div id="dye_stuff_schedule_inputs"></div>
                                         <small class="text-muted d-block mt-1" style="font-size: 11px;">
-                                            * Format: <code>JJ:MM:DD</code> (Contoh: <code>03:00:00</code>), tidak boleh melebihi Cycle Time.
+                                            * Format: <code>JJ:MM:DD</code> (Contoh: <code>03:00:00</code>), tidak boleh
+                                            melebihi Cycle Time.
                                         </small>
                                     </div>
                                 </div>
@@ -1771,13 +1881,15 @@
                                         </select>
                                     </div>
                                     <!-- Container Breakdown Jam AUX -->
-                                    <div id="aux_schedule_container" class="mt-2 mb-3 p-3 bg-light rounded border" style="display: none;">
+                                    <div id="aux_schedule_container" class="mt-2 mb-3 p-3 bg-light rounded border"
+                                        style="display: none;">
                                         <label class="form-label fw-semibold text-success mb-2" style="font-size: 13px;">
                                             <i class="fas fa-clock mr-1"></i> Breakdown Jam Input AUX
                                         </label>
                                         <div id="aux_schedule_inputs"></div>
                                         <small class="text-muted d-block mt-1" style="font-size: 11px;">
-                                            * Format: <code>JJ:MM:DD</code> (Contoh: <code>01:30:00</code>), tidak boleh melebihi Cycle Time.
+                                            * Format: <code>JJ:MM:DD</code> (Contoh: <code>01:30:00</code>), tidak boleh
+                                            melebihi Cycle Time.
                                         </small>
                                     </div>
                                 </div>
@@ -1996,7 +2108,9 @@
                                 </label>
                                 <span class="badge badge-secondary" id="badge-proses-status-note"></span>
                             </div>
-                            <textarea class="form-control bg-white" id="proses-note-text" rows="3" placeholder="Tambahkan catatan khusus untuk proses ini (opsional)..." maxlength="2000"></textarea>
+                            <textarea class="form-control bg-white" id="proses-note-text" rows="3"
+                                placeholder="Tambahkan catatan khusus untuk proses ini (opsional)..."
+                                maxlength="2000"></textarea>
                             <div class="mt-2 text-right" id="proses-note-actions">
                                 <button type="button" class="btn btn-sm btn-primary" id="btn-save-proses-note">
                                     <i class="fas fa-save mr-1"></i>Simpan Catatan
@@ -2017,7 +2131,8 @@
                                 </button>
                             @endif
                             @if (in_array($userRole ?? '', ['super_admin', 'kepala_shift']))
-                                <button type="button" class="btn btn-success btn-finish-force d-none mr-2" title="Selesaikan proses saat ini secara paksa dan lanjutkan ke antrian berikutnya">
+                                <button type="button" class="btn btn-danger btn-finish-force d-none mr-2"
+                                    title="Selesaikan proses saat ini secara paksa dan lanjutkan ke antrian berikutnya">
                                     <i class="fas fa-check-double mr-1"></i>Proses Selesai
                                 </button>
                             @endif
@@ -2027,12 +2142,14 @@
                                 </button>
                             @endif
                             @if (in_array($userRole ?? '', ['super_admin', 'kepala_ruangan', 'kepala_shift', 'operator', 'ppic']))
-                                <button type="button" class="btn btn-outline-info btn-preview-pinjam-mesin d-none mr-2" title="Lihat riwayat peminjaman mesin pada proses ini">
+                                <button type="button" class="btn btn-outline-info btn-preview-pinjam-mesin d-none mr-2"
+                                    title="Lihat riwayat peminjaman mesin pada proses ini">
                                     <i class="fas fa-history mr-1"></i>Riwayat Pinjam Mesin
                                 </button>
                             @endif
                             @if (in_array($userRole ?? '', ['super_admin', 'ppic']))
-                                <button type="button" class="btn btn-warning btn-recovery-proses d-none mr-2 font-weight-bold" title="Kembalikan proses dari history ke antrian produksi">
+                                <button type="button" class="btn btn-warning btn-recovery-proses d-none mr-2 font-weight-bold"
+                                    title="Kembalikan proses dari history ke antrian produksi">
                                     <i class="fas fa-undo mr-1"></i>Recovery Proses
                                 </button>
                             @endif
@@ -2057,7 +2174,8 @@
         </div>
 
         <!-- Modal Riwayat Pinjam Mesin -->
-        <div class="modal fade" id="modalPinjamMesinHistory" tabindex="-1" aria-labelledby="modalPinjamMesinHistoryLabel" aria-hidden="true" style="z-index: 1065;">
+        <div class="modal fade" id="modalPinjamMesinHistory" tabindex="-1" aria-labelledby="modalPinjamMesinHistoryLabel"
+            aria-hidden="true" style="z-index: 1065;">
             <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
                 <div class="modal-content shadow-lg border-0 rounded-3">
                     <div class="modal-header bg-info text-white">
@@ -2069,8 +2187,10 @@
                         </button>
                     </div>
                     <div class="modal-body p-3">
-                        <div class="alert alert-info py-2 px-3 mb-3 small d-flex justify-content-between align-items-center">
-                            <span id="pinjam-history-proses-info"><i class="fas fa-info-circle mr-1"></i> Memuat info proses...</span>
+                        <div
+                            class="alert alert-info py-2 px-3 mb-3 small d-flex justify-content-between align-items-center">
+                            <span id="pinjam-history-proses-info"><i class="fas fa-info-circle mr-1"></i> Memuat info
+                                proses...</span>
                             <span class="badge badge-light" id="pinjam-history-count">0 Sesi</span>
                         </div>
                         <div class="table-responsive">
@@ -2088,7 +2208,8 @@
                                 </thead>
                                 <tbody id="pinjam-history-tbody">
                                     <tr>
-                                        <td colspan="7" class="text-center py-3 text-muted">Memuat riwayat peminjaman mesin...</td>
+                                        <td colspan="7" class="text-center py-3 text-muted">Memuat riwayat peminjaman
+                                            mesin...</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -2118,10 +2239,13 @@
                             </button>
                         </div>
                         <div class="modal-body py-3 px-4">
-                            <div class="alert alert-warning py-2 mb-3" style="font-size: 13px; color: #856404; background-color: #fff3cd; border-color: #ffeeba;">
+                            <div class="alert alert-warning py-2 mb-3"
+                                style="font-size: 13px; color: #856404; background-color: #fff3cd; border-color: #ffeeba;">
                                 <i class="fas fa-exclamation-triangle mr-1"></i>
-                                <strong>Perhatian:</strong> Proses yang di-recovery akan dikembalikan ke <strong>antrian produksi</strong>.
-                                Waktu mulai, waktu selesai, dan cycle time actual akan di-<strong>reset</strong>, namun semua data barcode dan informasi OP tetap tersimpan.
+                                <strong>Perhatian:</strong> Proses yang di-recovery akan dikembalikan ke <strong>antrian
+                                    produksi</strong>.
+                                Waktu mulai, waktu selesai, dan cycle time actual akan di-<strong>reset</strong>, namun
+                                semua data barcode dan informasi OP tetap tersimpan.
                             </div>
 
                             <!-- Ringkasan Info Proses -->
@@ -2452,21 +2576,26 @@
                         </div>
                         <div class="modal-body py-3 px-4">
                             <div class="alert alert-info py-2 mb-3" style="font-size: 13px;">
-                                <i class="fas fa-info-circle mr-1"></i>Peminjaman mesin akan <strong>langsung aktif</strong> secara otomatis tanpa memerlukan persetujuan.
+                                <i class="fas fa-info-circle mr-1"></i>Peminjaman mesin akan <strong>langsung aktif</strong>
+                                secara otomatis tanpa memerlukan persetujuan.
                             </div>
                             <div class="form-group mb-2">
                                 <label class="form-label fw-semibold mb-1" style="font-size: 13px;">Informasi Proses</label>
-                                <div id="pinjamProsesInfo" class="p-2 bg-light rounded border text-muted" style="font-size: 13px;">
+                                <div id="pinjamProsesInfo" class="p-2 bg-light rounded border text-muted"
+                                    style="font-size: 13px;">
                                     -
                                 </div>
                             </div>
                             <div class="form-group mb-2">
                                 <label class="form-label fw-semibold mb-1" style="font-size: 13px;">Mesin</label>
-                                <input type="text" id="pinjamMesinAsal" class="form-control form-control-sm bg-light font-weight-bold" readonly>
+                                <input type="text" id="pinjamMesinAsal"
+                                    class="form-control form-control-sm bg-light font-weight-bold" readonly>
                             </div>
                             <div class="form-group mb-0">
-                                <label class="form-label fw-semibold mb-1" style="font-size: 13px;">Alasan Pinjam Mesin <span class="text-danger">*</span></label>
-                                <textarea name="alasan" id="pinjamAlasan" class="form-control" rows="3" placeholder="Masukkan alasan peminjaman mesin (wajib diisi)..." required></textarea>
+                                <label class="form-label fw-semibold mb-1" style="font-size: 13px;">Alasan Pinjam Mesin
+                                    <span class="text-danger">*</span></label>
+                                <textarea name="alasan" id="pinjamAlasan" class="form-control" rows="3"
+                                    placeholder="Masukkan alasan peminjaman mesin (wajib diisi)..." required></textarea>
                             </div>
                         </div>
                         <div class="modal-footer d-flex justify-content-between px-4">
@@ -4094,7 +4223,7 @@
                                     if (Array.isArray(parsed) && parsed.length > 0) {
                                         dsFormatted = parsed.map((t, idx) => `DS ${idx + 1}: ${t}`).join(', ');
                                     }
-                                } catch(e) { dsFormatted = val; }
+                                } catch (e) { dsFormatted = val; }
                             }
                             return ['JADWAL DYE STUFF', dsFormatted];
                         }
@@ -4108,7 +4237,7 @@
                                     if (Array.isArray(parsed) && parsed.length > 0) {
                                         auxFormatted = parsed.map((t, idx) => `AUX ${idx + 1}: ${t}`).join(', ');
                                     }
-                                } catch(e) { auxFormatted = val; }
+                                } catch (e) { auxFormatted = val; }
                             }
                             return ['JADWAL AUX', auxFormatted];
                         }
@@ -4445,7 +4574,7 @@
                                 if (Array.isArray(parsed) && parsed.length > 0) {
                                     dsFormatted = parsed.map((t, idx) => `DS ${idx + 1}: ${t}`).join(', ');
                                 }
-                            } catch(e) { dsFormatted = val; }
+                            } catch (e) { dsFormatted = val; }
                         }
                         return ['JADWAL DYE STUFF', dsFormatted];
                     }
@@ -4459,7 +4588,7 @@
                                 if (Array.isArray(parsed) && parsed.length > 0) {
                                     auxFormatted = parsed.map((t, idx) => `AUX ${idx + 1}: ${t}`).join(', ');
                                 }
-                            } catch(e) { auxFormatted = val; }
+                            } catch (e) { auxFormatted = val; }
                         }
                         return ['JADWAL AUX', auxFormatted];
                     }
@@ -4540,9 +4669,9 @@
                                     `<span style='position:absolute;top:2px;right:6px;cursor:pointer;font-weight:bold;color:#b00;font-size:16px;z-index:2;' class='cancel-barcode-btn' data-type='${barcodeType}' data-proses='${prosesId}' data-id='${bk.id}' data-matdok='${bk.matdok}' data-item-document='${bk.item_document || ""}' title='Cancel barcode'>&times;</span>` :
                                     '';
                                 html += `<div style="position:relative;flex:1 0 30%;max-width:32%;background:#f3f3f3;border-radius:6px;padding:6px 4px;margin-bottom:6px;text-align:center;font-weight:bold;font-size:13px;color:#222;box-shadow:0 1px 2px #0001;">
-                                                                                                        ${cancelButton}
-                                                                                                        ${bk.barcode} ${(bk.matdok ? '<br><span style=\'font-size:11px;color:#888;\'>' + bk.matdok + '</span>' : '')}
-                                                                                                    </div>`;
+                                                                                                                ${cancelButton}
+                                                                                                                ${bk.barcode} ${(bk.matdok ? '<br><span style=\'font-size:11px;color:#888;\'>' + bk.matdok + '</span>' : '')}
+                                                                                                            </div>`;
                             });
                             html += '</div>';
                             return html;
@@ -5480,14 +5609,14 @@
                         const userSelesai = item.user_selesai ? `${item.user_selesai.nama} <small class="text-muted">(${item.user_selesai.role})</small>` : (item.selesai_at_formatted ? '-' : '<span class="text-muted">-</span>');
 
                         html += `<tr>
-                            <td class="text-center">${idx + 1}</td>
-                            <td>${item.pinjam_at_formatted || '-'}</td>
-                            <td>${selesaiHtml}</td>
-                            <td><span class="badge badge-light border">${item.durasi_formatted || '-'}</span></td>
-                            <td>${item.alasan || '-'}</td>
-                            <td>${userPinjam}</td>
-                            <td>${userSelesai}</td>
-                        </tr>`;
+                                    <td class="text-center">${idx + 1}</td>
+                                    <td>${item.pinjam_at_formatted || '-'}</td>
+                                    <td>${selesaiHtml}</td>
+                                    <td><span class="badge badge-light border">${item.durasi_formatted || '-'}</span></td>
+                                    <td>${item.alasan || '-'}</td>
+                                    <td>${userPinjam}</td>
+                                    <td>${userSelesai}</td>
+                                </tr>`;
                     });
                     $('#pinjam-history-tbody').html(html);
                 },
@@ -5733,69 +5862,69 @@
         // 2 mode: Scan (kamera) dan Input Manual (ketik barcode)
         if (!document.getElementById('modalScanBarcode')) {
             $(document.body).append(`
-                                                                                <div class="modal fade" id="modalScanBarcode" tabindex="-1" aria-labelledby="modalScanBarcodeLabel" aria-hidden="true">
-                                                                                    <div class="modal-dialog modal-dialog-centered" style="max-width:480px;">
-                                                                                        <div class="modal-content shadow-lg border-0 rounded-3">
-                                                                                            <form id="formScanBarcode" method="POST" action="">
-                                                                                                @csrf
-                                                                                                <input type="hidden" name="barcode" id="inputBarcodeValue">
-                                                                                                <input type="hidden" name="detail_proses_id" id="inputDetailProsesId">
-                                                                                                <input type="hidden" name="approval_id" id="inputApprovalId">
-                                                                                                <div class="modal-header bg-success text-white">
-                                                                                                    <h5 class="modal-title fw-bold" id="modalScanBarcodeLabel">Input Barcode</h5>
-                                                                                                    <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
-                                                                                                        <span aria-hidden="true">&times;</span>
-                                                                                                    </button>
-                                                                                                </div>
-                                                                                                <div class="modal-body py-3 px-4 text-center">
-                                                                                                    <ul class="nav nav-pills nav-fill mb-3" id="barcodeModeTabs" role="tablist">
-                                                                                                        <li class="nav-item" role="presentation">
-                                                                                                            <a class="nav-link active" id="mode-scan-tab" data-toggle="pill" href="#mode-scan-pane" role="tab" aria-controls="mode-scan-pane" aria-selected="true"><i class="fas fa-barcode"></i> Scan Barcode</a>
-                                                                                                        </li>
-                                                                                                        <li class="nav-item" role="presentation">
-                                                                                                            <a class="nav-link" id="mode-manual-tab" data-toggle="pill" href="#mode-manual-pane" role="tab" aria-controls="mode-manual-pane" aria-selected="false"><i class="fas fa-keyboard"></i> Input Manual</a>
-                                                                                                        </li>
-                                                                                                    </ul>
-                                                                                                    <div class="tab-content position-relative" id="barcodeModeContent" style="min-height:320px;">
-                                                                                                        <div id="barcode-submit-loading" style="display:none;position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(255,255,255,0.9);align-items:center;justify-content:center;z-index:10;flex-direction:column;">
-                                                                                                            <div class="spinner-border text-success mb-2" style="width:3rem;height:3rem;"></div>
-                                                                                                            <p class="text-dark mb-0">Memproses barcode...</p>
+                                                                                        <div class="modal fade" id="modalScanBarcode" tabindex="-1" aria-labelledby="modalScanBarcodeLabel" aria-hidden="true">
+                                                                                            <div class="modal-dialog modal-dialog-centered" style="max-width:480px;">
+                                                                                                <div class="modal-content shadow-lg border-0 rounded-3">
+                                                                                                    <form id="formScanBarcode" method="POST" action="">
+                                                                                                        @csrf
+                                                                                                        <input type="hidden" name="barcode" id="inputBarcodeValue">
+                                                                                                        <input type="hidden" name="detail_proses_id" id="inputDetailProsesId">
+                                                                                                        <input type="hidden" name="approval_id" id="inputApprovalId">
+                                                                                                        <div class="modal-header bg-success text-white">
+                                                                                                            <h5 class="modal-title fw-bold" id="modalScanBarcodeLabel">Input Barcode</h5>
+                                                                                                            <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                                                                                                                <span aria-hidden="true">&times;</span>
+                                                                                                            </button>
                                                                                                         </div>
-                                                                                                        <div class="tab-pane fade show active" id="mode-scan-pane" role="tabpanel">
-                                                                                                            <div id="barcode-scanner-container" style="width:100%;min-height:320px;display:flex;align-items:center;justify-content:center;"></div>
-                                                                                                        </div>
-                                                                                                        <div class="tab-pane fade" id="mode-manual-pane" role="tabpanel">
-                                                                                                            <div id="barcode-manual-container" class="py-3">
-                                                                                                                <label for="inputBarcodeManual" class="d-block text-left mb-2 font-weight-bold">Ketik kode barcode:</label>
-                                                                                                                <input type="text" class="form-control form-control-lg text-center" id="inputBarcodeManual" placeholder="Masukkan barcode" maxlength="255" autocomplete="off">
-                                                                                                                <small class="text-muted d-block mt-2">Tekan Enter atau klik Simpan setelah mengisi barcode.</small>
-                                                                                                                <button type="button" class="btn btn-success mt-3" id="btnSubmitManualBarcode"><i class="fas fa-check"></i> Simpan Barcode</button>
+                                                                                                        <div class="modal-body py-3 px-4 text-center">
+                                                                                                            <ul class="nav nav-pills nav-fill mb-3" id="barcodeModeTabs" role="tablist">
+                                                                                                                <li class="nav-item" role="presentation">
+                                                                                                                    <a class="nav-link active" id="mode-scan-tab" data-toggle="pill" href="#mode-scan-pane" role="tab" aria-controls="mode-scan-pane" aria-selected="true"><i class="fas fa-barcode"></i> Scan Barcode</a>
+                                                                                                                </li>
+                                                                                                                <li class="nav-item" role="presentation">
+                                                                                                                    <a class="nav-link" id="mode-manual-tab" data-toggle="pill" href="#mode-manual-pane" role="tab" aria-controls="mode-manual-pane" aria-selected="false"><i class="fas fa-keyboard"></i> Input Manual</a>
+                                                                                                                </li>
+                                                                                                            </ul>
+                                                                                                            <div class="tab-content position-relative" id="barcodeModeContent" style="min-height:320px;">
+                                                                                                                <div id="barcode-submit-loading" style="display:none;position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(255,255,255,0.9);align-items:center;justify-content:center;z-index:10;flex-direction:column;">
+                                                                                                                    <div class="spinner-border text-success mb-2" style="width:3rem;height:3rem;"></div>
+                                                                                                                    <p class="text-dark mb-0">Memproses barcode...</p>
+                                                                                                                </div>
+                                                                                                                <div class="tab-pane fade show active" id="mode-scan-pane" role="tabpanel">
+                                                                                                                    <div id="barcode-scanner-container" style="width:100%;min-height:320px;display:flex;align-items:center;justify-content:center;"></div>
+                                                                                                                </div>
+                                                                                                                <div class="tab-pane fade" id="mode-manual-pane" role="tabpanel">
+                                                                                                                    <div id="barcode-manual-container" class="py-3">
+                                                                                                                        <label for="inputBarcodeManual" class="d-block text-left mb-2 font-weight-bold">Ketik kode barcode:</label>
+                                                                                                                        <input type="text" class="form-control form-control-lg text-center" id="inputBarcodeManual" placeholder="Masukkan barcode" maxlength="255" autocomplete="off">
+                                                                                                                        <small class="text-muted d-block mt-2">Tekan Enter atau klik Simpan setelah mengisi barcode.</small>
+                                                                                                                        <button type="button" class="btn btn-success mt-3" id="btnSubmitManualBarcode"><i class="fas fa-check"></i> Simpan Barcode</button>
+                                                                                                                    </div>
+                                                                                                                </div>
+                                                                                                            </div>
+                                                                                                            {{-- Section pending list barcode kain (hanya tampil saat barcode_kain) --}}
+                                                                                                            <div id="kain-pending-section" class="mt-3" style="display:none;">
+                                                                                                                <hr class="my-2">
+                                                                                                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                                                                                                    <strong class="text-left">Daftar Barcode Kain</strong>
+                                                                                                                    <span id="kain-pending-counter" class="badge badge-secondary" style="font-size:12px;">0/0</span>
+                                                                                                                </div>
+                                                                                                                <div id="kain-pending-list" style="max-height:220px;overflow-y:auto;padding:4px 2px;">
+                                                                                                                    <span style="color:#888;font-size:12px;">Belum ada barcode. Scan atau ketik manual untuk menambah.</span>
+                                                                                                                </div>
                                                                                                             </div>
                                                                                                         </div>
-                                                                                                    </div>
-                                                                                                    {{-- Section pending list barcode kain (hanya tampil saat barcode_kain) --}}
-                                                                                                    <div id="kain-pending-section" class="mt-3" style="display:none;">
-                                                                                                        <hr class="my-2">
-                                                                                                        <div class="d-flex justify-content-between align-items-center mb-2">
-                                                                                                            <strong class="text-left">Daftar Barcode Kain</strong>
-                                                                                                            <span id="kain-pending-counter" class="badge badge-secondary" style="font-size:12px;">0/0</span>
+                                                                                                        <div class="modal-footer d-flex justify-content-between px-4">
+                                                                                                            <button type="button" class="btn btn-success" id="btnSubmitKainBatch" style="display:none;">
+                                                                                                                <i class="fas fa-save"></i> Simpan Barcode (<span id="kain-pending-submit-count">0</span>)
+                                                                                                            </button>
+                                                                                                            <button type="button" class="btn btn-secondary ml-auto" data-dismiss="modal">Tutup</button>
                                                                                                         </div>
-                                                                                                        <div id="kain-pending-list" style="max-height:220px;overflow-y:auto;padding:4px 2px;">
-                                                                                                            <span style="color:#888;font-size:12px;">Belum ada barcode. Scan atau ketik manual untuk menambah.</span>
-                                                                                                        </div>
-                                                                                                    </div>
+                                                                                                    </form>
                                                                                                 </div>
-                                                                                                <div class="modal-footer d-flex justify-content-between px-4">
-                                                                                                    <button type="button" class="btn btn-success" id="btnSubmitKainBatch" style="display:none;">
-                                                                                                        <i class="fas fa-save"></i> Simpan Barcode (<span id="kain-pending-submit-count">0</span>)
-                                                                                                    </button>
-                                                                                                    <button type="button" class="btn btn-secondary ml-auto" data-dismiss="modal">Tutup</button>
-                                                                                                </div>
-                                                                                            </form>
+                                                                                            </div>
                                                                                         </div>
-                                                                                    </div>
-                                                                                </div>
-                                                                                `);
+                                                                                        `);
         }
 
         // ========================================================
@@ -5902,9 +6031,9 @@
                 s.pending.forEach(function (item, idx) {
                     const cont = item.container ? `<br><span style='font-size:11px;color:#888;'>${item.container}</span>` : '';
                     html += `<div style="position:relative;flex:1 0 30%;max-width:32%;background:#f3f3f3;border-radius:6px;padding:8px 4px;text-align:center;font-weight:bold;font-size:13px;color:#222;box-shadow:0 1px 2px #0001;">
-                                                                                            <span class="remove-pending-kain" data-idx="${idx}" style="position:absolute;top:2px;right:6px;cursor:pointer;font-weight:bold;color:#b00;font-size:16px;z-index:2;" title="Hapus">&times;</span>
-                                                                                            ${item.barcode}${cont}
-                                                                                        </div>`;
+                                                                                                    <span class="remove-pending-kain" data-idx="${idx}" style="position:absolute;top:2px;right:6px;cursor:pointer;font-weight:bold;color:#b00;font-size:16px;z-index:2;" title="Hapus">&times;</span>
+                                                                                                    ${item.barcode}${cont}
+                                                                                                </div>`;
                 });
                 html += '</div>';
                 $list.html(html);
@@ -6114,31 +6243,31 @@
             Swal.fire({
                 title: `Request Topping ${label}`,
                 html: `
-                    <div class="text-left" style="font-size: 14px;">
-                        <div class="alert alert-info py-2 px-3 mb-3" style="font-size: 13px;">
-                            <i class="fas fa-info-circle mr-1"></i> Request topping membutuhkan approval <strong>Kepala Shift</strong>. Jadwal input Dye Stuff / AUX normal berikutnya dan Cycle Time akan otomatis dimundurkan.
-                        </div>
-                        <div class="form-group mb-2">
-                            <label class="font-weight-bold mb-1">Durasi Topping <span class="text-danger">*</span></label>
-                            <div class="input-group">
-                                <input type="number" id="swal-topping-durasi" class="form-control" placeholder="Contoh: 1" min="0.1" step="any" value="1" required>
-                                <div class="input-group-append">
-                                    <select id="swal-topping-unit" class="custom-select font-weight-bold" style="min-width: 100px;">
-                                        <option value="jam" selected>Jam</option>
-                                        <option value="menit">Menit</option>
-                                    </select>
+                            <div class="text-left" style="font-size: 14px;">
+                                <div class="alert alert-info py-2 px-3 mb-3" style="font-size: 13px;">
+                                    <i class="fas fa-info-circle mr-1"></i> Request topping membutuhkan approval <strong>Kepala Shift</strong>. Jadwal input Dye Stuff / AUX normal berikutnya dan Cycle Time akan otomatis dimundurkan.
+                                </div>
+                                <div class="form-group mb-2">
+                                    <label class="font-weight-bold mb-1">Durasi Topping <span class="text-danger">*</span></label>
+                                    <div class="input-group">
+                                        <input type="number" id="swal-topping-durasi" class="form-control" placeholder="Contoh: 1" min="0.1" step="any" value="1" required>
+                                        <div class="input-group-append">
+                                            <select id="swal-topping-unit" class="custom-select font-weight-bold" style="min-width: 100px;">
+                                                <option value="jam" selected>Jam</option>
+                                                <option value="menit">Menit</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <small class="form-text text-muted">Menerima format jam (contoh: 1 atau 1.5) maupun menit (contoh: 30, 45, 60).</small>
+                                </div>
+                                <div class="p-2 rounded bg-light border mt-3" id="swal-topping-preview-box">
+                                    <div class="text-secondary small font-weight-bold mb-1">Kalkulasi Kemunduran Jadwal & Cycle Time:</div>
+                                    <div id="swal-topping-preview-text" class="text-dark font-weight-bold" style="font-size: 13px;">
+                                        Durasi: 1 Jam + 45 Menit (toleransi scan) = <span class="text-primary">+1 Jam 45 Menit</span>
+                                    </div>
                                 </div>
                             </div>
-                            <small class="form-text text-muted">Menerima format jam (contoh: 1 atau 1.5) maupun menit (contoh: 30, 45, 60).</small>
-                        </div>
-                        <div class="p-2 rounded bg-light border mt-3" id="swal-topping-preview-box">
-                            <div class="text-secondary small font-weight-bold mb-1">Kalkulasi Kemunduran Jadwal & Cycle Time:</div>
-                            <div id="swal-topping-preview-text" class="text-dark font-weight-bold" style="font-size: 13px;">
-                                Durasi: 1 Jam + 45 Menit (toleransi scan) = <span class="text-primary">+1 Jam 45 Menit</span>
-                            </div>
-                        </div>
-                    </div>
-                `,
+                        `,
                 icon: 'question',
                 showCancelButton: true,
                 confirmButtonColor: '#17a2b8',
@@ -6171,8 +6300,8 @@
                         if (totM > 0) totText.push(totM + ' Menit');
 
                         $('#swal-topping-preview-text').html(`
-                            Durasi: <strong>${durText.join(' ')}</strong> + <strong>45 Menit</strong> (toleransi scan) = <span class="text-primary font-weight-bold" style="font-size: 14px;">+${totText.join(' ')}</span>
-                        `);
+                                    Durasi: <strong>${durText.join(' ')}</strong> + <strong>45 Menit</strong> (toleransi scan) = <span class="text-primary font-weight-bold" style="font-size: 14px;">+${totText.join(' ')}</span>
+                                `);
                     };
                     $('#swal-topping-durasi, #swal-topping-unit').on('input change', updatePreview);
                 },
@@ -6823,7 +6952,7 @@
                                     if (Array.isArray(parsed) && parsed.length > 0) {
                                         dsFormatted = parsed.map((t, idx) => `DS ${idx + 1}: ${t}`).join(', ');
                                     }
-                                } catch(e) { dsFormatted = val; }
+                                } catch (e) { dsFormatted = val; }
                             }
                             return ['JADWAL DYE STUFF', dsFormatted];
                         }
@@ -6837,7 +6966,7 @@
                                     if (Array.isArray(parsed) && parsed.length > 0) {
                                         auxFormatted = parsed.map((t, idx) => `AUX ${idx + 1}: ${t}`).join(', ');
                                     }
-                                } catch(e) { auxFormatted = val; }
+                                } catch (e) { auxFormatted = val; }
                             }
                             return ['JADWAL AUX', auxFormatted];
                         }
@@ -6897,7 +7026,7 @@
                                     if (Array.isArray(parsed) && parsed.length > 0) {
                                         dsFormatted = parsed.map((t, idx) => `DS ${idx + 1}: ${t}`).join(', ');
                                     }
-                                } catch(e) { dsFormatted = val; }
+                                } catch (e) { dsFormatted = val; }
                             }
                             return ['JADWAL DYE STUFF', dsFormatted];
                         }
@@ -6911,7 +7040,7 @@
                                     if (Array.isArray(parsed) && parsed.length > 0) {
                                         auxFormatted = parsed.map((t, idx) => `AUX ${idx + 1}: ${t}`).join(', ');
                                     }
-                                } catch(e) { auxFormatted = val; }
+                                } catch (e) { auxFormatted = val; }
                             }
                             return ['JADWAL AUX', auxFormatted];
                         }
@@ -7040,16 +7169,16 @@
                         let laProgressHtmlLocal = (laInitialReqLocal === 0 && laToppingReqLocal === 0) ?
                             'Kebutuhan: 0 awal (Tidak Memerlukan Scanning) | <span style="color:#43a047;"><i class="fas fa-check"></i> Lengkap</span>' :
                             (laToppingReqLocal > 0 ?
-                            'Kebutuhan: ' + laInitialReqLocal + ' awal + ' + laToppingReqLocal + ' topping (TD) = ' + laReqLocal + ' total | Sudah: ' + laScnLocal + ' | ' + (laCompleteLocal ? '<span style="color:#43a047;"><i class="fas fa-check"></i> Lengkap</span>' : '<span style="color:#c62828;">Kurang: ' + (laReqLocal - laScnLocal) + '</span>') :
-                            'Kebutuhan: ' + laInitialReqLocal + ' awal | Sudah: ' + laScnLocal + ' | ' + (laCompleteLocal ? '<span style="color:#43a047;"><i class="fas fa-check"></i> Lengkap</span>' : '<span style="color:#c62828;">Kurang: ' + (laInitialReqLocal - laScnLocal) + '</span>'));
+                                'Kebutuhan: ' + laInitialReqLocal + ' awal + ' + laToppingReqLocal + ' topping (TD) = ' + laReqLocal + ' total | Sudah: ' + laScnLocal + ' | ' + (laCompleteLocal ? '<span style="color:#43a047;"><i class="fas fa-check"></i> Lengkap</span>' : '<span style="color:#c62828;">Kurang: ' + (laReqLocal - laScnLocal) + '</span>') :
+                                'Kebutuhan: ' + laInitialReqLocal + ' awal | Sudah: ' + laScnLocal + ' | ' + (laCompleteLocal ? '<span style="color:#43a047;"><i class="fas fa-check"></i> Lengkap</span>' : '<span style="color:#c62828;">Kurang: ' + (laInitialReqLocal - laScnLocal) + '</span>'));
                         $('#barcode-la-progress').html('<div style="padding:4px 8px;background:' + (laCompleteLocal ? '#e8f5e9' : '#fff3e0') + ';border-radius:4px;">' + laProgressHtmlLocal + '</div>').show();
 
                         const auxInitialReqLocal = auxProgressLocal.initial_required ?? 0;
                         let auxProgressHtmlLocal = (auxInitialReqLocal === 0 && auxToppingReqLocal === 0) ?
                             'Kebutuhan: 0 awal (Tidak Memerlukan Scanning) | <span style="color:#43a047;"><i class="fas fa-check"></i> Lengkap</span>' :
                             (auxToppingReqLocal > 0 ?
-                            'Kebutuhan: ' + auxInitialReqLocal + ' awal + ' + auxToppingReqLocal + ' topping (TA) = ' + auxReqLocal + ' total | Sudah: ' + auxScnLocal + ' | ' + (auxCompleteLocal ? '<span style="color:#43a047;"><i class="fas fa-check"></i> Lengkap</span>' : '<span style="color:#c62828;">Kurang: ' + (auxReqLocal - auxScnLocal) + '</span>') :
-                            'Kebutuhan: ' + auxInitialReqLocal + ' awal | Sudah: ' + auxScnLocal + ' | ' + (auxCompleteLocal ? '<span style="color:#43a047;"><i class="fas fa-check"></i> Lengkap</span>' : '<span style="color:#c62828;">Kurang: ' + (auxInitialReqLocal - auxScnLocal) + '</span>'));
+                                'Kebutuhan: ' + auxInitialReqLocal + ' awal + ' + auxToppingReqLocal + ' topping (TA) = ' + auxReqLocal + ' total | Sudah: ' + auxScnLocal + ' | ' + (auxCompleteLocal ? '<span style="color:#43a047;"><i class="fas fa-check"></i> Lengkap</span>' : '<span style="color:#c62828;">Kurang: ' + (auxReqLocal - auxScnLocal) + '</span>') :
+                                'Kebutuhan: ' + auxInitialReqLocal + ' awal | Sudah: ' + auxScnLocal + ' | ' + (auxCompleteLocal ? '<span style="color:#43a047;"><i class="fas fa-check"></i> Lengkap</span>' : '<span style="color:#c62828;">Kurang: ' + (auxInitialReqLocal - auxScnLocal) + '</span>'));
                         $('#barcode-aux-progress').html('<div style="padding:4px 8px;background:' + (auxCompleteLocal ? '#e8f5e9' : '#fff3e0') + ';border-radius:4px;">' + auxProgressHtmlLocal + '</div>').show();
 
                         const selectedProgress = data.barcode_kain_progress || [];
@@ -7225,15 +7354,15 @@
                 if (historyContainer.length === 0) {
                     const $prosesAktifContainer = $dropzone.find('.proses-aktif-container').first();
                     const newHistoryWrapper = $(`
-                                                                                        <div class="proses-history-wrapper" data-section="history" data-mesin-id="${mesinId}" style="margin-bottom: 8px;">
-                                                                                            <button class="btn-toggle-history btn btn-sm btn-secondary" 
-                                                                                                    data-mesin-id="${mesinId}" type="button">
-                                                                                                <i class="fas fa-history"></i> Tampilkan History
-                                                                                            </button>
-                                                                                            <div class="proses-history-container" id="history-${mesinId}" style="display: none;">
-                                                                                            </div>
-                                                                                        </div>
-                                                                                    `);
+                                                                                                <div class="proses-history-wrapper" data-section="history" data-mesin-id="${mesinId}" style="margin-bottom: 8px;">
+                                                                                                    <button class="btn-toggle-history btn btn-sm btn-secondary" 
+                                                                                                            data-mesin-id="${mesinId}" type="button">
+                                                                                                        <i class="fas fa-history"></i> Tampilkan History
+                                                                                                    </button>
+                                                                                                    <div class="proses-history-container" id="history-${mesinId}" style="display: none;">
+                                                                                                    </div>
+                                                                                                </div>
+                                                                                            `);
                     // Insert sebelum proses aktif container
                     if ($prosesAktifContainer.length > 0) {
                         $prosesAktifContainer.before(newHistoryWrapper);
@@ -7943,6 +8072,20 @@
                     $lamp.css('background', '#ff2a2a');
                 }
 
+                // Update tampilan Pinjam Mesin (PM) di bawah lampu indikator
+                const isPinjamActive = proses.is_pinjam_mesin === true || proses.is_pinjam_mesin === 1 || proses.is_pinjam_mesin === '1';
+                const $pinjamIndicator = $card.find('.pinjam-mesin-indicator');
+                if ($pinjamIndicator.length) {
+                    if (isPinjamActive) {
+                        $pinjamIndicator.css('display', 'flex');
+                        if (proses.pinjam_mesin_alasan) {
+                            $pinjamIndicator.find('.badge-pinjam-mesin').attr('title', 'Pinjam Mesin Aktif: ' + proses.pinjam_mesin_alasan);
+                        }
+                    } else {
+                        $pinjamIndicator.css('display', 'none');
+                    }
+                }
+
                 // Update tampilan cycle_time di card (setelah edit cycle time di-approve FM)
                 if (statusData.cycle_time !== undefined) {
                     const cycleTimeStr = formatDetikToHMS(statusData.cycle_time);
@@ -8483,12 +8626,12 @@
                     $produksi.prop('disabled', true).hide();
                     $maintenance.prop('disabled', true).hide();
                     $reproses.prop('disabled', false).show();
-                    $('#jenis').val('Reproses').css({'pointer-events': 'none', 'background-color': '#e9ecef'}).attr('tabindex', '-1');
+                    $('#jenis').val('Reproses').css({ 'pointer-events': 'none', 'background-color': '#e9ecef' }).attr('tabindex', '-1');
                 } else {
                     $produksi.prop('disabled', false).show();
                     $maintenance.prop('disabled', false).show();
                     $reproses.prop('disabled', false).show();
-                    $('#jenis').css({'pointer-events': 'auto', 'background-color': '#fff'}).removeAttr('tabindex');
+                    $('#jenis').css({ 'pointer-events': 'auto', 'background-color': '#fff' }).removeAttr('tabindex');
                 }
                 toggleReprocessHint();
             }
@@ -8600,23 +8743,23 @@
                     for (let i = 1; i <= count; i++) {
                         const defaultHour = String(i * 2).padStart(2, '0');
                         const inputHtml = `
-                            <div class="form-group mb-2">
-                                <div class="input-group input-group-sm">
-                                    <div class="input-group-prepend">
-                                        <span class="input-group-text font-weight-bold" style="font-size: 12px; min-width: 110px;">
-                                            <span class="badge ${badgeColor} mr-1">${i}</span> ${labelName} #${i}
-                                        </span>
+                                    <div class="form-group mb-2">
+                                        <div class="input-group input-group-sm">
+                                            <div class="input-group-prepend">
+                                                <span class="input-group-text font-weight-bold" style="font-size: 12px; min-width: 110px;">
+                                                    <span class="badge ${badgeColor} mr-1">${i}</span> ${labelName} #${i}
+                                                </span>
+                                            </div>
+                                            <input type="text" 
+                                                   name="${type}_schedules[${i - 1}]" 
+                                                   class="form-control form-control-sm schedule-time-input" 
+                                                   placeholder="Contoh: ${defaultHour}:00:00 (Jam ke-${i * 2})" 
+                                                   pattern="^[0-9]{2}:[0-9]{2}:[0-9]{2}$" 
+                                                   title="Format durasi Jam:Menit:Detik (JJ:MM:DD)" 
+                                                   required>
+                                        </div>
                                     </div>
-                                    <input type="text" 
-                                           name="${type}_schedules[${i - 1}]" 
-                                           class="form-control form-control-sm schedule-time-input" 
-                                           placeholder="Contoh: ${defaultHour}:00:00 (Jam ke-${i * 2})" 
-                                           pattern="^[0-9]{2}:[0-9]{2}:[0-9]{2}$" 
-                                           title="Format durasi Jam:Menit:Detik (JJ:MM:DD)" 
-                                           required>
-                                </div>
-                            </div>
-                        `;
+                                `;
                         inputsWrapper.append(inputHtml);
                     }
                     container.slideDown(200);
@@ -9024,40 +9167,40 @@
         // Modal konfirmasi cancel barcode
         if (!document.getElementById('modalConfirmCancelBarcode')) {
             $(document.body).append(`
-                                                                                <div class="modal fade" id="modalConfirmCancelBarcode" tabindex="-1" aria-labelledby="modalConfirmCancelBarcodeLabel" aria-hidden="true">
-                                                                                    <div class="modal-dialog modal-dialog-centered" style="max-width:500px;">
-                                                                                        <div class="modal-content shadow-lg border-0 rounded-3">
-                                                                                            <div class="modal-header bg-danger text-white">
-                                                                                                <h5 class="modal-title fw-bold" id="modalConfirmCancelBarcodeLabel">
-                                                                                                    <i class="fas fa-exclamation-triangle mr-2"></i>Konfirmasi Cancel Barcode
-                                                                                                </h5>
-                                                                                                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
-                                                                                                    <span aria-hidden="true">&times;</span>
-                                                                                                </button>
-                                                                                            </div>
-                                                                                            <div class="modal-body py-4 px-4 text-center">
-                                                                                                <div id="confirmCancelBarcodeText" style="font-size:15px;line-height:1.6;">
-                                                                                                    Apakah Anda yakin ingin mengcancel barcode ini?
-                                                                                                </div>
-                                                                                                <div id="cancelBarcodeLoading" style="display:none;margin-top:15px;">
-                                                                                                    <div class="spinner-border text-danger" role="status">
-                                                                                                        <span class="sr-only">Loading...</span>
+                                                                                        <div class="modal fade" id="modalConfirmCancelBarcode" tabindex="-1" aria-labelledby="modalConfirmCancelBarcodeLabel" aria-hidden="true">
+                                                                                            <div class="modal-dialog modal-dialog-centered" style="max-width:500px;">
+                                                                                                <div class="modal-content shadow-lg border-0 rounded-3">
+                                                                                                    <div class="modal-header bg-danger text-white">
+                                                                                                        <h5 class="modal-title fw-bold" id="modalConfirmCancelBarcodeLabel">
+                                                                                                            <i class="fas fa-exclamation-triangle mr-2"></i>Konfirmasi Cancel Barcode
+                                                                                                        </h5>
+                                                                                                        <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                                                                                                            <span aria-hidden="true">&times;</span>
+                                                                                                        </button>
                                                                                                     </div>
-                                                                                                    <p class="mt-2 text-muted">Memproses cancel barcode...</p>
+                                                                                                    <div class="modal-body py-4 px-4 text-center">
+                                                                                                        <div id="confirmCancelBarcodeText" style="font-size:15px;line-height:1.6;">
+                                                                                                            Apakah Anda yakin ingin mengcancel barcode ini?
+                                                                                                        </div>
+                                                                                                        <div id="cancelBarcodeLoading" style="display:none;margin-top:15px;">
+                                                                                                            <div class="spinner-border text-danger" role="status">
+                                                                                                                <span class="sr-only">Loading...</span>
+                                                                                                            </div>
+                                                                                                            <p class="mt-2 text-muted">Memproses cancel barcode...</p>
+                                                                                                        </div>
+                                                                                                    </div>
+                                                                                                    <div class="modal-footer d-flex justify-content-end px-4">
+                                                                                                        <button type="button" class="btn btn-secondary" data-dismiss="modal" id="btnCancelCancelBarcode">
+                                                                                                            <i class="fas fa-times mr-1"></i>Batal
+                                                                                                        </button>
+                                                                                                        <button type="button" class="btn btn-danger" id="btnConfirmCancelBarcode">
+                                                                                                            <i class="fas fa-check mr-1"></i>Ya, Cancel
+                                                                                                        </button>
+                                                                                                    </div>
                                                                                                 </div>
-                                                                                            </div>
-                                                                                            <div class="modal-footer d-flex justify-content-end px-4">
-                                                                                                <button type="button" class="btn btn-secondary" data-dismiss="modal" id="btnCancelCancelBarcode">
-                                                                                                    <i class="fas fa-times mr-1"></i>Batal
-                                                                                                </button>
-                                                                                                <button type="button" class="btn btn-danger" id="btnConfirmCancelBarcode">
-                                                                                                    <i class="fas fa-check mr-1"></i>Ya, Cancel
-                                                                                                </button>
                                                                                             </div>
                                                                                         </div>
-                                                                                    </div>
-                                                                                </div>
-                                                                                `);
+                                                                                        `);
         }
 
         let cancelBarcodeData = null;
@@ -9204,7 +9347,7 @@
             const currentMode = mode || window.dashboardViewMode || 'produksi';
             const isProd = currentMode === 'produksi';
             const optionsData = (window.filterOptionsByMode && window.filterOptionsByMode[currentMode]) ? window.filterOptionsByMode[currentMode] : (window.filterOptionsByMode ? window.filterOptionsByMode.produksi : {});
-            
+
             // Update badge dan label mode otomatis di dalam modal filter
             if (isProd) {
                 $('#filter-modal-active-badge').html('<i class="fas fa-industry mr-1"></i> Mode Production').removeClass('text-secondary').addClass('text-primary');
@@ -9262,7 +9405,7 @@
                     const mIdStr = String(m.id);
                     const isSelected = currentMesinVals.includes(mIdStr);
                     const isRelevant = activeMesinIds.includes(mIdStr);
-                    
+
                     const optText = isRelevant ? m.jenis_mesin : `${m.jenis_mesin} (0 proses)`;
                     $mesinSel.append(new Option(optText, m.id, isSelected, isSelected));
                 });

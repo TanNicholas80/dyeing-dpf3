@@ -339,12 +339,23 @@
                 @endif
             @endif
         </div>
-        <div style="{{ $proses->jenis === 'Maintenance' ? 'flex: 0 0 auto;' : 'flex: 1;' }} text-align: right;">
-            @if(!empty($proses->note))
-                <i class="fas fa-sticky-note text-warning mr-1 icon-has-note" title="Catatan: {{ Str::limit($proses->note, 60) }}" style="font-size: 16px; vertical-align: middle; text-shadow: 0 1px 2px #000;"></i>
-            @endif
-            <div class="status-light {{ $light == 'green' ? 'running-light' : ($light == 'yellow' ? 'running-light-yellow' : '') }}"
-                style="width: 24px; height: 24px; border-radius: 50%; background: {{ $light == 'green' ? '#00ff1a' : ($light == 'yellow' ? '#ffeb3b' : '#ff2a2a') }}; display: inline-block; border: 3px solid #fff; box-shadow: 0 0 0 0 transparent; transition: background 0.2s;">
+        <div class="status-header-right" style="{{ $proses->jenis === 'Maintenance' ? 'flex: 0 0 auto;' : 'flex: 1;' }} display: flex; flex-direction: column; align-items: flex-end; justify-content: center;">
+            <div style="display: flex; align-items: center; justify-content: flex-end;">
+                @if(!empty($proses->note))
+                    <i class="fas fa-sticky-note text-warning mr-1 icon-has-note" title="Catatan: {{ Str::limit($proses->note, 60) }}" style="font-size: 16px; vertical-align: middle; text-shadow: 0 1px 2px #000;"></i>
+                @endif
+                <div class="status-light {{ $light == 'green' ? 'running-light' : ($light == 'yellow' ? 'running-light-yellow' : '') }}"
+                    style="width: 24px; height: 24px; border-radius: 50%; background: {{ $light == 'green' ? '#00ff1a' : ($light == 'yellow' ? '#ffeb3b' : '#ff2a2a') }}; display: inline-block; border: 3px solid #fff; box-shadow: 0 0 0 0 transparent; transition: background 0.2s;">
+                </div>
+            </div>
+            @php
+                $isPinjamMesin = (bool) ($proses->is_pinjam_mesin ?? false);
+            @endphp
+            <div class="pinjam-mesin-indicator" style="{{ $isPinjamMesin ? 'display: flex;' : 'display: none;' }} justify-content: center; align-items: center; width: 24px; margin-top: 2px;">
+                <span class="badge-pinjam-mesin" title="Pinjam Mesin Aktif{{ !empty($proses->pinjam_mesin_alasan) ? ': ' . $proses->pinjam_mesin_alasan : '' }}"
+                    style="font-weight: 800; font-size: 13px; color: #111; text-shadow: 0 1px 3px rgba(255,255,255,0.9), 0 0 4px rgba(255,255,255,0.8); letter-spacing: 0.5px; line-height: 1; text-align: center;">
+                    PM
+                </span>
             </div>
         </div>
     </div>
