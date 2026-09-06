@@ -20,7 +20,7 @@
     <section class="content">
         @php
         $userRole = Auth::user()->role ?? null;
-        $canManageApproval = in_array($userRole, ['super_admin', 'kepala_shift']);
+        $canManageApproval = \App\Services\AbsenService::canApproveKepalaShift(Auth::user());
         $actionLabels = [
             'topping_la' => 'Topping LA',
             'topping_aux' => 'Topping AUX',

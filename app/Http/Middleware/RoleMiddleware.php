@@ -25,6 +25,15 @@ class RoleMiddleware
             return $next($request);
         }
 
+        // Pendelegasian dinamis bila salah satu role berstatus OFF (Absen)
+        if (in_array('kepala_shift', $roles, true) && $user->role === 'kepala_ruangan' && \App\Services\AbsenService::isKashiftOff()) {
+            return $next($request);
+        }
+
+        if (in_array('kepala_ruangan', $roles, true) && $user->role === 'kepala_shift' && \App\Services\AbsenService::isKaruOff()) {
+            return $next($request);
+        }
+
         // Redirect jika tidak memiliki akses (hindari loop: jangan kirim ke dashboard jika role tidak punya route dashboard)
         if ($user->role === 'aux') {
             return redirect()->route('aux.index')->with('error', 'Anda tidak memiliki akses');

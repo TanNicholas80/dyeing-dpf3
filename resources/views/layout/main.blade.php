@@ -146,12 +146,13 @@
                             $canDashboard = !in_array($role, ['aux', 'spv_listrik', 'dye_stuff']); // Semua role bisa akses dashboard kecuali aux, spv_listrik & dye_stuff
                             $canApprovalFm = in_array($role, ['super_admin', 'fm']);
                             $canApprovalVp = in_array($role, ['super_admin', 'vp']);
-                            $canApprovalKepalaShift = in_array($role, ['super_admin', 'kepala_shift']);
+                            $canApprovalKepalaShift = in_array($role, ['super_admin', 'kepala_shift']) || ($role === 'kepala_ruangan' && \App\Services\AbsenService::isKashiftOff());
                             $canUser = in_array($role, ['super_admin']);
                             $canMesin = in_array($role, ['super_admin', 'fm', 'vp', 'ppic', 'owner', 'spv_listrik', 'scm']);
                             $canAux = in_array($role, ['super_admin', 'aux', 'scm']);
                             $canDyeStuff = in_array($role, ['super_admin', 'ds', 'dye_stuff', 'ppic', 'scm', 'kepala_ruangan', 'operator']);
                             $canLog = in_array($role, ['super_admin', 'fm', 'vp']);
+                            $canAbsen = in_array($role, ['super_admin', 'fm']);
                         @endphp
 
                         @if ($canDashboard)
@@ -230,6 +231,12 @@
                                 <a href="{{ route('activity-log.index') }}" class="nav-link" title="Log">Log</a>
                             </li>
                         @endif
+
+                        @if ($canAbsen)
+                            <li class="nav-item">
+                                <a href="{{ route('absen.index') }}" class="nav-link" title="Absen & Delegasi">Absen</a>
+                            </li>
+                        @endif
                     </ul>
 
                 </div>
@@ -298,12 +305,13 @@
                             $canDashboard = !in_array($role, ['aux', 'spv_listrik', 'dye_stuff']); // Semua role bisa akses dashboard kecuali aux, spv_listrik & dye_stuff
                             $canApprovalFm = in_array($role, ['super_admin', 'fm', 'owner']);
                             $canApprovalVp = in_array($role, ['super_admin', 'vp', 'owner']);
-                            $canApprovalKepalaShift = in_array($role, ['super_admin', 'kepala_shift']);
+                            $canApprovalKepalaShift = in_array($role, ['super_admin', 'kepala_shift']) || ($role === 'kepala_ruangan' && \App\Services\AbsenService::isKashiftOff());
                             $canUser = in_array($role, ['super_admin', 'owner']);
                             $canMesin = in_array($role, ['super_admin', 'fm', 'vp', 'ppic', 'owner', 'spv_listrik', 'scm']);
                             $canAux = in_array($role, ['super_admin', 'aux', 'owner', 'scm']);
                             $canDyeStuff = in_array($role, ['super_admin', 'ds', 'dye_stuff', 'aux', 'ppic', 'scm', 'kepala_ruangan', 'operator', 'owner']);
                             $canLog = in_array($role, ['super_admin', 'fm', 'vp']);
+                            $canAbsen = in_array($role, ['super_admin', 'fm']);
                         @endphp
 
                         @if ($canDashboard)
@@ -413,6 +421,17 @@
                                     <i class="nav-icon fas fa-clipboard-list"></i>
                                     <p>
                                         Log Activity
+                                    </p>
+                                </a>
+                            </li>
+                        @endif
+
+                        @if ($canAbsen)
+                            <li class="nav-item">
+                                <a href="{{ route('absen.index') }}" class="nav-link">
+                                    <i class="nav-icon fas fa-user-check"></i>
+                                    <p>
+                                        Absen & Delegasi
                                     </p>
                                 </a>
                             </li>

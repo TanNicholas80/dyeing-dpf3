@@ -2147,7 +2147,7 @@
                                     <i class="fas fa-check mr-1"></i>Proses Selesai
                                 </button>
                             @endif
-                            @if (in_array($userRole ?? '', ['super_admin', 'kepala_shift']))
+                            @if (in_array($userRole ?? '', ['super_admin', 'kepala_shift']) || (($userRole ?? '') === 'kepala_ruangan' && \App\Services\AbsenService::isKashiftOff()))
                                 <button type="button" class="btn btn-danger btn-finish-force d-none mr-2"
                                     title="Selesaikan proses saat ini secara paksa dan lanjutkan ke antrian berikutnya">
                                     <i class="fas fa-check-double mr-1"></i>Proses Selesai
@@ -2732,6 +2732,8 @@
         window.canScanBarcode = @json($canScanBarcode ?? true);
         window.canFinishMaintenance = {{ ($canFinishMaintenance ?? in_array($userRole ?? '', ['super_admin', 'kepala_shift', 'kepala_ruangan'])) ? 'true' : 'false' }};
         window.canPinjamMesin = {{ ($canPinjamMesin ?? in_array($userRole ?? '', ['super_admin', 'kepala_ruangan', 'kepala_shift', 'operator'])) ? 'true' : 'false' }};
+        window.isKashiftOff = @json(\App\Services\AbsenService::isKashiftOff());
+        window.isKaruOff = @json(\App\Services\AbsenService::isKaruOff());
 
         // Toast mixin global: Error = close button (tanpa timer), Success = timer 8 detik (tanpa close button)
         window.ToastError = Swal.mixin({
@@ -4444,7 +4446,7 @@
             $btnFinishForce.addClass('d-none');
             if (proses.jenis !== 'Maintenance' && isStarted && !proses.selesai && !isWaitingStop) {
                 const userRoleStr = (window.userRole || '').toLowerCase();
-                const isAuthorizedForce = userRoleStr === 'super_admin' || userRoleStr === 'kepala_shift';
+                const isAuthorizedForce = userRoleStr === 'super_admin' || userRoleStr === 'kepala_shift' || (userRoleStr === 'kepala_ruangan' && window.isKashiftOff);
                 if (isAuthorizedForce) {
                     $btnFinishForce.removeClass('d-none');
                     if (hasPending || hasPendingReprocess) {
@@ -4733,8 +4735,9 @@
 
                         // Topping LA/AUX: badges TD/TA, tombol Request, tombol Scan
                         const userRole = window.userRole || '';
-                        const canRequestLa = data.can_request_topping_la && (userRole === 'kepala_ruangan' || userRole === 'super_admin');
-                        const canRequestAux = data.can_request_topping_aux && (userRole === 'kepala_ruangan' || userRole === 'super_admin');
+                        const canRequestToppingRole = (userRole === 'kepala_ruangan' || userRole === 'super_admin' || (userRole === 'kepala_shift' && window.isKaruOff));
+                        const canRequestLa = data.can_request_topping_la && canRequestToppingRole;
+                        const canRequestAux = data.can_request_topping_aux && canRequestToppingRole;
                         const canScanLa = data.can_scan_la === true;
                         const canScanAux = data.can_scan_aux === true;
                         const approvedToppingLa = data.approved_topping_la || null;
@@ -7223,8 +7226,9 @@
                         $('#barcode-aux-list').html(renderBarcodeGrid(data.barcode_aux, 'aux', prosesId));
 
                         const userRoleLocal = window.userRole || '';
-                        const canRequestLa = data.can_request_topping_la && (userRoleLocal === 'kepala_ruangan' || userRoleLocal === 'super_admin');
-                        const canRequestAux = data.can_request_topping_aux && (userRoleLocal === 'kepala_ruangan' || userRoleLocal === 'super_admin');
+                        const canRequestToppingRoleLocal = (userRoleLocal === 'kepala_ruangan' || userRoleLocal === 'super_admin' || (userRoleLocal === 'kepala_shift' && window.isKaruOff));
+                        const canRequestLa = data.can_request_topping_la && canRequestToppingRoleLocal;
+                        const canRequestAux = data.can_request_topping_aux && canRequestToppingRoleLocal;
                         const canScanLa = data.can_scan_la === true;
                         const canScanAux = data.can_scan_aux === true;
                         const approvedToppingLaLocal = data.approved_topping_la || null;
@@ -7471,7 +7475,7 @@
                                 const canFinMaint = window.canFinishMaintenance === true || ['super_admin', 'kepala_shift', 'kepala_ruangan'].includes(userRoleCur);
                                 if (canFinMaint) $modalBtnFinishMaint.removeClass('d-none');
                             } else {
-                                const canFinForce = ['super_admin', 'kepala_shift'].includes(userRoleCur);
+                                const canFinForce = ['super_admin', 'kepala_shift'].includes(userRoleCur) || (userRoleCur === 'kepala_ruangan' && window.isKashiftOff);
                                 if (canFinForce) $modalBtnFinishForce.removeClass('d-none');
                             }
                         }

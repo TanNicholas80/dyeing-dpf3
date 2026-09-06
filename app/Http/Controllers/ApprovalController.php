@@ -136,21 +136,24 @@ class ApprovalController extends Controller
 
             $approval->save();
 
+            $isPltKaru = (Auth::check() && Auth::user()->role === 'kepala_ruangan' && \App\Services\AbsenService::isKashiftOff());
+            $pltNote = $isPltKaru ? ' (oleh KARU - Delegasi Kashift OFF)' : '';
+
             // Jika status approved, eksekusi action sesuai jenis action
             if ($validated['status'] === 'approved') {
                 $this->executeApprovedAction($approval);
                 activity('Manajemen Approval')
                     ->performedOn($approval)
                     ->causedBy(Auth::user())
-                    ->withProperties(['note' => $approval->note])
-                    ->log("Approval {$approval->action} disetujui secara manual.");
+                    ->withProperties(['note' => $approval->note, 'delegasi' => $isPltKaru])
+                    ->log("Approval {$approval->action} disetujui secara manual{$pltNote}.");
             } elseif ($validated['status'] === 'rejected') {
                 $this->executeRejectedAction($approval);
                 activity('Manajemen Approval')
                     ->performedOn($approval)
                     ->causedBy(Auth::user())
-                    ->withProperties(['note' => $approval->note])
-                    ->log("Approval {$approval->action} ditolak secara manual.");
+                    ->withProperties(['note' => $approval->note, 'delegasi' => $isPltKaru])
+                    ->log("Approval {$approval->action} ditolak secara manual{$pltNote}.");
             }
 
             // Commit transaksi

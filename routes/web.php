@@ -9,6 +9,7 @@ use App\Http\Controllers\ProsesController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\ApprovalController;
 use App\Http\Controllers\ActivityLogController;
+use App\Http\Controllers\AbsenController;
 
 Route::middleware(['guest', 'prevent-back-history'])->group(function () {
     Route::get('/', [AuthController::class, 'login'])->name('login');
@@ -145,6 +146,15 @@ Route::middleware(['auth', 'prevent-back-history'])->group(function () {
     // Activity log: SuperAdmin, FM, VP
     Route::middleware('role:super_admin,fm,vp')->group(function () {
         Route::get('/activity-log', [ActivityLogController::class, 'index'])->name('activity-log.index');
+    });
+
+    /**
+     * ABSEN & DELEGASI
+     * - SuperAdmin & FM: akses menu Absen dan toggle status Kashift/Karu
+     */
+    Route::middleware('role:super_admin,fm')->group(function () {
+        Route::get('/absen', [AbsenController::class, 'index'])->name('absen.index');
+        Route::post('/absen/toggle', [AbsenController::class, 'toggle'])->name('absen.toggle');
     });
 
     /**

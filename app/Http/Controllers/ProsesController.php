@@ -1065,8 +1065,8 @@ class ProsesController extends Controller
             $approvalId = $request->approval_id ? (int) $request->approval_id : null;
             $userRole = Auth::user()->role ?? null;
 
-            // Kepala Ruangan: hanya boleh input topping (harus ada approval_id yang valid)
-            if (in_array($userRole, ['kepala_ruangan'])) {
+            // Kepala Ruangan (atau Kepala Shift saat Karu OFF): hanya boleh input topping (harus ada approval_id yang valid)
+            if (in_array($userRole, ['kepala_ruangan']) || ($userRole === 'kepala_shift' && \App\Services\AbsenService::isKaruOff())) {
                 if (!$approvalId) {
                     $msg = 'Anda hanya dapat input barcode LA untuk topping yang sudah di-approve Kepala Shift.';
                     if ($request->ajax() || $request->wantsJson()) {
@@ -1346,8 +1346,8 @@ class ProsesController extends Controller
             $approvalId = $request->approval_id ? (int) $request->approval_id : null;
             $userRole = Auth::user()->role ?? null;
 
-            // Kepala Ruangan: hanya boleh input topping (harus ada approval_id yang valid)
-            if (in_array($userRole, ['kepala_ruangan'])) {
+            // Kepala Ruangan (atau Kepala Shift saat Karu OFF): hanya boleh input topping (harus ada approval_id yang valid)
+            if (in_array($userRole, ['kepala_ruangan']) || ($userRole === 'kepala_shift' && \App\Services\AbsenService::isKaruOff())) {
                 if (!$approvalId) {
                     $msg = 'Anda hanya dapat input barcode AUX untuk topping yang sudah di-approve Kepala Shift.';
                     if ($request->ajax() || $request->wantsJson()) {
@@ -1678,8 +1678,7 @@ class ProsesController extends Controller
     private function requestTopping(Request $request, $prosesId, string $action)
     {
         $user = Auth::user();
-        $role = $user->role ?? null;
-        if (!in_array($role, ['super_admin', 'kepala_ruangan'])) {
+        if (!\App\Services\AbsenService::canRequestTopping($user)) {
             return response()->json(['status' => 'error', 'message' => 'Anda tidak memiliki akses untuk request topping.'], 403);
         }
 
@@ -2181,14 +2180,17 @@ class ProsesController extends Controller
             'initial_is_complete' => $auxInitialComplete,
         ];
 
-        $userRole = Auth::user()->role ?? null;
+        $user = Auth::user();
+        $userRole = $user->role ?? null;
+        $canActAsKaru = ($userRole === 'kepala_ruangan') || ($userRole === 'kepala_shift' && \App\Services\AbsenService::isKaruOff());
+
         $canScanLa = (($proses->qty_dye_stuff ?? 0) > 0 || $approvedToppingLa)
             && (in_array($userRole, ['super_admin', 'ppic', 'operator'])
-                || ($userRole === 'kepala_ruangan' && ($approvedToppingLa || $laIsComplete) && $allComplete))
+                || ($canActAsKaru && ($approvedToppingLa || $laIsComplete) && $allComplete))
             && $allComplete;
         $canScanAux = (($proses->qty_aux ?? 0) > 0 || $approvedToppingAux)
             && (in_array($userRole, ['super_admin', 'ppic', 'operator'])
-                || ($userRole === 'kepala_ruangan' && ($approvedToppingAux || $auxIsComplete) && $allComplete))
+                || ($canActAsKaru && ($approvedToppingAux || $auxIsComplete) && $allComplete))
             && $allComplete;
 
         $jenisOp = $proses->jenis_op ?? 'Single';
@@ -3318,11 +3320,10 @@ class ProsesController extends Controller
     public function forceFinishProses($id)
     {
         $user = Auth::user();
-        $userRole = $user ? $user->role : null;
-        if (!in_array($userRole, ['super_admin', 'kepala_shift'], true)) {
+        if (!\App\Services\AbsenService::canForceFinish($user)) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Hanya Kepala Shift dan Super Admin (Admin) yang memiliki hak akses untuk menyelesaikan proses ini secara paksa.'
+                'message' => 'Hanya Kepala Shift, Super Admin, atau Kepala Ruangan (saat Kashift Absen) yang memiliki hak akses untuk menyelesaikan proses ini secara paksa.'
             ], 403);
         }
 
