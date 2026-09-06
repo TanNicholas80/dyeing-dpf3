@@ -261,6 +261,9 @@ class ProsesStatusService
             'is_pinjam_mesin' => (bool) ($proses->is_pinjam_mesin ?? false),
             'pinjam_mesin_alasan' => $proses->pinjam_mesin_alasan ?? null,
             'note' => $proses->note ?? null,
+            'is_stop_requested' => (bool) ($proses->stop_requested_at !== null && $proses->selesai === null),
+            'stop_request_type' => $proses->stop_request_type ?? null,
+            'stop_requested_at' => $proses->stop_requested_at ? $proses->stop_requested_at->format('Y-m-d H:i:s') : null,
         ];
     }
 

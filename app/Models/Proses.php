@@ -34,6 +34,9 @@ class Proses extends Model
         'pinjam_mesin_at',
         'pinjam_mesin_by',
         'note',
+        'stop_requested_at',
+        'stop_requested_by',
+        'stop_request_type',
     ];
 
     protected $casts = [
@@ -49,6 +52,7 @@ class Proses extends Model
         'is_paused' => 'boolean',
         'is_pinjam_mesin' => 'boolean',
         'pinjam_mesin_at' => 'datetime',
+        'stop_requested_at' => 'datetime',
     ];
 
     public function mesin()
@@ -77,6 +81,16 @@ class Proses extends Model
     public function pinjamMesinHistories()
     {
         return $this->hasMany(PinjamMesinHistory::class, 'proses_id');
+    }
+
+    public function stopRequestedBy()
+    {
+        return $this->belongsTo(User::class, 'stop_requested_by');
+    }
+
+    public function isWaitingStop(): bool
+    {
+        return $this->stop_requested_at !== null && $this->selesai === null;
     }
 
     /**

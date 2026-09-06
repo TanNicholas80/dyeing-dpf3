@@ -34,6 +34,7 @@
                                     $restrictedRoles = ['fm', 'vp', 'ppic', 'owner', 'spv_listrik', 'scm'];
                                     $canManageMesin = !in_array(strtolower($userRole), $restrictedRoles);
                                     $isSuperAdmin = strtolower($userRole ?? '') === 'super_admin';
+                                    $canViewIotSignal = in_array(strtolower($userRole ?? ''), ['super_admin', 'spv_listrik']);
                                 @endphp
 
                                 @if ($canManageMesin)
@@ -51,7 +52,7 @@
                                         <tr>
                                             <th>Jenis Mesin</th>
                                             <th>Status</th>
-                                            @if ($isSuperAdmin)
+                                            @if ($canViewIotSignal)
                                             <th>Sinyal IoT</th>
                                             @endif
                                             @if ($isSuperAdmin)
@@ -74,11 +75,16 @@
                                                         {{ $mesin->status ? 'Hidup' : 'Mati' }}
                                                     </span>
                                                 </td>
-                                                @if ($isSuperAdmin)
+                                                @if ($canViewIotSignal)
+                                                @php
+                                                    $sig = $iotSignalMap[$mesin->id] ?? null;
+                                                    $isConnected = $sig['connected'] ?? false;
+                                                    $sigLabel = $sig['label'] ?? 'Mengecek...';
+                                                @endphp
                                                 <td>
-                                                    <span class="badge signal-badge badge-secondary"
+                                                    <span class="badge signal-badge {{ $isConnected ? 'badge-success' : 'badge-danger' }}"
                                                         data-id="{{ $mesin->id }}">
-                                                        Mengecek...
+                                                        {{ $sigLabel }}
                                                     </span>
                                                 </td>
                                                 @endif

@@ -120,6 +120,15 @@ class ApiCheckStatusBarcodeController extends Controller
                 }
                 $prosesAktif->save();
 
+                // Bersihkan cache alarm & sinyal agar langsung sinkron ke PLC (Sinyal 103 reset)
+                Cache::forget("iot:mesin:{$mesin->id}:alarm_result");
+                Cache::forget($this->alarmStateKey((int) $mesin->id));
+
+                if ($prosesAktif->stop_requested_at) {
+                    $stopTypeLabel = $prosesAktif->stop_request_type === 'maintenance_finish' ? 'Maintenance Selesai' : 'Force End (Produksi/Reproses)';
+                    \Illuminate\Support\Facades\Log::channel('iot')->info("Proses #{$prosesAktif->id} ({$stopTypeLabel}) selesai diverifikasi via mesin mati (Address 200 = 0). Sinyal 103 dinonaktifkan.");
+                }
+
                 // Broadcast ProsesStatusUpdated agar UI langsung hilang / update ke history
                 $prosesAktif->refresh();
                 $prosesAktif->load(['approvals', 'details.barcodeKains', 'details.barcodeLas', 'details.barcodeAuxs']);
@@ -477,7 +486,7 @@ class ApiCheckStatusBarcodeController extends Controller
             'signal_103_detail' => [
                 'value' => $signal103 ? 1 : 0,
                 'is_active' => $signal103,
-                'description' => '1 jika maintenance selesai manual atau semua barcode (kain, LA, AUX, topping) lengkap',
+                'description' => '1 jika proses aktif diajukan selesai/force end (menunggu mesin mati), maintenance selesai manual, atau semua barcode lengkap',
             ],
             'signal_105_detail' => [
                 'value' => $signal105 ? 1 : 0,
@@ -595,27 +604,33 @@ class ApiCheckStatusBarcodeController extends Controller
 
     /**
      * Cek status untuk sinyal Modbus Address 103:
-     * 1. Maintenance dihentikan/diselesaikan manual oleh Kashift/Super Admin.
-     * 2. Atau Proses (Single OP/Multiple OP) seluruh barcode-nya sudah LENGKAP di-scan (Kain + Dye Stuff + AUX + Topping).
+     * 1. Proses aktif (Produksi / Reproses / Maintenance) dalam status Force End / Selesai (stop_requested_at !== null).
+     * 2. Maintenance dihentikan/diselesaikan manual oleh Kashift/Super Admin/Karu.
+     * 3. Atau Proses (Single OP/Multiple OP) seluruh barcode-nya sudah LENGKAP di-scan (Kain + Dye Stuff + AUX + Topping).
      */
     private function checkSignal103(Mesin $mesin, ?Proses $prosesAktif, ?Proses $prosesSelesai): bool
     {
-        // 1. Cek Maintenance
+        // 1. Cek jika proses aktif sedang diajukan selesai / force end (menunggu verifikasi mesin mati / unload)
+        if ($prosesAktif && $prosesAktif->stop_requested_at !== null) {
+            return true;
+        }
+
+        // 2. Cek Maintenance
         if ($prosesAktif && ($prosesAktif->jenis ?? null) === 'Maintenance') {
-            // Jika proses aktif adalah Maintenance dan sudah diselesaikan:
-            if ($prosesAktif->selesai !== null) {
+            // Jika proses aktif adalah Maintenance dan sudah diselesaikan atau diajukan selesai:
+            if ($prosesAktif->selesai !== null || $prosesAktif->stop_requested_at !== null) {
                 return true;
             }
         }
 
-        // Cek jika proses selesai terakhir adalah Maintenance yang diselesaikan secara manual
+        // Cek jika proses selesai terakhir adalah Maintenance yang baru saja diselesaikan secara manual
         if (!$prosesAktif && $prosesSelesai && ($prosesSelesai->jenis ?? null) === 'Maintenance') {
-            if ($prosesSelesai->selesai && \Carbon\Carbon::parse($prosesSelesai->selesai)->isToday()) {
+            if ($prosesSelesai->selesai && now()->diffInMinutes($prosesSelesai->selesai) < 5 && (bool) $mesin->status) {
                 return true;
             }
         }
 
-        // 2. Cek Proses Produksi / Reproses (Single OP & Multiple OP)
+        // 3. Cek Proses Produksi / Reproses (Single OP & Multiple OP)
         if ($prosesAktif && ($prosesAktif->jenis ?? null) !== 'Maintenance') {
             // A. Cek Barcode Kain
             $kainIncomplete = $this->checkBarcodeKainIncomplete($prosesAktif);

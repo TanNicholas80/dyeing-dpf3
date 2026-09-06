@@ -13,7 +13,7 @@
   - [3. Alur Permintaan & Approval Topping (Grace Period 30 Menit)](#3-alur-permintaan--approval-topping-grace-period-30-menit)
   - [4. Alur Pinjam Mesin & Approval Kepala Shift](#4-alur-pinjam-mesin--approval-kepala-shift)
   - [5. Alur Multi-Level Approval (FM & VP)](#5-alur-multi-level-approval-fm--vp)
-  - [6. Alur Maintenance & Selesai Manual](#6-alur-maintenance--selesai-manual)
+  - [6. Alur Force End, Selesai Maintenance & Verifikasi Shutdown (Address 103 & 200)](#6-alur-force-end-selesai-maintenance--verifikasi-shutdown-address-103--200)
   - [7. Alur Integrasi IoT, Modbus TCP & PLC Industrial](#7-alur-integrasi-iot-modbus-tcp--plc-industrial)
   - [8. Audit Trail & Activity Log](#8-audit-trail--activity-log)
 - [Struktur Direktori](#-struktur-direktori)
@@ -37,11 +37,14 @@
    - **Breakdown Schedule Alarm**: Alarm berbunyi otomatis jika input Dye Stuff / AUX terlambat dari jadwal breakdown PPIC, dan padam saat di-scan.
    - **Topping Grace Period (30 Menit)**: Memberikan waktu 30 menit setelah approval Kepala Shift sebelum alarm berbunyi.
 4. **Modbus TCP & PLC Integration**: Komunikasi 2 arah dengan PLC mesin melalui gateway RS485/Modbus TCP (Address 100, 103, 105, 200).
+   - **Shutdown Handshake**: Force End dan Selesai Maintenance mengirim sinyal 103 = 1 ke PLC dan menunggu verifikasi mesin mati (Address 200 = 0) sebelum proses resmi selesai dan antrian berikutnya berjalan.
+   - **Pembatalan Selesai**: Fleksibilitas membatalkan permohonan selesai sebelum mesin mati yang secara instan me-reset sinyal 103 kembali ke 0.
 5. **Multi-Level Role & Approval System**:
    - **Factory Manager (FM)**: Approval Edit Cycle Time, Delete, Move Machine, Swap Queue, Reproses Tahap 1, Pause/Resume.
    - **Vice President (VP)**: Approval Reproses Tahap 2.
-   - **Kepala Shift (Kashift)**: Approval Topping LA/AUX, Approval Pinjam Mesin, Selesai Manual Maintenance.
-   - **Kepala Ruangan (Karu)**: Pengajuan Topping LA/AUX.
+   - **Kepala Shift (Kashift)**: Approval Topping LA/AUX, Approval Pinjam Mesin, Force End, Selesai Manual Maintenance, Batal Selesai.
+   - **Kepala Ruangan (Karu)**: Pengajuan Topping LA/AUX, Selesai Maintenance, Batal Selesai Maintenance.
+   - **SPV Listrik**: Monitoring real-time status online/offline koneksi IoT per mesin pada tabel mesin.
    - **Operator & PPIC**: Input order, scan barcode, pengajuan pinjam mesin.
 6. **Audit Trail**: Pencatatan riwayat setiap aksi, perubahan data (before/after), IP address, dan user role.
 
@@ -82,9 +85,9 @@
 ```mermaid
 graph TD
     subgraph PLC_Hardware [PLC & Gateway Industrial]
-        PLC[PLC Mesin] -->|Address 200: Status Mesin ON/OFF| MB_BRIDGE[Modbus TCP Bridge Node.js]
+        PLC[PLC Mesin] -->|Address 200: Status Mesin ON/OFF & Verifikasi Shutdown| MB_BRIDGE[Modbus TCP Bridge Node.js]
         MB_BRIDGE -->|Address 100: Alarm ON/OFF| PLC
-        MB_BRIDGE -->|Address 103: Barcode Lengkap / Maint End| PLC
+        MB_BRIDGE -->|Address 103: Stop Request / Barcode Lengkap| PLC
         MB_BRIDGE -->|Address 105: Pinjam Mesin| PLC
     end
 
@@ -160,13 +163,37 @@ graph TD
 
 ---
 
-### 6. Alur Maintenance & Selesai Manual
-1. Proses berjenis `Maintenance` digunakan untuk perawatan/perbaikan mesin.
+### 6. Alur Force End, Selesai Maintenance & Verifikasi Shutdown (Address 103 & 200)
+
+#### A. Alur Selesai Paksa (Force End Produksi / Reproses)
+1. **Hak Akses**: Hanya **Super Admin** dan **Kepala Shift**.
+2. **Kondisi Mesin Hidup (ON)**:
+   - Saat tombol **Selesai Paksa (Force End)** ditekan dan dikonfirmasi, sistem **tidak langsung menyelesaikan** proses ke history dan antrian berikutnya **tidak langsung dijalankan**.
+   - Sistem menetapkan `stop_requested_at = now()`, `stop_request_type = 'force_finish'`, dan mengirim sinyal **Address 103 = 1** ke PLC.
+   - Pada kartu proses di dashboard muncul banner animasi oranye: `Menunggu Mesin Mati (Sinyal 103 ON)`.
+   - Sistem menunggu operator lapangan mematikan mesin (**Address 200 = 0**).
+   - Segera setelah Address 200 bernilai `0` (mesin mati):
+     - Proses resmi diselesaikan (`selesai = now()`), durasi actual dihitung, dan dipindahkan ke riwayat (*history*).
+     - Sinyal 103 otomatis di-reset kembali ke `0`.
+     - Ketika mesin nantinya dinyalakan kembali, proses antrian berikutnya akan otomatis dijalankan.
+3. **Kondisi Mesin Mati (OFF)**: Jika mesin memang sudah dalam keadaan OFF saat tombol ditekan, proses langsung diselesaikan secara instan.
+
+#### B. Alur Selesai Maintenance
+1. **Hak Akses**: **Super Admin**, **Kepala Shift**, dan **Kepala Ruangan (KARU)**.
 2. Informasi GDA, mode, jenis OP, qty dye stuff/aux disembunyikan secara otomatis pada proses maintenance.
-3. Tombol **Proses Selesai (End Maintenance Manual)** hanya dapat diakses oleh **Super Admin**, **Kepala Shift**, dan **Kepala Ruangan (KARU)**.
-4. Saat diselesaikan manual:
-   - Sinyal **Address 103** bernilai `1` dikirim ke PLC.
-   - Proses antrian berikutnya otomatis dijalankan jika mesin dalam kondisi ON.
+3. **Mekanisme Verifikasi Shutdown**:
+   - Jika mesin sedang ON saat tombol **Selesai Maintenance** ditekan, sinyal **Address 103 = 1** dikirim ke PLC dan proses berstatus menunggu mesin mati (`stop_requested_at = now()`, `stop_request_type = 'maintenance_finish'`).
+   - Proses resmi selesai dan antrian berikutnya baru diizinkan berjalan setelah register **Address 200 = 0** (mesin fisik mati).
+
+#### C. Fitur Pembatalan Selesai ("Batal Force End / Batal Selesai")
+1. **Hak Akses**: **Super Admin**, **Kepala Shift**, dan **Kepala Ruangan**.
+2. **Operasional**:
+   - Jika terjadi pembatalan atau salah klik sebelum mesin mati, user dapat membuka modal detail proses.
+   - Tersedia tombol **"Batal Force End"** atau **"Batal Selesai"** beserta kotak notifikasi status menunggu mesin mati.
+   - Saat tombol pembatalan diklik dan dikonfirmasi:
+     - Field `stop_requested_at`, `stop_requested_by`, dan `stop_request_type` di-reset menjadi `null`.
+     - Cache alarm dibersihkan sehingga sinyal **Address 103 langsung kembali ke 0**.
+     - Status kartu proses di dashboard kembali menjadi proses normal berjalan via WebSocket real-time.
 
 ---
 
@@ -175,9 +202,9 @@ graph TD
 #### Tabel Pemetaan Register Modbus:
 | Modbus Address | Arah | Nilai | Definisi & Fungsi |
 | :--- | :--- | :---: | :--- |
-| **Address 200** | Read dari PLC $\rightarrow$ POST ke API | `0` / `1` | **Status Mesin Fisik ON/OFF** dari Relay/Pompa Air PLC. |
+| **Address 200** | Read dari PLC $\rightarrow$ POST ke API | `0` / `1` | **Status Mesin Fisik ON/OFF** dari Relay/Pompa Air PLC.<br>• `0`: Mesin Mati (memicu eksekusi penyelesaian proses jika sedang berstatus menunggu stop).<br>• `1`: Mesin Beroperasi. |
 | **Address 100** | GET dari API $\rightarrow$ Write ke PLC | `0` / `1` | **Status Alarm IoT** (1 = Bunyi, 0 = Padam). |
-| **Address 103** | GET dari API $\rightarrow$ Write ke PLC | `0` / `1` | **Maintenance Selesai Manual ATAU Seluruh Barcode Lengkap 100%** (Single & Multiple OP). |
+| **Address 103** | GET dari API $\rightarrow$ Write ke PLC | `0` / `1` | **Stop Request Aktif (Force End / Selesai Maintenance) ATAU Seluruh Barcode Lengkap 100%**.<br>• Bernilai `1` saat barcode lengkap atau sistem sedang menunggu mesin mati.<br>• Otomatis kembali ke `0` saat stop request dibatalkan atau mesin sudah mati. |
 | **Address 105** | GET dari API $\rightarrow$ Write ke PLC | `0` / `1` | **Status / Flag Pinjam Mesin** Aktif. |
 
 ---
@@ -227,6 +254,16 @@ system_dyeing/dyeing/
 ---
 
 ## 📝 Changelog & Versioning
+
+### Versi 2.5.0 (September 2026)
+- 🛑 **Handshake Sinyal 103 & 200 (Force End & Selesai Maintenance)**:
+  - Force End (Produksi/Reproses) dan Selesai Maintenance mengirim sinyal 103 = 1 ke PLC dan menunggu mesin mati / register 200 = 0 sebagai verifikasi fisik unload / shutdown sebelum proses dipindahkan ke riwayat dan antrian berikutnya dijalankan.
+- ↩️ **Fitur Batal Force End & Batal Selesai**:
+  - Tombol pembatalan permohonan selesai sebelum mesin mati pada modal detail proses. Secara instan me-reset sinyal 103 kembali ke 0 dan mengembalikan status proses menjadi normal berjalan.
+- ⚡ **Hak Akses SPV Listrik pada Tabel Mesin**:
+  - Role `spv_listrik` kini dapat memantau status indikator "Sinyal IoT" (Terhubung / Terputus) secara langsung pada halaman `/mesin`.
+- 🔄 **Realtime WebSocket Synchronization**:
+  - Banner oranye status menunggu mesin mati dan tombol pembatalan tersinkronisasi secara otomatis antar browser tanpa reload.
 
 ### Versi 2.4.0 (Agustus 2026)
 - ✨ **Fitur Pinjam Mesin**: Pengajuan pinjam mesin untuk proses berjalan / antrian ke-1 dengan Approval Kepala Shift.

@@ -78,6 +78,7 @@ Route::middleware(['auth', 'prevent-back-history'])->group(function () {
     // Selesai Maintenance: SuperAdmin, Kepala Shift, Kepala Ruangan (KARU)
     Route::middleware('role:super_admin,kepala_shift,kepala_ruangan')->group(function () {
         Route::post('/proses/{id}/selesai', [ProsesController::class, 'finishMaintenance'])->name('proses.selesai');
+        Route::post('/proses/{id}/cancel-stop-request', [ProsesController::class, 'cancelStopRequest'])->name('proses.cancel-stop-request');
     });
 
     // Proses Selesai (Paksa Selesai) untuk Produksi & Reproses: SuperAdmin & Kepala Shift

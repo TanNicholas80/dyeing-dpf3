@@ -287,6 +287,12 @@
     style="background: {{ $gradient }}; background-repeat: no-repeat; background-size: cover; border-radius: 0; color: #fff; margin: 5px 0 0 0; padding: 2px 2px; cursor: {{ $canDragDrop ? 'grab' : 'default' }}; box-shadow: 0 2px 6px rgba(0,0,0,0.2);"
     data-proses='@json($proses)' data-proses-id="{{ $proses->id }}" data-can-move="{{ $canDragDrop ? '1' : '0' }}"
     data-has-pending-reprocess="{{ $hasPendingReprocessApproval ? '1' : '0' }}" data-bg-color="{{ $bg }}">
+    @if ($proses->stop_requested_at && !$proses->selesai)
+        <div class="waiting-stop-banner" style="background: linear-gradient(90deg, #ff9800, #ffb74d); color: #111; font-weight: 800; font-size: 11px; padding: 3px 6px; text-align: center; border-bottom: 1px solid rgba(0,0,0,0.15); display: flex; align-items: center; justify-content: center; gap: 5px;">
+            <i class="fas fa-spinner fa-spin"></i>
+            <span>Menunggu Mesin Mati (Sinyal 103 ON)</span>
+        </div>
+    @endif
     {{-- Header --}}
     <div class="card-header"
         style="display: flex; flex-direction: row; align-items: center; padding: 0 10px 2px 10px; gap: 0; border-bottom: none;">

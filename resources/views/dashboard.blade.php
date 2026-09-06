@@ -2094,6 +2094,23 @@
                         </button>
                     </div>
                     <div class="modal-body py-3 px-4">
+                        <!-- Banner Peringatan Menunggu Mesin Mati (Address 200 = 0) -->
+                        <div id="alert-waiting-stop" class="alert alert-warning py-2 px-3 mb-3 d-none shadow-sm" style="border-left: 5px solid #f57c00; background-color: #fff3e0;">
+                            <div class="d-flex align-items-center">
+                                <div class="mr-3 text-warning">
+                                    <i class="fas fa-exclamation-triangle fa-2x"></i>
+                                </div>
+                                <div>
+                                    <div class="font-weight-bold text-dark" id="alert-waiting-stop-title" style="font-size: 14px;">
+                                        Sedang Menunggu Mesin Mati (Address 200 = 0)
+                                    </div>
+                                    <div class="small text-muted" id="alert-waiting-stop-desc">
+                                        Sinyal 103 ON dikirim ke PLC. Menunggu verifikasi unload atau operator di lapangan mematikan mesin sebelum proses selesai ke history.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         <table class="table table-bordered table-sm mb-0">
                             <tbody id="detail-proses-body">
                                 <!-- Diisi via JS -->
@@ -2134,6 +2151,12 @@
                                 <button type="button" class="btn btn-danger btn-finish-force d-none mr-2"
                                     title="Selesaikan proses saat ini secara paksa dan lanjutkan ke antrian berikutnya">
                                     <i class="fas fa-check-double mr-1"></i>Proses Selesai
+                                </button>
+                            @endif
+                            @if (in_array($userRole ?? '', ['super_admin', 'kepala_shift', 'kepala_ruangan']))
+                                <button type="button" class="btn btn-outline-warning btn-cancel-stop-request d-none mr-2"
+                                    title="Batalkan permohonan selesai dan kembalikan sinyal 103 ke 0">
+                                    <i class="fas fa-undo mr-1"></i>Batal Selesai
                                 </button>
                             @endif
                             @if ($canPinjamMesin ?? in_array($userRole ?? '', ['super_admin', 'kepala_ruangan', 'kepala_shift', 'operator']))
@@ -4293,6 +4316,8 @@
             const $btnPause = $('.btn-pause-proses');
             const $btnFinishMaintenance = $('.btn-finish-maintenance');
             const $btnFinishForce = $('.btn-finish-force');
+            const $btnCancelStopRequest = $('.btn-cancel-stop-request');
+            const $alertWaitingStop = $('#alert-waiting-stop');
             const $btnPinjam = $('.btn-pinjam-mesin');
             const $btnRecoveryProses = $('.btn-recovery-proses');
 
@@ -4380,9 +4405,29 @@
                 $('#badge-proses-status-note').text('Antrian').removeClass('badge-secondary badge-success').addClass('badge-info');
             }
 
+            // Status Menunggu Mesin Mati (Address 200 = 0) / Sinyal 103 ON
+            const isWaitingStop = !!(proses.stop_requested_at && !proses.selesai);
+            $btnCancelStopRequest.addClass('d-none');
+            if (isWaitingStop) {
+                $alertWaitingStop.removeClass('d-none');
+                if (proses.stop_request_type === 'maintenance_finish') {
+                    $('#alert-waiting-stop-title').text('Maintenance Sedang Menunggu Mesin Mati (Address 200 = 0)');
+                    $('#alert-waiting-stop-desc').text('Sinyal 103 ON dikirim ke PLC. Menunggu operator di lapangan mematikan mesin sebelum proses selesai.');
+                } else {
+                    $('#alert-waiting-stop-title').text('Sedang Menunggu Mesin Mati / Unload (Address 200 = 0)');
+                    $('#alert-waiting-stop-desc').text('Sinyal 103 ON dikirim ke PLC. Menunggu verifikasi unload atau operator mematikan mesin sebelum proses selesai.');
+                }
+                const canCancelStop = ['super_admin', 'kepala_shift', 'kepala_ruangan'].includes(userRoleStr);
+                if (canCancelStop) {
+                    $btnCancelStopRequest.removeClass('d-none');
+                }
+            } else {
+                $alertWaitingStop.addClass('d-none');
+            }
+
             // Logic untuk tombol Selesai Proses Maintenance (Super Admin, Kepala Shift, dan Kepala Ruangan / KARU)
             $btnFinishMaintenance.addClass('d-none');
-            if (proses.jenis === 'Maintenance' && isStarted && !proses.selesai) {
+            if (proses.jenis === 'Maintenance' && isStarted && !proses.selesai && !isWaitingStop) {
                 const userRoleStr = (window.userRole || '').toLowerCase();
                 const isAuthorized = window.canFinishMaintenance === true || userRoleStr === 'super_admin' || userRoleStr === 'kepala_shift' || userRoleStr === 'kepala_ruangan';
                 if (isAuthorized) {
@@ -4397,7 +4442,7 @@
 
             // Logic untuk tombol Selesai Proses Produksi / Reproses secara Paksa (Super Admin & Kepala Shift)
             $btnFinishForce.addClass('d-none');
-            if (proses.jenis !== 'Maintenance' && isStarted && !proses.selesai) {
+            if (proses.jenis !== 'Maintenance' && isStarted && !proses.selesai && !isWaitingStop) {
                 const userRoleStr = (window.userRole || '').toLowerCase();
                 const isAuthorizedForce = userRoleStr === 'super_admin' || userRoleStr === 'kepala_shift';
                 if (isAuthorizedForce) {
@@ -5721,7 +5766,7 @@
 
             Swal.fire({
                 title: 'Selesaikan Maintenance?',
-                text: 'Apakah Anda yakin ingin menyelesaikan proses Maintenance ini?',
+                text: 'Perintah ini akan mengirimkan sinyal 103 ke PLC. Jika mesin masih hidup, sistem akan menunggu mesin mati (Address 200 = 0) dari lapangan sebelum maintenance resmi selesai.',
                 icon: 'question',
                 showCancelButton: true,
                 confirmButtonColor: '#28a745',
@@ -5732,7 +5777,7 @@
             }).then((result) => {
                 if (result.isConfirmed) {
                     Swal.fire({
-                        title: 'Menyelesaikan proses...',
+                        title: 'Memproses permintaan...',
                         text: 'Mohon tunggu sebentar',
                         allowOutsideClick: false,
                         allowEscapeKey: false,
@@ -5749,11 +5794,12 @@
                         },
                         success: function (res) {
                             $('#modalDetailProses').modal('hide');
+                            const isWait = !!res.waiting_off;
                             Swal.fire({
-                                icon: 'success',
-                                title: 'Berhasil',
-                                text: res.message || 'Proses Maintenance berhasil diselesaikan!',
-                                timer: 1500,
+                                icon: isWait ? 'info' : 'success',
+                                title: isWait ? 'Menunggu Mesin Mati' : 'Berhasil',
+                                text: res.message || 'Proses Maintenance berhasil diproses.',
+                                timer: isWait ? 3000 : 1500,
                                 showConfirmButton: false
                             }).then(() => {
                                 if (typeof loadDashboardData === 'function') {
@@ -5789,19 +5835,19 @@
             if (!proses) return;
 
             Swal.fire({
-                title: 'Selesaikan Proses Sekarang?',
-                text: 'Apakah Anda yakin untuk melanjutkan ke proses selanjutnya? Proses saat ini akan otomatis diselesaikan, masuk ke history, dan dilanjutkan dengan proses antrian di bawahnya.',
+                title: 'Force End Proses?',
+                text: 'Perintah ini akan mengirimkan sinyal 103 ke PLC. Jika mesin masih hidup, sistem akan menunggu mesin mati (Address 200 = 0) / verifikasi unload dari lapangan sebelum proses selesai dan dialihkan ke antrian berikutnya.',
                 icon: 'warning',
                 showCancelButton: true,
                 confirmButtonColor: '#28a745',
                 cancelButtonColor: '#6c757d',
-                confirmButtonText: '<i class="fas fa-check mr-1"></i>Ya, Lanjutkan',
+                confirmButtonText: '<i class="fas fa-check mr-1"></i>Ya, Force End',
                 cancelButtonText: 'Batal',
                 reverseButtons: true
             }).then((result) => {
                 if (result.isConfirmed) {
                     Swal.fire({
-                        title: 'Menyelesaikan proses...',
+                        title: 'Memproses permintaan...',
                         text: 'Mohon tunggu sebentar',
                         allowOutsideClick: false,
                         allowEscapeKey: false,
@@ -5818,11 +5864,12 @@
                         },
                         success: function (res) {
                             $('#modalDetailProses').modal('hide');
+                            const isWait = !!res.waiting_off;
                             Swal.fire({
-                                icon: 'success',
-                                title: 'Berhasil',
-                                text: res.message || 'Proses berhasil diselesaikan dan dialihkan ke antrian berikutnya!',
-                                timer: 1500,
+                                icon: isWait ? 'info' : 'success',
+                                title: isWait ? 'Menunggu Unload / Mesin Mati' : 'Berhasil',
+                                text: res.message || 'Perintah Force End berhasil diproses.',
+                                timer: isWait ? 3000 : 1500,
                                 showConfirmButton: false
                             }).then(() => {
                                 if (typeof loadDashboardData === 'function') {
@@ -5834,6 +5881,75 @@
                         },
                         error: function (xhr) {
                             let errMsg = 'Gagal menyelesaikan proses.';
+                            if (xhr.responseJSON && xhr.responseJSON.message) {
+                                errMsg = xhr.responseJSON.message;
+                            }
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Gagal',
+                                text: errMsg
+                            });
+                        }
+                    });
+                }
+            });
+        });
+
+        // Handler tombol Batal Selesai / Batal Force End
+        $(document).on('click', '.btn-cancel-stop-request', function (e) {
+            e.preventDefault();
+            if ($(this).prop('disabled') || $(this).hasClass('disabled')) {
+                return false;
+            }
+            const proses = $('#modalDetailProses').data('proses');
+            if (!proses) return;
+
+            Swal.fire({
+                title: 'Batalkan Perintah Selesai?',
+                text: 'Apakah Anda yakin ingin membatalkan perintah selesai ini? Sinyal 103 ke PLC akan dimatikan (kembali ke 0) dan proses akan tetap berjalan normal.',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#ff9800',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: '<i class="fas fa-undo mr-1"></i>Ya, Batalkan',
+                cancelButtonText: 'Kembali',
+                reverseButtons: true
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    Swal.fire({
+                        title: 'Membatalkan...',
+                        text: 'Mohon tunggu sebentar',
+                        allowOutsideClick: false,
+                        allowEscapeKey: false,
+                        didOpen: () => {
+                            Swal.showLoading();
+                        }
+                    });
+
+                    $.ajax({
+                        url: `{{ url('proses') }}/${proses.id}/cancel-stop-request`,
+                        method: 'POST',
+                        data: {
+                            _token: '{{ csrf_token() }}'
+                        },
+                        success: function (res) {
+                            $('#modalDetailProses').modal('hide');
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Berhasil Dibatalkan',
+                                text: res.message || 'Perintah selesai berhasil dibatalkan. Sinyal 103 kembali ke 0.',
+                                timer: 2000,
+                                showConfirmButton: false
+                            }).then(() => {
+                                if (typeof loadDashboardData === 'function') {
+                                    loadDashboardData();
+                                } else {
+                                    window.location.reload();
+                                }
+                            });
+                        },
+                        error: function (xhr) {
+                            let errMsg = 'Gagal membatalkan perintah selesai.';
                             if (xhr.responseJSON && xhr.responseJSON.message) {
                                 errMsg = xhr.responseJSON.message;
                             }
@@ -7320,6 +7436,46 @@
                             $btnPinjam.attr('title', 'Klik untuk mengaktifkan status Pinjam Mesin');
                         }
                     }
+
+                    // Update Status Menunggu Mesin Mati di modal detail jika terbuka
+                    const isWaitingStopModal = !!(prosesFromCard.stop_requested_at && !prosesFromCard.selesai);
+                    const $modalAlertStop = $('#alert-waiting-stop');
+                    const $modalBtnCancelStop = $('.btn-cancel-stop-request');
+                    const $modalBtnFinishMaint = $('.btn-finish-maintenance');
+                    const $modalBtnFinishForce = $('.btn-finish-force');
+                    const userRoleCur = (window.userRole || '').toLowerCase();
+
+                    if (isWaitingStopModal) {
+                        $modalAlertStop.removeClass('d-none');
+                        if (prosesFromCard.stop_request_type === 'maintenance_finish') {
+                            $('#alert-waiting-stop-title').text('Maintenance Sedang Menunggu Mesin Mati (Address 200 = 0)');
+                            $('#alert-waiting-stop-desc').text('Sinyal 103 ON dikirim ke PLC. Menunggu operator di lapangan mematikan mesin sebelum proses selesai.');
+                        } else {
+                            $('#alert-waiting-stop-title').text('Sedang Menunggu Mesin Mati / Unload (Address 200 = 0)');
+                            $('#alert-waiting-stop-desc').text('Sinyal 103 ON dikirim ke PLC. Menunggu verifikasi unload atau operator mematikan mesin sebelum proses selesai.');
+                        }
+                        const canCancel = ['super_admin', 'kepala_shift', 'kepala_ruangan'].includes(userRoleCur);
+                        if (canCancel) {
+                            $modalBtnCancelStop.removeClass('d-none');
+                        } else {
+                            $modalBtnCancelStop.addClass('d-none');
+                        }
+                        $modalBtnFinishMaint.addClass('d-none');
+                        $modalBtnFinishForce.addClass('d-none');
+                    } else {
+                        $modalAlertStop.addClass('d-none');
+                        $modalBtnCancelStop.addClass('d-none');
+                        const isStartedModal = prosesFromCard.mulai !== null && !prosesFromCard.selesai;
+                        if (isStartedModal) {
+                            if (prosesFromCard.jenis === 'Maintenance') {
+                                const canFinMaint = window.canFinishMaintenance === true || ['super_admin', 'kepala_shift', 'kepala_ruangan'].includes(userRoleCur);
+                                if (canFinMaint) $modalBtnFinishMaint.removeClass('d-none');
+                            } else {
+                                const canFinForce = ['super_admin', 'kepala_shift'].includes(userRoleCur);
+                                if (canFinForce) $modalBtnFinishForce.removeClass('d-none');
+                            }
+                        }
+                    }
                 }
             }
 
@@ -7375,6 +7531,7 @@
 
                 // Pindahkan card ke history (prepend agar terbaru di atas) dengan animasi fade
                 $card.fadeOut(400, function () {
+                    $card.find('.waiting-stop-banner').remove();
                     $card.addClass('history-card');
                     $card.attr('draggable', 'false');
                     $card.attr('data-can-move', '0');
@@ -8049,6 +8206,28 @@
                 }
                 if (statusData.pinjam_mesin_alasan !== undefined) {
                     proses.pinjam_mesin_alasan = statusData.pinjam_mesin_alasan;
+                }
+
+                // Update stop_requested_at & stop_request_type dari WebSocket
+                if (statusData.is_stop_requested !== undefined) {
+                    proses.stop_requested_at = statusData.stop_requested_at;
+                    proses.stop_request_type = statusData.stop_request_type;
+
+                    const isStopReq = statusData.is_stop_requested && !proses.selesai;
+                    const $existingBanner = $card.find('.waiting-stop-banner');
+                    if (isStopReq) {
+                        if (!$existingBanner.length) {
+                            const bannerHtml = `
+                                <div class="waiting-stop-banner" style="background: linear-gradient(90deg, #ff9800, #ffb74d); color: #111; font-weight: 800; font-size: 11px; padding: 3px 6px; text-align: center; border-bottom: 1px solid rgba(0,0,0,0.15); display: flex; align-items: center; justify-content: center; gap: 5px;">
+                                    <i class="fas fa-spinner fa-spin"></i>
+                                    <span>Menunggu Mesin Mati (Sinyal 103 ON)</span>
+                                </div>
+                            `;
+                            $card.prepend(bannerHtml);
+                        }
+                    } else {
+                        $existingBanner.remove();
+                    }
                 }
 
                 $card.data('proses', proses);

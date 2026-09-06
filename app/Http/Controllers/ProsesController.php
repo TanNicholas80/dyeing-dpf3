@@ -3183,10 +3183,13 @@ class ProsesController extends Controller
 
     /**
      * Selesaikan proses Maintenance secara manual dari Dashboard modal Detail Proses.
+     * Jika mesin masih ON (Address 200 = 1), sinyal 103 dikirim ke PLC dan sistem menunggu mesin mati.
+     * Jika mesin sudah OFF, proses langsung diselesaikan ke history.
      */
     public function finishMaintenance($id)
     {
-        $userRole = Auth::user() ? Auth::user()->role : null;
+        $user = Auth::user();
+        $userRole = $user ? $user->role : null;
         if (!in_array($userRole, ['super_admin', 'kepala_shift', 'kepala_ruangan'], true)) {
             return response()->json([
                 'status' => 'error',
@@ -3217,41 +3220,86 @@ class ProsesController extends Controller
             ], 400);
         }
 
+        if ($proses->stop_requested_at !== null) {
+            return response()->json([
+                'status' => 'warning',
+                'waiting_off' => true,
+                'message' => 'Proses Maintenance ini sudah diajukan selesai (Sinyal 103 aktif). Sedang menunggu mesin mati (Address 200 = 0) dari lapangan.'
+            ], 400);
+        }
+
+        $isMesinOn = (bool) ($proses->mesin ? $proses->mesin->status : false);
+        $cacheState = Cache::get("iot:mesin:{$proses->mesin_id}:state", null);
+        if (is_array($cacheState) && array_key_exists('is_on', $cacheState)) {
+            $isMesinOn = (bool) $cacheState['is_on'];
+        }
+
         DB::beginTransaction();
         try {
-            $now = now();
-            $proses->selesai = $now;
-            $proses->is_paused = false;
-            if ($proses->mulai) {
-                $mulai = \Carbon\Carbon::parse($proses->mulai);
-                $proses->cycle_time_actual = max(0, (int) round($mulai->diffInSeconds($now, false)));
-            }
-            $proses->save();
-
-            Cache::forget("iot:proses:{$proses->id}:kain_latched");
-            Cache::forget("iot:mesin:{$proses->mesin_id}:alarm_result");
-
-            // Mulai proses antrian berikutnya jika mesin hidup / ON
-            $started = $this->startNextProsesIfMesinOn((int) $proses->mesin_id);
-
-            DB::commit();
-
-            // Broadcast update status ke semua client dashboard
             $statusService = new \App\Services\ProsesStatusService();
             $affectedProsesIds = $statusService->getAffectedProsesIds();
-            $statusData = $statusService->generateProsesStatus($proses, $affectedProsesIds);
-            event(new \App\Events\ProsesStatusUpdated($proses->id, $statusData));
 
-            if ($started) {
-                $startedStatusData = $statusService->generateProsesStatus($started, $affectedProsesIds);
-                event(new \App\Events\ProsesStatusUpdated($started->id, $startedStatusData));
+            if ($isMesinOn) {
+                // Mesin masih hidup (Address 200 = 1): Beri sinyal 103 dan TUNGGU mesin mati dari lapangan
+                $proses->stop_requested_at = now();
+                $proses->stop_requested_by = $user->id;
+                $proses->stop_request_type = 'maintenance_finish';
+                $proses->save();
+
+                Cache::forget("iot:mesin:{$proses->mesin_id}:alarm_result");
+                Cache::forget("iot:mesin:{$proses->mesin_id}:alarm_on_state");
+
+                activity('Manajemen Proses')
+                    ->performedOn($proses)
+                    ->causedBy($user)
+                    ->withProperties([
+                        'proses_id' => $proses->id,
+                        'jenis' => $proses->jenis,
+                        'mesin_id' => $proses->mesin_id,
+                    ])
+                    ->log("Perintah selesai Maintenance #{$proses->id} diajukan oleh {$user->nama} ({$userRole}). Sinyal 103 aktif, menunggu mesin mati (Address 200 = 0) dari lapangan.");
+
+                DB::commit();
+
+                $statusData = $statusService->generateProsesStatus($proses, $affectedProsesIds);
+                event(new \App\Events\ProsesStatusUpdated($proses->id, $statusData));
+
+                return response()->json([
+                    'status' => 'success',
+                    'waiting_off' => true,
+                    'message' => 'Perintah selesai Maintenance berhasil dikirim ke PLC (Sinyal 103 ON). Menunggu mesin mati (Address 200 = 0) dari lapangan.',
+                    'data' => $proses
+                ]);
+            } else {
+                // Mesin sudah mati di lapangan (Address 200 = 0): Langsung selesaikan seketika
+                $now = now();
+                $proses->selesai = $now;
+                $proses->is_paused = false;
+                $proses->stop_requested_at = null;
+                $proses->stop_requested_by = null;
+                $proses->stop_request_type = null;
+                if ($proses->mulai) {
+                    $mulai = \Carbon\Carbon::parse($proses->mulai);
+                    $proses->cycle_time_actual = max(0, (int) round($mulai->diffInSeconds($now, false)));
+                }
+                $proses->save();
+
+                Cache::forget("iot:proses:{$proses->id}:kain_latched");
+                Cache::forget("iot:mesin:{$proses->mesin_id}:alarm_result");
+                Cache::forget("iot:mesin:{$proses->mesin_id}:alarm_on_state");
+
+                DB::commit();
+
+                $statusData = $statusService->generateProsesStatus($proses, $affectedProsesIds);
+                event(new \App\Events\ProsesStatusUpdated($proses->id, $statusData));
+
+                return response()->json([
+                    'status' => 'success',
+                    'waiting_off' => false,
+                    'message' => 'Proses Maintenance berhasil diselesaikan.',
+                    'data' => $proses
+                ]);
             }
-
-            return response()->json([
-                'status' => 'success',
-                'message' => 'Proses Maintenance berhasil diselesaikan.',
-                'data' => $proses
-            ]);
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json([
@@ -3263,7 +3311,9 @@ class ProsesController extends Controller
 
     /**
      * Selesaikan proses aktif (Produksi / Reproses) secara paksa oleh Kepala Shift atau Super Admin.
-     * Proses saat ini diselesaikan (masuk history) dan antrian di bawahnya langsung dijalankan.
+     * Jika mesin masih ON (Address 200 = 1), sinyal 103 dikirim ke PLC dan sistem menunggu mesin mati (Address 200 = 0)
+     * sebagai verifikasi unload kain di lapangan sebelum proses diselesaikan dan antrian berikutnya berjalan.
+     * Jika mesin sudah OFF, proses langsung diselesaikan ke history.
      */
     public function forceFinishProses($id)
     {
@@ -3292,46 +3342,173 @@ class ProsesController extends Controller
             ], 400);
         }
 
+        if ($proses->stop_requested_at !== null) {
+            return response()->json([
+                'status' => 'warning',
+                'waiting_off' => true,
+                'message' => 'Proses ini sudah diajukan Force End (Sinyal 103 aktif). Sedang menunggu mesin mati (Address 200 = 0) / verifikasi unload dari lapangan.'
+            ], 400);
+        }
+
+        $isMesinOn = (bool) ($proses->mesin ? $proses->mesin->status : false);
+        $cacheState = Cache::get("iot:mesin:{$proses->mesin_id}:state", null);
+        if (is_array($cacheState) && array_key_exists('is_on', $cacheState)) {
+            $isMesinOn = (bool) $cacheState['is_on'];
+        }
+
         DB::beginTransaction();
         try {
-            $now = now();
-            $proses->selesai = $now;
-            $proses->is_paused = false;
-            if ($proses->mulai) {
-                $mulai = \Carbon\Carbon::parse($proses->mulai);
-                $proses->cycle_time_actual = max(0, (int) round($mulai->diffInSeconds($now, false)));
+            $statusService = new \App\Services\ProsesStatusService();
+            $affectedProsesIds = $statusService->getAffectedProsesIds();
+
+            if ($isMesinOn) {
+                // Mesin masih hidup (Address 200 = 1): Beri sinyal 103 dan TUNGGU mesin mati dari lapangan
+                $proses->stop_requested_at = now();
+                $proses->stop_requested_by = $user->id;
+                $proses->stop_request_type = 'force_finish';
+                $proses->save();
+
+                Cache::forget("iot:mesin:{$proses->mesin_id}:alarm_result");
+                Cache::forget("iot:mesin:{$proses->mesin_id}:alarm_on_state");
+
+                $noOpList = $proses->details ? $proses->details->pluck('no_op')->filter()->implode(', ') : '-';
+                activity('Manajemen Proses')
+                    ->performedOn($proses)
+                    ->causedBy($user)
+                    ->withProperties([
+                        'proses_id' => $proses->id,
+                        'jenis' => $proses->jenis,
+                        'no_op' => $noOpList,
+                        'mesin_id' => $proses->mesin_id,
+                    ])
+                    ->log("Pengajuan Force End untuk Proses #{$proses->id} ({$proses->jenis}, OP: {$noOpList}) oleh {$user->nama} ({$userRole}). Sinyal 103 aktif, menunggu mesin mati (Address 200 = 0) / verifikasi unload.");
+
+                DB::commit();
+
+                $statusData = $statusService->generateProsesStatus($proses, $affectedProsesIds);
+                event(new \App\Events\ProsesStatusUpdated($proses->id, $statusData));
+
+                return response()->json([
+                    'status' => 'success',
+                    'waiting_off' => true,
+                    'message' => 'Perintah Force End berhasil dikirim ke PLC (Sinyal 103 ON). Menunggu mesin mati (Address 200 = 0) / verifikasi unload dari lapangan.',
+                    'data' => $proses
+                ]);
+            } else {
+                // Mesin sudah mati di lapangan (Address 200 = 0): Selesaikan langsung
+                $now = now();
+                $proses->selesai = $now;
+                $proses->is_paused = false;
+                $proses->stop_requested_at = null;
+                $proses->stop_requested_by = null;
+                $proses->stop_request_type = null;
+                if ($proses->mulai) {
+                    $mulai = \Carbon\Carbon::parse($proses->mulai);
+                    $proses->cycle_time_actual = max(0, (int) round($mulai->diffInSeconds($now, false)));
+                }
+                if ($proses->is_pinjam_mesin) {
+                    \App\Models\PinjamMesinHistory::where('proses_id', $proses->id)
+                        ->whereNull('selesai_at')
+                        ->latest('pinjam_at')
+                        ->update([
+                            'selesai_at' => $now,
+                            'selesai_by' => $user->id,
+                        ]);
+                    $proses->is_pinjam_mesin = false;
+                }
+                $proses->save();
+
+                $noOpList = $proses->details ? $proses->details->pluck('no_op')->filter()->implode(', ') : '-';
+                activity('Manajemen Proses')
+                    ->performedOn($proses)
+                    ->causedBy($user)
+                    ->withProperties([
+                        'proses_id' => $proses->id,
+                        'jenis' => $proses->jenis,
+                        'no_op' => $noOpList,
+                        'mesin_id' => $proses->mesin_id,
+                        'cycle_time_actual' => $proses->cycle_time_actual,
+                    ])
+                    ->log("Proses #{$proses->id} ({$proses->jenis}, OP: {$noOpList}) diselesaikan paksa oleh {$user->nama} ({$userRole}) saat mesin OFF.");
+
+                Cache::forget("iot:proses:{$proses->id}:kain_latched");
+                Cache::forget("iot:mesin:{$proses->mesin_id}:alarm_result");
+                Cache::forget("iot:mesin:{$proses->mesin_id}:alarm_on_state");
+
+                DB::commit();
+
+                $statusData = $statusService->generateProsesStatus($proses, $affectedProsesIds);
+                event(new \App\Events\ProsesStatusUpdated($proses->id, $statusData));
+
+                return response()->json([
+                    'status' => 'success',
+                    'waiting_off' => false,
+                    'message' => 'Proses berhasil diselesaikan.',
+                    'data' => $proses
+                ]);
             }
-            if ($proses->is_pinjam_mesin) {
-                \App\Models\PinjamMesinHistory::where('proses_id', $proses->id)
-                    ->whereNull('selesai_at')
-                    ->latest('pinjam_at')
-                    ->update([
-                        'selesai_at' => $now,
-                        'selesai_by' => $user->id,
-                    ]);
-                $proses->is_pinjam_mesin = false;
-            }
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Gagal menyelesaikan proses: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Membatalkan permohonan Force End / Selesai Maintenance yang sedang menunggu mesin mati.
+     * Mengembalikan status proses menjadi normal berjalan dan me-reset sinyal 103 kembali ke 0.
+     */
+    public function cancelStopRequest($id)
+    {
+        $user = Auth::user();
+        $userRole = $user ? $user->role : null;
+        if (!in_array($userRole, ['super_admin', 'kepala_shift', 'kepala_ruangan'], true)) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Hanya Super Admin, Kepala Shift, dan Kepala Ruangan yang memiliki hak akses untuk membatalkan perintah ini.'
+            ], 403);
+        }
+
+        $proses = Proses::findOrFail($id);
+
+        if ($proses->selesai !== null) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Proses ini sudah selesai dan tidak dapat dibatalkan.'
+            ], 400);
+        }
+
+        if ($proses->stop_requested_at === null) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Proses ini tidak sedang dalam status menunggu mesin mati.'
+            ], 400);
+        }
+
+        DB::beginTransaction();
+        try {
+            $prevType = $proses->stop_request_type;
+            $proses->stop_requested_at = null;
+            $proses->stop_requested_by = null;
+            $proses->stop_request_type = null;
             $proses->save();
 
-            // Log activity
-            $noOpList = $proses->details ? $proses->details->pluck('no_op')->filter()->implode(', ') : '-';
+            // Bersihkan cache alarm agar sinyal 103 langsung kembali ke 0
+            Cache::forget("iot:mesin:{$proses->mesin_id}:alarm_result");
+            Cache::forget("iot:mesin:{$proses->mesin_id}:alarm_on_state");
+
             activity('Manajemen Proses')
                 ->performedOn($proses)
                 ->causedBy($user)
                 ->withProperties([
                     'proses_id' => $proses->id,
                     'jenis' => $proses->jenis,
-                    'no_op' => $noOpList,
                     'mesin_id' => $proses->mesin_id,
-                    'cycle_time_actual' => $proses->cycle_time_actual,
+                    'canceled_request_type' => $prevType,
                 ])
-                ->log("Proses #{$proses->id} ({$proses->jenis}, OP: {$noOpList}) diselesaikan paksa oleh {$user->nama} ({$userRole}). Antrian berikutnya dijalankan.");
-
-            Cache::forget("iot:proses:{$proses->id}:kain_latched");
-            Cache::forget("iot:mesin:{$proses->mesin_id}:alarm_result");
-
-            // Mulai proses antrian berikutnya jika mesin hidup / ON
-            $started = $this->startNextProsesIfMesinOn((int) $proses->mesin_id);
+                ->log("Pembatalan perintah selesai ({$prevType}) untuk Proses #{$proses->id} oleh {$user->nama} ({$userRole}). Sinyal 103 dinonaktifkan (kembali ke 0).");
 
             DB::commit();
 
@@ -3341,21 +3518,16 @@ class ProsesController extends Controller
             $statusData = $statusService->generateProsesStatus($proses, $affectedProsesIds);
             event(new \App\Events\ProsesStatusUpdated($proses->id, $statusData));
 
-            if ($started) {
-                $startedStatusData = $statusService->generateProsesStatus($started, $affectedProsesIds);
-                event(new \App\Events\ProsesStatusUpdated($started->id, $startedStatusData));
-            }
-
             return response()->json([
                 'status' => 'success',
-                'message' => 'Proses berhasil diselesaikan dan dialihkan ke antrian berikutnya.',
+                'message' => 'Perintah selesai berhasil dibatalkan. Sinyal 103 dinonaktifkan (kembali ke 0).',
                 'data' => $proses
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json([
                 'status' => 'error',
-                'message' => 'Gagal menyelesaikan proses: ' . $e->getMessage()
+                'message' => 'Gagal membatalkan perintah selesai: ' . $e->getMessage()
             ], 500);
         }
     }

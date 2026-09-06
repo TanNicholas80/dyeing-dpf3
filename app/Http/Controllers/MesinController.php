@@ -34,6 +34,9 @@ class MesinController extends Controller
             ->orderByDesc('created_at')
             ->get();
 
+        $iotSignalMap = [];
+        $nowTs = now()->getTimestamp();
+
         foreach ($mesins as $mesin) {
             $forceAlarmOffMap[$mesin->id] = (bool) Cache::get($this->forceAlarmKey((int) $mesin->id), false);
 
@@ -41,9 +44,20 @@ class MesinController extends Controller
                 'nyala' => $mesin->last_on_at ? $mesin->last_on_at->translatedFormat('d-m-Y H:i:s') : '-',
                 'mati' => $mesin->last_off_at ? $mesin->last_off_at->translatedFormat('d-m-Y H:i:s') : '-',
             ];
+
+            $isTimeout = true;
+            if ($mesin->last_seen_at) {
+                $lastSeenTs = $mesin->last_seen_at->getTimestamp();
+                $isTimeout = ($nowTs - $lastSeenTs) > 90;
+            }
+
+            $iotSignalMap[$mesin->id] = [
+                'connected' => !$isTimeout,
+                'label' => !$isTimeout ? 'Terhubung' : 'Terputus',
+            ];
         }
 
-        return view('mesin.index', compact('mesins', 'forceAlarmOffMap', 'lastStatusMap'));
+        return view('mesin.index', compact('mesins', 'forceAlarmOffMap', 'lastStatusMap', 'iotSignalMap'));
     }
 
     public function create()
