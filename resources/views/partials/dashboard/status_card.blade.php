@@ -235,7 +235,7 @@
         }
     } else {
         // Proses sedang berjalan (mulai ada, selesai belum)
-        if ($proses->is_paused) {
+        if ($proses->is_paused || (bool) ($proses->is_break ?? false)) {
             $bg = '#757575'; // abu-abu
         } else {
             $barcodeKainOpt = $barcodeKainOptional ?? false;
@@ -273,6 +273,14 @@
             $mulai->diffInSeconds($selesai, false),
         );
         $cycle_time_actual_str = detikKeWaktu($cycle_time_actual);
+    } elseif ($proses->mulai && (bool) ($proses->is_break ?? false) && $proses->break_at) {
+        $mulai = \Carbon\Carbon::parse($proses->mulai);
+        $breakAt = \Carbon\Carbon::parse($proses->break_at);
+        $cycle_time_actual = max(
+            0,
+            $mulai->diffInSeconds($breakAt, false),
+        );
+        $cycle_time_actual_str = detikKeWaktu($cycle_time_actual);
     }
 @endphp
 @php
@@ -290,7 +298,12 @@
     @if ($proses->stop_requested_at && !$proses->selesai)
         <div class="waiting-stop-banner" style="background: linear-gradient(90deg, #ff9800, #ffb74d); color: #111; font-weight: 800; font-size: 11px; padding: 3px 6px; text-align: center; border-bottom: 1px solid rgba(0,0,0,0.15); display: flex; align-items: center; justify-content: center; gap: 5px;">
             <i class="fas fa-spinner fa-spin"></i>
-            <span>Menunggu Mesin Mati (Sinyal 103 ON)</span>
+            <span>Menunggu Mesin Berhenti</span>
+        </div>
+    @elseif ($proses->is_break && !$proses->selesai)
+        <div class="break-banner" style="background: linear-gradient(90deg, #424242, #616161); color: #fff; font-weight: 800; font-size: 11px; padding: 3px 6px; text-align: center; border-bottom: 1px solid rgba(0,0,0,0.25); display: flex; align-items: center; justify-content: center; gap: 5px;">
+            <i class="fas fa-pause-circle text-warning"></i>
+            <span>BREAK{{ !empty($proses->break_alasan) ? ': ' . $proses->break_alasan : '' }}</span>
         </div>
     @endif
     {{-- Header --}}
@@ -356,11 +369,18 @@
             </div>
             @php
                 $isPinjamMesin = (bool) ($proses->is_pinjam_mesin ?? false);
+                $isBreak = (bool) ($proses->is_break ?? false);
             @endphp
             <div class="pinjam-mesin-indicator" style="{{ $isPinjamMesin ? 'display: flex;' : 'display: none;' }} justify-content: center; align-items: center; width: 24px; margin-top: 2px;">
                 <span class="badge-pinjam-mesin" title="Pinjam Mesin Aktif{{ !empty($proses->pinjam_mesin_alasan) ? ': ' . $proses->pinjam_mesin_alasan : '' }}"
                     style="font-weight: 800; font-size: 13px; color: #111; text-shadow: 0 1px 3px rgba(255,255,255,0.9), 0 0 4px rgba(255,255,255,0.8); letter-spacing: 0.5px; line-height: 1; text-align: center;">
                     PM
+                </span>
+            </div>
+            <div class="break-indicator" style="{{ $isBreak ? 'display: flex;' : 'display: none;' }} justify-content: center; align-items: center; width: 24px; margin-top: 2px;">
+                <span class="badge-break" title="Break Aktif{{ !empty($proses->break_alasan) ? ': ' . $proses->break_alasan : '' }}"
+                    style="font-weight: 800; font-size: 13px; color: #ffeb3b; text-shadow: 0 1px 3px rgba(0,0,0,0.9); letter-spacing: 0.5px; line-height: 1; text-align: center;">
+                    BR
                 </span>
             </div>
         </div>

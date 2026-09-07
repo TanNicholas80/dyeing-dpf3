@@ -2391,6 +2391,15 @@ class ProsesController extends Controller
     // Edit Proses
     public function update(Request $request, $id)
     {
+        $userRole = Auth::user() ? Auth::user()->role : null;
+        if (!in_array($userRole, ['super_admin', 'ppic'], true)) {
+            $errorMessage = 'Anda tidak memiliki hak akses untuk mengubah cycle time proses.';
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json(['status' => 'error', 'message' => $errorMessage], 403);
+            }
+            return back()->with('error', $errorMessage);
+        }
+
         // Hanya izinkan perubahan cycle_time, simpan sebagai request approval FM
         $request->validate([
             'cycle_time' => 'required|string',
@@ -2482,6 +2491,15 @@ class ProsesController extends Controller
     // Pindah proses ke mesin lain
     public function move(Request $request, $id)
     {
+        $userRole = Auth::user() ? Auth::user()->role : null;
+        if (!in_array($userRole, ['super_admin', 'ppic'], true)) {
+            $errorMessage = 'Anda tidak memiliki hak akses untuk memindahkan proses ke mesin lain.';
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json(['status' => 'error', 'message' => $errorMessage], 403);
+            }
+            return back()->with('error', $errorMessage);
+        }
+
         $proses = Proses::findOrFail($id);
 
         // Validasi: hanya bisa pindah jika proses belum mulai (mulai masih null)
@@ -2603,15 +2621,6 @@ class ProsesController extends Controller
 
         $proses = Proses::findOrFail($id);
 
-        // Tidak boleh Maintenance
-        if ($proses->jenis === 'Maintenance') {
-            $errorMessage = 'Fitur Pinjam Mesin tidak tersedia untuk proses Maintenance.';
-            if ($request->ajax() || $request->wantsJson()) {
-                return response()->json(['status' => 'error', 'message' => $errorMessage], 400);
-            }
-            return back()->with('error', $errorMessage);
-        }
-
         // Sudah selesai tidak bisa diajukan
         if ($proses->selesai !== null) {
             $errorMessage = 'Tidak dapat mengubah pinjam mesin. Proses sudah selesai.';
@@ -2676,7 +2685,7 @@ class ProsesController extends Controller
             $statusData = $statusService->generateProsesStatus($proses, $affectedProsesIds);
             event(new \App\Events\ProsesStatusUpdated($proses->id, $statusData));
 
-            $successMessage = 'Pinjam mesin berhasil dinonaktifkan (Sinyal Address 105: 0).';
+            $successMessage = 'Pinjam mesin berhasil dinonaktifkan.';
 
             if ($request->ajax() || $request->wantsJson()) {
                 return response()->json([
@@ -2724,12 +2733,159 @@ class ProsesController extends Controller
         $statusData = $statusService->generateProsesStatus($proses, $affectedProsesIds);
         event(new \App\Events\ProsesStatusUpdated($proses->id, $statusData));
 
-        $successMessage = 'Pinjam mesin berhasil diaktifkan (Sinyal Address 105: 1).';
+        $successMessage = 'Pinjam mesin berhasil diaktifkan.';
 
         if ($request->ajax() || $request->wantsJson()) {
             return response()->json([
                 'status' => 'success',
                 'is_pinjam_mesin' => true,
+                'message' => $successMessage,
+                'redirect' => route('dashboard', ['page' => $page])
+            ]);
+        }
+
+        return redirect()->route('dashboard', ['page' => $page])
+            ->with('success', $successMessage);
+    }
+
+    /**
+     * Toggle Break Proses oleh Super Admin, Kepala Ruangan, Kepala Shift, PPIC.
+     * Mengaktifkan/menonaktifkan sinyal break (Modbus Address 103) & freeze cycle time.
+     */
+    public function toggleBreak(Request $request, $id)
+    {
+        $userRole = Auth::user() ? Auth::user()->role : null;
+        if (!in_array($userRole, ['super_admin', 'kepala_ruangan', 'kepala_shift', 'ppic'], true)) {
+            $errorMessage = 'Anda tidak memiliki hak akses untuk mengelola break proses.';
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json(['status' => 'error', 'message' => $errorMessage], 403);
+            }
+            return back()->with('error', $errorMessage);
+        }
+
+        $proses = Proses::findOrFail($id);
+
+        // Sudah selesai tidak bisa diajukan break
+        if ($proses->selesai !== null) {
+            $errorMessage = 'Tidak dapat mengubah status break. Proses sudah selesai.';
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json(['status' => 'error', 'message' => $errorMessage], 400);
+            }
+            return back()->with('error', $errorMessage);
+        }
+
+        // Ambil halaman asal dari referer jika ada
+        $referer = $request->headers->get('referer');
+        $page = 1;
+        if ($referer) {
+            $parsed = parse_url($referer);
+            if (isset($parsed['query'])) {
+                parse_str($parsed['query'], $queryArr);
+                if (isset($queryArr['page']) && is_numeric($queryArr['page'])) {
+                    $page = (int) $queryArr['page'];
+                }
+            }
+        }
+
+        $requestedAction = $request->input('action');
+        $isDeactivate = ($requestedAction === 'deactivate') || ($proses->is_break && $requestedAction !== 'activate');
+
+        if ($isDeactivate) {
+            // Nonaktifkan Break (Sinyal Address 103 -> 0)
+            $now = now();
+            $breakDuration = 0;
+
+            // Tutup sesi log break yang sedang aktif
+            $openHistory = \App\Models\BreakHistory::where('proses_id', $proses->id)
+                ->whereNull('selesai_at')
+                ->latest('break_at')
+                ->first();
+            if ($openHistory) {
+                $openHistory->update([
+                    'selesai_at' => $now,
+                    'selesai_by' => Auth::id(),
+                ]);
+                $breakDuration = abs($now->diffInSeconds($openHistory->break_at));
+            } elseif ($proses->break_at) {
+                $breakDuration = abs($now->diffInSeconds($proses->break_at));
+            }
+
+            // Update proses: matikan flag break, catat total_break_seconds, dan sesuaikan waktu mulai
+            $proses->is_break = false;
+            $proses->total_break_seconds = ((int) ($proses->total_break_seconds ?? 0)) + $breakDuration;
+            if ($breakDuration > 0 && $proses->mulai) {
+                // Geser mulai maju sebesar durasi break agar cycle time actual tidak menghitung waktu break
+                $proses->mulai = \Carbon\Carbon::parse($proses->mulai)->addSeconds($breakDuration);
+            }
+            $proses->break_alasan = null;
+            $proses->break_at = null;
+            $proses->break_by = null;
+            $proses->save();
+
+            Cache::forget("iot:mesin:{$proses->mesin_id}:alarm_result");
+            Cache::forget("iot:mesin:{$proses->mesin_id}:alarm_on_state");
+
+            $proses->refresh();
+            $proses->load(['approvals', 'details.barcodeKains', 'details.barcodeLas', 'details.barcodeAuxs']);
+            $statusService = new \App\Services\ProsesStatusService();
+            $affectedProsesIds = $statusService->getAffectedProsesIds();
+            $statusData = $statusService->generateProsesStatus($proses, $affectedProsesIds);
+            event(new \App\Events\ProsesStatusUpdated($proses->id, $statusData));
+
+            $successMessage = 'Break proses berhasil dinonaktifkan. Proses dilanjutkan.';
+
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json([
+                    'status' => 'success',
+                    'is_break' => false,
+                    'message' => $successMessage,
+                    'redirect' => route('dashboard', ['page' => $page])
+                ]);
+            }
+
+            return redirect()->route('dashboard', ['page' => $page])->with('success', $successMessage);
+        }
+
+        // Aktifkan Break: Alasan Wajib Diisi! (Sinyal Address 103 -> 1)
+        $request->validate([
+            'alasan' => 'required|string|max:500',
+        ], [
+            'alasan.required' => 'Alasan break wajib diisi.',
+            'alasan.max' => 'Alasan break maksimal 500 karakter.',
+        ]);
+
+        $now = now();
+        $proses->is_break = true;
+        $proses->break_alasan = $request->alasan;
+        $proses->break_at = $now;
+        $proses->break_by = Auth::id();
+        $proses->save();
+
+        // Buat record baru di tabel riwayat break
+        \App\Models\BreakHistory::create([
+            'proses_id' => $proses->id,
+            'mesin_id' => $proses->mesin_id,
+            'alasan' => $request->alasan,
+            'break_at' => $now,
+            'break_by' => Auth::id(),
+        ]);
+
+        Cache::forget("iot:mesin:{$proses->mesin_id}:alarm_result");
+        Cache::forget("iot:mesin:{$proses->mesin_id}:alarm_on_state");
+
+        $proses->refresh();
+        $proses->load(['approvals', 'details.barcodeKains', 'details.barcodeLas', 'details.barcodeAuxs']);
+        $statusService = new \App\Services\ProsesStatusService();
+        $affectedProsesIds = $statusService->getAffectedProsesIds();
+        $statusData = $statusService->generateProsesStatus($proses, $affectedProsesIds);
+        event(new \App\Events\ProsesStatusUpdated($proses->id, $statusData));
+
+        $successMessage = 'Break proses berhasil diaktifkan. Mesin dihentikan sementara.';
+
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json([
+                'status' => 'success',
+                'is_break' => true,
                 'message' => $successMessage,
                 'redirect' => route('dashboard', ['page' => $page])
             ]);
@@ -3020,6 +3176,15 @@ class ProsesController extends Controller
     // Hapus Proses
     public function destroy(Request $request, $id)
     {
+        $userRole = Auth::user() ? Auth::user()->role : null;
+        if (!in_array($userRole, ['super_admin', 'ppic'], true)) {
+            $errorMessage = 'Anda tidak memiliki hak akses untuk menghapus proses.';
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json(['status' => 'error', 'message' => $errorMessage], 403);
+            }
+            return back()->with('error', $errorMessage);
+        }
+
         $proses = Proses::findOrFail($id);
 
         // Validasi: hanya bisa hapus jika proses belum mulai (mulai masih null)
@@ -3226,7 +3391,7 @@ class ProsesController extends Controller
             return response()->json([
                 'status' => 'warning',
                 'waiting_off' => true,
-                'message' => 'Proses Maintenance ini sudah diajukan selesai (Sinyal 103 aktif). Sedang menunggu mesin mati (Address 200 = 0) dari lapangan.'
+                'message' => 'Proses Maintenance ini sudah diajukan selesai. Sedang menunggu mesin mati dari lapangan.'
             ], 400);
         }
 
@@ -3269,7 +3434,7 @@ class ProsesController extends Controller
                 return response()->json([
                     'status' => 'success',
                     'waiting_off' => true,
-                    'message' => 'Perintah selesai Maintenance berhasil dikirim ke PLC (Sinyal 103 ON). Menunggu mesin mati (Address 200 = 0) dari lapangan.',
+                    'message' => 'Perintah selesai Maintenance berhasil dikirim. Menunggu mesin mati dari lapangan.',
                     'data' => $proses
                 ]);
             } else {
@@ -3283,6 +3448,16 @@ class ProsesController extends Controller
                 if ($proses->mulai) {
                     $mulai = \Carbon\Carbon::parse($proses->mulai);
                     $proses->cycle_time_actual = max(0, (int) round($mulai->diffInSeconds($now, false)));
+                }
+                if ($proses->is_pinjam_mesin) {
+                    \App\Models\PinjamMesinHistory::where('proses_id', $proses->id)
+                        ->whereNull('selesai_at')
+                        ->latest('pinjam_at')
+                        ->update([
+                            'selesai_at' => $now,
+                            'selesai_by' => $user->id,
+                        ]);
+                    $proses->is_pinjam_mesin = false;
                 }
                 $proses->save();
 
@@ -3347,7 +3522,7 @@ class ProsesController extends Controller
             return response()->json([
                 'status' => 'warning',
                 'waiting_off' => true,
-                'message' => 'Proses ini sudah diajukan Force End (Sinyal 103 aktif). Sedang menunggu mesin mati (Address 200 = 0) / verifikasi unload dari lapangan.'
+                'message' => 'Proses ini sudah diajukan selesai. Sedang menunggu mesin mati / verifikasi unload dari lapangan.'
             ], 400);
         }
 
@@ -3392,7 +3567,7 @@ class ProsesController extends Controller
                 return response()->json([
                     'status' => 'success',
                     'waiting_off' => true,
-                    'message' => 'Perintah Force End berhasil dikirim ke PLC (Sinyal 103 ON). Menunggu mesin mati (Address 200 = 0) / verifikasi unload dari lapangan.',
+                    'message' => 'Perintah selesai paksa berhasil dikirim. Menunggu mesin mati / verifikasi unload dari lapangan.',
                     'data' => $proses
                 ]);
             } else {
@@ -3521,7 +3696,7 @@ class ProsesController extends Controller
 
             return response()->json([
                 'status' => 'success',
-                'message' => 'Perintah selesai berhasil dibatalkan. Sinyal 103 dinonaktifkan (kembali ke 0).',
+                'message' => 'Perintah selesai berhasil dibatalkan.',
                 'data' => $proses
             ]);
         } catch (\Exception $e) {
@@ -3778,6 +3953,91 @@ class ProsesController extends Controller
         return response()->json([
             'status' => 'success',
             'proses_id' => $proses->id,
+            'data' => $data
+        ]);
+    }
+
+    /**
+     * Preview riwayat break (Break History) untuk suatu proses.
+     * Otorisasi: Kepala Ruangan, Kepala Shift, PPIC, Super Admin.
+     */
+    public function getBreakHistory($id)
+    {
+        $user = Auth::user();
+        $userRole = $user ? $user->role : null;
+        if (!in_array($userRole, ['super_admin', 'kepala_ruangan', 'kepala_shift', 'ppic'], true)) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Anda tidak memiliki hak akses untuk melihat riwayat break proses.'
+            ], 403);
+        }
+
+        $proses = Proses::findOrFail($id);
+        $histories = \App\Models\BreakHistory::with(['userBreak', 'userSelesai'])
+            ->where('proses_id', $proses->id)
+            ->orderBy('break_at', 'asc')
+            ->get();
+
+        $data = $histories->map(function ($item) {
+            $breakAt = $item->break_at;
+            $selesaiAt = $item->selesai_at;
+            $durasiFormatted = '-';
+
+            if ($breakAt && $selesaiAt) {
+                $diffInSec = $breakAt->diffInSeconds($selesaiAt);
+                $hours = floor($diffInSec / 3600);
+                $minutes = floor(($diffInSec % 3600) / 60);
+                $seconds = $diffInSec % 60;
+                if ($hours > 0) {
+                    $durasiFormatted = "{$hours} jam {$minutes} mnt";
+                } elseif ($minutes > 0) {
+                    $durasiFormatted = "{$minutes} mnt {$seconds} dtk";
+                } else {
+                    $durasiFormatted = "{$seconds} dtk";
+                }
+            } elseif ($breakAt && !$selesaiAt) {
+                $diffInSec = $breakAt->diffInSeconds(now());
+                $hours = floor($diffInSec / 3600);
+                $minutes = floor(($diffInSec % 3600) / 60);
+                if ($hours > 0) {
+                    $durasiFormatted = "{$hours} jam {$minutes} mnt (Sedang Break)";
+                } else {
+                    $durasiFormatted = "{$minutes} mnt (Sedang Break)";
+                }
+            }
+
+            return [
+                'id' => $item->id,
+                'proses_id' => $item->proses_id,
+                'alasan' => $item->alasan,
+                'break_at' => $breakAt?->toIso8601String(),
+                'break_at_formatted' => $breakAt?->format('d/m/Y H:i:s'),
+                'selesai_at' => $selesaiAt?->toIso8601String(),
+                'selesai_at_formatted' => $selesaiAt ? $selesaiAt->format('d/m/Y H:i:s') : '-',
+                'durasi' => $durasiFormatted,
+                'user_break' => $item->userBreak ? [
+                    'id' => $item->userBreak->id,
+                    'nama' => $item->userBreak->nama,
+                    'role' => $item->userBreak->role,
+                ] : null,
+                'user_selesai' => $item->userSelesai ? [
+                    'id' => $item->userSelesai->id,
+                    'nama' => $item->userSelesai->nama,
+                    'role' => $item->userSelesai->role,
+                ] : null,
+            ];
+        });
+
+        return response()->json([
+            'status' => 'success',
+            'proses' => [
+                'id' => $proses->id,
+                'jenis' => $proses->jenis,
+                'is_break' => (bool) $proses->is_break,
+                'break_alasan' => $proses->break_alasan,
+                'mesin_nama' => $proses->mesin?->nama ?? ('Mesin ' . $proses->mesin_id),
+            ],
+            'total_sesi' => $data->count(),
             'data' => $data
         ]);
     }

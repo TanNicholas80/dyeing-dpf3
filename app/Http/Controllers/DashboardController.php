@@ -183,14 +183,15 @@ class DashboardController extends Controller
 
         $cantScan = in_array($userRole, ['fm', 'vp', 'ds', 'owner', 'scm']);
         $canAddProses = !$cantModifyStructure;
-        $canEditProses = !$cantModifyStructure;
-        $canDeleteProses = !$cantModifyStructure;
-        $canMoveProses = !$cantModifyStructure;
-        $canSwapProses = !$cantModifyStructure;
+        $canEditProses = in_array($userRole, ['super_admin', 'ppic'], true);
+        $canDeleteProses = in_array($userRole, ['super_admin', 'ppic'], true);
+        $canMoveProses = in_array($userRole, ['super_admin', 'ppic'], true);
+        $canSwapProses = in_array($userRole, ['super_admin', 'ppic'], true);
 
         $canScanBarcode = !$cantScan;
         $canFinishMaintenance = in_array($userRole, ['super_admin', 'kepala_shift', 'kepala_ruangan'], true);
         $canPinjamMesin = in_array($userRole, ['super_admin', 'kepala_ruangan', 'kepala_shift', 'operator'], true);
+        $canBreakProses = in_array($userRole, ['super_admin', 'kepala_ruangan', 'kepala_shift', 'ppic'], true);
 
         // Opsi filter
         $filterOptions = $this->getFilterOptions();
@@ -222,6 +223,7 @@ class DashboardController extends Controller
             'canScanBarcode' => $canScanBarcode,
             'canFinishMaintenance' => $canFinishMaintenance,
             'canPinjamMesin' => $canPinjamMesin,
+            'canBreakProses' => $canBreakProses,
         ]);
     }
 
@@ -391,13 +393,14 @@ class DashboardController extends Controller
 
         $canCancelBarcode = in_array($userRole, ['super_admin', 'kepala_shift']);
         $canAddProses = !$cantModifyStructure;
-        $canEditProses = !$cantModifyStructure;
-        $canDeleteProses = !$cantModifyStructure;
-        $canMoveProses = !$cantModifyStructure;
-        $canSwapProses = !$cantModifyStructure;
+        $canEditProses = in_array($userRole, ['super_admin', 'ppic'], true);
+        $canDeleteProses = in_array($userRole, ['super_admin', 'ppic'], true);
+        $canMoveProses = in_array($userRole, ['super_admin', 'ppic'], true);
+        $canSwapProses = in_array($userRole, ['super_admin', 'ppic'], true);
         $canScanBarcode = !$cantScan;
         $canFinishMaintenance = in_array($userRole, ['super_admin', 'kepala_shift', 'kepala_ruangan'], true);
         $canPinjamMesin = in_array($userRole, ['super_admin', 'kepala_ruangan', 'kepala_shift', 'operator'], true);
+        $canBreakProses = in_array($userRole, ['super_admin', 'kepala_ruangan', 'kepala_shift', 'ppic'], true);
 
         $html = view('partials.dashboard.status_card', [
             'proses' => $proses,
@@ -412,6 +415,7 @@ class DashboardController extends Controller
             'canScanBarcode' => $canScanBarcode,
             'canFinishMaintenance' => $canFinishMaintenance,
             'canPinjamMesin' => $canPinjamMesin,
+            'canBreakProses' => $canBreakProses,
         ])->render();
 
         return response()->json(['html' => $html]);

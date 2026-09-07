@@ -610,6 +610,11 @@ class ApiCheckStatusBarcodeController extends Controller
      */
     private function checkSignal103(Mesin $mesin, ?Proses $prosesAktif, ?Proses $prosesSelesai): bool
     {
+        // 0. Cek jika proses aktif sedang dalam status Break (Sinyal 103 = 1)
+        if ($prosesAktif && (bool) $prosesAktif->is_break) {
+            return true;
+        }
+
         // 1. Cek jika proses aktif sedang diajukan selesai / force end (menunggu verifikasi mesin mati / unload)
         if ($prosesAktif && $prosesAktif->stop_requested_at !== null) {
             return true;

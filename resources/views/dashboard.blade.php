@@ -895,7 +895,9 @@
                                                                         }
                                                                     }
                                                                     $barcodeKainOptionalLocal = $barcodeKainOptional ?? false;
-                                                                    if ($proses->jenis !== 'Maintenance') {
+                                                                    if ((bool) ($proses->is_break ?? false)) {
+                                                                        $bg = '#757575';
+                                                                    } elseif ($proses->jenis !== 'Maintenance') {
                                                                         $kainComplete = $barcodeKainOptionalLocal || $hasBarcodeKain;
                                                                         if (!$kainComplete) {
                                                                             $bg = '#ef9a9a';
@@ -929,6 +931,11 @@
                                                                     $cycle_time_actual_str = detikKeWaktu(
                                                                         $cycle_time_actual,
                                                                     );
+                                                                } elseif ($proses->mulai && (bool) ($proses->is_break ?? false)) {
+                                                                    $mulai = \Carbon\Carbon::parse($proses->mulai);
+                                                                    $breakAt = $proses->break_at ? \Carbon\Carbon::parse($proses->break_at) : \Carbon\Carbon::now();
+                                                                    $cycle_time_actual = max(0, $mulai->diffInSeconds($breakAt, false));
+                                                                    $cycle_time_actual_str = detikKeWaktu($cycle_time_actual);
                                                                 }
                                                             @endphp
                                                             <div class="status-card history-card draggable" draggable="false"
@@ -1005,6 +1012,15 @@
                                                                             <span class="badge-pinjam-mesin" title="Pinjam Mesin Aktif{{ !empty($proses->pinjam_mesin_alasan) ? ': ' . $proses->pinjam_mesin_alasan : '' }}"
                                                                                 style="font-weight: 800; font-size: 13px; color: #111; text-shadow: 0 1px 3px rgba(255,255,255,0.9), 0 0 4px rgba(255,255,255,0.8); letter-spacing: 0.5px; line-height: 1; text-align: center;">
                                                                                 PM
+                                                                            </span>
+                                                                        </div>
+                                                                        @php
+                                                                            $isBreakHist = (bool) ($proses->is_break ?? false);
+                                                                        @endphp
+                                                                        <div class="break-proses-indicator" style="{{ $isBreakHist ? 'display: flex;' : 'display: none;' }} justify-content: center; align-items: center; width: 24px; margin-top: 2px;">
+                                                                            <span class="badge-break-proses" title="Break Aktif{{ !empty($proses->break_alasan) ? ': ' . $proses->break_alasan : '' }}"
+                                                                                style="font-weight: 800; font-size: 13px; color: #fff; background: #424242; border-radius: 4px; padding: 1px 3px; letter-spacing: 0.5px; line-height: 1; text-align: center;">
+                                                                                BR
                                                                             </span>
                                                                         </div>
                                                                     </div>
@@ -1164,6 +1180,17 @@
                                                                             @endif
                                                                         </div>
                                                                     @endif
+                                                                    @if ((bool) ($proses->is_break ?? false))
+                                                                        <div class="alert alert-dark py-1 px-2 mb-1 text-center font-weight-bold"
+                                                                            style="font-size: 11px; background: rgba(0,0,0,0.4); border: 1px dashed #fff; color: #fff;">
+                                                                            <i class="fas fa-pause mr-1"></i>BREAK
+                                                                            @if(!empty($proses->break_alasan))
+                                                                                <div class="small font-italic text-truncate mt-1" style="max-width: 100%;">
+                                                                                    "{{ $proses->break_alasan }}"
+                                                                                </div>
+                                                                            @endif
+                                                                        </div>
+                                                                    @endif
                                                                     <div class="card-time"
                                                                         style="display: flex; justify-content: space-between; font-size: 12px; margin: 2px 0; color: #fff; text-shadow: 0 1px 2px #0008;">
                                                                         <span>
@@ -1196,7 +1223,9 @@
                                                                                     $proses->mulai &&
                                                                                     !$proses->selesai
                                                                                 ) {
-                                                                                    $now = \Carbon\Carbon::now();
+                                                                                    $now = ((bool) ($proses->is_break ?? false) && $proses->break_at)
+                                                                                        ? \Carbon\Carbon::parse($proses->break_at)
+                                                                                        : \Carbon\Carbon::now();
                                                                                     $mulai = \Carbon\Carbon::parse(
                                                                                         $proses->mulai,
                                                                                     );
@@ -2094,7 +2123,7 @@
                         </button>
                     </div>
                     <div class="modal-body py-3 px-4">
-                        <!-- Banner Peringatan Menunggu Mesin Mati (Address 200 = 0) -->
+                        <!-- Banner Peringatan Menunggu Mesin Berhenti -->
                         <div id="alert-waiting-stop" class="alert alert-warning py-2 px-3 mb-3 d-none shadow-sm" style="border-left: 5px solid #f57c00; background-color: #fff3e0;">
                             <div class="d-flex align-items-center">
                                 <div class="mr-3 text-warning">
@@ -2102,10 +2131,10 @@
                                 </div>
                                 <div>
                                     <div class="font-weight-bold text-dark" id="alert-waiting-stop-title" style="font-size: 14px;">
-                                        Sedang Menunggu Mesin Mati (Address 200 = 0)
+                                        Sedang Menunggu Mesin Berhenti
                                     </div>
                                     <div class="small text-muted" id="alert-waiting-stop-desc">
-                                        Sinyal 103 ON dikirim ke PLC. Menunggu verifikasi unload atau operator di lapangan mematikan mesin sebelum proses selesai ke history.
+                                        Instruksi selesai telah dikirim. Menunggu verifikasi unload atau operator di lapangan mematikan mesin sebelum proses selesai ke history.
                                     </div>
                                 </div>
                             </div>
@@ -2155,7 +2184,7 @@
                             @endif
                             @if (in_array($userRole ?? '', ['super_admin', 'kepala_shift', 'kepala_ruangan']))
                                 <button type="button" class="btn btn-outline-warning btn-cancel-stop-request d-none mr-2"
-                                    title="Batalkan permohonan selesai dan kembalikan sinyal 103 ke 0">
+                                    title="Batalkan permohonan selesai dan lanjutkan proses kembali">
                                     <i class="fas fa-undo mr-1"></i>Batal Selesai
                                 </button>
                             @endif
@@ -2168,6 +2197,15 @@
                                 <button type="button" class="btn btn-outline-info btn-preview-pinjam-mesin d-none mr-2"
                                     title="Lihat riwayat peminjaman mesin pada proses ini">
                                     <i class="fas fa-history mr-1"></i>Riwayat Pinjam Mesin
+                                </button>
+                            @endif
+                            @if ($canBreakProses ?? in_array($userRole ?? '', ['super_admin', 'kepala_ruangan', 'kepala_shift', 'ppic']))
+                                <button type="button" class="btn btn-secondary btn-break-proses d-none mr-2 text-white">
+                                    <i class="fas fa-pause mr-1"></i>Break
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary btn-preview-break-proses d-none mr-2"
+                                    title="Lihat riwayat break pada proses ini">
+                                    <i class="fas fa-history mr-1"></i>Riwayat Break
                                 </button>
                             @endif
                             @if (in_array($userRole ?? '', ['super_admin', 'ppic']))
@@ -2233,6 +2271,54 @@
                                     <tr>
                                         <td colspan="7" class="text-center py-3 text-muted">Memuat riwayat peminjaman
                                             mesin...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Tutup</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal Riwayat Break -->
+        <div class="modal fade" id="modalBreakProsesHistory" tabindex="-1" aria-labelledby="modalBreakProsesHistoryLabel"
+            aria-hidden="true" style="z-index: 1065;">
+            <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+                <div class="modal-content shadow-lg border-0 rounded-3">
+                    <div class="modal-header bg-secondary text-white">
+                        <h5 class="modal-title fw-bold" id="modalBreakProsesHistoryLabel">
+                            <i class="fas fa-history mr-2"></i>Riwayat Break Proses
+                        </h5>
+                        <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body p-3">
+                        <div
+                            class="alert alert-secondary py-2 px-3 mb-3 small d-flex justify-content-between align-items-center">
+                            <span id="break-history-proses-info"><i class="fas fa-info-circle mr-1"></i> Memuat info
+                                proses...</span>
+                            <span class="badge badge-light" id="break-history-count">0 Sesi</span>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-striped table-hover table-sm mb-0">
+                                <thead class="thead-light">
+                                    <tr>
+                                        <th style="width: 40px;" class="text-center">No</th>
+                                        <th>Mulai Break</th>
+                                        <th>Selesai Break</th>
+                                        <th>Durasi</th>
+                                        <th>Alasan Break</th>
+                                        <th>Dibreak Oleh</th>
+                                        <th>Dilanjutkan Oleh</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="break-history-tbody">
+                                    <tr>
+                                        <td colspan="7" class="text-center py-3 text-muted">Memuat riwayat break proses...</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -2634,6 +2720,63 @@
             </div>
         </div>
 
+        <!-- Modal Break Proses -->
+        <div class="modal fade" id="modalBreakProses" tabindex="-1" aria-labelledby="modalBreakProsesLabel"
+            aria-hidden="true">
+            <div class="modal-dialog modal-md modal-dialog-centered">
+                <div class="modal-content shadow-lg border-0 rounded-3">
+                    <form id="formBreakProses" method="POST" action="">
+                        @csrf
+                        <input type="hidden" name="proses_id" id="breakProsesId">
+                        <div class="modal-header bg-secondary text-white">
+                            <h5 class="modal-title fw-bold" id="modalBreakProsesLabel">
+                                <i class="fas fa-pause mr-2"></i>Aktifkan Break Proses
+                            </h5>
+                            <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>
+                        <div class="modal-body py-3 px-4">
+                            <div class="alert alert-warning py-2 mb-3" style="font-size: 13px;">
+                                <i class="fas fa-exclamation-triangle mr-1"></i>Saat status Break diaktifkan:
+                                <ul class="mb-0 pl-3 mt-1">
+                                    <li>Mesin akan <strong>dihentikan sementara</strong>.</li>
+                                    <li>Cycle time actual akan <strong>dijeda (freeze)</strong>.</li>
+                                    <li>Proses akan tetap berada di mesin dengan status Break (warna abu-abu).</li>
+                                </ul>
+                            </div>
+                            <div class="form-group mb-2">
+                                <label class="form-label fw-semibold mb-1" style="font-size: 13px;">Informasi Proses</label>
+                                <div id="breakProsesInfo" class="p-2 bg-light rounded border text-muted"
+                                    style="font-size: 13px;">
+                                    -
+                                </div>
+                            </div>
+                            <div class="form-group mb-2">
+                                <label class="form-label fw-semibold mb-1" style="font-size: 13px;">Mesin</label>
+                                <input type="text" id="breakMesinAsal"
+                                    class="form-control form-control-sm bg-light font-weight-bold" readonly>
+                            </div>
+                            <div class="form-group mb-0">
+                                <label class="form-label fw-semibold mb-1" style="font-size: 13px;">Alasan Break
+                                    <span class="text-danger">*</span></label>
+                                <textarea name="alasan" id="breakAlasan" class="form-control" rows="3"
+                                    placeholder="Masukkan alasan break proses (wajib diisi)..." required></textarea>
+                            </div>
+                        </div>
+                        <div class="modal-footer d-flex justify-content-between px-4">
+                            <button type="button" class="btn btn-secondary" data-dismiss="modal">
+                                <i class="fas fa-times mr-1"></i>Batal
+                            </button>
+                            <button type="submit" class="btn btn-secondary text-white font-weight-bold">
+                                <i class="fas fa-pause mr-1"></i>Aktifkan Break
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
         <!-- Modal Konfirmasi Pindah Mesin (Drag & Drop) -->
         <div class="modal fade" id="modalConfirmMoveDragDrop" tabindex="-1" aria-labelledby="modalConfirmMoveDragDropLabel"
             aria-hidden="true">
@@ -2732,6 +2875,7 @@
         window.canScanBarcode = @json($canScanBarcode ?? true);
         window.canFinishMaintenance = {{ ($canFinishMaintenance ?? in_array($userRole ?? '', ['super_admin', 'kepala_shift', 'kepala_ruangan'])) ? 'true' : 'false' }};
         window.canPinjamMesin = {{ ($canPinjamMesin ?? in_array($userRole ?? '', ['super_admin', 'kepala_ruangan', 'kepala_shift', 'operator'])) ? 'true' : 'false' }};
+        window.canBreakProses = {{ ($canBreakProses ?? in_array($userRole ?? '', ['super_admin', 'kepala_ruangan', 'kepala_shift', 'ppic'])) ? 'true' : 'false' }};
         window.isKashiftOff = @json(\App\Services\AbsenService::isKashiftOff());
         window.isKaruOff = @json(\App\Services\AbsenService::isKaruOff());
 
@@ -3203,6 +3347,16 @@
                             `Apakah Anda yakin ingin menukar posisi proses <strong>${proses1NoOp}</strong> dengan proses <strong>${proses2NoOp}</strong>?<br><br><small class="text-muted">Permintaan ini akan menunggu persetujuan FM.</small>`;
                         $('#confirmSwapDragDropInfo').html(infoText);
                         $('#modalConfirmSwapDragDrop').modal('show');
+                        return;
+                    }
+
+                    // Validasi: Cek izin memindahkan proses ke mesin lain (window.canMoveProses)
+                    if (window.canMoveProses === false) {
+                        restoreCardToOriginalPosition(dragging);
+                        dragging.classList.remove('dragging');
+                        ToastError.fire({
+                            title: 'Anda tidak memiliki izin untuk memindahkan proses ke mesin lain.'
+                        });
                         return;
                     }
 
@@ -4323,13 +4477,13 @@
             const $btnPinjam = $('.btn-pinjam-mesin');
             const $btnRecoveryProses = $('.btn-recovery-proses');
 
-            // Logic untuk tombol Pinjam Mesin (Super Admin, Kepala Ruangan, Kepala Shift, Operator)
+            // Logic untuk tombol Pinjam Mesin (Super Admin, Kepala Ruangan, Kepala Shift, Operator, PPIC)
             // Muncul saat:
-            // 1. Jenis proses bukan Maintenance (Produksi, Reproses Greige, Reproses Finish)
+            // 1. Proses belum selesai (!proses.selesai)
             // 2. Status proses: Sedang berjalan (isStarted) ATAU antrian berikutnya (order == 1)
             const userRoleStr = (window.userRole || '').toLowerCase();
             $btnPinjam.addClass('d-none');
-            if (proses.jenis !== 'Maintenance' && !proses.selesai) {
+            if (!proses.selesai) {
                 const isNextInQueue = !isStarted && (parseInt(proses.order) === 1);
                 if (isStarted || isNextInQueue) {
                     const isAuthorizedPinjam = window.canPinjamMesin === true || ['super_admin', 'kepala_ruangan', 'kepala_shift', 'operator', 'ppic'].includes(userRoleStr);
@@ -4359,10 +4513,41 @@
             // Logic untuk tombol Preview Riwayat Pinjam Mesin (Karu, Kashift, Operator, PPIC, Admin)
             const $btnPreviewPinjam = $('.btn-preview-pinjam-mesin');
             const canPreviewPinjam = ['super_admin', 'kepala_ruangan', 'kepala_shift', 'operator', 'ppic'].includes(userRoleStr);
-            if (canPreviewPinjam && proses.jenis !== 'Maintenance') {
+            if (canPreviewPinjam) {
                 $btnPreviewPinjam.removeClass('d-none');
             } else {
                 $btnPreviewPinjam.addClass('d-none');
+            }
+
+            // Logic untuk tombol Break & Riwayat Break (Super Admin, Kepala Ruangan, Kepala Shift, PPIC)
+            // Tombol Break muncul saat:
+            // 1. Proses belum selesai (!proses.selesai)
+            // 2. Status proses: Sedang berjalan (isStarted)
+            const $btnBreak = $('.btn-break-proses');
+            const $btnPreviewBreak = $('.btn-preview-break-proses');
+            $btnBreak.addClass('d-none');
+            $btnPreviewBreak.addClass('d-none');
+
+            const isAuthorizedBreak = window.canBreakProses === true || ['super_admin', 'kepala_ruangan', 'kepala_shift', 'ppic'].includes(userRoleStr);
+
+            if (isAuthorizedBreak) {
+                $btnPreviewBreak.removeClass('d-none');
+
+                if (!proses.selesai && isStarted) {
+                    $btnBreak.removeClass('d-none');
+                    const isBreakActive = proses.is_break === true || proses.is_break === 1 || proses.is_break === '1';
+                    $btnBreak.data('is-break-active', isBreakActive);
+
+                    if (isBreakActive) {
+                        $btnBreak.removeClass('btn-secondary').addClass('btn-success');
+                        $btnBreak.html('<i class="fas fa-play mr-1"></i>Lanjutkan Proses');
+                        $btnBreak.attr('title', 'Klik untuk menonaktifkan status Break dan melanjutkan proses');
+                    } else {
+                        $btnBreak.removeClass('btn-success').addClass('btn-secondary');
+                        $btnBreak.html('<i class="fas fa-pause mr-1"></i>Break');
+                        $btnBreak.attr('title', 'Klik untuk mengaktifkan status Break (Freeze cycle time)');
+                    }
+                }
             }
 
             // Logic untuk tombol Recovery Proses (PPIC dan Super Admin)
@@ -4407,17 +4592,17 @@
                 $('#badge-proses-status-note').text('Antrian').removeClass('badge-secondary badge-success').addClass('badge-info');
             }
 
-            // Status Menunggu Mesin Mati (Address 200 = 0) / Sinyal 103 ON
+            // Status Menunggu Mesin Mati / Sinyal Selesai Aktif
             const isWaitingStop = !!(proses.stop_requested_at && !proses.selesai);
             $btnCancelStopRequest.addClass('d-none');
             if (isWaitingStop) {
                 $alertWaitingStop.removeClass('d-none');
                 if (proses.stop_request_type === 'maintenance_finish') {
-                    $('#alert-waiting-stop-title').text('Maintenance Sedang Menunggu Mesin Mati (Address 200 = 0)');
-                    $('#alert-waiting-stop-desc').text('Sinyal 103 ON dikirim ke PLC. Menunggu operator di lapangan mematikan mesin sebelum proses selesai.');
+                    $('#alert-waiting-stop-title').text('Maintenance Sedang Menunggu Mesin Berhenti');
+                    $('#alert-waiting-stop-desc').text('Instruksi selesai telah dikirim. Menunggu operator di lapangan mematikan mesin sebelum proses selesai.');
                 } else {
-                    $('#alert-waiting-stop-title').text('Sedang Menunggu Mesin Mati / Unload (Address 200 = 0)');
-                    $('#alert-waiting-stop-desc').text('Sinyal 103 ON dikirim ke PLC. Menunggu verifikasi unload atau operator mematikan mesin sebelum proses selesai.');
+                    $('#alert-waiting-stop-title').text('Sedang Menunggu Mesin Berhenti / Unload');
+                    $('#alert-waiting-stop-desc').text('Instruksi selesai telah dikirim. Menunggu verifikasi unload atau operator mematikan mesin sebelum proses selesai.');
                 }
                 const canCancelStop = ['super_admin', 'kepala_shift', 'kepala_ruangan'].includes(userRoleStr);
                 if (canCancelStop) {
@@ -5004,8 +5189,8 @@
         // Handler tombol Edit Proses (hanya ubah cycle time -> kirim ke approval FM)
         $(document).on('click', '.btn-edit-proses', function (e) {
             e.preventDefault();
-            // Cek apakah tombol disabled
-            if ($(this).prop('disabled') || $(this).hasClass('disabled')) {
+            // Cek apakah tombol disabled atau user tidak punya hak akses
+            if ($(this).prop('disabled') || $(this).hasClass('disabled') || window.canEditProses === false) {
                 return false;
             }
             const proses = $('#modalDetailProses').data('proses');
@@ -5072,8 +5257,8 @@
         // Handler tombol Pindah Mesin (buka modal pindah mesin)
         $(document).on('click', '.btn-move-proses', function (e) {
             e.preventDefault();
-            // Cek apakah tombol disabled
-            if ($(this).prop('disabled') || $(this).hasClass('disabled')) {
+            // Cek apakah tombol disabled atau user tidak punya hak akses
+            if ($(this).prop('disabled') || $(this).hasClass('disabled') || window.canMoveProses === false) {
                 return false;
             }
             const proses = $('#modalDetailProses').data('proses');
@@ -5387,13 +5572,6 @@
             const proses = $('#modalDetailProses').data('proses');
             if (!proses) return;
 
-            if (proses.jenis === 'Maintenance') {
-                ToastError.fire({
-                    title: 'Fitur Pinjam Mesin tidak tersedia untuk proses Maintenance.'
-                });
-                return false;
-            }
-
             const id = proses.id;
             const pinjamUrl = "{{ url('proses') }}/" + id + "/pinjam-mesin";
             const isPinjamActive = $(this).data('is-pinjam-active') === true;
@@ -5476,7 +5654,11 @@
             const noOpStr = firstDetail ? (firstDetail.no_op || '-') : '-';
             const noPartaiStr = firstDetail ? (firstDetail.no_partai || '-') : '-';
             const jenisStr = proses.jenis || '-';
-            $('#pinjamProsesInfo').html(`<strong>Jenis:</strong> ${jenisStr} | <strong>No OP:</strong> ${noOpStr} | <strong>No Partai:</strong> ${noPartaiStr}`);
+            if (jenisStr === 'Maintenance') {
+                $('#pinjamProsesInfo').html(`<strong>Jenis:</strong> Maintenance | <strong>Mesin:</strong> ${currentMesinNama}`);
+            } else {
+                $('#pinjamProsesInfo').html(`<strong>Jenis:</strong> ${jenisStr} | <strong>No OP:</strong> ${noOpStr} | <strong>No Partai:</strong> ${noPartaiStr}`);
+            }
 
             const currentMesinId = proses.mesin_id ? parseInt(proses.mesin_id) : null;
             let currentMesinNama = 'Mesin ' + currentMesinId;
@@ -5682,11 +5864,245 @@
             }
         });
 
+        // Handler tombol Break (Toggle ON / OFF)
+        $(document).on('click', '.btn-break-proses', function (e) {
+            e.preventDefault();
+            if ($(this).prop('disabled') || $(this).hasClass('disabled')) {
+                return false;
+            }
+            const proses = $('#modalDetailProses').data('proses');
+            if (!proses) return;
+
+            const id = proses.id;
+            const breakUrl = "{{ url('proses') }}/" + id + "/break";
+            const isBreakActive = $(this).data('is-break-active') === true;
+
+            if (isBreakActive) {
+                // Konfirmasi untuk mematikan status Break (Lanjutkan proses)
+                Swal.fire({
+                    title: 'Lanjutkan Proses?',
+                    text: 'Status Break akan dinonaktifkan dan cycle time proses akan dilanjutkan.',
+                    icon: 'question',
+                    showCancelButton: true,
+                    confirmButtonColor: '#28a745',
+                    cancelButtonColor: '#6c757d',
+                    confirmButtonText: 'Ya, Lanjutkan Proses',
+                    cancelButtonText: 'Batal'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        Swal.fire({
+                            title: 'Memproses...',
+                            text: 'Melanjutkan proses...',
+                            allowOutsideClick: false,
+                            didOpen: () => {
+                                Swal.showLoading();
+                            }
+                        });
+
+                        $.ajax({
+                            url: breakUrl,
+                            method: 'POST',
+                            headers: {
+                                'X-Requested-With': 'XMLHttpRequest',
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+                            },
+                            data: {
+                                _token: $('meta[name="csrf-token"]').attr('content'),
+                                action: 'deactivate'
+                            },
+                            success: function (response) {
+                                $('#modalDetailProses').modal('hide');
+                                ToastSuccess.fire({
+                                    title: response.message || 'Proses berhasil dilanjutkan.'
+                                });
+                                setTimeout(function () {
+                                    if (response && response.redirect) {
+                                        window.location.href = response.redirect;
+                                    } else {
+                                        window.location.reload();
+                                    }
+                                }, 500);
+                            },
+                            error: function (xhr) {
+                                let errorMsg = 'Gagal melanjutkan proses.';
+                                if (xhr.responseJSON && xhr.responseJSON.message) {
+                                    errorMsg = xhr.responseJSON.message;
+                                }
+                                ToastError.fire({
+                                    title: errorMsg
+                                });
+                            }
+                        });
+                    }
+                });
+                return false;
+            }
+
+            $('#formBreakProses').attr('action', breakUrl);
+            $('#breakProsesId').val(id);
+            $('#breakAlasan').val('');
+
+            // Set info proses
+            const currentMesinId = proses.mesin_id ? parseInt(proses.mesin_id) : null;
+            let currentMesinNama = 'Mesin ' + currentMesinId;
+            if (proses.mesin && (proses.mesin.nama || proses.mesin.jenis_mesin)) {
+                currentMesinNama = proses.mesin.nama || proses.mesin.jenis_mesin;
+            } else if (window.mesinsData && Array.isArray(window.mesinsData)) {
+                const found = window.mesinsData.find(m => parseInt(m.id || m.mesin_id) === currentMesinId);
+                if (found) currentMesinNama = found.nama || found.jenis_mesin || ('Mesin ' + currentMesinId);
+            }
+            $('#breakMesinAsal').val(currentMesinNama);
+
+            const firstDetail = getFirstDetailProses(proses);
+            const noOpStr = firstDetail ? (firstDetail.no_op || '-') : '-';
+            const noPartaiStr = firstDetail ? (firstDetail.no_partai || '-') : '-';
+            const jenisStr = proses.jenis || '-';
+            if (jenisStr === 'Maintenance') {
+                $('#breakProsesInfo').html(`<strong>Jenis:</strong> Maintenance | <strong>Mesin:</strong> ${currentMesinNama}`);
+            } else {
+                $('#breakProsesInfo').html(`<strong>Jenis:</strong> ${jenisStr} | <strong>No OP:</strong> ${noOpStr} | <strong>No Partai:</strong> ${noPartaiStr}`);
+            }
+
+            $('#modalDetailProses').modal('hide').one('hidden.bs.modal', function () {
+                $('#modalBreakProses').modal('show');
+                $('body').addClass('modal-open');
+            });
+        });
+
+        // Handler submit form break proses
+        $('#formBreakProses').on('submit', function (e) {
+            e.preventDefault();
+            const form = $(this);
+            const url = form.attr('action');
+            const alasan = ($('#breakAlasan').val() || '').trim();
+
+            if (!alasan) {
+                ToastError.fire({
+                    title: 'Alasan break proses wajib diisi.'
+                });
+                $('#breakAlasan').focus();
+                return false;
+            }
+
+            const $submitBtn = form.find('button[type="submit"]');
+            $submitBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin mr-1"></i>Mengaktifkan...');
+
+            $.ajax({
+                url: url,
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+                },
+                data: {
+                    _token: $('meta[name="csrf-token"]').attr('content'),
+                    action: 'activate',
+                    alasan: alasan
+                },
+                success: function (response) {
+                    $('#modalBreakProses').modal('hide');
+                    if (response && response.status === 'success' && response.message) {
+                        ToastSuccess.fire({
+                            title: response.message
+                        });
+                    }
+                    setTimeout(function () {
+                        if (response && response.redirect) {
+                            window.location.href = response.redirect;
+                        } else {
+                            window.location.reload();
+                        }
+                    }, 500);
+                },
+                error: function (xhr) {
+                    let errorMsg = 'Gagal mengaktifkan break proses.';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        errorMsg = xhr.responseJSON.message;
+                    } else if (xhr.responseJSON && xhr.responseJSON.errors) {
+                        errorMsg = Object.values(xhr.responseJSON.errors).flat().join(', ');
+                    }
+                    ToastError.fire({
+                        title: errorMsg
+                    });
+                },
+                complete: function () {
+                    $submitBtn.prop('disabled', false).html('<i class="fas fa-pause mr-1"></i>Aktifkan Break');
+                }
+            });
+        });
+
+        // Handler Preview Riwayat Break Proses
+        $(document).on('click', '.btn-preview-break-proses', function (e) {
+            e.preventDefault();
+            const proses = $('#modalDetailProses').data('proses') || {};
+            const prosesId = proses.id || $('#modalDetailProses').data('prosesId');
+            if (!prosesId) return;
+
+            const jenisText = proses.jenis || 'Produksi';
+            const noOp = proses.details && proses.details.length ? proses.details.map(d => d.no_op).filter(Boolean).join(', ') : (proses.no_op || '-');
+            $('#break-history-proses-info').html(`<i class="fas fa-info-circle mr-1"></i> <strong>Proses #${prosesId}</strong> (${jenisText}) | OP: ${noOp}`);
+            $('#break-history-count').text('Memuat...');
+            $('#break-history-tbody').html('<tr><td colspan="7" class="text-center py-3 text-muted"><i class="fas fa-spinner fa-spin mr-1"></i>Memuat riwayat break proses...</td></tr>');
+
+            $('#modalBreakProsesHistory').modal('show');
+
+            $.ajax({
+                url: `/proses/${prosesId}/break-history`,
+                method: 'GET',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json'
+                },
+                success: function (response) {
+                    const data = response.data || [];
+                    $('#break-history-count').text(`${data.length} Sesi`);
+
+                    if (!data.length) {
+                        $('#break-history-tbody').html('<tr><td colspan="7" class="text-center py-3 text-muted">Belum ada riwayat break untuk proses ini.</td></tr>');
+                        return;
+                    }
+
+                    let html = '';
+                    data.forEach((item, idx) => {
+                        const selesaiHtml = item.selesai_at_formatted
+                            ? item.selesai_at_formatted
+                            : '<span class="badge badge-warning"><i class="fas fa-pause mr-1"></i>Sedang Break</span>';
+                        const userBreak = item.user_break ? `${item.user_break.nama} <small class="text-muted">(${item.user_break.role})</small>` : '-';
+                        const userSelesai = item.user_selesai ? `${item.user_selesai.nama} <small class="text-muted">(${item.user_selesai.role})</small>` : (item.selesai_at_formatted ? '-' : '<span class="text-muted">-</span>');
+
+                        html += `<tr>
+                                    <td class="text-center">${idx + 1}</td>
+                                    <td>${item.break_at_formatted || '-'}</td>
+                                    <td>${selesaiHtml}</td>
+                                    <td><span class="badge badge-light border">${item.durasi_formatted || '-'}</span></td>
+                                    <td>${item.alasan || '-'}</td>
+                                    <td>${userBreak}</td>
+                                    <td>${userSelesai}</td>
+                                </tr>`;
+                    });
+                    $('#break-history-tbody').html(html);
+                },
+                error: function (xhr) {
+                    $('#break-history-count').text('0 Sesi');
+                    $('#break-history-tbody').html(`<tr><td colspan="7" class="text-center py-3 text-danger"><i class="fas fa-exclamation-circle mr-1"></i>${xhr.responseJSON?.message || 'Gagal memuat riwayat break proses.'}</td></tr>`);
+                }
+            });
+        });
+
+        // Pastikan backdrop & scroll modalDetailProses tetap aktif saat modalBreakProsesHistory ditutup
+        $('#modalBreakProsesHistory').on('hidden.bs.modal', function () {
+            if ($('#modalDetailProses').hasClass('show')) {
+                $('body').addClass('modal-open');
+            }
+        });
+
         // Handler tombol Hapus Proses (kirim permintaan delete ke approval FM)
         $(document).on('click', '.btn-delete-proses', function (e) {
             e.preventDefault();
-            // Cek apakah tombol disabled
-            if ($(this).prop('disabled') || $(this).hasClass('disabled')) {
+            // Cek apakah tombol disabled atau user tidak punya hak akses
+            if ($(this).prop('disabled') || $(this).hasClass('disabled') || window.canDeleteProses === false) {
                 return false;
             }
             const proses = $('#modalDetailProses').data('proses');
@@ -5769,7 +6185,7 @@
 
             Swal.fire({
                 title: 'Selesaikan Maintenance?',
-                text: 'Perintah ini akan mengirimkan sinyal 103 ke PLC. Jika mesin masih hidup, sistem akan menunggu mesin mati (Address 200 = 0) dari lapangan sebelum maintenance resmi selesai.',
+                text: 'Jika mesin masih berjalan, sistem akan menunggu mesin dimatikan oleh operator di lapangan sebelum maintenance resmi selesai.',
                 icon: 'question',
                 showCancelButton: true,
                 confirmButtonColor: '#28a745',
@@ -5838,8 +6254,8 @@
             if (!proses) return;
 
             Swal.fire({
-                title: 'Force End Proses?',
-                text: 'Perintah ini akan mengirimkan sinyal 103 ke PLC. Jika mesin masih hidup, sistem akan menunggu mesin mati (Address 200 = 0) / verifikasi unload dari lapangan sebelum proses selesai dan dialihkan ke antrian berikutnya.',
+                title: 'Selesaikan Proses Secara Paksa?',
+                text: 'Jika mesin masih berjalan, sistem akan menunggu verifikasi unload atau mesin dimatikan di lapangan sebelum proses selesai dan dialihkan ke antrian berikutnya.',
                 icon: 'warning',
                 showCancelButton: true,
                 confirmButtonColor: '#28a745',
@@ -5909,7 +6325,7 @@
 
             Swal.fire({
                 title: 'Batalkan Perintah Selesai?',
-                text: 'Apakah Anda yakin ingin membatalkan perintah selesai ini? Sinyal 103 ke PLC akan dimatikan (kembali ke 0) dan proses akan tetap berjalan normal.',
+                text: 'Apakah Anda yakin ingin membatalkan perintah selesai ini? Proses akan dilanjutkan dan tetap berjalan normal.',
                 icon: 'warning',
                 showCancelButton: true,
                 confirmButtonColor: '#ff9800',
@@ -5940,7 +6356,7 @@
                             Swal.fire({
                                 icon: 'success',
                                 title: 'Berhasil Dibatalkan',
-                                text: res.message || 'Perintah selesai berhasil dibatalkan. Sinyal 103 kembali ke 0.',
+                                text: res.message || 'Perintah selesai berhasil dibatalkan.',
                                 timer: 2000,
                                 showConfirmButton: false
                             }).then(() => {
@@ -6975,6 +7391,10 @@
                         if (proses.is_paused) {
                             const pausedAt = new Date(proses.updated_at.replace(' ', 'T'));
                             diff = Math.floor((pausedAt - mulai) / 1000);
+                        } else if (proses.is_break) {
+                            let breakAt = proses.break_at ? new Date(proses.break_at) : new Date();
+                            if (isNaN(breakAt.getTime())) breakAt = new Date();
+                            diff = Math.floor((breakAt - mulai) / 1000);
                         } else {
                             const now = new Date();
                             diff = Math.floor((now - mulai) / 1000);
@@ -7441,6 +7861,21 @@
                         }
                     }
 
+                    const $btnBreak = $('.btn-break-proses');
+                    if ($btnBreak.length && !$btnBreak.hasClass('d-none')) {
+                        const isBreakActive = prosesFromCard.is_break === true || prosesFromCard.is_break === 1 || prosesFromCard.is_break === '1';
+                        $btnBreak.data('is-break-active', isBreakActive);
+                        if (isBreakActive) {
+                            $btnBreak.removeClass('btn-secondary').addClass('btn-success');
+                            $btnBreak.html('<i class="fas fa-play mr-1"></i>Lanjutkan Proses');
+                            $btnBreak.attr('title', 'Klik untuk menonaktifkan status Break dan melanjutkan proses');
+                        } else {
+                            $btnBreak.removeClass('btn-success').addClass('btn-secondary');
+                            $btnBreak.html('<i class="fas fa-pause mr-1"></i>Break');
+                            $btnBreak.attr('title', 'Klik untuk mengaktifkan status Break (Freeze cycle time)');
+                        }
+                    }
+
                     // Update Status Menunggu Mesin Mati di modal detail jika terbuka
                     const isWaitingStopModal = !!(prosesFromCard.stop_requested_at && !prosesFromCard.selesai);
                     const $modalAlertStop = $('#alert-waiting-stop');
@@ -7452,11 +7887,11 @@
                     if (isWaitingStopModal) {
                         $modalAlertStop.removeClass('d-none');
                         if (prosesFromCard.stop_request_type === 'maintenance_finish') {
-                            $('#alert-waiting-stop-title').text('Maintenance Sedang Menunggu Mesin Mati (Address 200 = 0)');
-                            $('#alert-waiting-stop-desc').text('Sinyal 103 ON dikirim ke PLC. Menunggu operator di lapangan mematikan mesin sebelum proses selesai.');
+                            $('#alert-waiting-stop-title').text('Maintenance Sedang Menunggu Mesin Berhenti');
+                            $('#alert-waiting-stop-desc').text('Instruksi selesai telah dikirim. Menunggu operator di lapangan mematikan mesin sebelum proses selesai.');
                         } else {
-                            $('#alert-waiting-stop-title').text('Sedang Menunggu Mesin Mati / Unload (Address 200 = 0)');
-                            $('#alert-waiting-stop-desc').text('Sinyal 103 ON dikirim ke PLC. Menunggu verifikasi unload atau operator mematikan mesin sebelum proses selesai.');
+                            $('#alert-waiting-stop-title').text('Sedang Menunggu Mesin Berhenti / Unload');
+                            $('#alert-waiting-stop-desc').text('Instruksi selesai telah dikirim. Menunggu verifikasi unload atau operator mematikan mesin sebelum proses selesai.');
                         }
                         const canCancel = ['super_admin', 'kepala_shift', 'kepala_ruangan'].includes(userRoleCur);
                         if (canCancel) {
@@ -8224,7 +8659,7 @@
                             const bannerHtml = `
                                 <div class="waiting-stop-banner" style="background: linear-gradient(90deg, #ff9800, #ffb74d); color: #111; font-weight: 800; font-size: 11px; padding: 3px 6px; text-align: center; border-bottom: 1px solid rgba(0,0,0,0.15); display: flex; align-items: center; justify-content: center; gap: 5px;">
                                     <i class="fas fa-spinner fa-spin"></i>
-                                    <span>Menunggu Mesin Mati (Sinyal 103 ON)</span>
+                                    <span>Menunggu Mesin Berhenti</span>
                                 </div>
                             `;
                             $card.prepend(bannerHtml);

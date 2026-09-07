@@ -33,6 +33,11 @@ class Proses extends Model
         'pinjam_mesin_alasan',
         'pinjam_mesin_at',
         'pinjam_mesin_by',
+        'is_break',
+        'break_alasan',
+        'break_at',
+        'break_by',
+        'total_break_seconds',
         'note',
         'stop_requested_at',
         'stop_requested_by',
@@ -52,6 +57,9 @@ class Proses extends Model
         'is_paused' => 'boolean',
         'is_pinjam_mesin' => 'boolean',
         'pinjam_mesin_at' => 'datetime',
+        'is_break' => 'boolean',
+        'break_at' => 'datetime',
+        'total_break_seconds' => 'integer',
         'stop_requested_at' => 'datetime',
     ];
 
@@ -81,6 +89,16 @@ class Proses extends Model
     public function pinjamMesinHistories()
     {
         return $this->hasMany(PinjamMesinHistory::class, 'proses_id');
+    }
+
+    public function breakHistories()
+    {
+        return $this->hasMany(BreakHistory::class, 'proses_id');
+    }
+
+    public function userBreak()
+    {
+        return $this->belongsTo(User::class, 'break_by');
     }
 
     public function stopRequestedBy()

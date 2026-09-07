@@ -93,6 +93,12 @@ Route::middleware(['auth', 'prevent-back-history'])->group(function () {
         Route::get('/proses/{id}/pinjam-mesin-history', [ProsesController::class, 'getPinjamMesinHistory'])->name('proses.pinjam-mesin-history');
     });
 
+    // Break & Riwayat Break Proses: SuperAdmin, Karu, Kashift, PPIC (Sinyal Address 103 & Freeze Cycle Time)
+    Route::middleware('role:super_admin,kepala_ruangan,kepala_shift,ppic')->group(function () {
+        Route::post('/proses/{id}/break', [ProsesController::class, 'toggleBreak'])->name('proses.break');
+        Route::get('/proses/{id}/break-history', [ProsesController::class, 'getBreakHistory'])->name('proses.break-history');
+    });
+
     // Catatan Proses (Note): SuperAdmin, Kepala Ruangan, Kepala Shift
     Route::middleware('role:super_admin,kepala_ruangan,kepala_shift')->group(function () {
         Route::post('/proses/{id}/note', [ProsesController::class, 'updateNote'])->name('proses.note');

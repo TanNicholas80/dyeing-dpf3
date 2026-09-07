@@ -150,7 +150,7 @@ class ProsesStatusService
             }
         } else {
             // Proses sedang berjalan (mulai ada, selesai belum)
-            if ($proses->is_paused) {
+            if ($proses->is_paused || (bool) ($proses->is_break ?? false)) {
                 $bg = '#757575'; // abu-abu
             } else {
                 $barcodeKainOptional = $proses->isBarcodeKainOptionalForLaAux();
@@ -242,6 +242,9 @@ class ProsesStatusService
             'mode' => $proses->mode ?? 'greige',
             'order' => (int)($proses->order ?? 0),
             'is_paused' => (bool)$proses->is_paused,
+            'is_break' => (bool)($proses->is_break ?? false),
+            'break_at' => $proses->break_at ? $proses->break_at->format('Y-m-d H:i:s') : null,
+            'break_alasan' => $proses->break_alasan,
             'mesin_status' => $proses->mesin ? (bool)$proses->mesin->status : null,
             'mesin_last_off_at' => $proses->mesin && $proses->mesin->last_off_at ? $proses->mesin->last_off_at->format('Y-m-d H:i:s') : null,
             'gda_details' => $gdaDetails,
