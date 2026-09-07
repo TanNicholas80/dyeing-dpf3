@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\AbsenDelegasi;
 use App\Models\AbsenHistory;
 use App\Services\AbsenService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -20,28 +21,24 @@ class AbsenController extends Controller
             abort(403, 'Hanya Factory Manager (FM) dan Super Admin yang berhak mengakses menu Absen.');
         }
 
-        // Ambil status delegasi saat ini
-        $delegasiKashift = AbsenDelegasi::firstOrCreate(
-            ['role_target' => 'kepala_shift'],
-            [
-                'is_active' => true,
-                'current_shift' => AbsenService::detectCurrentShift(),
-                'keterangan' => 'Default sistem: Hadir / Aktif',
-                'updated_by' => $user->id,
-            ]
-        );
+        // Lazy auto-reset: pastikan status shift lampau yang masih OFF langsung di-reset dan dicatat ke log
+        AbsenService::checkAndPerformAutoReset();
 
-        $delegasiKaru = AbsenDelegasi::firstOrCreate(
-            ['role_target' => 'kepala_ruangan'],
-            [
-                'is_active' => true,
-                'current_shift' => AbsenService::detectCurrentShift(),
-                'keterangan' => 'Default sistem: Hadir / Aktif',
-                'updated_by' => $user->id,
-            ]
-        );
+        // Info shift & tanggal produksi saat ini
+        $currentShiftInfo = AbsenService::getCurrentShiftDetails();
 
-        $currentShift = AbsenService::detectCurrentShift();
+        // Tanggal yang sedang ditampilkan (default ke tanggal produksi hari ini)
+        $activeDate = $request->input('active_date', $currentShiftInfo['production_date']);
+
+        // Konfigurasi jam shift untuk tanggal aktif
+        $scheduleConfig = AbsenService::getScheduleConfigForDate($activeDate);
+
+        // Data status Shift 1 & Shift 2 untuk Kashift dan Karu pada tanggal aktif
+        $delegations = AbsenService::getDayShiftDelegations($activeDate);
+        $kashiftShift1 = $delegations['kepala_shift']['Shift 1'];
+        $kashiftShift2 = $delegations['kepala_shift']['Shift 2'];
+        $karuShift1 = $delegations['kepala_ruangan']['Shift 1'];
+        $karuShift2 = $delegations['kepala_ruangan']['Shift 2'];
 
         // Query riwayat dengan filter
         $query = AbsenHistory::with('user')->orderByDesc('created_at');
@@ -61,15 +58,19 @@ class AbsenController extends Controller
         $histories = $query->paginate(15)->withQueryString();
 
         return view('absen.index', compact(
-            'delegasiKashift',
-            'delegasiKaru',
-            'currentShift',
+            'currentShiftInfo',
+            'activeDate',
+            'scheduleConfig',
+            'kashiftShift1',
+            'kashiftShift2',
+            'karuShift1',
+            'karuShift2',
             'histories'
         ));
     }
 
     /**
-     * Ubah status absen ON / OFF oleh FM atau Super Admin.
+     * Ubah status absen ON / OFF untuk shift tertentu oleh FM atau Super Admin.
      */
     public function toggle(Request $request)
     {
@@ -84,38 +85,44 @@ class AbsenController extends Controller
         $validated = $request->validate([
             'role_target' => 'required|in:kepala_shift,kepala_ruangan',
             'status' => 'required|in:ON,OFF,on,off',
-            'shift' => 'nullable|string|max:50',
+            'shift' => 'required|string|max:50',
+            'tanggal' => 'nullable|date',
             'keterangan' => 'nullable|string|max:500',
         ]);
 
         $roleTarget = $validated['role_target'];
         $status = strtoupper($validated['status']);
-        $shift = $validated['shift'] ?: AbsenService::detectCurrentShift();
+        $shift = $validated['shift'];
         $keterangan = $validated['keterangan'] ?? null;
+        $tanggal = $validated['tanggal'] ?? null;
 
         $delegasi = AbsenService::toggleStatus(
             $roleTarget,
             $status,
             $shift,
             $keterangan,
-            $user->id
+            $user->id,
+            $tanggal
         );
 
         $roleName = $roleTarget === 'kepala_shift' ? 'Kepala Shift' : 'Kepala Ruangan';
         $statusMsg = $status === 'OFF' 
-            ? "berhasil diubah menjadi OFF (Absen). Wewenang dialihkan ke " . ($roleTarget === 'kepala_shift' ? 'Kepala Ruangan (KARU)' : 'Kepala Shift')
-            : "berhasil diubah menjadi ON (Aktif kembali). Akses kembali normal.";
+            ? "berhasil diubah menjadi OFF (Izin/Absen) untuk {$shift}. Wewenang dialihkan ke " . ($roleTarget === 'kepala_shift' ? 'Kepala Ruangan (KARU)' : 'Kepala Shift')
+            : "berhasil diubah menjadi ON (Hadir/Normal) untuk {$shift}. Akses kembali normal.";
 
-        activity('Manajemen Absen')
-            ->performedOn($delegasi)
-            ->causedBy($user)
-            ->withProperties([
-                'role_target' => $roleTarget,
-                'status' => $status,
-                'shift' => $shift,
-                'keterangan' => $keterangan,
-            ])
-            ->log("Status absen {$roleName} diubah menjadi {$status} pada {$shift} oleh {$user->nama} ({$user->role}).");
+        if (function_exists('activity')) {
+            activity('Manajemen Absen')
+                ->performedOn($delegasi)
+                ->causedBy($user)
+                ->withProperties([
+                    'role_target' => $roleTarget,
+                    'status' => $status,
+                    'shift' => $shift,
+                    'tanggal' => $delegasi->tanggal ? $delegasi->tanggal->toDateString() : $tanggal,
+                    'keterangan' => $keterangan,
+                ])
+                ->log("Status absen {$roleName} diubah menjadi {$status} pada {$shift} oleh {$user->nama} ({$user->role}).");
+        }
 
         if ($request->wantsJson()) {
             return response()->json([
@@ -125,6 +132,7 @@ class AbsenController extends Controller
             ]);
         }
 
-        return redirect()->route('absen.index')->with('success', "Status {$roleName} {$statusMsg}");
+        return redirect()->route('absen.index', ['active_date' => $delegasi->tanggal ? $delegasi->tanggal->toDateString() : $tanggal])
+            ->with('success', "Status {$roleName} {$statusMsg}");
     }
 }
