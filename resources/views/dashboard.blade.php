@@ -5615,13 +5615,15 @@
                                 ToastSuccess.fire({
                                     title: response.message || 'Status pinjam mesin berhasil dimatikan.'
                                 });
-                                setTimeout(function () {
-                                    if (response && response.redirect) {
-                                        window.location.href = response.redirect;
-                                    } else {
-                                        window.location.reload();
-                                    }
-                                }, 500);
+                                // Update DOM card langsung tanpa reload
+                                const $card = $(`.status-card[data-proses-id="${id}"]`);
+                                if ($card.length) {
+                                    const cardProses = $card.data('proses') || {};
+                                    cardProses.is_pinjam_mesin = false;
+                                    cardProses.pinjam_mesin_alasan = null;
+                                    $card.data('proses', cardProses);
+                                    $card.find('.pinjam-mesin-indicator').css('display', 'none');
+                                }
                             },
                             error: function (xhr) {
                                 let errorMsg = 'Gagal mematikan status pinjam mesin.';
@@ -5713,13 +5715,18 @@
                             title: response.message
                         });
                     }
-                    setTimeout(function () {
-                        if (response && response.redirect) {
-                            window.location.href = response.redirect;
-                        } else {
-                            window.location.reload();
-                        }
-                    }, 500);
+                    // Update DOM card langsung tanpa reload
+                    const pinjamPid = $('#pinjamProsesId').val();
+                    const $card = $(`.status-card[data-proses-id="${pinjamPid}"]`);
+                    if ($card.length) {
+                        const cardProses = $card.data('proses') || {};
+                        cardProses.is_pinjam_mesin = true;
+                        cardProses.pinjam_mesin_alasan = alasan;
+                        $card.data('proses', cardProses);
+                        const $pinjamIndicator = $card.find('.pinjam-mesin-indicator');
+                        $pinjamIndicator.css('display', 'flex');
+                        $pinjamIndicator.find('.badge-pinjam-mesin').attr('title', 'Pinjam Mesin Aktif: ' + alasan);
+                    }
                 },
                 error: function (xhr) {
                     let errorMsg = 'Gagal mengaktifkan pinjam mesin.';
@@ -6218,15 +6225,32 @@
                                 icon: isWait ? 'info' : 'success',
                                 title: isWait ? 'Menunggu Mesin Mati' : 'Berhasil',
                                 text: res.message || 'Proses Maintenance berhasil diproses.',
-                                timer: isWait ? 3000 : 1500,
+                                timer: isWait ? 2500 : 1500,
                                 showConfirmButton: false
-                            }).then(() => {
-                                if (typeof loadDashboardData === 'function') {
-                                    loadDashboardData();
-                                } else {
-                                    window.location.reload();
-                                }
                             });
+                            // Update DOM card langsung tanpa reload
+                            const $card = $(`.status-card[data-proses-id="${proses.id}"]`);
+                            if ($card.length) {
+                                if (isWait) {
+                                    const cardProses = $card.data('proses') || {};
+                                    cardProses.stop_requested_at = (res.data && res.data.stop_requested_at) ? res.data.stop_requested_at : new Date().toISOString();
+                                    cardProses.stop_request_type = 'maintenance_finish';
+                                    $card.data('proses', cardProses);
+                                    if (!$card.find('.waiting-stop-banner').length) {
+                                        const bannerHtml = `
+                                            <div class="waiting-stop-banner" style="background: linear-gradient(90deg, #ff9800, #ffb74d); color: #111; font-weight: 800; font-size: 11px; padding: 3px 6px; text-align: center; border-bottom: 1px solid rgba(0,0,0,0.15); display: flex; align-items: center; justify-content: center; gap: 5px;">
+                                                <i class="fas fa-spinner fa-spin"></i>
+                                                <span>Menunggu Mesin Mati (Sinyal 103 ON)</span>
+                                            </div>
+                                        `;
+                                        $card.prepend(bannerHtml);
+                                    }
+                                } else {
+                                    if (typeof moveToHistory === 'function') {
+                                        moveToHistory($card, res.data || {});
+                                    }
+                                }
+                            }
                         },
                         error: function (xhr) {
                             let errMsg = 'Gagal menyelesaikan proses Maintenance.';
@@ -6288,15 +6312,32 @@
                                 icon: isWait ? 'info' : 'success',
                                 title: isWait ? 'Menunggu Unload / Mesin Mati' : 'Berhasil',
                                 text: res.message || 'Perintah Force End berhasil diproses.',
-                                timer: isWait ? 3000 : 1500,
+                                timer: isWait ? 2500 : 1500,
                                 showConfirmButton: false
-                            }).then(() => {
-                                if (typeof loadDashboardData === 'function') {
-                                    loadDashboardData();
-                                } else {
-                                    window.location.reload();
-                                }
                             });
+                            // Update DOM card langsung tanpa reload
+                            const $card = $(`.status-card[data-proses-id="${proses.id}"]`);
+                            if ($card.length) {
+                                if (isWait) {
+                                    const cardProses = $card.data('proses') || {};
+                                    cardProses.stop_requested_at = (res.data && res.data.stop_requested_at) ? res.data.stop_requested_at : new Date().toISOString();
+                                    cardProses.stop_request_type = 'force_finish';
+                                    $card.data('proses', cardProses);
+                                    if (!$card.find('.waiting-stop-banner').length) {
+                                        const bannerHtml = `
+                                            <div class="waiting-stop-banner" style="background: linear-gradient(90deg, #ff9800, #ffb74d); color: #111; font-weight: 800; font-size: 11px; padding: 3px 6px; text-align: center; border-bottom: 1px solid rgba(0,0,0,0.15); display: flex; align-items: center; justify-content: center; gap: 5px;">
+                                                <i class="fas fa-spinner fa-spin"></i>
+                                                <span>Menunggu Mesin Mati (Sinyal 103 ON)</span>
+                                            </div>
+                                        `;
+                                        $card.prepend(bannerHtml);
+                                    }
+                                } else {
+                                    if (typeof moveToHistory === 'function') {
+                                        moveToHistory($card, res.data || {});
+                                    }
+                                }
+                            }
                         },
                         error: function (xhr) {
                             let errMsg = 'Gagal menyelesaikan proses.';
@@ -6359,13 +6400,16 @@
                                 text: res.message || 'Perintah selesai berhasil dibatalkan.',
                                 timer: 2000,
                                 showConfirmButton: false
-                            }).then(() => {
-                                if (typeof loadDashboardData === 'function') {
-                                    loadDashboardData();
-                                } else {
-                                    window.location.reload();
-                                }
                             });
+                            // Update DOM card langsung tanpa reload
+                            const $card = $(`.status-card[data-proses-id="${proses.id}"]`);
+                            if ($card.length) {
+                                const cardProses = $card.data('proses') || {};
+                                cardProses.stop_requested_at = null;
+                                cardProses.stop_request_type = null;
+                                $card.data('proses', cardProses);
+                                $card.find('.waiting-stop-banner').remove();
+                            }
                         },
                         error: function (xhr) {
                             let errMsg = 'Gagal membatalkan perintah selesai.';
@@ -7421,6 +7465,27 @@
                 fetch('/mesin/statuses?_=' + new Date().getTime(), { cache: 'no-store' })
                     .catch(e => console.error('Error triggering statuses:', e));
             }, 5000);
+
+            // Auto-update / background sync status proses (Pinjam Mesin, Mesin Mati/Nyala, Selesai, Topping) tanpa refresh
+            function syncProsesStatuses() {
+                if (typeof handleProsesStatusUpdate !== 'function') return;
+                const currentParams = window.location.search || '';
+                const separator = currentParams ? '&' : '?';
+                const url = '{{ route("dashboard.proses-statuses") }}' + currentParams + separator + '_=' + new Date().getTime();
+
+                fetch(url, { cache: 'no-store', headers: { 'Accept': 'application/json' } })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data && typeof data === 'object' && !data.error) {
+                            Object.keys(data).forEach(function (prosesId) {
+                                const statusData = data[prosesId];
+                                handleProsesStatusUpdate(prosesId, statusData);
+                            });
+                        }
+                    })
+                    .catch(e => {});
+            }
+            setInterval(syncProsesStatuses, 4000);
         });
 
         // Real-time update warna card berdasarkan status mulai/selesai
@@ -8285,8 +8350,11 @@
                             // UPDATE: sinkronisasikan properti proses.mesin.status pada semua proses (cards) di mesin ini
                             $('.status-card').each(function () {
                                 let proses = $(this).data('proses');
-                                if (proses && proses.mesin_id == e.mesin.id && proses.mesin) {
-                                    proses.mesin.status = e.mesin.status;
+                                const cardMesinId = proses ? (proses.mesin_id || (proses.mesin ? proses.mesin.id : null)) : $(this).closest('.card-dropzone').data('mesin-id');
+                                if (cardMesinId == e.mesin.id) {
+                                    if (!proses) proses = {};
+                                    if (!proses.mesin) proses.mesin = {};
+                                    proses.mesin.status = !!e.mesin.status;
                                     if (e.mesin.status === false && e.mesin.auto_offline) {
                                         // Update last_off_at secara real-time jika mesin auto-offline
                                         proses.mesin.last_off_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
@@ -8294,7 +8362,7 @@
                                     $(this).data('proses', proses);
 
                                     // FIX: Update visual lampu secara real-time
-                                    const isRunning = proses.mulai !== null && proses.selesai === null;
+                                    const isRunning = proses.mulai !== null && (proses.selesai === null || proses.selesai === undefined);
                                     let light = 'red';
                                     if (proses.jenis === 'Maintenance') {
                                         light = isRunning ? 'yellow' : 'red';
