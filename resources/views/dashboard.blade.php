@@ -2901,6 +2901,37 @@
         const ToastError = window.ToastError;
         const ToastSuccess = window.ToastSuccess;
 
+        // Helper global format detik ke HH:MM:SS
+        function formatDetikToHMS(detik) {
+            if (detik === null || detik === undefined || isNaN(detik)) return '-';
+            const val = parseInt(detik, 10);
+            const jam = Math.floor(val / 3600).toString().padStart(2, '0');
+            const menit = Math.floor((val % 3600) / 60).toString().padStart(2, '0');
+            const d = (val % 60).toString().padStart(2, '0');
+            return jam + ':' + menit + ':' + d;
+        }
+        window.formatDetikToHMS = formatDetikToHMS;
+
+        // Helper global format tanggal & waktu
+        function formatDateTimeDisplay(val) {
+            if (val === null || val === undefined || val === '') return '-';
+            try {
+                let str = typeof val === 'string' ? val.trim() : val;
+                if (typeof str === 'string' && /^\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}(:\d{2})?$/.test(str)) {
+                    str = str.replace(' ', 'T');
+                }
+                const d = new Date(str);
+                if (isNaN(d.getTime())) return typeof val === 'string' ? val : '-';
+                const pad = (n) => String(n).padStart(2, '0');
+                const tgl = pad(d.getDate()) + '/' + pad(d.getMonth() + 1) + '/' + d.getFullYear();
+                const jam = pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+                return tgl + ' ' + jam;
+            } catch (e) {
+                return typeof val === 'string' ? val : '-';
+            }
+        }
+        window.formatDateTimeDisplay = formatDateTimeDisplay;
+
         document.addEventListener('DOMContentLoaded', () => {
             const draggables = document.querySelectorAll('.draggable');
             const containers = document.querySelectorAll('.card-dropzone');
