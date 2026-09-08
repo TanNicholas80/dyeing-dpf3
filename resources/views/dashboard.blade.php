@@ -649,7 +649,17 @@
                                                         return $p->selesai === null;
                                                     })
                                                     ->sort(function ($a, $b) {
-                                                        // Urutkan berdasarkan order untuk proses pending (belum mulai)
+                                                        // 1. Proses yang sedang berjalan (mulai terisi dan belum selesai) HARUS selalu di paling atas
+                                                        $isRunningA = $a->mulai && !$a->selesai;
+                                                        $isRunningB = $b->mulai && !$b->selesai;
+                                                        if ($isRunningA && !$isRunningB) {
+                                                            return -1;
+                                                        }
+                                                        if (!$isRunningA && $isRunningB) {
+                                                            return 1;
+                                                        }
+
+                                                        // 2. Jika keduanya pending (belum mulai), urutkan berdasarkan order (1, 2, 3...)
                                                         if (!$a->mulai && !$b->mulai) {
                                                             $orderA = (int) ($a->order ?? 0);
                                                             $orderB = (int) ($b->order ?? 0);
@@ -657,7 +667,7 @@
                                                                 return $orderA <=> $orderB;
                                                             }
                                                         }
-                                                        // Fallback ke created_at dan id
+                                                        // 3. Fallback ke created_at dan id
                                                         if ($a->created_at != $b->created_at) {
                                                             return $a->created_at <=> $b->created_at;
                                                         }
@@ -8101,8 +8111,15 @@
 
                     if (!prosesA || !prosesB) return 0;
 
-                    // Hanya reorder jika kedua proses belum mulai (pending)
-                    if (!prosesA.mulai && !prosesB.mulai && !prosesA.selesai && !prosesB.selesai) {
+                    const isRunningA = !!(prosesA.mulai && !prosesA.selesai);
+                    const isRunningB = !!(prosesB.mulai && !prosesB.selesai);
+
+                    // 1. Proses yang sedang berjalan HARUS selalu di paling atas
+                    if (isRunningA && !isRunningB) return -1;
+                    if (!isRunningA && isRunningB) return 1;
+
+                    // 2. Jika keduanya belum mulai (pending), urutkan berdasarkan order
+                    if (!prosesA.mulai && !prosesB.mulai) {
                         const orderA = parseInt(prosesA.order || 0);
                         const orderB = parseInt(prosesB.order || 0);
                         if (orderA !== orderB) {
@@ -8110,8 +8127,13 @@
                         }
                     }
 
-                    // Fallback: tetap urutkan berdasarkan posisi DOM saat ini
-                    return 0;
+                    // 3. Fallback ke created_at atau id
+                    const createdA = prosesA.created_at ? new Date(prosesA.created_at).getTime() : 0;
+                    const createdB = prosesB.created_at ? new Date(prosesB.created_at).getTime() : 0;
+                    if (createdA !== createdB) {
+                        return createdA - createdB;
+                    }
+                    return (prosesA.id || 0) - (prosesB.id || 0);
                 });
 
                 // Cek apakah urutan sudah benar

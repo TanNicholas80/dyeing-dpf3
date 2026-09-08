@@ -3765,6 +3765,7 @@ class ProsesController extends Controller
         try {
             // Hitung nomor order berikutnya di mesin tujuan (ditaruh di paling belakang antrian aktif)
             $maxOrder = Proses::where('mesin_id', $targetMesinId)
+                ->where('id', '!=', $proses->id)
                 ->whereNull('selesai')
                 ->max('order') ?? 0;
             $newOrder = $maxOrder + 1;
@@ -3780,6 +3781,15 @@ class ProsesController extends Controller
             $proses->pinjam_mesin_alasan = null;
             $proses->pinjam_mesin_at = null;
             $proses->pinjam_mesin_by = null;
+            $proses->is_break = false;
+            $proses->break_alasan = null;
+            $proses->break_at = null;
+            $proses->break_by = null;
+            $proses->total_break_seconds = 0;
+            $proses->stop_requested_at = null;
+            $proses->stop_requested_by = null;
+            $proses->stop_request_type = null;
+            $proses->created_at = now(); // Update created_at agar seperti proses yang benar-benar baru dibuat
 
             // Catat log di field note proses
             $recoveryNote = "[Recovery dari History ke Mesin ID {$targetMesinId} oleh {$user->nama} ({$userRole}) pada " . now()->format('d/m/Y H:i') . " (Durasi sebelumnya: {$oldDurationFormatted})]";

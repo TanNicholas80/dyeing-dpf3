@@ -160,7 +160,17 @@ class DashboardController extends Controller
             $proses->barcode_kain_optional = $proses->isBarcodeKainOptionalForLaAux();
             return $proses;
         })->sort(function ($a, $b) {
-            // Proses pending (belum mulai) diurutkan berdasarkan order
+            // 1. Proses yang sedang berjalan (mulai terisi dan belum selesai) HARUS selalu di paling atas
+            $isRunningA = $a->mulai && !$a->selesai;
+            $isRunningB = $b->mulai && !$b->selesai;
+            if ($isRunningA && !$isRunningB) {
+                return -1;
+            }
+            if (!$isRunningA && $isRunningB) {
+                return 1;
+            }
+
+            // 2. Jika keduanya pending (belum mulai), urutkan berdasarkan order (1, 2, 3...)
             if (!$a->mulai && !$b->mulai) {
                 $orderA = (int) ($a->order ?? 0);
                 $orderB = (int) ($b->order ?? 0);
@@ -168,7 +178,8 @@ class DashboardController extends Controller
                     return $orderA <=> $orderB;
                 }
             }
-            // Fallback ke created_at dan id
+
+            // 3. Fallback ke created_at dan id
             if ($a->created_at != $b->created_at) {
                 return $a->created_at <=> $b->created_at;
             }
@@ -304,7 +315,17 @@ class DashboardController extends Controller
 
             $prosesList = $prosesQuery->get()
                 ->sort(function ($a, $b) {
-                    // Proses pending (belum mulai) diurutkan berdasarkan order
+                    // 1. Proses yang sedang berjalan (mulai terisi dan belum selesai) HARUS selalu di paling atas
+                    $isRunningA = $a->mulai && !$a->selesai;
+                    $isRunningB = $b->mulai && !$b->selesai;
+                    if ($isRunningA && !$isRunningB) {
+                        return -1;
+                    }
+                    if (!$isRunningA && $isRunningB) {
+                        return 1;
+                    }
+
+                    // 2. Jika keduanya pending (belum mulai), urutkan berdasarkan order (1, 2, 3...)
                     if (!$a->mulai && !$b->mulai) {
                         $orderA = (int) ($a->order ?? 0);
                         $orderB = (int) ($b->order ?? 0);
@@ -312,7 +333,8 @@ class DashboardController extends Controller
                             return $orderA <=> $orderB;
                         }
                     }
-                    // Fallback ke created_at dan id
+
+                    // 3. Fallback ke created_at dan id
                     if ($a->created_at != $b->created_at) {
                         return $a->created_at <=> $b->created_at;
                     }
