@@ -282,7 +282,6 @@
         );
         $cycle_time_actual_str = detikKeWaktu($cycle_time_actual);
     }
-@endphp
 @php
     $canDragDrop =
         $bg === '#757575' &&
@@ -290,6 +289,16 @@
         !$hasPendingChange &&
         !$hasPendingReprocessApproval &&
         ($canSwapProses ?? true);
+
+    $mesin = $proses->mesin ?? ($proses->mesin_id ? \App\Models\Mesin::find($proses->mesin_id) : null);
+    $nowTs = now()->getTimestamp();
+    $isIotDisconnected = true;
+    if ($mesin && $mesin->last_seen_at) {
+        $lastSeenTs = $mesin->last_seen_at->getTimestamp();
+        $isIotDisconnected = ($nowTs - $lastSeenTs) > 90;
+    }
+    $isRunning = $proses->mulai !== null && ($proses->selesai === null);
+    $showIotDisconnected = $isRunning && $isIotDisconnected;
 @endphp
 <div class="status-card draggable" draggable="{{ $canDragDrop ? 'true' : 'false' }}"
     style="background: {{ $gradient }}; background-repeat: no-repeat; background-size: cover; border-radius: 0; color: #fff; margin: 5px 0 0 0; padding: 2px 2px; cursor: {{ $canDragDrop ? 'grab' : 'default' }}; box-shadow: 0 2px 6px rgba(0,0,0,0.2);"
@@ -315,10 +324,16 @@
                 {{ $type }}
             </span>
         </div>
-        <div style="{{ $proses->jenis === 'Maintenance' ? 'flex: 1; padding: 0 8px;' : 'flex: 2;' }} text-align: center; display: flex; justify-content: center; align-items: center; gap: 6px;">
+        <div class="status-header-center" style="{{ $proses->jenis === 'Maintenance' ? 'flex: 1; padding: 0 6px;' : 'flex: 2;' }} text-align: center; display: flex; justify-content: center; align-items: center; gap: 6px;">
+            {{-- Icon Sinyal IoT Terputus / Tidak Stabil (di sisi kiri button detail proses) --}}
+            <i class="fas fa-exclamation-triangle iot-offline-icon"
+                title="Peringatan: Sinyal IoT Mesin Terputus / Tidak Stabil (> 90 detik tidak ada sinyal)"
+                style="{{ $showIotDisconnected ? 'display: inline-block;' : 'display: none;' }}; font-size: 18px; margin-right: 2px;"></i>
+
+            {{-- Button Detail Proses --}}
             @if ($proses->jenis === 'Maintenance')
                 <div class="op-row" data-detail-id=""
-                    style="width: 100%; padding: 4px 12px; margin: 0; display: flex; align-items: center; justify-content: center; border-radius: 8px; cursor: pointer; background: rgba(255,255,255,0.22); border: 1.5px solid rgba(0,0,0,0.18);">
+                    style="flex: 1; width: auto; padding: 4px 10px; margin: 0; display: flex; align-items: center; justify-content: center; border-radius: 8px; cursor: pointer; background: rgba(255,255,255,0.22); border: 1.5px solid rgba(0,0,0,0.18);">
                     <div class="op-row-noop"
                         style="font-weight: 800; color: #111; font-size: 20px; letter-spacing: 3px; text-shadow: 0 1px 4px #fff8; margin: 0;">
                         MAINTENANCE
@@ -357,12 +372,16 @@
                         style="display: inline-block; {{ $taStyle2 }}; font-weight: bold; font-size: 18px; padding: 2px 8px; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.10); letter-spacing: 1px;">TA</span>
                 @endif
             @endif
+
+            {{-- Icon Catatan (Note) dipindahkan ke sisi kanan button detail proses --}}
+            <span class="note-icon-slot">
+                @if(!empty($proses->note))
+                    <i class="fas fa-sticky-note text-warning icon-has-note" title="Catatan: {{ Str::limit($proses->note, 60) }}" style="font-size: 16px; vertical-align: middle; text-shadow: 0 1px 2px #000; cursor: pointer;"></i>
+                @endif
+            </span>
         </div>
         <div class="status-header-right" style="{{ $proses->jenis === 'Maintenance' ? 'flex: 0 0 auto;' : 'flex: 1;' }} display: flex; flex-direction: column; align-items: flex-end; justify-content: center;">
             <div style="display: flex; align-items: center; justify-content: flex-end;">
-                @if(!empty($proses->note))
-                    <i class="fas fa-sticky-note text-warning mr-1 icon-has-note" title="Catatan: {{ Str::limit($proses->note, 60) }}" style="font-size: 16px; vertical-align: middle; text-shadow: 0 1px 2px #000;"></i>
-                @endif
                 <div class="status-light {{ $light == 'green' ? 'running-light' : ($light == 'yellow' ? 'running-light-yellow' : '') }}"
                     style="width: 24px; height: 24px; border-radius: 50%; background: {{ $light == 'green' ? '#00ff1a' : ($light == 'yellow' ? '#ffeb3b' : '#ff2a2a') }}; display: inline-block; border: 3px solid #fff; box-shadow: 0 0 0 0 transparent; transition: background 0.2s;">
                 </div>

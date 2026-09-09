@@ -10,6 +10,7 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\ApprovalController;
 use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\AbsenController;
+use App\Http\Controllers\ApiCheckStatusBarcodeController;
 
 Route::middleware(['guest', 'prevent-back-history'])->group(function () {
     Route::get('/', [AuthController::class, 'login'])->name('login');
@@ -24,6 +25,11 @@ Route::middleware(['auth', 'prevent-back-history'])->group(function () {
         Route::get('/dashboard', [DashboardController::class, 'dashboard'])->name('dashboard');
         Route::get('/dashboard/proses/{id}/card-html', [DashboardController::class, 'getProsesCardHtml'])->name('dashboard.proses-card');
         Route::get('/dashboard/proses-statuses', [DashboardController::class, 'prosesStatuses'])->name('dashboard.proses-statuses');
+    });
+
+    // Resync sinyal IoT Modbus (100, 103, 105): SuperAdmin, Kepala Shift, PPIC
+    Route::middleware('role:super_admin,kepala_shift,ppic')->group(function () {
+        Route::post('/dashboard/resync-iot', [ApiCheckStatusBarcodeController::class, 'resyncIotSignals'])->name('dashboard.resync-iot');
     });
 
     Route::get('/profile', [UserController::class, 'editProfile'])->name('user.profile');

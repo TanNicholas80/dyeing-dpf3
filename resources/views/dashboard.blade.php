@@ -293,6 +293,34 @@
             animation: pulse-soft-yellow 1.4s ease-in-out infinite;
         }
 
+        /* Efek peringatan kelap-kelip untuk icon sinyal IoT terputus / tidak stabil */
+        @keyframes pulse-iot-warning {
+            0% {
+                transform: scale(1);
+                opacity: 1;
+                filter: drop-shadow(0 0 2px rgba(255, 193, 7, 0.8));
+            }
+            50% {
+                transform: scale(1.18);
+                opacity: 0.6;
+                filter: drop-shadow(0 0 6px rgba(255, 61, 0, 0.9));
+            }
+            100% {
+                transform: scale(1);
+                opacity: 1;
+                filter: drop-shadow(0 0 2px rgba(255, 193, 7, 0.8));
+            }
+        }
+
+        .iot-offline-icon {
+            animation: pulse-iot-warning 1.5s ease-in-out infinite;
+            font-size: 18px;
+            vertical-align: middle;
+            color: #ffc107;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.9);
+            cursor: help;
+        }
+
         /* Tombol toggle history */
         .btn-toggle-history {
             width: 100%;
@@ -432,6 +460,13 @@
                                 <i class="fas fa-history"></i> History
                             </button>
                         </div>
+                        @if(in_array(Auth::user()->role ?? '', ['super_admin', 'kepala_shift', 'ppic'], true))
+                            <button type="button" class="btn btn-sm btn-outline-info shadow-sm mr-2" id="btn-resync-iot"
+                                title="Sinkronkan ulang seluruh register sinyal IoT (100, 103, 105) ke semua PLC"
+                                style="font-weight: 600;">
+                                <i class="fas fa-sync-alt" id="icon-resync-iot"></i> Resync Sinyal
+                            </button>
+                        @endif
                         <div id="dashboard-controls" style="display: flex; justify-content: flex-end; gap: 10px;">
                             @if ($canAddProses ?? true)
                                 <button type="button" id="add-card-btn" class="btn btn-success shadow-sm"
@@ -964,11 +999,11 @@
                                                                             {{ $type }}
                                                                         </span>
                                                                     </div>
-                                                                    <div
-                                                                        style="{{ $proses->jenis === 'Maintenance' ? 'flex: 1; padding: 0 8px;' : 'flex: 2;' }} text-align: center; display: flex; justify-content: center; align-items: center; gap: 6px;">
+                                                                    <div class="status-header-center"
+                                                                        style="{{ $proses->jenis === 'Maintenance' ? 'flex: 1; padding: 0 6px;' : 'flex: 2;' }} text-align: center; display: flex; justify-content: center; align-items: center; gap: 6px;">
                                                                         @if ($proses->jenis === 'Maintenance')
                                                                             <div class="op-row" data-detail-id=""
-                                                                                style="width: 100%; padding: 4px 12px; margin: 0; display: flex; align-items: center; justify-content: center; border-radius: 8px; cursor: pointer; background: rgba(255,255,255,0.22); border: 1.5px solid rgba(0,0,0,0.18);">
+                                                                                style="flex: 1; width: auto; padding: 4px 10px; margin: 0; display: flex; align-items: center; justify-content: center; border-radius: 8px; cursor: pointer; background: rgba(255,255,255,0.22); border: 1.5px solid rgba(0,0,0,0.18);">
                                                                                 <div class="op-row-noop"
                                                                                     style="font-weight: 800; color: #111; font-size: 20px; letter-spacing: 3px; text-shadow: 0 1px 4px #fff8; margin: 0;">
                                                                                     MAINTENANCE
@@ -1007,6 +1042,13 @@
                                                                                     style="display: inline-block; {{ $taStyle }}; font-weight: bold; font-size: 18px; padding: 2px 8px; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.10); letter-spacing: 1px;">TA</span>
                                                                             @endif
                                                                         @endif
+
+                                                                        {{-- Icon Catatan (Note) di sebelah kanan button detail proses --}}
+                                                                        <span class="note-icon-slot">
+                                                                            @if(!empty($proses->note))
+                                                                                <i class="fas fa-sticky-note text-warning icon-has-note" title="Catatan: {{ Str::limit($proses->note, 60) }}" style="font-size: 16px; vertical-align: middle; text-shadow: 0 1px 2px #000; cursor: pointer;"></i>
+                                                                            @endif
+                                                                        </span>
                                                                     </div>
                                                                     <div class="status-header-right"
                                                                         style="{{ $proses->jenis === 'Maintenance' ? 'flex: 0 0 auto;' : 'flex: 1;' }} display: flex; flex-direction: column; align-items: flex-end; justify-content: center;">
@@ -5825,14 +5867,18 @@
                         cardProses.note = noteContent;
                         $card.data('proses', cardProses);
 
-                        // Update indikator icon note di card
-                        const $noteIcon = $card.find('.icon-has-note');
+                        // Update indikator icon note di card (di samping kanan button detail proses)
+                        const $noteSlot = $card.find('.note-icon-slot');
                         if (noteContent) {
-                            if (!$noteIcon.length) {
-                                $card.find('.status-light').before('<i class="fas fa-sticky-note text-warning mr-1 icon-has-note" title="Catatan proses tersimpan" style="font-size: 15px; vertical-align: middle;"></i>');
+                            if ($noteSlot.length) {
+                                $noteSlot.html('<i class="fas fa-sticky-note text-warning icon-has-note" title="Catatan proses tersimpan" style="font-size: 16px; vertical-align: middle; text-shadow: 0 1px 2px #000; cursor: pointer;"></i>');
                             }
                         } else {
-                            $noteIcon.remove();
+                            if ($noteSlot.length) {
+                                $noteSlot.empty();
+                            } else {
+                                $card.find('.icon-has-note').remove();
+                            }
                         }
                     }
                 },
@@ -7504,6 +7550,28 @@
             // Ini untuk memastikan logic timeout tetap jalan meskipun menu Data Mesin tidak dibuka
             setInterval(function () {
                 fetch('/mesin/statuses?_=' + new Date().getTime(), { cache: 'no-store' })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data && typeof data === 'object') {
+                            Object.keys(data).forEach(function (mesinId) {
+                                const info = data[mesinId];
+                                if (info && info.iot_signal !== undefined) {
+                                    const isConnected = !!info.iot_signal;
+                                    const $cards = $(`.card-dropzone[data-mesin-id="${mesinId}"] .status-card:not(.history-card)`);
+                                    $cards.each(function () {
+                                        const proses = $(this).data('proses');
+                                        const isRunning = proses && proses.mulai !== null && (proses.selesai === null || proses.selesai === undefined);
+                                        const $offlineIcon = $(this).find('.iot-offline-icon');
+                                        if (isRunning && !isConnected) {
+                                            $offlineIcon.show();
+                                        } else {
+                                            $offlineIcon.hide();
+                                        }
+                                    });
+                                }
+                            });
+                        }
+                    })
                     .catch(e => console.error('Error triggering statuses:', e));
             }, 5000);
 
@@ -8077,6 +8145,7 @@
                 // Pindahkan card ke history (prepend agar terbaru di atas) dengan animasi fade
                 $card.fadeOut(400, function () {
                     $card.find('.waiting-stop-banner').remove();
+                    $card.find('.iot-offline-icon').hide();
                     $card.addClass('history-card');
                     $card.attr('draggable', 'false');
                     $card.attr('data-can-move', '0');
@@ -8431,6 +8500,16 @@
                                     } else {
                                         $lamp.css('background', '#ff2a2a');
                                     }
+
+                                    // Update icon peringatan sinyal IoT terputus
+                                    const $offlineIcon = $(this).find('.iot-offline-icon');
+                                    if (e.mesin.auto_offline) {
+                                        if (isRunning) {
+                                            $offlineIcon.show();
+                                        }
+                                    } else if (e.mesin.status) {
+                                        $offlineIcon.hide();
+                                    }
                                 }
                             });
                         }
@@ -8727,6 +8806,7 @@
 
                 if (wasNotFinished && isNowFinished && !$card.hasClass('history-card')) {
                     // Proses baru selesai, pindahkan ke history container
+                    $card.find('.iot-offline-icon').hide();
                     moveToHistory($card, statusData);
                     // JANGAN RETURN DI SINI! Kita harus tetap meng-update warna, cycle time, dll.
                 }
@@ -10280,6 +10360,65 @@
                 applyMode(getMode());
             };
         })();
+
+        // Handler tombol Resync Sinyal IoT (Address 100, 103, 105) ke seluruh PLC
+        $('#btn-resync-iot').on('click', function () {
+            const $btn = $(this);
+            const $icon = $('#icon-resync-iot');
+
+            Swal.fire({
+                title: 'Resync Sinyal IoT?',
+                text: 'Sistem akan membersihkan cache dan memaksa penulisan ulang seluruh register sinyal (100, 103, 105) ke semua PLC.',
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#17a2b8',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: '<i class="fas fa-sync-alt mr-1"></i> Ya, Sinkronkan!',
+                cancelButtonText: 'Batal',
+                reverseButtons: true
+            }).then((result) => {
+                if (!result.isConfirmed) return;
+
+                $btn.prop('disabled', true);
+                $icon.addClass('fa-spin');
+
+                $.ajax({
+                    url: '{{ route("dashboard.resync-iot") }}',
+                    type: 'POST',
+                    data: {
+                        _token: '{{ csrf_token() }}'
+                    },
+                    dataType: 'json',
+                    success: function (res) {
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Berhasil!',
+                            text: res.message || 'Sinyal IoT berhasil disinkronkan ulang ke seluruh PLC.',
+                            timer: 3000,
+                            timerProgressBar: true,
+                            toast: true,
+                            position: 'top-end',
+                            showConfirmButton: false
+                        });
+                    },
+                    error: function (xhr) {
+                        const msg = (xhr.responseJSON && xhr.responseJSON.message) 
+                            ? xhr.responseJSON.message 
+                            : 'Gagal melakukan resync sinyal IoT.';
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Gagal',
+                            text: msg
+                        });
+                    },
+                    complete: function () {
+                        $btn.prop('disabled', false);
+                        $icon.removeClass('fa-spin');
+                    }
+                });
+            });
+        });
+
 
         // --- DASHBOARD AUTO-SCROLL REVERSE (BOUNCE) LOGIC ---
         $(document).ready(function () {

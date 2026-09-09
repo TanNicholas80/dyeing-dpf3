@@ -440,6 +440,7 @@ class ApiCheckStatusBarcodeController extends Controller
         // Sinyal Modbus Address 103 & 105:
         $signal103 = $this->checkSignal103($mesin, $prosesAktif, $prosesSelesai);
         $signal105 = $this->checkSignal105($mesin, $prosesAktif, $prosesAntriRunnable);
+        $resyncToken = (int) Cache::get('iot:global_resync_token', 0);
 
         $minimal = [
             'mesin_id' => $mesin->id,
@@ -452,6 +453,7 @@ class ApiCheckStatusBarcodeController extends Controller
                 '103' => $signal103 ? 1 : 0,
                 '105' => $signal105 ? 1 : 0,
             ],
+            'resync_token' => $resyncToken,
         ];
         Cache::put($this->alarmStateKey((int) $mesin->id), (bool) $alarmOn, now()->addMinutes(5));
 
@@ -1058,6 +1060,54 @@ class ApiCheckStatusBarcodeController extends Controller
         ]);
 
         return $this->updateMesinState($request, $mesin);
+    }
+
+    /**
+     * Resync sinyal IoT Modbus (100, 103, 105) untuk seluruh mesin.
+     * Membersihkan cache alarm & memicu penulisan ulang register ke PLC.
+     * POST /dashboard/resync-iot
+     */
+    public function resyncIotSignals(Request $request)
+    {
+        $user = \Illuminate\Support\Facades\Auth::user();
+        $userRole = $user->role ?? null;
+        if (!in_array($userRole, ['super_admin', 'kepala_shift', 'ppic'], true)) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Anda tidak memiliki hak akses untuk melakukan resync sinyal IoT.',
+            ], 403);
+        }
+
+        // 1. Bersihkan semua cache alarm & sinyal per mesin
+        $mesins = Mesin::all(['id', 'jenis_mesin']);
+        foreach ($mesins as $m) {
+            Cache::forget("iot:mesin:{$m->id}:alarm_result");
+            Cache::forget($this->alarmStateKey((int) $m->id));
+        }
+
+        // 2. Generate token resync baru (timestamp) agar bridge Node.js mendeteksi perubahan token
+        $newToken = now()->timestamp;
+        Cache::put('iot:global_resync_token', $newToken, now()->addDays(7));
+
+        // 3. Catat ke activity log
+        try {
+            activity('Manajemen IoT')
+                ->causedBy($user)
+                ->withProperties([
+                    'resync_token' => $newToken,
+                    'mesin_count' => $mesins->count(),
+                    'user_role' => $userRole,
+                ])
+                ->log("Sinyal IoT Modbus (Address 100, 103, 105) ke seluruh PLC berhasil disinkronkan ulang oleh {$user->nama} ({$userRole}).");
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Gagal mencatat activity log resync IoT: ' . $e->getMessage());
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Sinyal IoT (Address 100, 103, 105) berhasil disinkronkan ulang ke seluruh PLC.',
+            'resync_token' => $newToken,
+        ]);
     }
 }
 
