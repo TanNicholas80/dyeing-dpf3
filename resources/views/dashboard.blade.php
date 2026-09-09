@@ -10383,7 +10383,7 @@
                 $icon.addClass('fa-spin');
 
                 $.ajax({
-                    url: '{{ route("dashboard.resync-iot") }}',
+                    url: '{{ url("/dashboard/resync-iot") }}',
                     type: 'POST',
                     data: {
                         _token: '{{ csrf_token() }}'

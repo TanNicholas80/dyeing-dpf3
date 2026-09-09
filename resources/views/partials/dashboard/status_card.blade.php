@@ -282,7 +282,7 @@
         );
         $cycle_time_actual_str = detikKeWaktu($cycle_time_actual);
     }
-@php
+
     $canDragDrop =
         $bg === '#757575' &&
         !$proses->mulai &&
@@ -292,11 +292,17 @@
 
     $mesin = $proses->mesin ?? ($proses->mesin_id ? \App\Models\Mesin::find($proses->mesin_id) : null);
     $nowTs = now()->getTimestamp();
-    $isIotDisconnected = true;
-    if ($mesin && $mesin->last_seen_at) {
-        $lastSeenTs = $mesin->last_seen_at->getTimestamp();
-        $isIotDisconnected = ($nowTs - $lastSeenTs) > 90;
+    $lastSeenTs = null;
+    if ($mesin && !empty($mesin->last_seen_at)) {
+        try {
+            $lastSeenTs = $mesin->last_seen_at instanceof \DateTimeInterface
+                ? $mesin->last_seen_at->getTimestamp()
+                : \Carbon\Carbon::parse($mesin->last_seen_at)->getTimestamp();
+        } catch (\Throwable $e) {
+            $lastSeenTs = null;
+        }
     }
+    $isIotDisconnected = ($lastSeenTs === null) || (($nowTs - $lastSeenTs) > 90);
     $isRunning = $proses->mulai !== null && ($proses->selesai === null);
     $showIotDisconnected = $isRunning && $isIotDisconnected;
 @endphp
