@@ -113,6 +113,7 @@ Route::middleware(['auth', 'prevent-back-history'])->group(function () {
     Route::middleware('role:super_admin,mesin,ppic,operator')->group(function () {
         // Tambah barcode (mesin hanya barcode kain; LA/AUX: ppic, super_admin, kepala_ruangan)
         Route::post('/proses/{id}/barcode/kain', [ProsesController::class, 'barcodeKain'])->name('proses.barcode.kain');
+        Route::post('/proses/{id}/barcode/kain/pengajuan-over-gi', [ProsesController::class, 'pengajuanOverGi'])->name('proses.barcode.kain.pengajuan-over-gi');
     });
     Route::middleware('role:super_admin,ppic,kepala_ruangan,operator')->group(function () {
         Route::post('/proses/{id}/barcode/la', [ProsesController::class, 'barcodeLa'])->name('proses.barcode.la');

@@ -45,14 +45,20 @@
     if ($proses->jenis === 'Maintenance') {
         $blockColors = ['gray', 'gray', 'gray'];
     } else {
-        // G: hijau hanya jika SEMUA detail OP sudah memenuhi barcode kain >= roll
+        // G: hijau hanya jika SEMUA detail OP sudah memenuhi barcode kain >= roll, kuning jika ada pending approval over limit
         $allKainComplete = true;
+        $hasPendingKainOverGi = false;
         if (isset($proses->details) && is_iterable($proses->details)) {
             foreach ($proses->details as $d) {
+                if (isset($d->barcodeKains)) {
+                    if ($d->barcodeKains->where('cancel', false)->where('approval_status', 'pending')->isNotEmpty()) {
+                        $hasPendingKainOverGi = true;
+                    }
+                }
                 // Cek apakah detail ini sudah memenuhi barcode kain >= roll
                 $detailRoll = $d->roll ?? 0;
                 $detailKainCount = isset($d->barcodeKains)
-                    ? $d->barcodeKains->where('cancel', false)->count()
+                    ? $d->barcodeKains->where('cancel', false)->where('approval_status', 'approved')->count()
                     : 0;
                 if ($detailRoll > 0 && $detailKainCount < $detailRoll) {
                     $allKainComplete = false;
@@ -76,11 +82,12 @@
         if (!$hasBarcodeAux && isset($proses->barcode_aux)) {
             $hasBarcodeAux = (bool) $proses->barcode_aux;
         }
-        // G: hijau jika semua detail OP sudah memenuhi barcode kain >= roll
+        // G: kuning jika ada pending approval over limit, hijau jika semua detail OP sudah memenuhi barcode kain >= roll
         // D: hijau jika ada minimal 1 barcode LA (cancel=false)
         // A: hijau jika ada minimal 1 barcode AUX (cancel=false)
+        $kainColor = $hasPendingKainOverGi ? 'yellow' : ($allKainComplete ? 'green' : 'red');
         $blockColors = [
-            $allKainComplete ? 'green' : 'red',
+            $kainColor,
             $hasBarcodeLa ? 'green' : 'red',
             $hasBarcodeAux ? 'green' : 'red',
         ];
@@ -358,11 +365,11 @@
                             $blockBg =
                                 $color === 'green'
                                 ? '#d4f8e8'
-                                : '#ffb3b3';
+                                : ($color === 'yellow' ? '#fff9c4' : '#ffb3b3');
                             $blockBorder =
                                 $color === 'green'
                                 ? '#43a047'
-                                : '#c62828';
+                                : ($color === 'yellow' ? '#f9a825' : '#c62828');
                         @endphp
                         <span class="gda-block" data-block-type="{{ $b }}"
                             style="display: inline-block; background: {{ $blockBg }}; color: #111; font-weight: bold; font-size: 22px; padding: 2px 10px; border-radius: 6px; border: 2.5px solid {{ $blockBorder }}; box-shadow: 0 1px 4px rgba(0,0,0,0.10); letter-spacing: 1px; text-shadow: 0 1px 2px #fff8;">
@@ -486,17 +493,19 @@
                 {{-- Loop OP kedua dan seterusnya dengan garis pemisah --}}
                 @foreach ($detailList->skip(1) as $d)
                     @php
-                        // Indikator G: hijau hanya jika jumlah barcode kain >= roll
+                        // Indikator G: kuning jika pending approval, hijau jika approved >= roll
                         $subRoll = $d->roll ?? 0;
-                        $subBarcodeKainCount = isset($d->barcodeKains)
-                            ? $d->barcodeKains->where('cancel', false)->count()
+                        $subHasPendingKain = isset($d->barcodeKains) && $d->barcodeKains->where('cancel', false)->where('approval_status', 'pending')->isNotEmpty();
+                        $subApprovedKainCount = isset($d->barcodeKains)
+                            ? $d->barcodeKains->where('cancel', false)->where('approval_status', 'approved')->count()
                             : 0;
-                        $subHasKain = ($subBarcodeKainCount >= $subRoll && $subRoll > 0);
+                        $subHasKain = ($subApprovedKainCount >= $subRoll && $subRoll > 0);
+                        $subKainColor = $subHasPendingKain ? 'yellow' : ($subHasKain ? 'green' : 'red');
                         $subHasLa = ($d->barcodeLas ? $d->barcodeLas->where('cancel', false)->where('approval_id', null)->count() : 0) >= ($proses->qty_dye_stuff ?? 0);
                         $subHasAux = ($d->barcodeAuxs ? $d->barcodeAuxs->where('cancel', false)->where('approval_id', null)->count() : 0) >= ($proses->qty_aux ?? 0);
                         $subMap = $barcodeKainOptional
                             ? [$blocks[0] => $subHasLa ? 'green' : 'red', $blocks[1] => $subHasAux ? 'green' : 'red']
-                            : [$blocks[0] => $subHasKain ? 'green' : 'red', $blocks[1] => $subHasLa ? 'green' : 'red', $blocks[2] => $subHasAux ? 'green' : 'red'];
+                            : [$blocks[0] => $subKainColor, $blocks[1] => $subHasLa ? 'green' : 'red', $blocks[2] => $subHasAux ? 'green' : 'red'];
                     @endphp
                     {{-- Garis pemisah --}}
                     <div style="border-top: 1px solid rgba(255,255,255,0.3); margin: 8px 0; padding-top: 8px;">
@@ -507,8 +516,8 @@
                         @foreach ($blocks as $b)
                             @php
                                 $color = $subMap[$b] ?? 'red';
-                                $blockBg = $color === 'green' ? '#d4f8e8' : '#ffb3b3';
-                                $blockBorder = $color === 'green' ? '#43a047' : '#c62828';
+                                $blockBg = $color === 'green' ? '#d4f8e8' : ($color === 'yellow' ? '#fff9c4' : '#ffb3b3');
+                                $blockBorder = $color === 'green' ? '#43a047' : ($color === 'yellow' ? '#f9a825' : '#c62828');
                             @endphp
                             <span class="gda-block" data-block-type="{{ $b }}"
                                 style="display: inline-block; background: {{ $blockBg }}; color: #111; font-weight: bold; font-size: 22px; padding: 2px 10px; border-radius: 6px; border: 2.5px solid {{ $blockBorder }}; box-shadow: 0 1px 4px rgba(0,0,0,0.10); letter-spacing: 1px; text-shadow: 0 1px 2px #fff8;">

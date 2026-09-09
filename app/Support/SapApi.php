@@ -51,8 +51,14 @@ class SapApi
      */
     public static function guzzleOptions(array $merge = []): array
     {
+        $headers = self::defaultHeaders();
+        if (isset($merge['headers']) && is_array($merge['headers'])) {
+            $headers = array_merge($headers, $merge['headers']);
+            unset($merge['headers']);
+        }
+
         return array_merge([
-            'headers' => self::defaultHeaders(),
+            'headers' => $headers,
             'timeout' => (int) config('sap.timeout.default', 30),
         ], $merge);
     }

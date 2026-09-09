@@ -23,7 +23,10 @@ class BarcodeKain extends Model
         'item_document',
         'qty_gi',
         'mesin_id',
-        'cancel'
+        'cancel',
+        'approval_status',
+        'approval_reject_reason',
+        'approved_at',
     ];
 
     public function mesin()
@@ -42,7 +45,7 @@ class BarcodeKain extends Model
      */
     public function getActivitylogOptions(): LogOptions
     {
-        $logFields = ['detail_proses_id', 'no_op', 'no_partai', 'barcode', 'matdok', 'item_document', 'mesin_id', 'cancel'];
+        $logFields = ['detail_proses_id', 'no_op', 'no_partai', 'barcode', 'matdok', 'item_document', 'mesin_id', 'cancel', 'approval_status', 'approval_reject_reason', 'approved_at'];
 
         return LogOptions::defaults()
             ->useLogName('Manajemen BarcodeKain')
@@ -88,8 +91,11 @@ class BarcodeKain extends Model
             'barcode' => $this->barcode,
             'matdok' => $this->matdok,
             'item_document' => $this->item_document,
-            'mesin_id' => $this->mesin->jenis_mesin,
+            'mesin_id' => $this->mesin->jenis_mesin ?? null,
             'cancel' => $this->cancel,
+            'approval_status' => $this->approval_status,
+            'approval_reject_reason' => $this->approval_reject_reason,
+            'approved_at' => $this->approved_at,
         ];
 
         switch ($eventName) {

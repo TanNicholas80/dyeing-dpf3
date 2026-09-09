@@ -300,11 +300,13 @@
                 opacity: 1;
                 filter: drop-shadow(0 0 2px rgba(255, 193, 7, 0.8));
             }
+
             50% {
                 transform: scale(1.18);
                 opacity: 0.6;
                 filter: drop-shadow(0 0 6px rgba(255, 61, 0, 0.9));
             }
+
             100% {
                 transform: scale(1);
                 opacity: 1;
@@ -317,7 +319,7 @@
             font-size: 18px;
             vertical-align: middle;
             color: #ffc107;
-            text-shadow: 0 1px 3px rgba(0,0,0,0.9);
+            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
             cursor: help;
         }
 
@@ -1011,12 +1013,15 @@
                                                                                 {{-- Icon Catatan di dalam kotak Maintenance --}}
                                                                                 <span class="note-icon-slot">
                                                                                     @if(!empty($proses->note))
-                                                                                        <i class="fas fa-sticky-note text-warning icon-has-note" title="Catatan: {{ Str::limit($proses->note, 60) }}" style="font-size: 16px; vertical-align: middle; text-shadow: 0 1px 2px #000; cursor: pointer;"></i>
+                                                                                        <i class="fas fa-sticky-note text-warning icon-has-note"
+                                                                                            title="Catatan: {{ Str::limit($proses->note, 60) }}"
+                                                                                            style="font-size: 16px; vertical-align: middle; text-shadow: 0 1px 2px #000; cursor: pointer;"></i>
                                                                                     @endif
                                                                                 </span>
                                                                             </div>
                                                                         @else
-                                                                            <div style="display: flex; justify-content: center; align-items: center; gap: 6px;">
+                                                                            <div
+                                                                                style="display: flex; justify-content: center; align-items: center; gap: 6px;">
                                                                                 @foreach ($blocks as $i => $b)
                                                                                     @php
                                                                                         $color = $blockColors[$i];
@@ -1039,12 +1044,14 @@
                                                                                     $taStyle = $taColor === 'yellow' ? 'background:#fff9c4;color:#111;border:2.5px solid #f9a825' : ($taColor === 'red' ? 'background:#ffb3b3;color:#111;border:2.5px solid #c62828' : ($taColor === 'green' ? 'background:#d4f8e8;color:#111;border:2.5px solid #43a047' : ($taColor === 'inactive' ? 'background:#eceff1;color:#555;border:2.5px solid #90a4ae' : '')));
                                                                                 @endphp
                                                                                 @if($hasToppingLa ?? false)
-                                                                                    <span class="topping-indicator topping-td" data-block-type="TD"
+                                                                                    <span class="topping-indicator topping-td"
+                                                                                        data-block-type="TD"
                                                                                         title="Topping Dyes - {{ \App\Services\ProsesStatusService::toppingIndicatorTitle($tdColor, 'td') }}"
                                                                                         style="display: inline-block; {{ $tdStyle }}; font-weight: bold; font-size: 18px; padding: 2px 8px; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.10); letter-spacing: 1px;">TD</span>
                                                                                 @endif
                                                                                 @if($hasToppingAux ?? false)
-                                                                                    <span class="topping-indicator topping-ta" data-block-type="TA"
+                                                                                    <span class="topping-indicator topping-ta"
+                                                                                        data-block-type="TA"
                                                                                         title="Topping Auxiliaries - {{ \App\Services\ProsesStatusService::toppingIndicatorTitle($taColor, 'ta') }}"
                                                                                         style="display: inline-block; {{ $taStyle }}; font-weight: bold; font-size: 18px; padding: 2px 8px; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.10); letter-spacing: 1px;">TA</span>
                                                                                 @endif
@@ -1053,7 +1060,8 @@
                                                                     </div>
                                                                     <div class="status-header-right"
                                                                         style="{{ $proses->jenis === 'Maintenance' ? 'flex: 0 0 auto;' : 'flex: 1;' }} display: flex; flex-direction: column; align-items: flex-end; justify-content: center;">
-                                                                        <div style="display: flex; align-items: center; justify-content: flex-end;">
+                                                                        <div
+                                                                            style="display: flex; align-items: center; justify-content: flex-end;">
                                                                             <div class="status-light {{ $light == 'green' ? 'running-light' : ($light == 'yellow' ? 'running-light-yellow' : '') }}"
                                                                                 style="width: 24px; height: 24px; border-radius: 50%; background: {{ $light == 'green' ? '#00ff1a' : ($light == 'yellow' ? '#ffeb3b' : '#ff2a2a') }}; display: inline-block; border: 3px solid #fff; box-shadow: 0 0 0 0 transparent; transition: background 0.2s;">
                                                                             </div>
@@ -1061,8 +1069,10 @@
                                                                         @php
                                                                             $isPinjamMesinHist = (bool) ($proses->is_pinjam_mesin ?? false);
                                                                         @endphp
-                                                                        <div class="pinjam-mesin-indicator" style="{{ $isPinjamMesinHist ? 'display: flex;' : 'display: none;' }} justify-content: center; align-items: center; width: 24px; margin-top: 2px;">
-                                                                            <span class="badge-pinjam-mesin" title="Pinjam Mesin Aktif{{ !empty($proses->pinjam_mesin_alasan) ? ': ' . $proses->pinjam_mesin_alasan : '' }}"
+                                                                        <div class="pinjam-mesin-indicator"
+                                                                            style="{{ $isPinjamMesinHist ? 'display: flex;' : 'display: none;' }} justify-content: center; align-items: center; width: 24px; margin-top: 2px;">
+                                                                            <span class="badge-pinjam-mesin"
+                                                                                title="Pinjam Mesin Aktif{{ !empty($proses->pinjam_mesin_alasan) ? ': ' . $proses->pinjam_mesin_alasan : '' }}"
                                                                                 style="font-weight: 800; font-size: 13px; color: #111; text-shadow: 0 1px 3px rgba(255,255,255,0.9), 0 0 4px rgba(255,255,255,0.8); letter-spacing: 0.5px; line-height: 1; text-align: center;">
                                                                                 PM
                                                                             </span>
@@ -1070,8 +1080,10 @@
                                                                         @php
                                                                             $isBreakHist = (bool) ($proses->is_break ?? false);
                                                                         @endphp
-                                                                        <div class="break-proses-indicator" style="{{ $isBreakHist ? 'display: flex;' : 'display: none;' }} justify-content: center; align-items: center; width: 24px; margin-top: 2px;">
-                                                                            <span class="badge-break-proses" title="Break Aktif{{ !empty($proses->break_alasan) ? ': ' . $proses->break_alasan : '' }}"
+                                                                        <div class="break-proses-indicator"
+                                                                            style="{{ $isBreakHist ? 'display: flex;' : 'display: none;' }} justify-content: center; align-items: center; width: 24px; margin-top: 2px;">
+                                                                            <span class="badge-break-proses"
+                                                                                title="Break Aktif{{ !empty($proses->break_alasan) ? ': ' . $proses->break_alasan : '' }}"
                                                                                 style="font-weight: 800; font-size: 13px; color: #fff; background: #424242; border-radius: 4px; padding: 1px 3px; letter-spacing: 0.5px; line-height: 1; text-align: center;">
                                                                                 BR
                                                                             </span>
@@ -1097,7 +1109,9 @@
                                                                                         <span>-</span>
                                                                                         <span class="note-icon-slot">
                                                                                             @if(!empty($proses->note))
-                                                                                                <i class="fas fa-sticky-note text-warning icon-has-note" title="Catatan: {{ Str::limit($proses->note, 60) }}" style="font-size: 16px; vertical-align: middle; text-shadow: 0 1px 2px #000; cursor: pointer;"></i>
+                                                                                                <i class="fas fa-sticky-note text-warning icon-has-note"
+                                                                                                    title="Catatan: {{ Str::limit($proses->note, 60) }}"
+                                                                                                    style="font-size: 16px; vertical-align: middle; text-shadow: 0 1px 2px #000; cursor: pointer;"></i>
                                                                                             @endif
                                                                                         </span>
                                                                                     </div>
@@ -1115,7 +1129,9 @@
                                                                                         <span>{{ $firstDetail->no_op ?? '-' }}</span>
                                                                                         <span class="note-icon-slot">
                                                                                             @if(!empty($proses->note))
-                                                                                                <i class="fas fa-sticky-note text-warning icon-has-note" title="Catatan: {{ Str::limit($proses->note, 60) }}" style="font-size: 16px; vertical-align: middle; text-shadow: 0 1px 2px #000; cursor: pointer;"></i>
+                                                                                                <i class="fas fa-sticky-note text-warning icon-has-note"
+                                                                                                    title="Catatan: {{ Str::limit($proses->note, 60) }}"
+                                                                                                    style="font-size: 16px; vertical-align: middle; text-shadow: 0 1px 2px #000; cursor: pointer;"></i>
                                                                                             @endif
                                                                                         </span>
                                                                                     </div>
@@ -1224,7 +1240,9 @@
                                                                                         <span>{{ $singleDetail->no_op ?? '-' }}</span>
                                                                                         <span class="note-icon-slot">
                                                                                             @if(!empty($proses->note))
-                                                                                                <i class="fas fa-sticky-note text-warning icon-has-note" title="Catatan: {{ Str::limit($proses->note, 60) }}" style="font-size: 16px; vertical-align: middle; text-shadow: 0 1px 2px #000; cursor: pointer;"></i>
+                                                                                                <i class="fas fa-sticky-note text-warning icon-has-note"
+                                                                                                    title="Catatan: {{ Str::limit($proses->note, 60) }}"
+                                                                                                    style="font-size: 16px; vertical-align: middle; text-shadow: 0 1px 2px #000; cursor: pointer;"></i>
                                                                                             @endif
                                                                                         </span>
                                                                                     </div>
@@ -1253,7 +1271,8 @@
                                                                             style="font-size: 11px; background: rgba(0,0,0,0.4); border: 1px dashed #fff; color: #fff;">
                                                                             <i class="fas fa-pause mr-1"></i>BREAK
                                                                             @if(!empty($proses->break_alasan))
-                                                                                <div class="small font-italic text-truncate mt-1" style="max-width: 100%;">
+                                                                                <div class="small font-italic text-truncate mt-1"
+                                                                                    style="max-width: 100%;">
                                                                                     "{{ $proses->break_alasan }}"
                                                                                 </div>
                                                                             @endif
@@ -2192,17 +2211,20 @@
                     </div>
                     <div class="modal-body py-3 px-4">
                         <!-- Banner Peringatan Menunggu Mesin Berhenti -->
-                        <div id="alert-waiting-stop" class="alert alert-warning py-2 px-3 mb-3 d-none shadow-sm" style="border-left: 5px solid #f57c00; background-color: #fff3e0;">
+                        <div id="alert-waiting-stop" class="alert alert-warning py-2 px-3 mb-3 d-none shadow-sm"
+                            style="border-left: 5px solid #f57c00; background-color: #fff3e0;">
                             <div class="d-flex align-items-center">
                                 <div class="mr-3 text-warning">
                                     <i class="fas fa-exclamation-triangle fa-2x"></i>
                                 </div>
                                 <div>
-                                    <div class="font-weight-bold text-dark" id="alert-waiting-stop-title" style="font-size: 14px;">
+                                    <div class="font-weight-bold text-dark" id="alert-waiting-stop-title"
+                                        style="font-size: 14px;">
                                         Sedang Menunggu Mesin Berhenti
                                     </div>
                                     <div class="small text-muted" id="alert-waiting-stop-desc">
-                                        Instruksi selesai telah dikirim. Menunggu verifikasi unload atau operator di lapangan mematikan mesin sebelum proses selesai ke history.
+                                        Instruksi selesai telah dikirim. Menunggu verifikasi unload atau operator di
+                                        lapangan mematikan mesin sebelum proses selesai ke history.
                                     </div>
                                 </div>
                             </div>
@@ -2386,7 +2408,8 @@
                                 </thead>
                                 <tbody id="break-history-tbody">
                                     <tr>
-                                        <td colspan="7" class="text-center py-3 text-muted">Memuat riwayat break proses...</td>
+                                        <td colspan="7" class="text-center py-3 text-muted">Memuat riwayat break proses...
+                                        </td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -4995,14 +5018,35 @@
                             const allowCancel = canCancel && canCancelByProses;
                             let html = '<div style="display:flex;flex-wrap:wrap;gap:6px;">';
                             activeBarcodes.forEach(function (bk, idx) {
-                                // Hanya tampilkan button cancel jika user memiliki akses
-                                const cancelButton = allowCancel ?
-                                    `<span style='position:absolute;top:2px;right:6px;cursor:pointer;font-weight:bold;color:#b00;font-size:16px;z-index:2;' class='cancel-barcode-btn' data-type='${barcodeType}' data-proses='${prosesId}' data-id='${bk.id}' data-matdok='${bk.matdok}' data-item-document='${bk.item_document || ""}' title='Cancel barcode'>&times;</span>` :
+                                const isPending = bk.approval_status === 'pending';
+                                const isRejected = bk.approval_status === 'rejected';
+
+                                // Tombol cancel barcode dihilangkan jika pending approval QTY GI,
+                                // dan hanya muncul ketika barcode sudah approved atau rejected dari SAP (atau jenis barcode lain)
+                                const canCancelThis = allowCancel && !isPending;
+                                const cancelButton = canCancelThis ?
+                                    `<span style='position:absolute;top:2px;right:6px;cursor:pointer;font-weight:bold;color:#b00;font-size:16px;z-index:2;' class='cancel-barcode-btn' data-type='${barcodeType}' data-proses='${prosesId}' data-id='${bk.id}' data-matdok='${bk.matdok || ""}' data-item-document='${bk.item_document || ""}' data-approval-status='${bk.approval_status || ""}' data-barcode='${bk.barcode}' title='Cancel barcode'>&times;</span>` :
                                     '';
-                                html += `<div style="position:relative;flex:1 0 30%;max-width:32%;background:#f3f3f3;border-radius:6px;padding:6px 4px;margin-bottom:6px;text-align:center;font-weight:bold;font-size:13px;color:#222;box-shadow:0 1px 2px #0001;">
-                                                                                                                ${cancelButton}
-                                                                                                                ${bk.barcode} ${(bk.matdok ? '<br><span style=\'font-size:11px;color:#888;\'>' + bk.matdok + '</span>' : '')}
-                                                                                                            </div>`;
+
+                                let boxBg = '#f3f3f3';
+                                let boxBorder = '';
+                                let badgeHtml = '';
+
+                                if (isPending) {
+                                    boxBg = '#fff9c4';
+                                    boxBorder = 'border:1.5px solid #fbc02d;';
+                                    badgeHtml = '<br><span class="badge badge-warning" style="font-size:10px; background:#fff176; color:#856404; border:1px solid #fbc02d; margin-top:3px; padding:2px 4px;"><i class="fas fa-clock mr-1"></i>Menunggu Approval</span>';
+                                } else if (isRejected) {
+                                    boxBg = '#ffebee';
+                                    boxBorder = 'border:1.5px solid #ef5350;';
+                                    badgeHtml = '<br><span class="badge badge-danger" style="font-size:10px; background:#ef9a9a; color:#b71c1c; border:1px solid #ef5350; margin-top:3px; padding:2px 4px;"><i class="fas fa-times-circle mr-1"></i>Ditolak SAP</span>';
+                                }
+
+                                html += `<div style="position:relative;flex:1 0 30%;max-width:32%;min-width:130px;background:${boxBg};${boxBorder}border-radius:6px;padding:6px 4px;margin-bottom:6px;text-align:center;font-weight:bold;font-size:13px;color:#222;box-shadow:0 1px 2px #0001;">
+                                        ${cancelButton}
+                                        ${bk.barcode} ${(bk.matdok ? '<br><span style=\'font-size:11px;color:#888;\'>' + bk.matdok + '</span>' : '')}
+                                        ${badgeHtml}
+                                    </div>`;
                             });
                             html += '</div>';
                             return html;
@@ -5108,14 +5152,32 @@
                         if (selectedProgress.length > 0) {
                             progressHtml += '<div style="padding:4px 0;"><strong>Progress Barcode Kain (Detail yang Dipilih):</strong><br>';
                             selectedProgress.forEach(function (p) {
-                                const statusIcon = p.is_complete ?
-                                    '<span style="color:#43a047;"><i class="fas fa-check"></i></span>' :
-                                    '<span style="color:#c62828;"><i class="fas fa-times"></i></span>';
-                                const statusText = p.is_complete ?
-                                    '<span style="color:#43a047;">Lengkap</span>' :
-                                    '<span style="color:#c62828;">Kurang ' + (p.roll - p.scanned) + ' roll</span>';
-                                const bgColor = p.is_complete ? '#e8f5e9' : '#ffebee';
-                                progressHtml += `<div style="background:${bgColor};padding:4px 8px;margin:2px 0;border-radius:4px;">`;
+                                let statusIcon = '';
+                                let statusText = '';
+                                let bgColor = '';
+                                let borderStyle = '';
+
+                                if (p.is_complete) {
+                                    statusIcon = '<span style="color:#43a047;"><i class="fas fa-check"></i></span>';
+                                    statusText = '<span style="color:#43a047;font-weight:600;">Lengkap</span>';
+                                    bgColor = '#e8f5e9';
+                                } else if (p.has_pending) {
+                                    statusIcon = '<span style="color:#f57f17;"><i class="fas fa-clock"></i></span>';
+                                    const remaining = p.roll - p.scanned;
+                                    if (remaining > 0) {
+                                        statusText = '<span style="color:#b78103;font-weight:600;">Menunggu Approval SAP (Kurang ' + remaining + ' roll)</span>';
+                                    } else {
+                                        statusText = '<span style="color:#b78103;font-weight:600;">Menunggu Approval SAP</span>';
+                                    }
+                                    bgColor = '#fffde7';
+                                    borderStyle = 'border:1px solid #ffe082;';
+                                } else {
+                                    statusIcon = '<span style="color:#c62828;"><i class="fas fa-times"></i></span>';
+                                    statusText = '<span style="color:#c62828;">Kurang ' + (p.roll - p.scanned) + ' roll</span>';
+                                    bgColor = '#ffebee';
+                                }
+
+                                progressHtml += `<div style="background:${bgColor};${borderStyle}padding:4px 8px;margin:2px 0;border-radius:4px;">`;
                                 progressHtml += `${statusIcon} <strong>OP ${p.no_op || 'N/A'}:</strong> ${p.scanned}/${p.roll} roll - ${statusText}`;
                                 progressHtml += '</div>';
                             });
@@ -5130,19 +5192,26 @@
                             const totalDetails = allProgress.length;
                             const completeCount = allProgress.filter(p => p.is_complete).length;
                             const allComplete = completeCount === totalDetails;
+                            const hasAnyPending = allProgress.some(p => p.has_pending);
 
                             if (allComplete) {
                                 progressHtml = '<div style="padding:4px 0;background:#e8f5e9;border-radius:4px;margin-bottom:8px;">' + progressHtml;
                                 progressHtml += '<div style="padding:4px 0;background:#e8f5e9;border-radius:4px;margin-top:8px;">';
                                 progressHtml += '<strong style="color:#2e7d32;"><i class="fas fa-check-circle"></i> Semua Detail OP Sudah Lengkap!</strong>';
                                 progressHtml += '<br><span style="color:#43a047;font-size:12px;">Scan Barcode Dye Stuff & AUX sudah diizinkan.</span>';
-                                progressHtml += '</div>';
+                                progressHtml += '</div></div>';
+                            } else if (hasAnyPending) {
+                                progressHtml = '<div style="padding:4px 0;background:#fffde7;border:1px solid #ffe082;border-radius:4px;margin-bottom:8px;">' + progressHtml;
+                                progressHtml += '<div style="padding:6px 8px;background:#fff9c4;border-radius:4px;margin-top:8px;">';
+                                progressHtml += '<strong style="color:#b78103;"><i class="fas fa-clock mr-1"></i> Barcode Kain Sedang Menunggu Approval SAP</strong>';
+                                progressHtml += '<br><span style="color:#856404;font-size:12px;">Terdapat pengajuan QTY GI Over Limit yang sedang menunggu persetujuan dari SAP. Scan Barcode Dye Stuff & AUX dapat dilakukan setelah disetujui.</span>';
+                                progressHtml += '</div></div>';
                             } else {
                                 progressHtml = '<div style="padding:4px 0;background:#ffebee;border-radius:4px;margin-bottom:8px;">' + progressHtml;
                                 progressHtml += '<div style="padding:4px 0;background:#ffebee;border-radius:4px;margin-top:8px;">';
                                 progressHtml += `<strong style="color:#c62828;"><i class="fas fa-exclamation-triangle"></i> ${completeCount} dari ${totalDetails} Detail OP Lengkap</strong>`;
                                 progressHtml += '<br><span style="color:#c62828;font-size:12px;">Semua Detail OP harus lengkap sebelum scan Barcode Dye Stuff & AUX.</span>';
-                                progressHtml += '</div>';
+                                progressHtml += '</div></div>';
                             }
                         }
                         if ($('#barcode-kain-progress').length) {
@@ -5156,15 +5225,24 @@
                         const $btnScanLa = $('#barcode-la-buttons .scan-barcode-btn');
                         const $btnScanAux = $('#barcode-aux-buttons .scan-barcode-btn');
 
-                        // Scan Kain (G/F): disable jika semua roll sudah terpenuhi
+                        // Scan Kain (G/F): disable jika semua roll sudah terpenuhi atau sedang menunggu approval
                         const allProgressKain = data.all_barcode_kain_progress || [];
                         const allRollComplete = allProgressKain.length > 0 && allProgressKain.every(p => p.is_complete);
+                        const anyPendingKain = allProgressKain.some(p => p.has_pending);
+                        const allScannedOrPending = allProgressKain.length > 0 && allProgressKain.every(p => p.scanned >= p.roll);
+
                         if (allRollComplete) {
                             $btnScanKain.prop('disabled', true)
                                 .removeClass('btn-success')
                                 .addClass('btn-secondary')
                                 .css('cursor', 'not-allowed')
                                 .attr('title', 'Barcode kain sudah lengkap sesuai roll');
+                        } else if (allScannedOrPending && anyPendingKain) {
+                            $btnScanKain.prop('disabled', true)
+                                .removeClass('btn-success')
+                                .addClass('btn-secondary')
+                                .css('cursor', 'not-allowed')
+                                .attr('title', 'Menunggu approval SAP untuk barcode kain');
                         } else {
                             $btnScanKain.prop('disabled', false)
                                 .removeClass('btn-secondary')
@@ -5216,7 +5294,8 @@
                         }
 
                         // Update G/D/A indicators based on completion status
-                        const hasKainActiveGlobal = data.can_scan_la_aux === true;
+                        const hasPendingKainGlobal = (data.all_barcode_kain_progress || []).some(p => p.has_pending) || (data.barcode_kain_progress || []).some(p => p.has_pending);
+                        const hasKainActiveGlobal = data.can_scan_la_aux === true ? true : (hasPendingKainGlobal ? 'yellow' : false);
                         const laProgGlobal = data.la_progress || {};
                         const auxProgGlobal = data.aux_progress || {};
                         const hasLaActiveGlobal = laProgGlobal.initial_is_complete !== undefined ? laProgGlobal.initial_is_complete : (laProgGlobal.initial_scanned >= (laProgGlobal.initial_required !== undefined ? laProgGlobal.initial_required : 0));
@@ -5949,14 +6028,14 @@
                         const userSelesai = item.user_selesai ? `${item.user_selesai.nama} <small class="text-muted">(${item.user_selesai.role})</small>` : (item.selesai_at_formatted ? '-' : '<span class="text-muted">-</span>');
 
                         html += `<tr>
-                                    <td class="text-center">${idx + 1}</td>
-                                    <td>${item.pinjam_at_formatted || '-'}</td>
-                                    <td>${selesaiHtml}</td>
-                                    <td><span class="badge badge-light border">${item.durasi_formatted || '-'}</span></td>
-                                    <td>${item.alasan || '-'}</td>
-                                    <td>${userPinjam}</td>
-                                    <td>${userSelesai}</td>
-                                </tr>`;
+                                        <td class="text-center">${idx + 1}</td>
+                                        <td>${item.pinjam_at_formatted || '-'}</td>
+                                        <td>${selesaiHtml}</td>
+                                        <td><span class="badge badge-light border">${item.durasi_formatted || '-'}</span></td>
+                                        <td>${item.alasan || '-'}</td>
+                                        <td>${userPinjam}</td>
+                                        <td>${userSelesai}</td>
+                                    </tr>`;
                     });
                     $('#pinjam-history-tbody').html(html);
                 },
@@ -6183,14 +6262,14 @@
                         const userSelesai = item.user_selesai ? `${item.user_selesai.nama} <small class="text-muted">(${item.user_selesai.role})</small>` : (item.selesai_at_formatted ? '-' : '<span class="text-muted">-</span>');
 
                         html += `<tr>
-                                    <td class="text-center">${idx + 1}</td>
-                                    <td>${item.break_at_formatted || '-'}</td>
-                                    <td>${selesaiHtml}</td>
-                                    <td><span class="badge badge-light border">${item.durasi_formatted || '-'}</span></td>
-                                    <td>${item.alasan || '-'}</td>
-                                    <td>${userBreak}</td>
-                                    <td>${userSelesai}</td>
-                                </tr>`;
+                                        <td class="text-center">${idx + 1}</td>
+                                        <td>${item.break_at_formatted || '-'}</td>
+                                        <td>${selesaiHtml}</td>
+                                        <td><span class="badge badge-light border">${item.durasi_formatted || '-'}</span></td>
+                                        <td>${item.alasan || '-'}</td>
+                                        <td>${userBreak}</td>
+                                        <td>${userSelesai}</td>
+                                    </tr>`;
                     });
                     $('#break-history-tbody').html(html);
                 },
@@ -6341,11 +6420,11 @@
                                     $card.data('proses', cardProses);
                                     if (!$card.find('.waiting-stop-banner').length) {
                                         const bannerHtml = `
-                                            <div class="waiting-stop-banner" style="background: linear-gradient(90deg, #ff9800, #ffb74d); color: #111; font-weight: 800; font-size: 11px; padding: 3px 6px; text-align: center; border-bottom: 1px solid rgba(0,0,0,0.15); display: flex; align-items: center; justify-content: center; gap: 5px;">
-                                                <i class="fas fa-spinner fa-spin"></i>
-                                                <span>Menunggu Mesin Mati (Sinyal 103 ON)</span>
-                                            </div>
-                                        `;
+                                                <div class="waiting-stop-banner" style="background: linear-gradient(90deg, #ff9800, #ffb74d); color: #111; font-weight: 800; font-size: 11px; padding: 3px 6px; text-align: center; border-bottom: 1px solid rgba(0,0,0,0.15); display: flex; align-items: center; justify-content: center; gap: 5px;">
+                                                    <i class="fas fa-spinner fa-spin"></i>
+                                                    <span>Menunggu Mesin Mati (Sinyal 103 ON)</span>
+                                                </div>
+                                            `;
                                         $card.prepend(bannerHtml);
                                     }
                                 } else {
@@ -6428,11 +6507,11 @@
                                     $card.data('proses', cardProses);
                                     if (!$card.find('.waiting-stop-banner').length) {
                                         const bannerHtml = `
-                                            <div class="waiting-stop-banner" style="background: linear-gradient(90deg, #ff9800, #ffb74d); color: #111; font-weight: 800; font-size: 11px; padding: 3px 6px; text-align: center; border-bottom: 1px solid rgba(0,0,0,0.15); display: flex; align-items: center; justify-content: center; gap: 5px;">
-                                                <i class="fas fa-spinner fa-spin"></i>
-                                                <span>Menunggu Mesin Mati (Sinyal 103 ON)</span>
-                                            </div>
-                                        `;
+                                                <div class="waiting-stop-banner" style="background: linear-gradient(90deg, #ff9800, #ffb74d); color: #111; font-weight: 800; font-size: 11px; padding: 3px 6px; text-align: center; border-bottom: 1px solid rgba(0,0,0,0.15); display: flex; align-items: center; justify-content: center; gap: 5px;">
+                                                    <i class="fas fa-spinner fa-spin"></i>
+                                                    <span>Menunggu Mesin Mati (Sinyal 103 ON)</span>
+                                                </div>
+                                            `;
                                         $card.prepend(bannerHtml);
                                     }
                                 } else {
@@ -6544,69 +6623,69 @@
         // 2 mode: Scan (kamera) dan Input Manual (ketik barcode)
         if (!document.getElementById('modalScanBarcode')) {
             $(document.body).append(`
-                                                                                        <div class="modal fade" id="modalScanBarcode" tabindex="-1" aria-labelledby="modalScanBarcodeLabel" aria-hidden="true">
-                                                                                            <div class="modal-dialog modal-dialog-centered" style="max-width:480px;">
-                                                                                                <div class="modal-content shadow-lg border-0 rounded-3">
-                                                                                                    <form id="formScanBarcode" method="POST" action="">
-                                                                                                        @csrf
-                                                                                                        <input type="hidden" name="barcode" id="inputBarcodeValue">
-                                                                                                        <input type="hidden" name="detail_proses_id" id="inputDetailProsesId">
-                                                                                                        <input type="hidden" name="approval_id" id="inputApprovalId">
-                                                                                                        <div class="modal-header bg-success text-white">
-                                                                                                            <h5 class="modal-title fw-bold" id="modalScanBarcodeLabel">Input Barcode</h5>
-                                                                                                            <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
-                                                                                                                <span aria-hidden="true">&times;</span>
-                                                                                                            </button>
-                                                                                                        </div>
-                                                                                                        <div class="modal-body py-3 px-4 text-center">
-                                                                                                            <ul class="nav nav-pills nav-fill mb-3" id="barcodeModeTabs" role="tablist">
-                                                                                                                <li class="nav-item" role="presentation">
-                                                                                                                    <a class="nav-link active" id="mode-scan-tab" data-toggle="pill" href="#mode-scan-pane" role="tab" aria-controls="mode-scan-pane" aria-selected="true"><i class="fas fa-barcode"></i> Scan Barcode</a>
-                                                                                                                </li>
-                                                                                                                <li class="nav-item" role="presentation">
-                                                                                                                    <a class="nav-link" id="mode-manual-tab" data-toggle="pill" href="#mode-manual-pane" role="tab" aria-controls="mode-manual-pane" aria-selected="false"><i class="fas fa-keyboard"></i> Input Manual</a>
-                                                                                                                </li>
-                                                                                                            </ul>
-                                                                                                            <div class="tab-content position-relative" id="barcodeModeContent" style="min-height:320px;">
-                                                                                                                <div id="barcode-submit-loading" style="display:none;position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(255,255,255,0.9);align-items:center;justify-content:center;z-index:10;flex-direction:column;">
-                                                                                                                    <div class="spinner-border text-success mb-2" style="width:3rem;height:3rem;"></div>
-                                                                                                                    <p class="text-dark mb-0">Memproses barcode...</p>
+                                                                                            <div class="modal fade" id="modalScanBarcode" tabindex="-1" aria-labelledby="modalScanBarcodeLabel" aria-hidden="true">
+                                                                                                <div class="modal-dialog modal-dialog-centered" style="max-width:480px;">
+                                                                                                    <div class="modal-content shadow-lg border-0 rounded-3">
+                                                                                                        <form id="formScanBarcode" method="POST" action="">
+                                                                                                            @csrf
+                                                                                                            <input type="hidden" name="barcode" id="inputBarcodeValue">
+                                                                                                            <input type="hidden" name="detail_proses_id" id="inputDetailProsesId">
+                                                                                                            <input type="hidden" name="approval_id" id="inputApprovalId">
+                                                                                                            <div class="modal-header bg-success text-white">
+                                                                                                                <h5 class="modal-title fw-bold" id="modalScanBarcodeLabel">Input Barcode</h5>
+                                                                                                                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                                                                                                                    <span aria-hidden="true">&times;</span>
+                                                                                                                </button>
+                                                                                                            </div>
+                                                                                                            <div class="modal-body py-3 px-4 text-center">
+                                                                                                                <ul class="nav nav-pills nav-fill mb-3" id="barcodeModeTabs" role="tablist">
+                                                                                                                    <li class="nav-item" role="presentation">
+                                                                                                                        <a class="nav-link active" id="mode-scan-tab" data-toggle="pill" href="#mode-scan-pane" role="tab" aria-controls="mode-scan-pane" aria-selected="true"><i class="fas fa-barcode"></i> Scan Barcode</a>
+                                                                                                                    </li>
+                                                                                                                    <li class="nav-item" role="presentation">
+                                                                                                                        <a class="nav-link" id="mode-manual-tab" data-toggle="pill" href="#mode-manual-pane" role="tab" aria-controls="mode-manual-pane" aria-selected="false"><i class="fas fa-keyboard"></i> Input Manual</a>
+                                                                                                                    </li>
+                                                                                                                </ul>
+                                                                                                                <div class="tab-content position-relative" id="barcodeModeContent" style="min-height:320px;">
+                                                                                                                    <div id="barcode-submit-loading" style="display:none;position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(255,255,255,0.9);align-items:center;justify-content:center;z-index:10;flex-direction:column;">
+                                                                                                                        <div class="spinner-border text-success mb-2" style="width:3rem;height:3rem;"></div>
+                                                                                                                        <p class="text-dark mb-0">Memproses barcode...</p>
+                                                                                                                    </div>
+                                                                                                                    <div class="tab-pane fade show active" id="mode-scan-pane" role="tabpanel">
+                                                                                                                        <div id="barcode-scanner-container" style="width:100%;min-height:320px;display:flex;align-items:center;justify-content:center;"></div>
+                                                                                                                    </div>
+                                                                                                                    <div class="tab-pane fade" id="mode-manual-pane" role="tabpanel">
+                                                                                                                        <div id="barcode-manual-container" class="py-3">
+                                                                                                                            <label for="inputBarcodeManual" class="d-block text-left mb-2 font-weight-bold">Ketik kode barcode:</label>
+                                                                                                                            <input type="text" class="form-control form-control-lg text-center" id="inputBarcodeManual" placeholder="Masukkan barcode" maxlength="255" autocomplete="off">
+                                                                                                                            <small class="text-muted d-block mt-2">Tekan Enter atau klik Simpan setelah mengisi barcode.</small>
+                                                                                                                            <button type="button" class="btn btn-success mt-3" id="btnSubmitManualBarcode"><i class="fas fa-check"></i> Simpan Barcode</button>
+                                                                                                                        </div>
+                                                                                                                    </div>
                                                                                                                 </div>
-                                                                                                                <div class="tab-pane fade show active" id="mode-scan-pane" role="tabpanel">
-                                                                                                                    <div id="barcode-scanner-container" style="width:100%;min-height:320px;display:flex;align-items:center;justify-content:center;"></div>
-                                                                                                                </div>
-                                                                                                                <div class="tab-pane fade" id="mode-manual-pane" role="tabpanel">
-                                                                                                                    <div id="barcode-manual-container" class="py-3">
-                                                                                                                        <label for="inputBarcodeManual" class="d-block text-left mb-2 font-weight-bold">Ketik kode barcode:</label>
-                                                                                                                        <input type="text" class="form-control form-control-lg text-center" id="inputBarcodeManual" placeholder="Masukkan barcode" maxlength="255" autocomplete="off">
-                                                                                                                        <small class="text-muted d-block mt-2">Tekan Enter atau klik Simpan setelah mengisi barcode.</small>
-                                                                                                                        <button type="button" class="btn btn-success mt-3" id="btnSubmitManualBarcode"><i class="fas fa-check"></i> Simpan Barcode</button>
+                                                                                                                {{-- Section pending list barcode kain (hanya tampil saat barcode_kain) --}}
+                                                                                                                <div id="kain-pending-section" class="mt-3" style="display:none;">
+                                                                                                                    <hr class="my-2">
+                                                                                                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                                                                                                        <strong class="text-left">Daftar Barcode Kain</strong>
+                                                                                                                        <span id="kain-pending-counter" class="badge badge-secondary" style="font-size:12px;">0/0</span>
+                                                                                                                    </div>
+                                                                                                                    <div id="kain-pending-list" style="max-height:220px;overflow-y:auto;padding:4px 2px;">
+                                                                                                                        <span style="color:#888;font-size:12px;">Belum ada barcode. Scan atau ketik manual untuk menambah.</span>
                                                                                                                     </div>
                                                                                                                 </div>
                                                                                                             </div>
-                                                                                                            {{-- Section pending list barcode kain (hanya tampil saat barcode_kain) --}}
-                                                                                                            <div id="kain-pending-section" class="mt-3" style="display:none;">
-                                                                                                                <hr class="my-2">
-                                                                                                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                                                                                                    <strong class="text-left">Daftar Barcode Kain</strong>
-                                                                                                                    <span id="kain-pending-counter" class="badge badge-secondary" style="font-size:12px;">0/0</span>
-                                                                                                                </div>
-                                                                                                                <div id="kain-pending-list" style="max-height:220px;overflow-y:auto;padding:4px 2px;">
-                                                                                                                    <span style="color:#888;font-size:12px;">Belum ada barcode. Scan atau ketik manual untuk menambah.</span>
-                                                                                                                </div>
+                                                                                                            <div class="modal-footer d-flex justify-content-between px-4">
+                                                                                                                <button type="button" class="btn btn-success" id="btnSubmitKainBatch" style="display:none;">
+                                                                                                                    <i class="fas fa-save"></i> Simpan Barcode (<span id="kain-pending-submit-count">0</span>)
+                                                                                                                </button>
+                                                                                                                <button type="button" class="btn btn-secondary ml-auto" data-dismiss="modal">Tutup</button>
                                                                                                             </div>
-                                                                                                        </div>
-                                                                                                        <div class="modal-footer d-flex justify-content-between px-4">
-                                                                                                            <button type="button" class="btn btn-success" id="btnSubmitKainBatch" style="display:none;">
-                                                                                                                <i class="fas fa-save"></i> Simpan Barcode (<span id="kain-pending-submit-count">0</span>)
-                                                                                                            </button>
-                                                                                                            <button type="button" class="btn btn-secondary ml-auto" data-dismiss="modal">Tutup</button>
-                                                                                                        </div>
-                                                                                                    </form>
+                                                                                                        </form>
+                                                                                                    </div>
                                                                                                 </div>
                                                                                             </div>
-                                                                                        </div>
-                                                                                        `);
+                                                                                            `);
         }
 
         // ========================================================
@@ -6713,9 +6792,9 @@
                 s.pending.forEach(function (item, idx) {
                     const cont = item.container ? `<br><span style='font-size:11px;color:#888;'>${item.container}</span>` : '';
                     html += `<div style="position:relative;flex:1 0 30%;max-width:32%;background:#f3f3f3;border-radius:6px;padding:8px 4px;text-align:center;font-weight:bold;font-size:13px;color:#222;box-shadow:0 1px 2px #0001;">
-                                                                                                    <span class="remove-pending-kain" data-idx="${idx}" style="position:absolute;top:2px;right:6px;cursor:pointer;font-weight:bold;color:#b00;font-size:16px;z-index:2;" title="Hapus">&times;</span>
-                                                                                                    ${item.barcode}${cont}
-                                                                                                </div>`;
+                                                                                                        <span class="remove-pending-kain" data-idx="${idx}" style="position:absolute;top:2px;right:6px;cursor:pointer;font-weight:bold;color:#b00;font-size:16px;z-index:2;" title="Hapus">&times;</span>
+                                                                                                        ${item.barcode}${cont}
+                                                                                                    </div>`;
                 });
                 html += '</div>';
                 $list.html(html);
@@ -6925,31 +7004,31 @@
             Swal.fire({
                 title: `Request Topping ${label}`,
                 html: `
-                            <div class="text-left" style="font-size: 14px;">
-                                <div class="alert alert-info py-2 px-3 mb-3" style="font-size: 13px;">
-                                    <i class="fas fa-info-circle mr-1"></i> Request topping membutuhkan approval <strong>Kepala Shift</strong>. Jadwal input Dye Stuff / AUX normal berikutnya dan Cycle Time akan otomatis dimundurkan.
-                                </div>
-                                <div class="form-group mb-2">
-                                    <label class="font-weight-bold mb-1">Durasi Topping <span class="text-danger">*</span></label>
-                                    <div class="input-group">
-                                        <input type="number" id="swal-topping-durasi" class="form-control" placeholder="Contoh: 1" min="0.1" step="any" value="1" required>
-                                        <div class="input-group-append">
-                                            <select id="swal-topping-unit" class="custom-select font-weight-bold" style="min-width: 100px;">
-                                                <option value="jam" selected>Jam</option>
-                                                <option value="menit">Menit</option>
-                                            </select>
+                                <div class="text-left" style="font-size: 14px;">
+                                    <div class="alert alert-info py-2 px-3 mb-3" style="font-size: 13px;">
+                                        <i class="fas fa-info-circle mr-1"></i> Request topping membutuhkan approval <strong>Kepala Shift</strong>. Jadwal input Dye Stuff / AUX normal berikutnya dan Cycle Time akan otomatis dimundurkan.
+                                    </div>
+                                    <div class="form-group mb-2">
+                                        <label class="font-weight-bold mb-1">Durasi Topping <span class="text-danger">*</span></label>
+                                        <div class="input-group">
+                                            <input type="number" id="swal-topping-durasi" class="form-control" placeholder="Contoh: 1" min="0.1" step="any" value="1" required>
+                                            <div class="input-group-append">
+                                                <select id="swal-topping-unit" class="custom-select font-weight-bold" style="min-width: 100px;">
+                                                    <option value="jam" selected>Jam</option>
+                                                    <option value="menit">Menit</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <small class="form-text text-muted">Menerima format jam (contoh: 1 atau 1.5) maupun menit (contoh: 30, 45, 60).</small>
+                                    </div>
+                                    <div class="p-2 rounded bg-light border mt-3" id="swal-topping-preview-box">
+                                        <div class="text-secondary small font-weight-bold mb-1">Kalkulasi Kemunduran Jadwal & Cycle Time:</div>
+                                        <div id="swal-topping-preview-text" class="text-dark font-weight-bold" style="font-size: 13px;">
+                                            Durasi: 1 Jam + 45 Menit (toleransi scan) = <span class="text-primary">+1 Jam 45 Menit</span>
                                         </div>
                                     </div>
-                                    <small class="form-text text-muted">Menerima format jam (contoh: 1 atau 1.5) maupun menit (contoh: 30, 45, 60).</small>
                                 </div>
-                                <div class="p-2 rounded bg-light border mt-3" id="swal-topping-preview-box">
-                                    <div class="text-secondary small font-weight-bold mb-1">Kalkulasi Kemunduran Jadwal & Cycle Time:</div>
-                                    <div id="swal-topping-preview-text" class="text-dark font-weight-bold" style="font-size: 13px;">
-                                        Durasi: 1 Jam + 45 Menit (toleransi scan) = <span class="text-primary">+1 Jam 45 Menit</span>
-                                    </div>
-                                </div>
-                            </div>
-                        `,
+                            `,
                 icon: 'question',
                 showCancelButton: true,
                 confirmButtonColor: '#17a2b8',
@@ -6982,8 +7061,8 @@
                         if (totM > 0) totText.push(totM + ' Menit');
 
                         $('#swal-topping-preview-text').html(`
-                                    Durasi: <strong>${durText.join(' ')}</strong> + <strong>45 Menit</strong> (toleransi scan) = <span class="text-primary font-weight-bold" style="font-size: 14px;">+${totText.join(' ')}</span>
-                                `);
+                                        Durasi: <strong>${durText.join(' ')}</strong> + <strong>45 Menit</strong> (toleransi scan) = <span class="text-primary font-weight-bold" style="font-size: 14px;">+${totText.join(' ')}</span>
+                                    `);
                     };
                     $('#swal-topping-durasi, #swal-topping-unit').on('input change', updatePreview);
                 },
@@ -7236,9 +7315,78 @@
                 },
                 error: function (xhr) {
                     let errMsg = 'Gagal menyimpan barcode kain.';
-                    if (xhr.responseJSON && xhr.responseJSON.message) {
-                        errMsg = xhr.responseJSON.message;
+                    const res = xhr.responseJSON;
+                    if (res && res.message) {
+                        errMsg = res.message;
                     }
+
+                    // Cek apakah terdapat error terkait QTY GI Over Limit dari SAP
+                    if (res && res.is_over_limit && res.over_limit_barcodes && res.over_limit_barcodes.length > 0) {
+                        const bcs = res.over_limit_barcodes;
+                        const bcsListStr = bcs.join(', ');
+                        const detailId = res.detail_proses_id || s.detailId;
+                        const prosesId = s.prosesId;
+
+                        Swal.fire({
+                            icon: 'warning',
+                            title: 'QTY GI Over Limit',
+                            html: `
+                                    <div style="text-align: left; font-size: 13px; line-height: 1.5;">
+                                        <div class="alert alert-warning mb-2" style="font-size: 12px;">
+                                            ${errMsg.replace(/\n/g, '<br>')}
+                                        </div>
+                                        <p class="mb-1">Barcode berikut terdeteksi <strong>QTY GI Over Limit</strong> oleh SAP:</p>
+                                        <div class="p-2 mb-2 bg-light border rounded font-weight-bold text-danger" style="word-break: break-all;">
+                                            ${bcsListStr}
+                                        </div>
+                                        <p class="mb-0 text-muted">Apakah Anda ingin mengirimkan <strong>Pengajuan Over GI</strong> ke SAP untuk barcode tersebut?</p>
+                                    </div>
+                                `,
+                            showCancelButton: true,
+                            confirmButtonColor: '#f39c12',
+                            cancelButtonColor: '#6c757d',
+                            confirmButtonText: '<i class="fas fa-paper-plane mr-1"></i> Ajukan Over GI ke SAP',
+                            cancelButtonText: 'Batal',
+                            showLoaderOnConfirm: true,
+                            preConfirm: () => {
+                                return $.ajax({
+                                    url: `/proses/${prosesId}/barcode/kain/pengajuan-over-gi`,
+                                    method: 'POST',
+                                    headers: {
+                                        'X-Requested-With': 'XMLHttpRequest',
+                                        'Accept': 'application/json'
+                                    },
+                                    data: {
+                                        detail_proses_id: detailId,
+                                        barcodes: bcs,
+                                        _token: $('meta[name="csrf-token"]').attr('content')
+                                    }
+                                }).then(response => {
+                                    return response;
+                                }).catch(error => {
+                                    const submitErr = error.responseJSON && error.responseJSON.message ? error.responseJSON.message : 'Gagal mengirim pengajuan Over GI ke SAP';
+                                    Swal.showValidationMessage(submitErr);
+                                });
+                            },
+                            allowOutsideClick: () => !Swal.isLoading()
+                        }).then((result) => {
+                            if (result.isConfirmed && result.value) {
+                                showToastNotification('success', result.value.message || 'Pengajuan Over GI berhasil dikirim ke SAP!');
+                                resetKainScanState();
+                                $('#modalScanBarcode').modal('hide');
+
+                                if ($('#modalDetailProses').hasClass('show') || $('#modalDetailProses').is(':visible')) {
+                                    const currentProsesId = $('#modalDetailProses').data('proses')?.id || prosesId;
+                                    const selectedDetailId = $('#modalDetailProses').data('detailProsesId') || detailId || '';
+                                    if (currentProsesId && window.loadBarcodesIntoDetailModal) {
+                                        window.loadBarcodesIntoDetailModal(currentProsesId, selectedDetailId);
+                                    }
+                                }
+                            }
+                        });
+                        return;
+                    }
+
                     showToastNotification('error', errMsg);
                 },
                 complete: function () {
@@ -7608,7 +7756,7 @@
                             });
                         }
                     })
-                    .catch(e => {});
+                    .catch(e => { });
             }
             setInterval(syncProsesStatuses, 4000);
         });
@@ -7823,8 +7971,29 @@
 
                             let h = '<div style="display:flex;flex-wrap:wrap;gap:6px;">';
                             activeBarcodes.forEach(function (bk) {
-                                const cancelBtn = allowCancel ? '<span style="position:absolute;top:2px;right:6px;cursor:pointer;font-weight:bold;color:#b00;font-size:16px;z-index:2;" class="cancel-barcode-btn" data-type="' + barcodeType + '" data-proses="' + pid + '" data-id="' + bk.id + '" data-matdok="' + (bk.matdok || '') + '" data-item-document="' + (bk.item_document || '') + '" title="Cancel barcode">&times;</span>' : '';
-                                h += '<div style="position:relative;flex:1 0 30%;max-width:32%;background:#f3f3f3;border-radius:6px;padding:6px 4px;margin-bottom:6px;text-align:center;font-weight:bold;font-size:13px;color:#222;box-shadow:0 1px 2px #0001;">' + cancelBtn + bk.barcode + (bk.matdok ? '<br><span style="font-size:11px;color:#888;">' + bk.matdok + '</span>' : '') + '</div>';
+                                const isPending = bk.approval_status === 'pending';
+                                const isRejected = bk.approval_status === 'rejected';
+
+                                // Tombol cancel barcode dihilangkan jika pending approval QTY GI,
+                                // dan hanya muncul ketika barcode sudah approved atau rejected dari SAP (atau jenis barcode lain)
+                                const canCancelThis = allowCancel && !isPending;
+                                const cancelBtn = canCancelThis ? '<span style="position:absolute;top:2px;right:6px;cursor:pointer;font-weight:bold;color:#b00;font-size:16px;z-index:2;" class="cancel-barcode-btn" data-type="' + barcodeType + '" data-proses="' + pid + '" data-id="' + bk.id + '" data-matdok="' + (bk.matdok || '') + '" data-item-document="' + (bk.item_document || '') + '" data-approval-status="' + (bk.approval_status || '') + '" data-barcode="' + bk.barcode + '" title="Cancel barcode">&times;</span>' : '';
+
+                                let boxBg = '#f3f3f3';
+                                let boxBorder = '';
+                                let pendingBadge = '';
+
+                                if (isPending) {
+                                    boxBg = '#fff9c4';
+                                    boxBorder = 'border:1.5px solid #fbc02d;';
+                                    pendingBadge = '<br><span class="badge badge-warning" style="font-size:10px; background:#fff176; color:#856404; border:1px solid #fbc02d; margin-top:3px; padding:2px 4px;"><i class="fas fa-clock mr-1"></i>Menunggu Approval</span>';
+                                } else if (isRejected) {
+                                    boxBg = '#ffebee';
+                                    boxBorder = 'border:1.5px solid #ef5350;';
+                                    pendingBadge = '<br><span class="badge badge-danger" style="font-size:10px; background:#ef9a9a; color:#b71c1c; border:1px solid #ef5350; margin-top:3px; padding:2px 4px;"><i class="fas fa-times-circle mr-1"></i>Ditolak SAP</span>';
+                                }
+
+                                h += '<div style="position:relative;flex:1 0 30%;max-width:32%;min-width:130px;background:' + boxBg + ';' + boxBorder + 'border-radius:6px;padding:6px 4px;margin-bottom:6px;text-align:center;font-weight:bold;font-size:13px;color:#222;box-shadow:0 1px 2px #0001;">' + cancelBtn + bk.barcode + (bk.matdok ? '<br><span style="font-size:11px;color:#888;">' + bk.matdok + '</span>' : '') + pendingBadge + '</div>';
                             });
                             h += '</div>';
                             return h;
@@ -7918,10 +8087,34 @@
                         if (selectedProgress.length > 0) {
                             progressHtml += '<div style="padding:4px 0;"><strong>Progress Barcode Kain (Detail yang Dipilih):</strong><br>';
                             selectedProgress.forEach(function (p) {
-                                const statusIcon = p.is_complete ? '<span style="color:#43a047;"><i class="fas fa-check"></i></span>' : '<span style="color:#c62828;"><i class="fas fa-times"></i></span>';
-                                const statusText = p.is_complete ? '<span style="color:#43a047;">Lengkap</span>' : '<span style="color:#c62828;">Kurang ' + (p.roll - p.scanned) + ' roll</span>';
-                                const bgColor = p.is_complete ? '#e8f5e9' : '#ffebee';
-                                progressHtml += '<div style="background:' + bgColor + ';padding:4px 8px;margin:2px 0;border-radius:4px;">' + statusIcon + ' <strong>OP ' + (p.no_op || 'N/A') + ':</strong> ' + p.scanned + '/' + p.roll + ' roll - ' + statusText + '</div>';
+                                let statusIcon = '';
+                                let statusText = '';
+                                let bgColor = '';
+                                let borderStyle = '';
+
+                                if (p.is_complete) {
+                                    statusIcon = '<span style="color:#43a047;"><i class="fas fa-check"></i></span>';
+                                    statusText = '<span style="color:#43a047;font-weight:600;">Lengkap</span>';
+                                    bgColor = '#e8f5e9';
+                                } else if (p.has_pending) {
+                                    statusIcon = '<span style="color:#f57f17;"><i class="fas fa-clock"></i></span>';
+                                    const remaining = p.roll - p.scanned;
+                                    if (remaining > 0) {
+                                        statusText = '<span style="color:#b78103;font-weight:600;">Menunggu Approval SAP (Kurang ' + remaining + ' roll)</span>';
+                                    } else {
+                                        statusText = '<span style="color:#b78103;font-weight:600;">Menunggu Approval SAP</span>';
+                                    }
+                                    bgColor = '#fffde7';
+                                    borderStyle = 'border:1px solid #ffe082;';
+                                } else {
+                                    statusIcon = '<span style="color:#c62828;"><i class="fas fa-times"></i></span>';
+                                    statusText = '<span style="color:#c62828;">Kurang ' + (p.roll - p.scanned) + ' roll</span>';
+                                    bgColor = '#ffebee';
+                                }
+
+                                progressHtml += `<div style="background:${bgColor};${borderStyle}padding:4px 8px;margin:2px 0;border-radius:4px;">`;
+                                progressHtml += `${statusIcon} <strong>OP ${p.no_op || 'N/A'}:</strong> ${p.scanned}/${p.roll} roll - ${statusText}`;
+                                progressHtml += '</div>';
                             });
                             progressHtml += '</div>';
                         }
@@ -7929,13 +8122,17 @@
                             const hintHtmlLocal = '<div style="padding:6px 8px;background:#e3f2fd;border-radius:4px;margin-bottom:8px;font-size:12px;color:#1565c0;"><i class="fas fa-info-circle"></i> <strong>Proses ini hanya wajib Barcode Dye Stuff &amp; AUX (D &amp; A).</strong> Barcode Kain (G/F) tidak wajib.</div>';
                             progressHtml = hintHtmlLocal + progressHtml;
                         } else if (allProgress.length > 0) {
-                            const completeCount = allProgress.filter(function (p) { return p.is_complete; }).length;
                             const totalDetails = allProgress.length;
+                            const completeCount = allProgress.filter(function (p) { return p.is_complete; }).length;
                             const allComplete = completeCount === totalDetails;
+                            const hasAnyPending = allProgress.some(function (p) { return p.has_pending; });
+
                             if (allComplete) {
-                                progressHtml = '<div style="padding:4px 0;background:#e8f5e9;border-radius:4px;margin-bottom:8px;">' + progressHtml + '<div style="padding:4px 0;background:#e8f5e9;border-radius:4px;margin-top:8px;"><strong style="color:#2e7d32;"><i class="fas fa-check-circle"></i> Semua Detail OP Sudah Lengkap!</strong><br><span style="color:#43a047;font-size:12px;">Scan Barcode Dye Stuff & AUX sudah diizinkan.</span></div>';
+                                progressHtml = '<div style="padding:4px 0;background:#e8f5e9;border-radius:4px;margin-bottom:8px;">' + progressHtml + '<div style="padding:4px 0;background:#e8f5e9;border-radius:4px;margin-top:8px;"><strong style="color:#2e7d32;"><i class="fas fa-check-circle"></i> Semua Detail OP Sudah Lengkap!</strong><br><span style="color:#43a047;font-size:12px;">Scan Barcode Dye Stuff & AUX sudah diizinkan.</span></div></div>';
+                            } else if (hasAnyPending) {
+                                progressHtml = '<div style="padding:4px 0;background:#fffde7;border:1px solid #ffe082;border-radius:4px;margin-bottom:8px;">' + progressHtml + '<div style="padding:6px 8px;background:#fff9c4;border-radius:4px;margin-top:8px;"><strong style="color:#b78103;"><i class="fas fa-clock mr-1"></i> Barcode Kain Sedang Menunggu Approval SAP</strong><br><span style="color:#856404;font-size:12px;">Terdapat pengajuan QTY GI Over Limit yang sedang menunggu persetujuan dari SAP. Scan Barcode Dye Stuff & AUX dapat dilakukan setelah disetujui.</span></div></div>';
                             } else {
-                                progressHtml = '<div style="padding:4px 0;background:#ffebee;border-radius:4px;margin-bottom:8px;">' + progressHtml + '<div style="padding:4px 0;background:#ffebee;border-radius:4px;margin-top:8px;"><strong style="color:#c62828;"><i class="fas fa-exclamation-triangle"></i> ' + completeCount + ' dari ' + totalDetails + ' Detail OP Lengkap</strong><br><span style="color:#c62828;font-size:12px;">Semua Detail OP harus lengkap sebelum scan Barcode Dye Stuff & AUX.</span></div>';
+                                progressHtml = '<div style="padding:4px 0;background:#ffebee;border-radius:4px;margin-bottom:8px;">' + progressHtml + '<div style="padding:4px 0;background:#ffebee;border-radius:4px;margin-top:8px;"><strong style="color:#c62828;"><i class="fas fa-exclamation-triangle"></i> ' + completeCount + ' dari ' + totalDetails + ' Detail OP Lengkap</strong><br><span style="color:#c62828;font-size:12px;">Semua Detail OP harus lengkap sebelum scan Barcode Dye Stuff & AUX.</span></div></div>';
                             }
                         }
                         if ($('#barcode-kain-progress').length) {
@@ -7945,14 +8142,20 @@
                         if ($btnScanKainLocal.length) {
                             const allProgressLocal = data.all_barcode_kain_progress || [];
                             const allRollCompleteLocal = allProgressLocal.length > 0 && allProgressLocal.every(function (p) { return p.is_complete; });
+                            const anyPendingKainLocal = allProgressLocal.some(function (p) { return p.has_pending; });
+                            const allScannedOrPendingLocal = allProgressLocal.length > 0 && allProgressLocal.every(function (p) { return p.scanned >= p.roll; });
+
                             if (allRollCompleteLocal) {
                                 $btnScanKainLocal.prop('disabled', true).removeClass('btn-success').addClass('btn-secondary').css('cursor', 'not-allowed').attr('title', 'Barcode kain sudah lengkap sesuai roll');
+                            } else if (allScannedOrPendingLocal && anyPendingKainLocal) {
+                                $btnScanKainLocal.prop('disabled', true).removeClass('btn-success').addClass('btn-secondary').css('cursor', 'not-allowed').attr('title', 'Menunggu approval SAP untuk barcode kain');
                             } else {
                                 $btnScanKainLocal.prop('disabled', false).removeClass('btn-secondary').addClass('btn-success').css('cursor', 'pointer').removeAttr('title');
                             }
                         }
                         // Update G/D/A indicators based on completion status
-                        const hasKainActiveGlobal = data.can_scan_la_aux === true;
+                        const hasPendingKainGlobal = (data.all_barcode_kain_progress || []).some(function (p) { return p.has_pending; }) || (data.barcode_kain_progress || []).some(function (p) { return p.has_pending; });
+                        const hasKainActiveGlobal = data.can_scan_la_aux === true ? true : (hasPendingKainGlobal ? 'yellow' : false);
                         const laProgGlobal = data.la_progress || {};
                         const auxProgGlobal = data.aux_progress || {};
                         const hasLaActiveGlobal = laProgGlobal.initial_is_complete !== undefined ? laProgGlobal.initial_is_complete : (laProgGlobal.initial_scanned >= (laProgGlobal.initial_required !== undefined ? laProgGlobal.initial_required : 0));
@@ -8139,15 +8342,15 @@
                 if (historyContainer.length === 0) {
                     const $prosesAktifContainer = $dropzone.find('.proses-aktif-container').first();
                     const newHistoryWrapper = $(`
-                                                                                                <div class="proses-history-wrapper" data-section="history" data-mesin-id="${mesinId}" style="margin-bottom: 8px;">
-                                                                                                    <button class="btn-toggle-history btn btn-sm btn-secondary" 
-                                                                                                            data-mesin-id="${mesinId}" type="button">
-                                                                                                        <i class="fas fa-history"></i> Tampilkan History
-                                                                                                    </button>
-                                                                                                    <div class="proses-history-container" id="history-${mesinId}" style="display: none;">
+                                                                                                    <div class="proses-history-wrapper" data-section="history" data-mesin-id="${mesinId}" style="margin-bottom: 8px;">
+                                                                                                        <button class="btn-toggle-history btn btn-sm btn-secondary" 
+                                                                                                                data-mesin-id="${mesinId}" type="button">
+                                                                                                            <i class="fas fa-history"></i> Tampilkan History
+                                                                                                        </button>
+                                                                                                        <div class="proses-history-container" id="history-${mesinId}" style="display: none;">
+                                                                                                        </div>
                                                                                                     </div>
-                                                                                                </div>
-                                                                                            `);
+                                                                                                `);
                     // Insert sebelum proses aktif container
                     if ($prosesAktifContainer.length > 0) {
                         $prosesAktifContainer.before(newHistoryWrapper);
@@ -8268,13 +8471,15 @@
                         return;
                     }
 
-                    const blockBg = ok ? '#d4f8e8' : '#ffb3b3';
-                    const blockBorder = ok ? '#43a047' : '#c62828';
+                    const isYellow = ok === 'yellow' || ok === 'pending';
+                    const isGreen = ok === true || ok === 'green';
+                    const blockBg = isGreen ? '#d4f8e8' : (isYellow ? '#fff9c4' : '#ffb3b3');
+                    const blockBorder = isGreen ? '#43a047' : (isYellow ? '#f9a825' : '#c62828');
                     $blocks.css({
                         background: blockBg,
                         borderColor: blockBorder
                     });
-                    console.log(`Updated ${blockType} to ${ok ? 'green' : 'red'} for prosesId: ${prosesId}, detailId: ${detailId || 'header'}`);
+                    console.log(`Updated ${blockType} to ${isGreen ? 'green' : (isYellow ? 'yellow' : 'red')} for prosesId: ${prosesId}, detailId: ${detailId || 'header'}`);
                 }
 
                 // Convert detailId ke string untuk memastikan match dengan HTML
@@ -8283,7 +8488,7 @@
                 // Jika detailId tidak ada atau kosong, update GDA/FDA di header card (untuk single OP atau OP pertama)
                 if (!detailIdStr || detailIdStr === '' || detailIdStr === 'null' || detailIdStr === 'undefined') {
                     console.log('Updating blocks in header card (no detailId)');
-                    if (!barcodeKainOptGlobal) setBlockColor($card, firstBlock, !!hasKain);
+                    if (!barcodeKainOptGlobal) setBlockColor($card, firstBlock, hasKain);
                     setBlockColor($card, 'D', !!hasLa);
                     setBlockColor($card, 'A', !!hasAux);
                     return;
@@ -8304,7 +8509,7 @@
                 if (isFirstOp) {
                     // OP pertama: update blok di header card
                     console.log('Updating blocks in header card (first OP), detailId:', detailIdStr);
-                    if (!barcodeKainOptGlobal) setBlockColor($card, firstBlock, !!hasKain);
+                    if (!barcodeKainOptGlobal) setBlockColor($card, firstBlock, hasKain);
                     setBlockColor($card, 'D', !!hasLa);
                     setBlockColor($card, 'A', !!hasAux);
                 } else if ($opRow.length) {
@@ -8334,20 +8539,20 @@
 
                     if ($gdaContainer && $gdaContainer.length) {
                         console.log('Updating blocks in container for OP:', detailIdStr);
-                        if (!barcodeKainOptGlobal) setBlockColor($gdaContainer, firstBlock, !!hasKain);
+                        if (!barcodeKainOptGlobal) setBlockColor($gdaContainer, firstBlock, hasKain);
                         setBlockColor($gdaContainer, 'D', !!hasLa);
                         setBlockColor($gdaContainer, 'A', !!hasAux);
                     } else {
                         // Fallback: update di header card jika container tidak ditemukan
                         console.log('Block container not found, updating in header card as fallback');
-                        if (!barcodeKainOptGlobal) setBlockColor($card, firstBlock, !!hasKain);
+                        if (!barcodeKainOptGlobal) setBlockColor($card, firstBlock, hasKain);
                         setBlockColor($card, 'D', !!hasLa);
                         setBlockColor($card, 'A', !!hasAux);
                     }
                 } else {
                     // Jika OP row tidak ditemukan, update di header card sebagai fallback
                     console.log('OP row not found, updating in header card as fallback. detailId:', detailIdStr);
-                    if (!barcodeKainOptGlobal) setBlockColor($card, firstBlock, !!hasKain);
+                    if (!barcodeKainOptGlobal) setBlockColor($card, firstBlock, hasKain);
                     setBlockColor($card, 'D', !!hasLa);
                     setBlockColor($card, 'A', !!hasAux);
                 }
@@ -8874,11 +9079,11 @@
                     if (isStopReq) {
                         if (!$existingBanner.length) {
                             const bannerHtml = `
-                                <div class="waiting-stop-banner" style="background: linear-gradient(90deg, #ff9800, #ffb74d); color: #111; font-weight: 800; font-size: 11px; padding: 3px 6px; text-align: center; border-bottom: 1px solid rgba(0,0,0,0.15); display: flex; align-items: center; justify-content: center; gap: 5px;">
-                                    <i class="fas fa-spinner fa-spin"></i>
-                                    <span>Menunggu Mesin Berhenti</span>
-                                </div>
-                            `;
+                                    <div class="waiting-stop-banner" style="background: linear-gradient(90deg, #ff9800, #ffb74d); color: #111; font-weight: 800; font-size: 11px; padding: 3px 6px; text-align: center; border-bottom: 1px solid rgba(0,0,0,0.15); display: flex; align-items: center; justify-content: center; gap: 5px;">
+                                        <i class="fas fa-spinner fa-spin"></i>
+                                        <span>Menunggu Mesin Berhenti</span>
+                                    </div>
+                                `;
                             $card.prepend(bannerHtml);
                         }
                     } else {
@@ -9578,23 +9783,23 @@
                     for (let i = 1; i <= count; i++) {
                         const defaultHour = String(i * 2).padStart(2, '0');
                         const inputHtml = `
-                                    <div class="form-group mb-2">
-                                        <div class="input-group input-group-sm">
-                                            <div class="input-group-prepend">
-                                                <span class="input-group-text font-weight-bold" style="font-size: 12px; min-width: 110px;">
-                                                    <span class="badge ${badgeColor} mr-1">${i}</span> ${labelName} #${i}
-                                                </span>
+                                        <div class="form-group mb-2">
+                                            <div class="input-group input-group-sm">
+                                                <div class="input-group-prepend">
+                                                    <span class="input-group-text font-weight-bold" style="font-size: 12px; min-width: 110px;">
+                                                        <span class="badge ${badgeColor} mr-1">${i}</span> ${labelName} #${i}
+                                                    </span>
+                                                </div>
+                                                <input type="text" 
+                                                       name="${type}_schedules[${i - 1}]" 
+                                                       class="form-control form-control-sm schedule-time-input" 
+                                                       placeholder="Contoh: ${defaultHour}:00:00 (Jam ke-${i * 2})" 
+                                                       pattern="^[0-9]{2}:[0-9]{2}:[0-9]{2}$" 
+                                                       title="Format durasi Jam:Menit:Detik (JJ:MM:DD)" 
+                                                       required>
                                             </div>
-                                            <input type="text" 
-                                                   name="${type}_schedules[${i - 1}]" 
-                                                   class="form-control form-control-sm schedule-time-input" 
-                                                   placeholder="Contoh: ${defaultHour}:00:00 (Jam ke-${i * 2})" 
-                                                   pattern="^[0-9]{2}:[0-9]{2}:[0-9]{2}$" 
-                                                   title="Format durasi Jam:Menit:Detik (JJ:MM:DD)" 
-                                                   required>
                                         </div>
-                                    </div>
-                                `;
+                                    `;
                         inputsWrapper.append(inputHtml);
                     }
                     container.slideDown(200);
@@ -9938,9 +10143,16 @@
         // Helper function untuk notifikasi Swal Toast (tetap muncul hingga user tutup)
         function showToastNotification(type, message) {
             const toastMixin = type === 'success' ? window.ToastSuccess : window.ToastError;
-            toastMixin.fire({
-                title: message
-            });
+            if (typeof message === 'string' && (message.includes('\n') || message.includes('<br>'))) {
+                const formattedHtml = message.replace(/\n/g, '<br>');
+                toastMixin.fire({
+                    html: `<div style="text-align: left; font-size: 13px; line-height: 1.4; word-break: break-word;">${formattedHtml}</div>`
+                });
+            } else {
+                toastMixin.fire({
+                    title: message
+                });
+            }
         }
 
         $(document).on('click', '.cancel-barcode-btn', function (e) {
@@ -9951,8 +10163,14 @@
             const barcodeId = $(this).data('id');
             const matdok = $(this).data('matdok');
             const barcode = $(this).data('barcode') || '';
+            const approvalStatus = $(this).data('approval-status') || '';
 
-            if (!matdok) {
+            if (barcodeType === 'kain' && approvalStatus === 'pending') {
+                showToastNotification('warning', 'Barcode sedang menunggu approval SAP dan belum dapat dibatalkan.');
+                return;
+            }
+
+            if (!matdok && approvalStatus !== 'rejected') {
                 showToastNotification('error', 'Material document tidak tersedia!');
                 return;
             }
@@ -10002,40 +10220,40 @@
         // Modal konfirmasi cancel barcode
         if (!document.getElementById('modalConfirmCancelBarcode')) {
             $(document.body).append(`
-                                                                                        <div class="modal fade" id="modalConfirmCancelBarcode" tabindex="-1" aria-labelledby="modalConfirmCancelBarcodeLabel" aria-hidden="true">
-                                                                                            <div class="modal-dialog modal-dialog-centered" style="max-width:500px;">
-                                                                                                <div class="modal-content shadow-lg border-0 rounded-3">
-                                                                                                    <div class="modal-header bg-danger text-white">
-                                                                                                        <h5 class="modal-title fw-bold" id="modalConfirmCancelBarcodeLabel">
-                                                                                                            <i class="fas fa-exclamation-triangle mr-2"></i>Konfirmasi Cancel Barcode
-                                                                                                        </h5>
-                                                                                                        <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
-                                                                                                            <span aria-hidden="true">&times;</span>
-                                                                                                        </button>
-                                                                                                    </div>
-                                                                                                    <div class="modal-body py-4 px-4 text-center">
-                                                                                                        <div id="confirmCancelBarcodeText" style="font-size:15px;line-height:1.6;">
-                                                                                                            Apakah Anda yakin ingin mengcancel barcode ini?
+                                                                                            <div class="modal fade" id="modalConfirmCancelBarcode" tabindex="-1" aria-labelledby="modalConfirmCancelBarcodeLabel" aria-hidden="true">
+                                                                                                <div class="modal-dialog modal-dialog-centered" style="max-width:500px;">
+                                                                                                    <div class="modal-content shadow-lg border-0 rounded-3">
+                                                                                                        <div class="modal-header bg-danger text-white">
+                                                                                                            <h5 class="modal-title fw-bold" id="modalConfirmCancelBarcodeLabel">
+                                                                                                                <i class="fas fa-exclamation-triangle mr-2"></i>Konfirmasi Cancel Barcode
+                                                                                                            </h5>
+                                                                                                            <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                                                                                                                <span aria-hidden="true">&times;</span>
+                                                                                                            </button>
                                                                                                         </div>
-                                                                                                        <div id="cancelBarcodeLoading" style="display:none;margin-top:15px;">
-                                                                                                            <div class="spinner-border text-danger" role="status">
-                                                                                                                <span class="sr-only">Loading...</span>
+                                                                                                        <div class="modal-body py-4 px-4 text-center">
+                                                                                                            <div id="confirmCancelBarcodeText" style="font-size:15px;line-height:1.6;">
+                                                                                                                Apakah Anda yakin ingin mengcancel barcode ini?
                                                                                                             </div>
-                                                                                                            <p class="mt-2 text-muted">Memproses cancel barcode...</p>
+                                                                                                            <div id="cancelBarcodeLoading" style="display:none;margin-top:15px;">
+                                                                                                                <div class="spinner-border text-danger" role="status">
+                                                                                                                    <span class="sr-only">Loading...</span>
+                                                                                                                </div>
+                                                                                                                <p class="mt-2 text-muted">Memproses cancel barcode...</p>
+                                                                                                            </div>
                                                                                                         </div>
-                                                                                                    </div>
-                                                                                                    <div class="modal-footer d-flex justify-content-end px-4">
-                                                                                                        <button type="button" class="btn btn-secondary" data-dismiss="modal" id="btnCancelCancelBarcode">
-                                                                                                            <i class="fas fa-times mr-1"></i>Batal
-                                                                                                        </button>
-                                                                                                        <button type="button" class="btn btn-danger" id="btnConfirmCancelBarcode">
-                                                                                                            <i class="fas fa-check mr-1"></i>Ya, Cancel
-                                                                                                        </button>
+                                                                                                        <div class="modal-footer d-flex justify-content-end px-4">
+                                                                                                            <button type="button" class="btn btn-secondary" data-dismiss="modal" id="btnCancelCancelBarcode">
+                                                                                                                <i class="fas fa-times mr-1"></i>Batal
+                                                                                                            </button>
+                                                                                                            <button type="button" class="btn btn-danger" id="btnConfirmCancelBarcode">
+                                                                                                                <i class="fas fa-check mr-1"></i>Ya, Cancel
+                                                                                                            </button>
+                                                                                                        </div>
                                                                                                     </div>
                                                                                                 </div>
                                                                                             </div>
-                                                                                        </div>
-                                                                                        `);
+                                                                                            `);
         }
 
         let cancelBarcodeData = null;
@@ -10418,8 +10636,8 @@
                         });
                     },
                     error: function (xhr) {
-                        const msg = (xhr.responseJSON && xhr.responseJSON.message) 
-                            ? xhr.responseJSON.message 
+                        const msg = (xhr.responseJSON && xhr.responseJSON.message)
+                            ? xhr.responseJSON.message
                             : 'Gagal melakukan resync sinyal IoT.';
                         Swal.fire({
                             icon: 'error',

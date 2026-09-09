@@ -619,11 +619,19 @@
             });
         @endif
         @if(session('error'))
+            @php
+                $sessionError = (string) session('error');
+                $hasNewline = strpos($sessionError, "\n") !== false;
+            @endphp
             Swal.fire({
                 toast: true,
                 position: 'top-end',
                 icon: 'error',
-                title: {!! json_encode(session('error')) !!},
+                @if($hasNewline)
+                html: '<div style="text-align: left; font-size: 13px; line-height: 1.4; word-break: break-word;">{!! nl2br(e($sessionError)) !!}</div>',
+                @else
+                title: {!! json_encode($sessionError) !!},
+                @endif
                 showConfirmButton: true,
                 confirmButtonText: 'Tutup',
                 showCloseButton: true,

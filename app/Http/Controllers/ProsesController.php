@@ -879,6 +879,21 @@ class ProsesController extends Controller
 
             // Cek barcode di DB (termasuk yang di-cancel)
             $existingBarcodes = BarcodeKain::whereIn('barcode', $trimmedBarcodes)->get();
+
+            // Cek apakah ada barcode yang sedang dalam status pending approval QTY GI Over Limit
+            $pendingBarcodes = $existingBarcodes->where('cancel', false)->where('approval_status', 'pending');
+            if ($pendingBarcodes->isNotEmpty()) {
+                $pendingMsgs = [];
+                foreach ($pendingBarcodes as $pb) {
+                    $pendingMsgs[] = "List Barcode: {$pb->barcode} sedang menunggu approval pada OP {$pb->no_op}";
+                }
+                $msg = implode("\n", $pendingMsgs);
+                if ($request->ajax() || $request->wantsJson()) {
+                    return response()->json(['status' => 'error', 'message' => $msg], 400);
+                }
+                return redirect()->route('dashboard')->with('error', $msg);
+            }
+
             $realDuplicates = $existingBarcodes->where('cancel', false)->pluck('barcode')->all();
 
             if (!empty($realDuplicates)) {
@@ -940,31 +955,73 @@ class ProsesController extends Controller
                     return back()->withInput()->with('error', $errorMsg);
                 }
 
-                // Petakan response SAP
-                if (count($data) === count($barcodesToSap)) {
-                    $barcodesToSapArray = array_values($barcodesToSap);
-                    foreach ($barcodesToSapArray as $idx => $bc) {
-                        $results[$bc] = $data[$idx] ?? [];
-                    }
-                } else {
-                    $agg = $data[0];
-                    foreach ($barcodesToSap as $bc) {
-                        $results[$bc] = $agg;
+                // Petakan response SAP (utamakan pencocokan berdasarkan key 'barcode' dari SAP)
+                $dataByBarcode = [];
+                foreach ($data as $idx => $row) {
+                    if (is_array($row) && !empty($row['barcode'])) {
+                        $dataByBarcode[trim((string) $row['barcode'])] = $row;
                     }
                 }
 
-                // Periksa status tiap barcode SAP
-                $sapErrors = [];
+                $barcodesToSapArray = array_values($barcodesToSap);
+                foreach ($barcodesToSapArray as $idx => $bc) {
+                    if (isset($dataByBarcode[$bc])) {
+                        $results[$bc] = $dataByBarcode[$bc];
+                    } elseif (isset($data[$idx])) {
+                        $results[$bc] = $data[$idx];
+                    } else {
+                        $results[$bc] = $data[0] ?? [];
+                    }
+                }
+
+                // Periksa status tiap barcode SAP dan lakukan grouping jika memiliki error yang sama
+                $groupedErrors = [];
                 foreach ($results as $bc => $r) {
                     $stats = is_array($r) ? ($r['stats'] ?? null) : null;
                     if ($stats !== 'success') {
-                        $sapErrors[] = $bc . ': ' . ($stats ?: 'tidak dikenali');
+                        $rawReason = $stats ?: 'tidak dikenali';
+                        // Normalisasi spasi ganda yang sering dihasilkan SAP
+                        $cleanReason = trim(preg_replace('/\s+/', ' ', (string) $rawReason));
+                        $groupedErrors[$cleanReason][] = $bc;
                     }
                 }
-                if (!empty($sapErrors)) {
-                    $errorMsg = 'Beberapa barcode baru ditolak SAP: ' . implode('; ', $sapErrors);
+
+                if (!empty($groupedErrors)) {
+                    $errorLines = [];
+                    foreach ($groupedErrors as $reason => $barcodes) {
+                        $bcList = implode(', ', $barcodes);
+                        $errorLines[] = "• [{$bcList}]: {$reason}";
+                    }
+
+                    if (count($groupedErrors) === 1) {
+                        $firstReason = array_key_first($groupedErrors);
+                        $firstBcs = implode(', ', $groupedErrors[$firstReason]);
+                        $errorMsg = "Ditolak SAP [{$firstBcs}]: {$firstReason}";
+                    } else {
+                        $errorMsg = "Beberapa barcode baru ditolak SAP:\n" . implode("\n", $errorLines);
+                    }
+
+                    // Cek apakah terdapat error terkait QTY GI Over Limit
+                    $isOverLimit = false;
+                    $overLimitBarcodes = [];
+                    foreach ($groupedErrors as $reason => $barcodes) {
+                        if (stripos($reason, 'Over Limit') !== false || stripos($reason, 'Overlimit') !== false) {
+                            $isOverLimit = true;
+                            $overLimitBarcodes = array_merge($overLimitBarcodes, $barcodes);
+                        }
+                    }
+
                     if ($request->ajax() || $request->wantsJson()) {
-                        return response()->json(['status' => 'error', 'message' => $errorMsg], 400);
+                        return response()->json([
+                            'status' => 'error',
+                            'message' => $errorMsg,
+                            'grouped_errors' => $groupedErrors,
+                            'is_over_limit' => $isOverLimit,
+                            'over_limit_barcodes' => array_values(array_unique($overLimitBarcodes)),
+                            'detail_proses_id' => $detailProses->id,
+                            'no_op' => $detailProses->no_op,
+                            'item_op' => $detailProses->item_op,
+                        ], 400);
                     }
                     return redirect()->route('dashboard')->with('error', $errorMsg);
                 }
@@ -981,6 +1038,7 @@ class ProsesController extends Controller
                         'no_partai' => $no_partai,
                         'mesin_id' => $mesin_id,
                         'cancel' => false,
+                        'approval_status' => 'approved',
                     ]);
                 }
 
@@ -997,6 +1055,7 @@ class ProsesController extends Controller
                         'qty_gi' => isset($r['menge']) ? (float) $r['menge'] : null,
                         'mesin_id' => $mesin_id,
                         'cancel' => false,
+                        'approval_status' => 'approved',
                     ]);
                 }
                 DB::commit();
@@ -1037,6 +1096,150 @@ class ProsesController extends Controller
                 return response()->json(['status' => 'error', 'message' => $errorMsg], 500);
             }
             return redirect()->route('dashboard')->with('error', $errorMsg);
+        }
+    }
+
+    // Pengajuan QTY GI Over Limit ke SAP untuk Barcode Kain
+    public function pengajuanOverGi(Request $request, $id)
+    {
+        $request->validate([
+            'detail_proses_id' => 'required|exists:detail_proses,id',
+            'barcodes' => 'required|array|min:1',
+            'barcodes.*' => 'required|string|max:255',
+        ]);
+
+        try {
+            $proses = Proses::findOrFail($id);
+            $detailProses = DetailProses::where('id', $request->detail_proses_id)
+                ->where('proses_id', $id)
+                ->firstOrFail();
+
+            // Potong ke 10 karakter dan bersihkan
+            $rawBarcodes = $request->barcodes;
+            $trimmedBarcodes = [];
+            foreach ($rawBarcodes as $b) {
+                $trimmed = substr(trim((string) $b), 0, 10);
+                if ($trimmed !== '') {
+                    $trimmedBarcodes[] = $trimmed;
+                }
+            }
+            $trimmedBarcodes = array_values(array_unique($trimmedBarcodes));
+
+            if (empty($trimmedBarcodes)) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Tidak ada barcode valid untuk diajukan.'
+                ], 400);
+            }
+
+            // Validasi keberadaan barcode di DB
+            $existingBarcodes = BarcodeKain::whereIn('barcode', $trimmedBarcodes)
+                ->where('cancel', false)
+                ->get();
+
+            $pendingInOther = $existingBarcodes->where('approval_status', 'pending');
+            if ($pendingInOther->isNotEmpty()) {
+                $details = [];
+                foreach ($pendingInOther as $pb) {
+                    $details[] = "List Barcode: {$pb->barcode} sedang menunggu approval pada OP {$pb->no_op}";
+                }
+                return response()->json([
+                    'status' => 'error',
+                    'message' => implode("\n", $details)
+                ], 400);
+            }
+
+            $alreadyApproved = $existingBarcodes->where('approval_status', 'approved');
+            if ($alreadyApproved->isNotEmpty()) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Barcode sudah pernah digunakan dan aktif: ' . implode(', ', $alreadyApproved->pluck('barcode')->all())
+                ], 400);
+            }
+
+            // Susun payload untuk SAP (sesuai format Postman)
+            $barcodeItems = [];
+            foreach ($trimmedBarcodes as $bc) {
+                $barcodeItems[] = [
+                    'barcode' => $bc,
+                ];
+            }
+
+            $noOp = (string) $detailProses->no_op;
+            $itemOp = (string) ($detailProses->item_op ?: '10');
+
+            $sapPayload = [
+                'AUFNR' => $noOp,
+                'NO' => $itemOp,
+                'barcode' => $barcodeItems,
+            ];
+
+            Log::info('BarcodeKain: Mengirim Pengajuan Over GI ke SAP', [
+                'proses_id' => $id,
+                'detail_proses_id' => $detailProses->id,
+                'payload' => $sapPayload
+            ]);
+
+            $client = new \GuzzleHttp\Client();
+            $sapUrl = SapApi::url('zterima_ovr_gi');
+            $method = env('SAP_METHOD_ZTERIMA_OVR_GI', 'GET');
+
+            // Gunakan guzzleOptions default yang sudah menyertakan Authorization Basic Auth & Content-Type text/plain
+            $options = SapApi::guzzleOptions([
+                'body' => json_encode($sapPayload),
+            ]);
+
+            $response = $client->request($method, $sapUrl, $options);
+            $responseBody = (string) $response->getBody();
+            Log::info('BarcodeKain: Response SAP Pengajuan Over GI', [
+                'status_code' => $response->getStatusCode(),
+                'body' => $responseBody
+            ]);
+
+            // Simpan record BarcodeKain dengan status 'pending'
+            DB::beginTransaction();
+            try {
+                foreach ($trimmedBarcodes as $bc) {
+                    BarcodeKain::create([
+                        'detail_proses_id' => $detailProses->id,
+                        'no_op' => $detailProses->no_op,
+                        'no_partai' => $detailProses->no_partai,
+                        'barcode' => $bc,
+                        'matdok' => null,
+                        'item_document' => null,
+                        'qty_gi' => null,
+                        'mesin_id' => $proses->mesin_id,
+                        'cancel' => false,
+                        'approval_status' => 'pending',
+                    ]);
+                }
+                DB::commit();
+            } catch (\Exception $e) {
+                DB::rollBack();
+                throw $e;
+            }
+
+            // Broadcast real-time status card dan detail
+            $proses->refresh();
+            $proses->load(['approvals', 'details.barcodeKains', 'details.barcodeLas', 'details.barcodeAuxs']);
+            $statusService = new \App\Services\ProsesStatusService();
+            $affectedProsesIds = $statusService->getAffectedProsesIds();
+            $statusData = $statusService->generateProsesStatus($proses, $affectedProsesIds);
+            event(new \App\Events\BarcodeStatusUpdated($proses->id, $statusData));
+            Cache::forget("iot:mesin:{$proses->mesin_id}:alarm_result");
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Pengajuan QTY GI Over Limit untuk ' . count($trimmedBarcodes) . ' barcode berhasil dikirim ke SAP dan sedang menunggu approval.',
+                'barcodes' => $trimmedBarcodes,
+                'count' => count($trimmedBarcodes)
+            ]);
+        } catch (\Exception $e) {
+            Log::error('BarcodeKain: Gagal pengajuan Over GI', ['error' => $e->getMessage(), 'proses_id' => $id]);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Gagal mengirim pengajuan Over GI ke SAP: ' . $e->getMessage()
+            ], 500);
         }
     }
 
@@ -1956,9 +2159,17 @@ class ProsesController extends Controller
 
             // Hitung progress barcode kain untuk DetailProses ini
             $roll = $detailProses->roll ?? 0;
+            $approvedCount = BarcodeKain::where('detail_proses_id', $detailProses->id)
+                ->where('cancel', false)
+                ->where('approval_status', 'approved')
+                ->count();
             $barcodeKainCount = BarcodeKain::where('detail_proses_id', $detailProses->id)
                 ->where('cancel', false)
                 ->count();
+            $hasPending = BarcodeKain::where('detail_proses_id', $detailProses->id)
+                ->where('cancel', false)
+                ->where('approval_status', 'pending')
+                ->exists();
 
             $barcodeKainProgress[] = [
                 'detail_proses_id' => $detailProses->id,
@@ -1966,7 +2177,9 @@ class ProsesController extends Controller
                 'no_op' => $detailProses->no_op ?? 'N/A',
                 'roll' => $roll,
                 'scanned' => $barcodeKainCount,
-                'is_complete' => $barcodeKainCount >= $roll
+                'approved' => $approvedCount,
+                'has_pending' => $hasPending,
+                'is_complete' => ($approvedCount >= $roll && $roll > 0)
             ];
 
             // Ambil barcode la dari DetailProses ini
@@ -1990,11 +2203,19 @@ class ProsesController extends Controller
 
         foreach ($allDetailProsesList as $detailProses) {
             $roll = $detailProses->roll ?? 0;
+            $approvedCount = BarcodeKain::where('detail_proses_id', $detailProses->id)
+                ->where('cancel', false)
+                ->where('approval_status', 'approved')
+                ->count();
             $barcodeKainCount = BarcodeKain::where('detail_proses_id', $detailProses->id)
                 ->where('cancel', false)
                 ->count();
+            $hasPending = BarcodeKain::where('detail_proses_id', $detailProses->id)
+                ->where('cancel', false)
+                ->where('approval_status', 'pending')
+                ->exists();
 
-            $isComplete = $barcodeKainCount >= $roll;
+            $isComplete = ($approvedCount >= $roll && $roll > 0);
 
             $allBarcodeKainProgress[] = [
                 'detail_proses_id' => $detailProses->id,
@@ -2002,6 +2223,8 @@ class ProsesController extends Controller
                 'no_op' => $detailProses->no_op ?? 'N/A',
                 'roll' => $roll,
                 'scanned' => $barcodeKainCount,
+                'approved' => $approvedCount,
+                'has_pending' => $hasPending,
                 'is_complete' => $isComplete
             ];
 
@@ -2242,6 +2465,34 @@ class ProsesController extends Controller
         if (!$barcodeObj) {
             Log::error('Cancel barcode gagal: barcode tidak ditemukan', compact('type', 'barcode'));
             return response()->json(['status' => 'error', 'message' => 'Barcode tidak ditemukan'], 404);
+        }
+
+        // Tolak pembatalan jika barcode kain masih berstatus pending approval
+        if ($type === 'kain' && ($barcodeObj->approval_status ?? '') === 'pending') {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Barcode sedang menunggu approval SAP dan tidak dapat dicancel.'
+            ], 400);
+        }
+
+        // Jika barcode kain berstatus rejected atau belum memiliki matdok di SAP, batalkan langsung di database lokal
+        if ($type === 'kain' && (($barcodeObj->approval_status ?? '') === 'rejected' || empty($barcodeObj->matdok) || $barcodeObj->matdok === '0')) {
+            $barcodeObj->cancel = true;
+            $barcodeObj->save();
+
+            $prosesId = $barcodeObj->detailProses->proses_id ?? $proses;
+            $statusService = new \App\Services\ProsesStatusService();
+            $globalAffected = $statusService->getAffectedProsesIds();
+            $prosesModel = \App\Models\Proses::with(['approvals', 'details.barcodeKains', 'details.barcodeLas', 'details.barcodeAuxs'])->find($prosesId);
+            if ($prosesModel) {
+                $statusData = $statusService->generateProsesStatus($prosesModel, $globalAffected);
+                event(new \App\Events\BarcodeStatusUpdated($prosesModel->id, $statusData));
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Barcode yang ditolak berhasil dibatalkan.'
+            ]);
         }
 
         // Jika matdok kosong/null, ambil dari database barcode

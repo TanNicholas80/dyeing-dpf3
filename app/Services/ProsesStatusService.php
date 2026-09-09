@@ -93,11 +93,17 @@ class ProsesStatusService
                 // Untuk indikator G (Kain): cek apakah jumlah barcode kain sudah sesuai dengan roll
                 $roll = $detail->roll ?? 0;
                 $barcodeKainCount = 0;
+                $barcodeKainApprovedCount = 0;
+                $hasPendingOverGi = false;
                 if ($detail->barcodeKains) {
-                    $barcodeKainCount = $detail->barcodeKains->where('cancel', false)->count();
+                    $activeKains = $detail->barcodeKains->where('cancel', false);
+                    $barcodeKainCount = $activeKains->count();
+                    $barcodeKainApprovedCount = $activeKains->where('approval_status', 'approved')->count();
+                    $hasPendingOverGi = $activeKains->where('approval_status', 'pending')->isNotEmpty();
                 }
-                // Indikator G hijau hanya jika jumlah barcode kain >= jumlah roll
-                $detailHasKain = ($barcodeKainCount >= $roll && $roll > 0);
+                // Indikator G hijau hanya jika jumlah barcode kain approved >= jumlah roll
+                $detailHasKain = ($barcodeKainApprovedCount >= $roll && $roll > 0);
+                $kainColorStatus = $hasPendingOverGi ? 'yellow' : ($detailHasKain ? 'green' : 'red');
                 $hasBarcodeKain = $hasBarcodeKain && $detailHasKain;
                 
                 if ($detail->barcodeLas) {
@@ -113,11 +119,13 @@ class ProsesStatusService
                 // Simpan status GDA per detail untuk update real-time
                 $gdaDetails[] = [
                     'detail_id' => $detail->id,
-                    'has_kain' => $detailHasKain,
+                    'has_kain' => $kainColorStatus,
                     'has_la' => $detailHasLa,
                     'has_aux' => $detailHasAux,
                     'roll' => $roll,
                     'barcode_kain_count' => $barcodeKainCount,
+                    'barcode_kain_approved_count' => $barcodeKainApprovedCount,
+                    'has_pending_over_gi' => $hasPendingOverGi,
                 ];
             }
         }

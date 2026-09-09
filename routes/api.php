@@ -61,3 +61,12 @@ Route::prefix('iot')->group(function () {
 
 // Endpoint Legacy untuk firmware lama (Backward Compatibility)
 Route::match(['get', 'post'], '/checkStatus', [ApiCheckStatusBarcodeController::class, 'checkStatusLegacy']);
+
+/**
+ * SAP Webhook / Callback API
+ * Base path: /api/sap/...
+ */
+Route::prefix('sap')->group(function () {
+    Route::post('/approval-over-gi', [\App\Http\Controllers\Api\SapApprovalController::class, 'updateApprovalOverGi']);
+});
+
