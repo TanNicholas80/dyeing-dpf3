@@ -52,5 +52,6 @@ return [
         'zterima_cstmr' => env('SAP_PATH_ZTERIMA_CSTMR', '/sap/bc/zdyes/zterima_cstmr'),
         'zterima_mkt' => env('SAP_PATH_ZTERIMA_MKT', '/sap/bc/zdyes/zterima_mkt'),
         'zterima_ovr_gi' => env('SAP_PATH_ZTERIMA_OVR_GI', '/sap/bc/zdyes/zterima_ovr_gi'),
+        'zterima_stock' => env('SAP_PATH_ZTERIMA_STOCK', '/sap/bc/zdyes/zterima_stock'),
     ],
 ];

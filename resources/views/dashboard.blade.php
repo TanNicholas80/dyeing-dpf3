@@ -738,7 +738,11 @@
                                                                     ? 'P'
                                                                     : ($proses->jenis === 'Reproses'
                                                                         ? 'R'
-                                                                        : 'M');
+                                                                        : ($proses->jenis === 'Proses Makloon'
+                                                                            ? 'PM'
+                                                                            : ($proses->jenis === 'Reproses Makloon'
+                                                                                ? 'RM'
+                                                                                : 'M')));
                                                                 if ($proses->jenis === 'Maintenance') {
                                                                     $blockColors = ['gray', 'gray', 'gray'];
                                                                 } else {
@@ -814,7 +818,7 @@
                                                                                 'swap_position',
                                                                             ]);
                                                                     });
-                                                                    if ($proses->jenis === 'Reproses') {
+                                                                    if (in_array($proses->jenis, ['Reproses', 'Reproses Makloon'])) {
                                                                         $hasPendingReprocessApproval = collect(
                                                                             $proses->approvals,
                                                                         )->contains(function ($appr) {
@@ -1913,11 +1917,17 @@
                                             <option value="Produksi" selected id="jenis-option-produksi">Produksi</option>
                                             <option value="Maintenance" id="jenis-option-maintenance">Maintenance</option>
                                             <option value="Reproses" id="jenis-option-reproses">Reproses</option>
+                                            <option value="Proses Makloon" id="jenis-option-proses-makloon">Proses Makloon</option>
+                                            <option value="Reproses Makloon" id="jenis-option-reproses-makloon">Reproses Makloon</option>
                                         </select>
                                         <small id="reprocess-hint-greige" class="form-text text-info mt-1"
                                             style="display:none;">
                                             <i class="fas fa-info-circle"></i> Reproses hanya untuk No OP &amp; No Partai
                                             yang pernah dipakai pada jenis proses Produksi.
+                                        </small>
+                                        <small id="makloon-hint-op" class="form-text text-warning mt-1"
+                                            style="display:none;">
+                                            <i class="fas fa-info-circle"></i> Format No OP untuk Makloon wajib berawalan <strong>007</strong> (contoh: 007000000001).
                                         </small>
                                     </div>
                                 </div>
@@ -6655,13 +6665,29 @@
                                                                                                                         <div id="barcode-scanner-container" style="width:100%;min-height:320px;display:flex;align-items:center;justify-content:center;"></div>
                                                                                                                     </div>
                                                                                                                     <div class="tab-pane fade" id="mode-manual-pane" role="tabpanel">
-                                                                                                                        <div id="barcode-manual-container" class="py-3">
-                                                                                                                            <label for="inputBarcodeManual" class="d-block text-left mb-2 font-weight-bold">Ketik kode barcode:</label>
-                                                                                                                            <input type="text" class="form-control form-control-lg text-center" id="inputBarcodeManual" placeholder="Masukkan barcode" maxlength="255" autocomplete="off">
-                                                                                                                            <small class="text-muted d-block mt-2">Tekan Enter atau klik Simpan setelah mengisi barcode.</small>
-                                                                                                                            <button type="button" class="btn btn-success mt-3" id="btnSubmitManualBarcode"><i class="fas fa-check"></i> Simpan Barcode</button>
-                                                                                                                        </div>
-                                                                                                                    </div>
+                                                                                                                         <div id="barcode-manual-container" class="py-3">
+                                                                                                                             <label for="inputBarcodeManual" class="d-block text-left mb-2 font-weight-bold">Ketik kode barcode:</label>
+                                                                                                                             <input type="text" class="form-control form-control-lg text-center" id="inputBarcodeManual" placeholder="Masukkan barcode" maxlength="255" autocomplete="off">
+                                                                                                                             <small class="text-muted d-block mt-2">Tekan Enter atau klik Simpan setelah mengisi barcode.</small>
+                                                                                                                             <button type="button" class="btn btn-success mt-3" id="btnSubmitManualBarcode"><i class="fas fa-check"></i> Simpan Barcode</button>
+                                                                                                                         </div>
+                                                                                                                         <div id="kain-material-makloon-container" class="py-3 text-left" style="display:none;">
+                                                                                                                             <label for="selectMaterialMakloon" class="d-block font-weight-bold mb-1">
+                                                                                                                                 <i class="fas fa-boxes text-success mr-1"></i> Pilih Material Kain Stock (SAP):
+                                                                                                                             </label>
+                                                                                                                             <select id="selectMaterialMakloon" class="form-control" style="width:100%;">
+                                                                                                                                 <option value="">-- Cari Kode / Deskripsi Material --</option>
+                                                                                                                             </select>
+                                                                                                                             <div id="material-stock-info" class="mt-2 p-2 rounded" style="display:none; font-size:12px; background:#f8f9fa; border:1px solid #ddd;">
+                                                                                                                                 <div><strong>Deskripsi:</strong> <span id="mkl-info-desc">-</span></div>
+                                                                                                                                 <div><strong>Batch:</strong> <span id="mkl-info-batch">-</span> | <strong>Sloc:</strong> <span id="mkl-info-sloc">-</span></div>
+                                                                                                                                 <div><strong>Available Qty:</strong> <span id="mkl-info-qty" class="text-success font-weight-bold">-</span></div>
+                                                                                                                             </div>
+                                                                                                                             <button type="button" class="btn btn-success mt-3" id="btnSubmitMaterialMakloon">
+                                                                                                                                 <i class="fas fa-plus mr-1"></i> Tambah Material ke Daftar
+                                                                                                                             </button>
+                                                                                                                         </div>
+                                                                                                                     </div>
                                                                                                                 </div>
                                                                                                                 {{-- Section pending list barcode kain (hanya tampil saat barcode_kain) --}}
                                                                                                                 <div id="kain-pending-section" class="mt-3" style="display:none;">
@@ -6816,24 +6842,33 @@
             const raw = (rawInput || '').trim();
             if (!raw) return false;
 
-            const bc = raw.substring(0, 10);
-            const container = raw.length > 10 ? raw.substring(10, 20) : '';
+            const isMkl = !!s.isMakloon;
+            const bc = isMkl ? raw : raw.substring(0, 10);
+            const container = (!isMkl && raw.length > 10) ? raw.substring(10, 20) : '';
 
             if (bc.length < 3) {
-                showToastNotification('error', 'Barcode terlalu pendek.');
+                showToastNotification('error', isMkl ? 'Kode material terlalu pendek.' : 'Barcode terlalu pendek.');
                 return false;
             }
 
             // Cek duplikat di pending list
             if (s.pending.some(p => p.barcode === bc)) {
-                showToastNotification('error', `Barcode ${bc} sudah ada di daftar.`);
+                showToastNotification('error', `${isMkl ? 'Material' : 'Barcode'} ${bc} sudah ada di daftar.`);
                 return false;
             }
 
             // Cek kapasitas
             if (s.pending.length >= s.remaining) {
-                showToastNotification('error', `Jumlah barcode sudah mencapai kebutuhan (${s.remaining}). Klik Simpan Barcode untuk menyimpan.`);
+                showToastNotification('error', `Jumlah ${isMkl ? 'material' : 'barcode'} sudah mencapai kebutuhan (${s.remaining}). Klik Simpan Barcode untuk menyimpan.`);
                 return false;
+            }
+
+            // Untuk Makloon: Material berasal dari stock SAP terverifikasi, langsung masukkan ke pending list tanpa cek barcode aktif fisik
+            if (isMkl) {
+                s.pending.push({ barcode: bc, container: container, raw: raw });
+                renderKainPendingList();
+                updateBarcodeScanUI();
+                return true;
             }
 
             // REAL-TIME VALIDASI KE SERVER
@@ -6934,13 +6969,34 @@
             $('#inputDetailProsesId').val(detailId);
             $('#inputApprovalId').val(approvalId);
 
+            // Ambil data proses
+            const $card = $(`.status-card[data-proses-id="${prosesId}"]`);
+            const prosesData = $card.length ? $card.data('proses') : $('#modalDetailProses').data('proses');
+            const isMakloon = prosesData && (prosesData.jenis === 'Proses Makloon' || prosesData.jenis === 'Reproses Makloon');
+
             // Update judul modal agar lebih jelas
-            const title = barcodeType === 'barcode_kain' ? 'Input Barcode Kain' :
+            let title = barcodeType === 'barcode_kain' ? 'Input Barcode Kain' :
                 (barcodeType === 'barcode_la' ? 'Input Barcode Dye Stuff' : 'Input Barcode AUX');
+            if (barcodeType === 'barcode_kain' && isMakloon) {
+                title = 'Input Material Kain (Makloon)';
+            }
             $('#modalScanBarcodeLabel').text(title);
 
             // Reset state kain
             resetKainScanState();
+            window.kainScanState.isMakloon = isMakloon;
+
+            if (barcodeType === 'barcode_kain' && isMakloon) {
+                $('#mode-scan-tab').parent().hide();
+                $('#mode-manual-tab').tab('show');
+                $('#barcode-manual-container').hide();
+                $('#kain-material-makloon-container').show();
+                initSelectMaterialMakloon();
+            } else {
+                $('#mode-scan-tab').parent().show();
+                $('#barcode-manual-container').show();
+                $('#kain-material-makloon-container').hide();
+            }
 
             if (barcodeType === 'barcode_kain') {
                 // Fetch progress roll saat ini untuk detail OP terpilih
@@ -7258,6 +7314,70 @@
                 $('#btnSubmitManualBarcode').click();
             }
         });
+
+        // Submit material dari select2 Makloon
+        $('#modalScanBarcode').on('click', '#btnSubmitMaterialMakloon', function () {
+            const selectedMat = $('#selectMaterialMakloon').val();
+            if (!selectedMat || selectedMat.trim() === '') {
+                showToastNotification('error', 'Silakan pilih material terlebih dahulu!');
+                $('#selectMaterialMakloon').select2('open');
+                return;
+            }
+
+            const ok = addPendingKainBarcode(selectedMat.trim());
+            if (ok) {
+                $('#selectMaterialMakloon').val('').trigger('change');
+                $('#material-stock-info').hide();
+            }
+        });
+
+        function initSelectMaterialMakloon() {
+            const $select = $('#selectMaterialMakloon');
+            if ($select.data('select2')) {
+                $select.val('').trigger('change');
+                $('#material-stock-info').hide();
+                return;
+            }
+
+            $select.select2({
+                dropdownParent: $('#modalScanBarcode'),
+                placeholder: '-- Cari Kode / Deskripsi Material Stock --',
+                allowClear: true,
+                width: '100%',
+                ajax: {
+                    url: '/api/proxy-material-stock',
+                    type: 'POST',
+                    dataType: 'json',
+                    delay: 400,
+                    data: function (params) {
+                        return {
+                            term: params.term || 'M-',
+                            _token: '{{ csrf_token() }}'
+                        };
+                    },
+                    processResults: function (data) {
+                        return {
+                            results: data.results || []
+                        };
+                    }
+                }
+            });
+
+            $select.on('select2:select', function (e) {
+                const data = e.params.data;
+                if (data && data.material) {
+                    $('#mkl-info-desc').text(data.mat_dec || '-');
+                    $('#mkl-info-batch').text(data.batch || '-');
+                    $('#mkl-info-sloc').text(data.sloc || '-');
+                    $('#mkl-info-qty').text(data.quantity ? Number(data.quantity).toLocaleString('id-ID') : '0');
+                    $('#material-stock-info').slideDown(150);
+                }
+            });
+
+            $select.on('select2:clear', function () {
+                $('#material-stock-info').slideUp(150);
+            });
+        }
 
         // ========================================================
         // Handler submit batch barcode kain (semua pending -> backend)
@@ -9591,9 +9711,21 @@
             // Tampilkan hint Reproses (mode Greige): No OP & No Partai harus pernah dipakai di Produksi
             function toggleReprocessHint() {
                 var mode = $('input[name="proses_mode_radio"]:checked').val() || 'greige';
-                var isReproses = $('#jenis').val() === 'Reproses';
+                var jenis = $('#jenis').val();
+                var isReproses = (jenis === 'Reproses');
                 var $hint = $('#reprocess-hint-greige');
                 if (mode === 'greige' && isReproses) {
+                    $hint.show();
+                } else {
+                    $hint.hide();
+                }
+            }
+
+            function toggleMakloonHint() {
+                var jenis = $('#jenis').val();
+                var isMakloon = (jenis === 'Proses Makloon' || jenis === 'Reproses Makloon');
+                var $hint = $('#makloon-hint-op');
+                if (isMakloon) {
                     $hint.show();
                 } else {
                     $hint.hide();
@@ -9629,6 +9761,7 @@
                     });
                 }
                 toggleReprocessHint();
+                toggleMakloonHint();
             });
 
             // Handler untuk tombol tambah detail
@@ -9662,18 +9795,39 @@
                 var $produksi = $('#jenis-option-produksi');
                 var $maintenance = $('#jenis-option-maintenance');
                 var $reproses = $('#jenis-option-reproses');
+                var $prosesMakloon = $('#jenis-option-proses-makloon');
+                var $reprosesMakloon = $('#jenis-option-reproses-makloon');
+
                 if (mode === 'finish') {
+                    // Finish hanya boleh Reproses dan Reproses Makloon
                     $produksi.prop('disabled', true).hide();
                     $maintenance.prop('disabled', true).hide();
+                    $prosesMakloon.prop('disabled', true).hide();
+
                     $reproses.prop('disabled', false).show();
-                    $('#jenis').val('Reproses').css({ 'pointer-events': 'none', 'background-color': '#e9ecef' }).attr('tabindex', '-1');
+                    $reprosesMakloon.prop('disabled', false).show();
+
+                    var curVal = $('#jenis').val();
+                    if (curVal !== 'Reproses' && curVal !== 'Reproses Makloon') {
+                        $('#jenis').val('Reproses');
+                    }
+                    $('#jenis').css({ 'pointer-events': 'auto', 'background-color': '#fff' }).removeAttr('tabindex');
                 } else {
+                    // Greige boleh semua
                     $produksi.prop('disabled', false).show();
                     $maintenance.prop('disabled', false).show();
                     $reproses.prop('disabled', false).show();
+                    $prosesMakloon.prop('disabled', false).show();
+                    $reprosesMakloon.prop('disabled', false).show();
+
+                    var curVal = $('#jenis').val();
+                    if (!curVal) {
+                        $('#jenis').val('Produksi');
+                    }
                     $('#jenis').css({ 'pointer-events': 'auto', 'background-color': '#fff' }).removeAttr('tabindex');
                 }
                 toggleReprocessHint();
+                toggleMakloonHint();
             }
 
             // Saat modal dibuka: set default mode Greige dan terapkan (kecuali form di-reopen dengan error, jenis bisa Reproses)
@@ -9954,6 +10108,43 @@
 
                 // Validasi duplikasi (no_op, no_partai) dalam 1 proses. No Partai sama boleh jika No OP beda.
                 if (jenisProses !== 'Maintenance') {
+                    const isMakloon = (jenisProses === 'Proses Makloon' || jenisProses === 'Reproses Makloon');
+                    const modeVal = $('#proses_mode').val() || 'greige';
+                    let opError = null;
+
+                    $('#detail-proses-container .detail-proses-item').each(function (idx) {
+                        const noOp = $(this).find('[name*=\"[no_op]\"]').val() || '';
+                        const trimmedOp = noOp.trim();
+                        if (!trimmedOp) return;
+
+                        if (isMakloon) {
+                            if (!trimmedOp.startsWith('007')) {
+                                opError = `No OP pada item #${idx + 1} (${trimmedOp}) harus berawalan "007" untuk jenis proses ${jenisProses}.`;
+                                return false;
+                            }
+                        } else if (modeVal === 'finish') {
+                            if (!trimmedOp.startsWith('010')) {
+                                opError = `No OP pada item #${idx + 1} (${trimmedOp}) harus berawalan "010" untuk mode Finish.`;
+                                return false;
+                            }
+                        } else {
+                            if (!trimmedOp.startsWith('066')) {
+                                opError = `No OP pada item #${idx + 1} (${trimmedOp}) harus berawalan "066" untuk mode Greige.`;
+                                return false;
+                            }
+                        }
+                    });
+
+                    if (opError) {
+                        Swal.fire({
+                            icon: 'warning',
+                            title: 'Format No OP Tidak Sesuai',
+                            text: opError,
+                            confirmButtonText: 'OK'
+                        });
+                        return false;
+                    }
+
                     const pairs = {};
                     const duplicatePairs = [];
 

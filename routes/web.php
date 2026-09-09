@@ -207,3 +207,4 @@ Route::post('/api/proxy-marketing', [AuxlController::class, 'proxyMarketingSearc
 // Cek (no_op, no_partai) sudah terpakai di proses lain (validasi tambah proses)
 Route::post('/api/check-partai-used', [ProsesController::class, 'checkPartaiUsed']);
 Route::post('/api/check-barcode-active', [ProsesController::class, 'checkBarcodeActive']);
+Route::match(['get', 'post'], '/api/proxy-material-stock', [ProsesController::class, 'proxyMaterialStock']);

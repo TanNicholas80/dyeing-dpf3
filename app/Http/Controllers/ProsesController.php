@@ -284,16 +284,16 @@ class ProsesController extends Controller
         $mode = $request->input('mode', 'greige');
         $rules = [
             'mode' => 'nullable|in:greige,finish',
-            'jenis' => 'required|in:Produksi,Maintenance,Reproses',
+            'jenis' => 'required|in:Produksi,Maintenance,Reproses,Proses Makloon,Reproses Makloon',
             'mesin_id' => 'required|exists:mesins,id',
             'cycle_time' => 'required',
             'qty_dye_stuff' => 'nullable|integer|in:0,1,2,3',
             'qty_aux' => 'nullable|integer|in:0,1,2,3',
         ];
 
-        // Finish mode: hanya Reproses
+        // Finish mode: hanya Reproses dan Reproses Makloon
         if ($mode === 'finish') {
-            $rules['jenis'] = 'required|in:Reproses';
+            $rules['jenis'] = 'required|in:Reproses,Reproses Makloon';
         }
 
         if ($request->jenis !== 'Maintenance') {
@@ -356,8 +356,13 @@ class ProsesController extends Controller
         ) {
             $jenisProses = $validated['jenis'];
             $mode = $validated['mode'] ?? $request->input('mode', 'greige');
+            $isMakloon = in_array($jenisProses, ['Proses Makloon', 'Reproses Makloon']);
 
-            // 0. Validasi format No OP menurut mode (Greige = 066, Finish = 010)
+            // 0. Validasi format No OP menurut mode dan jenis proses
+            // Makloon (Greige & Finish) = kode awal 007
+            // Greige reguler = kode awal 066
+            // Finish reguler = kode awal 010
+            $prefixMakloon = '007';
             $prefixGreige = '066';
             $prefixFinish = '010';
             foreach ($validated['details'] as $index => $detail) {
@@ -365,7 +370,15 @@ class ProsesController extends Controller
                 if ($noOp === '') {
                     continue;
                 }
-                if ($mode === 'finish') {
+                if ($isMakloon) {
+                    if (!str_starts_with($noOp, $prefixMakloon)) {
+                        return back()
+                            ->withInput()
+                            ->withErrors([
+                                "details.$index.no_op" => "No OP untuk {$jenisProses} harus memiliki kode awal {$prefixMakloon}. Contoh: {$prefixMakloon}xxxxx. No OP yang dimasukkan: \"{$noOp}\".",
+                            ]);
+                    }
+                } elseif ($mode === 'finish') {
                     if (!str_starts_with($noOp, $prefixFinish)) {
                         return back()
                             ->withInput()
@@ -374,7 +387,7 @@ class ProsesController extends Controller
                             ]);
                     }
                 } else {
-                    // greige
+                    // greige reguler
                     if (!str_starts_with($noOp, $prefixGreige)) {
                         return back()
                             ->withInput()
@@ -427,7 +440,7 @@ class ProsesController extends Controller
                     ->with('proses')
                     ->get();
 
-                if ($jenisProses === 'Reproses') {
+                if (in_array($jenisProses, ['Reproses', 'Reproses Makloon'])) {
                     if ($mode !== 'finish') {
                         $produksis = $existingDetails->filter(function ($d) {
                             return $d->proses && $d->proses->jenis === 'Produksi';
@@ -576,8 +589,8 @@ class ProsesController extends Controller
                 }
             }
 
-            // Jika jenis = Reproses, buat approval ke FM terlebih dahulu (2 tahap: FM dulu, baru VP)
-            if ($proses->jenis === 'Reproses') {
+            // Jika jenis = Reproses atau Reproses Makloon, buat approval ke FM terlebih dahulu (2 tahap: FM dulu, baru VP)
+            if (in_array($proses->jenis, ['Reproses', 'Reproses Makloon'])) {
                 // Ambil semua DetailProses untuk snapshot
                 $detailProsesList = DetailProses::where('proses_id', $proses->id)->get();
                 $detailProsesSnapshots = $detailProsesList->map(function ($detail) {
@@ -713,6 +726,79 @@ class ProsesController extends Controller
     }
 
     /**
+     * Proxy untuk mengambil list Material Stock dari SAP (/sap/bc/zdyes/zterima_stock)
+     * Digunakan untuk input manual material pada Barcode Kain jenis proses Makloon.
+     */
+    public function proxyMaterialStock(Request $request)
+    {
+        $term = trim((string) $request->input('term', $request->input('q', 'M-')));
+        if ($term === '') {
+            $term = 'M-';
+        }
+
+        $cacheKey = 'proxy_sap:stock:' . md5($term);
+        $cached = Cache::get($cacheKey);
+        if ($cached !== null) {
+            return response()->json($cached);
+        }
+
+        try {
+            $client = new \GuzzleHttp\Client();
+            $response = $client->request(
+                'POST',
+                SapApi::url('zterima_stock'),
+                SapApi::guzzleOptions(['body' => json_encode($term)])
+            );
+            $data = json_decode($response->getBody(), true);
+            if (!is_array($data)) {
+                return response()->json(['results' => [], 'raw' => []]);
+            }
+
+            $results = [];
+            foreach ($data as $item) {
+                if (!is_array($item)) {
+                    continue;
+                }
+                $mat = trim((string) ($item['MATERIAL'] ?? ''));
+                $desc = trim((string) ($item['MAT_DEC'] ?? ''));
+                $batch = trim((string) ($item['BATCH'] ?? ''));
+                $qty = (float) ($item['QUANTITY'] ?? 0);
+                $sloc = trim((string) ($item['SLOC'] ?? ''));
+
+                $label = "{$mat} - {$desc}";
+                if ($batch !== '') {
+                    $label .= " (Batch: {$batch})";
+                }
+                if ($sloc !== '') {
+                    $label .= " [Sloc: {$sloc}]";
+                }
+                $label .= " - Stock: {$qty}";
+
+                $results[] = [
+                    'id' => $mat,
+                    'text' => $label,
+                    'material' => $mat,
+                    'mat_dec' => $desc,
+                    'batch' => $batch,
+                    'quantity' => $qty,
+                    'sloc' => $sloc,
+                    'raw' => $item,
+                ];
+            }
+
+            $payload = [
+                'results' => $results,
+                'raw' => $data,
+            ];
+            Cache::put($cacheKey, $payload, now()->addMinutes(5));
+            return response()->json($payload);
+        } catch (\Exception $e) {
+            Log::error('Proxy Material Stock SAP error: ' . $e->getMessage());
+            return response()->json(['results' => [], 'raw' => [], 'error' => $e->getMessage()]);
+        }
+    }
+
+    /**
      * API: Cek apakah (no_op, no_partai) sudah terpakai di proses lain.
      * Dipakai untuk validasi frontend sebelum submit tambah proses.
      *
@@ -738,7 +824,7 @@ class ProsesController extends Controller
             ->with('proses')
             ->get();
 
-        if ($jenis === 'Reproses') {
+        if (in_array($jenis, ['Reproses', 'Reproses Makloon'])) {
             if ($mode !== 'finish') {
                 if ($existing->isEmpty()) {
                     return response()->json([
@@ -837,9 +923,11 @@ class ProsesController extends Controller
         try {
             $proses = Proses::findOrFail($id);
 
-            // Trim tiap barcode ke 10 karakter dan dedupe di dalam batch
+            $isMakloon = in_array($proses->jenis, ['Proses Makloon', 'Reproses Makloon']);
+
+            // Trim tiap barcode: Makloon menggunakan kode material penuh (max 255), non-Makloon dipotong 10 karakter
             $trimmedBarcodes = collect($rawBarcodes)
-                ->map(fn($b) => substr(trim((string) $b), 0, 10))
+                ->map(fn($b) => $isMakloon ? trim((string) $b) : substr(trim((string) $b), 0, 10))
                 ->filter(fn($b) => $b !== '')
                 ->unique()
                 ->values()
@@ -894,20 +982,21 @@ class ProsesController extends Controller
                 return redirect()->route('dashboard')->with('error', $msg);
             }
 
-            $realDuplicates = $existingBarcodes->where('cancel', false)->pluck('barcode')->all();
+            if (!$isMakloon) {
+                $realDuplicates = $existingBarcodes->where('cancel', false)->pluck('barcode')->all();
 
-            if (!empty($realDuplicates)) {
-                $msg = 'Barcode sudah pernah digunakan dan aktif: ' . implode(', ', $realDuplicates);
-                if ($request->ajax() || $request->wantsJson()) {
-                    return response()->json(['status' => 'error', 'message' => $msg], 400);
+                if (!empty($realDuplicates)) {
+                    $msg = 'Barcode sudah pernah digunakan dan aktif: ' . implode(', ', $realDuplicates);
+                    if ($request->ajax() || $request->wantsJson()) {
+                        return response()->json(['status' => 'error', 'message' => $msg], 400);
+                    }
+                    return redirect()->route('dashboard')->with('error', $msg);
                 }
-                return redirect()->route('dashboard')->with('error', $msg);
             }
 
-            // Identifikasi mana yang bisa diaktifkan kembali dan mana yang baru (perlu ke SAP)
-            $reactivatable = $existingBarcodes->where('cancel', true);
-            $reactivatedBarcodes = $reactivatable->pluck('barcode')->all();
-            $barcodesToSap = array_diff($trimmedBarcodes, $existingBarcodes->pluck('barcode')->all());
+            // Semua barcode yang discan (baik barcode baru maupun yang pernah dicancel)
+            // wajib dikirim ulang ke SAP untuk Good Issue (GI) baru agar mendapatkan MBLNR baru.
+            $barcodesToSap = $trimmedBarcodes;
 
             // Cek kapasitas roll
             $roll = (int) ($detailProses->roll ?? 0);
@@ -928,6 +1017,48 @@ class ProsesController extends Controller
             $no_partai = $detailProses->no_partai;
             $mesin_id = $proses->mesin_id;
             $item_op = $detailProses->item_op;
+
+            // Jika proses adalah Makloon:
+            // Sesuai kebutuhan, API pengiriman informasi barcode kain untuk makloon masih dalam fase pengembangan SAP (bukan zterima_data).
+            // Simpan langsung material kain makloon ke database lokal dengan status approved.
+            if ($isMakloon) {
+                $savedRecords = [];
+                foreach ($trimmedBarcodes as $bc) {
+                    $savedRecords[] = BarcodeKain::create([
+                        'detail_proses_id' => $detailProses->id,
+                        'no_op' => $no_op,
+                        'no_partai' => $no_partai,
+                        'barcode' => $bc,
+                        'matdok' => '0',
+                        'item_document' => '0',
+                        'qty_gi' => 0,
+                        'mesin_id' => $proses->mesin_id,
+                        'cancel' => false,
+                        'approval_status' => 'approved',
+                        'approved_at' => now(),
+                    ]);
+                }
+
+                $statusService = new \App\Services\ProsesStatusService();
+                $globalAffected = $statusService->getAffectedProsesIds();
+                $prosesModel = Proses::with(['approvals', 'details.barcodeKains', 'details.barcodeLas', 'details.barcodeAuxs'])->find($id);
+                if ($prosesModel) {
+                    $statusData = $statusService->generateProsesStatus($prosesModel, $globalAffected);
+                    event(new \App\Events\BarcodeStatusUpdated($prosesModel->id, $statusData));
+                    Cache::forget("iot:mesin:{$prosesModel->mesin_id}:alarm_result");
+                }
+
+                $countSaved = count($savedRecords);
+                $msg = "Berhasil menyimpan {$countSaved} Material Kain Makloon.";
+                if ($request->ajax() || $request->wantsJson()) {
+                    return response()->json([
+                        'status' => 'success',
+                        'message' => $msg,
+                        'barcodes' => collect($savedRecords)->pluck('barcode')->all(),
+                    ]);
+                }
+                return redirect()->route('dashboard')->with('success', $msg);
+            }
 
             $results = [];
 
@@ -1027,22 +1158,9 @@ class ProsesController extends Controller
                 }
             }
 
-            // Semua sukses (baik reaktivasi maupun SAP): simpan ke DB dalam transaksi
+            // Semua sukses dari SAP: simpan BarcodeKain ke DB dalam transaksi menggunakan data fresh dari SAP
             DB::beginTransaction();
             try {
-                // A. Reaktivasi Barcode Lama
-                foreach ($reactivatable as $bcObj) {
-                    $bcObj->update([
-                        'detail_proses_id' => $detailProses->id,
-                        'no_op' => $no_op,
-                        'no_partai' => $no_partai,
-                        'mesin_id' => $mesin_id,
-                        'cancel' => false,
-                        'approval_status' => 'approved',
-                    ]);
-                }
-
-                // B. Simpan Barcode Baru dari SAP
                 foreach ($barcodesToSap as $bc) {
                     $r = $results[$bc];
                     BarcodeKain::create([
@@ -1056,6 +1174,7 @@ class ProsesController extends Controller
                         'mesin_id' => $mesin_id,
                         'cancel' => false,
                         'approval_status' => 'approved',
+                        'approved_at' => now(),
                     ]);
                 }
                 DB::commit();

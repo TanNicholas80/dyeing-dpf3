@@ -63,7 +63,7 @@ class ProsesStatusService
                 }
                 return false;
             });
-            if ($proses->jenis === 'Reproses') {
+            if (in_array($proses->jenis, ['Reproses', 'Reproses Makloon'])) {
                 $hasPendingReprocessApproval = $proses->approvals->contains(function ($appr) {
                     return $appr->status === 'pending'
                         && $appr->action === 'create_reprocess'

@@ -34,13 +34,17 @@
         }
     }
 
-    // Jenis proses: P/R/M
+    // Jenis proses: P/R/M/PM/RM
     $type =
         $proses->jenis === 'Produksi'
         ? 'P'
         : ($proses->jenis === 'Reproses'
             ? 'R'
-            : 'M');
+            : ($proses->jenis === 'Proses Makloon'
+                ? 'PM'
+                : ($proses->jenis === 'Reproses Makloon'
+                    ? 'RM'
+                    : 'M')));
     // Status blok G, D, A (G: hijau jika barcode kain >= roll, D/A: hijau jika ada barcode)
     if ($proses->jenis === 'Maintenance') {
         $blockColors = ['gray', 'gray', 'gray'];
@@ -136,8 +140,8 @@
                     ]);
             },
         );
-        // Cek pending approval FM atau VP untuk Reproses (2 tahap approval: FM dulu, baru VP)
-        if ($proses->jenis === 'Reproses') {
+        // Cek pending approval FM atau VP untuk Reproses & Reproses Makloon (2 tahap approval: FM dulu, baru VP)
+        if (in_array($proses->jenis, ['Reproses', 'Reproses Makloon'])) {
             $hasPendingReprocessApproval = collect(
                 $proses->approvals,
             )->contains(function ($appr) {
