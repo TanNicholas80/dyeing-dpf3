@@ -1000,55 +1000,56 @@
                                                                         </span>
                                                                     </div>
                                                                     <div class="status-header-center"
-                                                                        style="{{ $proses->jenis === 'Maintenance' ? 'flex: 1; padding: 0 6px;' : 'flex: 2;' }} text-align: center; display: flex; justify-content: center; align-items: center; gap: 6px;">
+                                                                        style="{{ $proses->jenis === 'Maintenance' ? 'flex: 1; padding: 0 4px;' : 'flex: 2;' }} text-align: center; display: flex; justify-content: center; align-items: center;">
                                                                         @if ($proses->jenis === 'Maintenance')
                                                                             <div class="op-row" data-detail-id=""
-                                                                                style="flex: 1; width: auto; padding: 4px 10px; margin: 0; display: flex; align-items: center; justify-content: center; border-radius: 8px; cursor: pointer; background: rgba(255,255,255,0.22); border: 1.5px solid rgba(0,0,0,0.18);">
+                                                                                style="flex: 1; width: auto; padding: 4px 8px; margin: 0; display: flex; align-items: center; justify-content: center; gap: 6px; border-radius: 8px; cursor: pointer; background: rgba(255,255,255,0.22); border: 1.5px solid rgba(0,0,0,0.18);">
                                                                                 <div class="op-row-noop"
-                                                                                    style="font-weight: 800; color: #111; font-size: 20px; letter-spacing: 3px; text-shadow: 0 1px 4px #fff8; margin: 0;">
+                                                                                    style="font-weight: 800; color: #111; font-size: 19px; letter-spacing: 2px; text-shadow: 0 1px 4px #fff8; margin: 0;">
                                                                                     MAINTENANCE
                                                                                 </div>
+                                                                                {{-- Icon Catatan di dalam kotak Maintenance --}}
+                                                                                <span class="note-icon-slot">
+                                                                                    @if(!empty($proses->note))
+                                                                                        <i class="fas fa-sticky-note text-warning icon-has-note" title="Catatan: {{ Str::limit($proses->note, 60) }}" style="font-size: 16px; vertical-align: middle; text-shadow: 0 1px 2px #000; cursor: pointer;"></i>
+                                                                                    @endif
+                                                                                </span>
                                                                             </div>
                                                                         @else
-                                                                            @foreach ($blocks as $i => $b)
+                                                                            <div style="display: flex; justify-content: center; align-items: center; gap: 6px;">
+                                                                                @foreach ($blocks as $i => $b)
+                                                                                    @php
+                                                                                        $color = $blockColors[$i];
+                                                                                        $blockBg =
+                                                                                            $color === 'green'
+                                                                                            ? '#d4f8e8'
+                                                                                            : '#ffb3b3';
+                                                                                        $blockBorder =
+                                                                                            $color === 'green'
+                                                                                            ? '#43a047'
+                                                                                            : '#c62828';
+                                                                                    @endphp
+                                                                                    <span class="gda-block" data-block-type="{{ $b }}"
+                                                                                        style="display: inline-block; background: {{ $blockBg }}; color: #111; font-weight: bold; font-size: 22px; padding: 2px 10px; border-radius: 6px; border: 2.5px solid {{ $blockBorder }}; box-shadow: 0 1px 4px rgba(0,0,0,0.10); letter-spacing: 1px; text-shadow: 0 1px 2px #fff8;">
+                                                                                        {{ $b }}
+                                                                                    </span>
+                                                                                @endforeach
                                                                                 @php
-                                                                                    $color = $blockColors[$i];
-                                                                                    $blockBg =
-                                                                                        $color === 'green'
-                                                                                        ? '#d4f8e8'
-                                                                                        : '#ffb3b3';
-                                                                                    $blockBorder =
-                                                                                        $color === 'green'
-                                                                                        ? '#43a047'
-                                                                                        : '#c62828';
+                                                                                    $tdStyle = $tdColor === 'yellow' ? 'background:#fff9c4;color:#111;border:2.5px solid #f9a825' : ($tdColor === 'red' ? 'background:#ffb3b3;color:#111;border:2.5px solid #c62828' : ($tdColor === 'green' ? 'background:#d4f8e8;color:#111;border:2.5px solid #43a047' : ($tdColor === 'inactive' ? 'background:#eceff1;color:#555;border:2.5px solid #90a4ae' : '')));
+                                                                                    $taStyle = $taColor === 'yellow' ? 'background:#fff9c4;color:#111;border:2.5px solid #f9a825' : ($taColor === 'red' ? 'background:#ffb3b3;color:#111;border:2.5px solid #c62828' : ($taColor === 'green' ? 'background:#d4f8e8;color:#111;border:2.5px solid #43a047' : ($taColor === 'inactive' ? 'background:#eceff1;color:#555;border:2.5px solid #90a4ae' : '')));
                                                                                 @endphp
-                                                                                <span class="gda-block" data-block-type="{{ $b }}"
-                                                                                    style="display: inline-block; background: {{ $blockBg }}; color: #111; font-weight: bold; font-size: 22px; padding: 2px 10px; border-radius: 6px; border: 2.5px solid {{ $blockBorder }}; box-shadow: 0 1px 4px rgba(0,0,0,0.10); letter-spacing: 1px; text-shadow: 0 1px 2px #fff8;">
-                                                                                    {{ $b }}
-                                                                                </span>
-                                                                            @endforeach
-                                                                            @php
-                                                                                $tdStyle = $tdColor === 'yellow' ? 'background:#fff9c4;color:#111;border:2.5px solid #f9a825' : ($tdColor === 'red' ? 'background:#ffb3b3;color:#111;border:2.5px solid #c62828' : ($tdColor === 'green' ? 'background:#d4f8e8;color:#111;border:2.5px solid #43a047' : ($tdColor === 'inactive' ? 'background:#eceff1;color:#555;border:2.5px solid #90a4ae' : '')));
-                                                                                $taStyle = $taColor === 'yellow' ? 'background:#fff9c4;color:#111;border:2.5px solid #f9a825' : ($taColor === 'red' ? 'background:#ffb3b3;color:#111;border:2.5px solid #c62828' : ($taColor === 'green' ? 'background:#d4f8e8;color:#111;border:2.5px solid #43a047' : ($taColor === 'inactive' ? 'background:#eceff1;color:#555;border:2.5px solid #90a4ae' : '')));
-                                                                            @endphp
-                                                                            @if($hasToppingLa ?? false)
-                                                                                <span class="topping-indicator topping-td" data-block-type="TD"
-                                                                                    title="Topping Dyes - {{ \App\Services\ProsesStatusService::toppingIndicatorTitle($tdColor, 'td') }}"
-                                                                                    style="display: inline-block; {{ $tdStyle }}; font-weight: bold; font-size: 18px; padding: 2px 8px; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.10); letter-spacing: 1px;">TD</span>
-                                                                            @endif
-                                                                            @if($hasToppingAux ?? false)
-                                                                                <span class="topping-indicator topping-ta" data-block-type="TA"
-                                                                                    title="Topping Auxiliaries - {{ \App\Services\ProsesStatusService::toppingIndicatorTitle($taColor, 'ta') }}"
-                                                                                    style="display: inline-block; {{ $taStyle }}; font-weight: bold; font-size: 18px; padding: 2px 8px; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.10); letter-spacing: 1px;">TA</span>
-                                                                            @endif
+                                                                                @if($hasToppingLa ?? false)
+                                                                                    <span class="topping-indicator topping-td" data-block-type="TD"
+                                                                                        title="Topping Dyes - {{ \App\Services\ProsesStatusService::toppingIndicatorTitle($tdColor, 'td') }}"
+                                                                                        style="display: inline-block; {{ $tdStyle }}; font-weight: bold; font-size: 18px; padding: 2px 8px; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.10); letter-spacing: 1px;">TD</span>
+                                                                                @endif
+                                                                                @if($hasToppingAux ?? false)
+                                                                                    <span class="topping-indicator topping-ta" data-block-type="TA"
+                                                                                        title="Topping Auxiliaries - {{ \App\Services\ProsesStatusService::toppingIndicatorTitle($taColor, 'ta') }}"
+                                                                                        style="display: inline-block; {{ $taStyle }}; font-weight: bold; font-size: 18px; padding: 2px 8px; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.10); letter-spacing: 1px;">TA</span>
+                                                                                @endif
+                                                                            </div>
                                                                         @endif
-
-                                                                        {{-- Icon Catatan (Note) di sebelah kanan button detail proses --}}
-                                                                        <span class="note-icon-slot">
-                                                                            @if(!empty($proses->note))
-                                                                                <i class="fas fa-sticky-note text-warning icon-has-note" title="Catatan: {{ Str::limit($proses->note, 60) }}" style="font-size: 16px; vertical-align: middle; text-shadow: 0 1px 2px #000; cursor: pointer;"></i>
-                                                                            @endif
-                                                                        </span>
                                                                     </div>
                                                                     <div class="status-header-right"
                                                                         style="{{ $proses->jenis === 'Maintenance' ? 'flex: 0 0 auto;' : 'flex: 1;' }} display: flex; flex-direction: column; align-items: flex-end; justify-content: center;">
@@ -1092,8 +1093,13 @@
                                                                                 {{-- Tidak ada detail --}}
                                                                                 <div class="op-row" data-detail-id="">
                                                                                     <div class="op-row-noop"
-                                                                                        style="font-weight: bold; color: #111; font-size: 22px; letter-spacing: 2px; text-shadow: 0 1px 4px #fff8;">
-                                                                                        -
+                                                                                        style="display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: bold; color: #111; font-size: 22px; letter-spacing: 2px; text-shadow: 0 1px 4px #fff8;">
+                                                                                        <span>-</span>
+                                                                                        <span class="note-icon-slot">
+                                                                                            @if(!empty($proses->note))
+                                                                                                <i class="fas fa-sticky-note text-warning icon-has-note" title="Catatan: {{ Str::limit($proses->note, 60) }}" style="font-size: 16px; vertical-align: middle; text-shadow: 0 1px 2px #000; cursor: pointer;"></i>
+                                                                                            @endif
+                                                                                        </span>
                                                                                     </div>
                                                                                 </div>
                                                                             @elseif ($isMultipleOp)
@@ -1105,8 +1111,13 @@
                                                                                 {{-- OP Pertama: Detail lengkap dengan No OP dan Info --}}
                                                                                 <div class="op-row" data-detail-id="{{ $firstDetail->id }}">
                                                                                     <div class="op-row-noop"
-                                                                                        style="font-weight: bold; color: #111; font-size: 22px; letter-spacing: 2px; text-shadow: 0 1px 4px #fff8; margin-bottom: 4px;">
-                                                                                        {{ $firstDetail->no_op ?? '-' }}
+                                                                                        style="display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: bold; color: #111; font-size: 22px; letter-spacing: 2px; text-shadow: 0 1px 4px #fff8; margin-bottom: 4px;">
+                                                                                        <span>{{ $firstDetail->no_op ?? '-' }}</span>
+                                                                                        <span class="note-icon-slot">
+                                                                                            @if(!empty($proses->note))
+                                                                                                <i class="fas fa-sticky-note text-warning icon-has-note" title="Catatan: {{ Str::limit($proses->note, 60) }}" style="font-size: 16px; vertical-align: middle; text-shadow: 0 1px 2px #000; cursor: pointer;"></i>
+                                                                                            @endif
+                                                                                        </span>
                                                                                     </div>
                                                                                     @if($firstDetail->customer)
                                                                                         <div
@@ -1209,8 +1220,13 @@
                                                                                 @endphp
                                                                                 <div class="op-row" data-detail-id="{{ $singleDetail->id }}">
                                                                                     <div class="op-row-noop"
-                                                                                        style="font-weight: bold; color: #111; font-size: 22px; letter-spacing: 2px; text-shadow: 0 1px 4px #fff8;">
-                                                                                        {{ $singleDetail->no_op ?? '-' }}
+                                                                                        style="display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: bold; color: #111; font-size: 22px; letter-spacing: 2px; text-shadow: 0 1px 4px #fff8;">
+                                                                                        <span>{{ $singleDetail->no_op ?? '-' }}</span>
+                                                                                        <span class="note-icon-slot">
+                                                                                            @if(!empty($proses->note))
+                                                                                                <i class="fas fa-sticky-note text-warning icon-has-note" title="Catatan: {{ Str::limit($proses->note, 60) }}" style="font-size: 16px; vertical-align: middle; text-shadow: 0 1px 2px #000; cursor: pointer;"></i>
+                                                                                            @endif
+                                                                                        </span>
                                                                                     </div>
                                                                                     @if($singleDetail->customer)
                                                                                         <div
