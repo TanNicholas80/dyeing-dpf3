@@ -3865,6 +3865,7 @@ class ProsesController extends Controller
     public function forceFinishProses($id)
     {
         $user = Auth::user();
+        $userRole = $user ? $user->role : null;
         if (!\App\Services\AbsenService::canForceFinish($user)) {
             return response()->json([
                 'status' => 'error',
