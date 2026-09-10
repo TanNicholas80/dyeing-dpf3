@@ -66,7 +66,7 @@ Route::match(['get', 'post'], '/checkStatus', [ApiCheckStatusBarcodeController::
  * SAP Webhook / Callback API
  * Base path: /api/sap/...
  */
-Route::prefix('sap')->group(function () {
+Route::prefix('sap')->middleware('sap.token')->group(function () {
     Route::post('/approval-over-gi', [\App\Http\Controllers\Api\SapApprovalController::class, 'updateApprovalOverGi']);
 });
 

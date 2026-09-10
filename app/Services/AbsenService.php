@@ -550,6 +550,21 @@ class AbsenService
         $dateToUse = $tanggal ?: $details['production_date'];
         $shiftToUse = $shift ?: ($details['is_production_off'] ? 'Shift 1' : $details['shift']);
 
+        // Validasi: Tidak boleh kedua role (Kashift & Karu) sama-sama OFF pada shift dan tanggal yang sama
+        if (!$isActive) {
+            $counterpartRole = $roleTarget === 'kepala_shift' ? 'kepala_ruangan' : 'kepala_shift';
+            $counterpartRecord = AbsenDelegasi::where('tanggal', $dateToUse)
+                ->where('shift', $shiftToUse)
+                ->where('role_target', $counterpartRole)
+                ->first();
+
+            if ($counterpartRecord && !$counterpartRecord->is_active) {
+                $counterpartTitle = $counterpartRole === 'kepala_shift' ? 'Kepala Shift (Kashift)' : 'Kepala Ruangan (Karu)';
+                $currentTitle = $roleTarget === 'kepala_shift' ? 'Kepala Shift' : 'Kepala Ruangan';
+                throw new \InvalidArgumentException("Tidak dapat mengubah {$currentTitle} menjadi OFF. Pada {$shiftToUse}, {$counterpartTitle} sudah berstatus OFF (Izin/Sakit). Salah satu harus tetap hadir (ON) untuk pendelegasian wewenang.");
+            }
+        }
+
         $delegasi = AbsenDelegasi::updateOrCreate(
             [
                 'tanggal' => $dateToUse,

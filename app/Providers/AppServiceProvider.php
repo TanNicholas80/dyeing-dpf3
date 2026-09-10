@@ -31,7 +31,7 @@ class AppServiceProvider extends ServiceProvider
         config(['app.timezone' => 'Asia/Jakarta']);
         date_default_timezone_set('Asia/Jakarta');
 
-        if (config('app.env') === 'production') {
+        if (config('app.env') === 'production' || request()->header('X-Forwarded-Proto') === 'https' || str_contains(request()->header('host') ?? '', 'trycloudflare.com')) {
             \Illuminate\Support\Facades\URL::forceScheme('https');
         }
 

@@ -96,14 +96,24 @@ class AbsenController extends Controller
         $keterangan = $validated['keterangan'] ?? null;
         $tanggal = $validated['tanggal'] ?? null;
 
-        $delegasi = AbsenService::toggleStatus(
-            $roleTarget,
-            $status,
-            $shift,
-            $keterangan,
-            $user->id,
-            $tanggal
-        );
+        try {
+            $delegasi = AbsenService::toggleStatus(
+                $roleTarget,
+                $status,
+                $shift,
+                $keterangan,
+                $user->id,
+                $tanggal
+            );
+        } catch (\InvalidArgumentException $e) {
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => $e->getMessage()
+                ], 422);
+            }
+            return back()->with('error', $e->getMessage());
+        }
 
         $roleName = $roleTarget === 'kepala_shift' ? 'Kepala Shift' : 'Kepala Ruangan';
         $statusMsg = $status === 'OFF' 

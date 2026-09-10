@@ -131,11 +131,17 @@
                                     'Shift 1' => $kashiftShift1,
                                     'Shift 2' => $kashiftShift2,
                                 ];
+                                $karuRows = [
+                                    'Shift 1' => $karuShift1,
+                                    'Shift 2' => $karuShift2,
+                                ];
                             @endphp
 
                             @foreach($shiftsList as $sName)
                                 @php
                                     $row = $kashiftRows[$sName];
+                                    $karuRow = $karuRows[$sName] ?? null;
+                                    $isKaruOff = ($karuRow && !$karuRow->is_active);
                                     $sInfo = $scheduleConfig['shifts'][$sName] ?? [
                                         'range' => ($sName === 'Shift 1' ? '06:00 - 18:00' : '18:00 - 06:00'),
                                         'duration' => 'Shift Kerja'
@@ -182,6 +188,14 @@
                                         </div>
                                     @endif
 
+                                    {{-- Banner Peringatan Jika Karu Sedang OFF (Kashift Terkunci Tidak Boleh Izin) --}}
+                                    @if($row->is_active && $isKaruOff)
+                                        <div class="alert alert-warning py-1 px-2 mb-2 small font-weight-bold text-dark" style="background-color: #fff3cd; border-color: #ffeeba;">
+                                            <i class="fas fa-shield-alt text-warning mr-1"></i>
+                                            <strong>Karu sedang OFF:</strong> Kashift tidak dapat mengajukan izin pada {{ $sName }} karena salah satu harus tetap hadir untuk wewenang operasional.
+                                        </div>
+                                    @endif
+
                                     {{-- Metadata Shift --}}
                                     <div class="row text-muted small mb-2">
                                         <div class="col-md-6">
@@ -196,10 +210,17 @@
                                     {{-- Tombol Interaksi FM --}}
                                     <div class="d-flex justify-content-end pt-2 border-top">
                                         @if($row->is_active)
-                                            <button type="button" class="btn btn-sm btn-outline-danger font-weight-bold"
-                                                onclick="openToggleModal('kepala_shift', 'Kepala Shift (Kashift)', '{{ $sName }}', '{{ $sInfo['range'] }}', 'OFF', '{{ addslashes($row->keterangan ?? '') }}')">
-                                                <i class="fas fa-user-slash mr-1"></i> Set {{ $sName }} ke OFF (Izin / Sakit)
-                                            </button>
+                                            @if($isKaruOff)
+                                                <button type="button" class="btn btn-sm btn-secondary font-weight-bold" disabled
+                                                    title="Tidak dapat izin: Kepala Ruangan (Karu) pada {{ $sName }} sudah berstatus OFF. Salah satu harus tetap hadir.">
+                                                    <i class="fas fa-lock mr-1"></i> Terkunci (Karu Sudah Izin)
+                                                </button>
+                                            @else
+                                                <button type="button" class="btn btn-sm btn-outline-danger font-weight-bold"
+                                                    onclick="openToggleModal('kepala_shift', 'Kepala Shift (Kashift)', '{{ $sName }}', '{{ $sInfo['range'] }}', 'OFF', '{{ addslashes($row->keterangan ?? '') }}')">
+                                                    <i class="fas fa-user-slash mr-1"></i> Set {{ $sName }} ke OFF (Izin / Sakit)
+                                                </button>
+                                            @endif
                                         @else
                                             <button type="button" class="btn btn-sm btn-success font-weight-bold"
                                                 onclick="openToggleModal('kepala_shift', 'Kepala Shift (Kashift)', '{{ $sName }}', '{{ $sInfo['range'] }}', 'ON', 'Hadir kembali / Normal')">
@@ -243,6 +264,8 @@
                             @foreach($shiftsList as $sName)
                                 @php
                                     $row = $karuRows[$sName];
+                                    $kashiftRow = $kashiftRows[$sName] ?? null;
+                                    $isKashiftOff = ($kashiftRow && !$kashiftRow->is_active);
                                     $sInfo = $scheduleConfig['shifts'][$sName] ?? [
                                         'range' => ($sName === 'Shift 1' ? '06:00 - 18:00' : '18:00 - 06:00'),
                                         'duration' => 'Shift Kerja'
@@ -289,6 +312,14 @@
                                         </div>
                                     @endif
 
+                                    {{-- Banner Peringatan Jika Kashift Sedang OFF (Karu Terkunci Tidak Boleh Izin) --}}
+                                    @if($row->is_active && $isKashiftOff)
+                                        <div class="alert alert-warning py-1 px-2 mb-2 small font-weight-bold text-dark" style="background-color: #fff3cd; border-color: #ffeeba;">
+                                            <i class="fas fa-shield-alt text-warning mr-1"></i>
+                                            <strong>Kashift sedang OFF:</strong> Karu tidak dapat mengajukan izin pada {{ $sName }} karena wewenang operasional sedang dialihkan ke Karu.
+                                        </div>
+                                    @endif
+
                                     {{-- Metadata Shift --}}
                                     <div class="row text-muted small mb-2">
                                         <div class="col-md-6">
@@ -303,10 +334,17 @@
                                     {{-- Tombol Interaksi FM --}}
                                     <div class="d-flex justify-content-end pt-2 border-top">
                                         @if($row->is_active)
-                                            <button type="button" class="btn btn-sm btn-outline-danger font-weight-bold"
-                                                onclick="openToggleModal('kepala_ruangan', 'Kepala Ruangan (Karu)', '{{ $sName }}', '{{ $sInfo['range'] }}', 'OFF', '{{ addslashes($row->keterangan ?? '') }}')">
-                                                <i class="fas fa-user-slash mr-1"></i> Set {{ $sName }} ke OFF (Izin / Sakit)
-                                            </button>
+                                            @if($isKashiftOff)
+                                                <button type="button" class="btn btn-sm btn-secondary font-weight-bold" disabled
+                                                    title="Tidak dapat izin: Kepala Shift (Kashift) pada {{ $sName }} sudah berstatus OFF. Salah satu harus tetap hadir.">
+                                                    <i class="fas fa-lock mr-1"></i> Terkunci (Kashift Sudah Izin)
+                                                </button>
+                                            @else
+                                                <button type="button" class="btn btn-sm btn-outline-danger font-weight-bold"
+                                                    onclick="openToggleModal('kepala_ruangan', 'Kepala Ruangan (Karu)', '{{ $sName }}', '{{ $sInfo['range'] }}', 'OFF', '{{ addslashes($row->keterangan ?? '') }}')">
+                                                    <i class="fas fa-user-slash mr-1"></i> Set {{ $sName }} ke OFF (Izin / Sakit)
+                                                </button>
+                                            @endif
                                         @else
                                             <button type="button" class="btn btn-sm btn-success font-weight-bold"
                                                 onclick="openToggleModal('kepala_ruangan', 'Kepala Ruangan (Karu)', '{{ $sName }}', '{{ $sInfo['range'] }}', 'ON', 'Hadir kembali / Normal')">
