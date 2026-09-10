@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\AbsenDelegasi;
 use App\Models\AbsenHistory;
+use App\Models\ShiftSchedule;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
@@ -14,22 +15,65 @@ class AbsenService
     const CACHE_KEY_KARU = 'absen_status_karu_is_active';
 
     /**
+     * Cari apakah ada jadwal kustom (ShiftSchedule) aktif yang ditetapkan FM untuk tanggal tertentu.
+     * Catatan: Hari Minggu selalu mengembalikan null (Minggu selalu Libur Produksi / OFF).
+     */
+    public static function getActiveCustomScheduleForDate(string $dateString): ?ShiftSchedule
+    {
+        $date = Carbon::parse($dateString, 'Asia/Jakarta');
+        if ((int) $date->dayOfWeek === Carbon::SUNDAY) {
+            return null;
+        }
+
+        $cacheKey = "shift_custom_schedule_{$dateString}";
+        return Cache::remember($cacheKey, 60, function () use ($dateString) {
+            return ShiftSchedule::active()
+                ->where('tanggal_mulai', '<=', $dateString)
+                ->where('tanggal_selesai', '>=', $dateString)
+                ->latest('id')
+                ->first();
+        });
+    }
+
+    /**
+     * Hitung durasi jam kerja antara jam mulai dan jam selesai.
+     */
+    public static function calculateShiftDuration(string $start, string $end): string
+    {
+        $s = Carbon::createFromFormat('H:i', substr($start, 0, 5));
+        $e = Carbon::createFromFormat('H:i', substr($end, 0, 5));
+        if ($e->lessThanOrEqualTo($s)) {
+            $e->addDay();
+        }
+        $diff = $s->diffInMinutes($e);
+        $hours = round($diff / 60, 1);
+        return ($hours == (int)$hours ? (int)$hours : $hours) . ' Jam';
+    }
+
+    /**
      * Mendapatkan rincian shift kerja produksi aktif saat ini (atau pada waktu tertentu).
      *
-     * Aturan Jadwal:
+     * Aturan Jadwal Default Pabrik:
      * 1. Senin:
      *    - 00:00 - 13:59: Libur Produksi (lanjutan weekend)
      *    - 14:00 - 21:59: Shift 1 (14:00 - 22:00)
      *    - 22:00 - 23:59: Shift 2 (22:00 - 06:00, tgl produksi Senin)
-     * 2. Selasa s/d Jumat:
+     * 2. Selasa s/d Kamis:
      *    - 00:00 - 05:59: Shift 2 hari sebelumnya (tgl produksi H-1)
      *    - 06:00 - 17:59: Shift 1 (06:00 - 18:00, tgl produksi hari ini)
      *    - 18:00 - 23:59: Shift 2 (18:00 - 06:00, tgl produksi hari ini)
-     * 3. Sabtu:
-     *    - 00:00 - 05:59: Shift 2 hari Jumat (18:00 - 06:00, tgl produksi Jumat)
-     *    - 06:00 - 23:59: Libur Produksi (OFF)
-     * 4. Minggu:
+     * 3. Jumat (Aturan Resmi Pabrik):
+     *    - 00:00 - 05:59: Shift 2 hari Kamis (18:00 - 06:00, tgl produksi Kamis)
+     *    - 06:00 - 18:59: Shift 1 (06:00 - 19:00, tgl produksi Jumat)
+     *    - 19:00 - 23:59: Shift 2 (19:00 - 08:00, tgl produksi Jumat)
+     * 4. Sabtu:
+     *    - 00:00 - 07:59: Shift 2 hari Jumat (19:00 - 08:00, tgl produksi Jumat)
+     *    - 08:00 - 23:59: Libur Produksi (OFF)
+     * 5. Minggu:
      *    - Seharian: Libur Produksi (OFF)
+     *
+     * Jika FM menetapkan jadwal custom pada range tanggal (Senin - Sabtu), jam Shift 1 & Shift 2
+     * kustom tersebut yang akan digunakan pada rentang tanggal tersebut.
      */
     public static function getCurrentShiftDetails(?Carbon $time = null): array
     {
@@ -37,41 +81,194 @@ class AbsenService
         $dayOfWeek = (int) $now->dayOfWeek; // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
         $timeStr = $now->format('H:i:s');
         $todayDate = $now->toDateString();
+        $yesterday = $now->copy()->subDay();
+        $yesterdayDate = $yesterday->toDateString();
+        $yesterdayDayOfWeek = (int) $yesterday->dayOfWeek;
 
-        // 1. MINGGU (Sunday)
+        $dayNames = [
+            Carbon::SUNDAY => 'Minggu',
+            Carbon::MONDAY => 'Senin',
+            Carbon::TUESDAY => 'Selasa',
+            Carbon::WEDNESDAY => 'Rabu',
+            Carbon::THURSDAY => 'Kamis',
+            Carbon::FRIDAY => 'Jumat',
+            Carbon::SATURDAY => 'Sabtu',
+        ];
+
+        // ------------------------------------------------------------------------------------
+        // A. CEK APAKAH WAKTU SAAT INI ADALAH LANJUTAN SHIFT 2 HARI KEMARIN (CROSS-MIDNIGHT)
+        // ------------------------------------------------------------------------------------
+        $prevCustom = self::getActiveCustomScheduleForDate($yesterdayDate);
+        if ($prevCustom) {
+            $prevCfg = $prevCustom->getConfigForDate($yesterdayDate);
+            if (!$prevCfg['is_holiday'] && !empty($prevCfg['shift2_start']) && !empty($prevCfg['shift2_end'])) {
+                $prevS2Start = $prevCfg['shift2_start'];
+                $prevS2End = $prevCfg['shift2_end'];
+                // Cross midnight jika end <= start
+                if ($prevS2End < $prevS2Start) {
+                    if ($timeStr < $prevS2End) {
+                        $range = "{$prevS2Start} - {$prevS2End}";
+                        $pName = $dayNames[$yesterdayDayOfWeek];
+                        return [
+                            'shift' => 'Shift 2',
+                            'production_date' => $yesterdayDate,
+                            'is_production_off' => false,
+                            'time_range' => $range,
+                            'label' => "{$pName} - Shift 2 ({$range})",
+                        ];
+                    }
+                }
+            }
+        } else {
+            // Default cross-midnight rules:
+            if ($dayOfWeek === Carbon::SATURDAY) {
+                // Hari Sabtu pagi: lanjutan Shift 2 hari Jumat (19:00 - 08:00)
+                if ($timeStr < '08:00:00') {
+                    return [
+                        'shift' => 'Shift 2',
+                        'production_date' => $yesterdayDate,
+                        'is_production_off' => false,
+                        'time_range' => '19:00 - 08:00',
+                        'label' => 'Jumat - Shift 2 (19:00 - 08:00)',
+                    ];
+                }
+            } elseif ($dayOfWeek === Carbon::TUESDAY) {
+                // Hari Selasa pagi: lanjutan Shift 2 hari Senin (22:00 - 06:00)
+                if ($timeStr < '06:00:00') {
+                    return [
+                        'shift' => 'Shift 2',
+                        'production_date' => $yesterdayDate,
+                        'is_production_off' => false,
+                        'time_range' => '22:00 - 06:00',
+                        'label' => 'Senin - Shift 2 (22:00 - 06:00)',
+                    ];
+                }
+            } elseif (in_array($dayOfWeek, [Carbon::WEDNESDAY, Carbon::THURSDAY, Carbon::FRIDAY], true)) {
+                // Hari Rabu, Kamis, Jumat pagi: lanjutan Shift 2 hari sebelumnya (18:00 - 06:00)
+                if ($timeStr < '06:00:00') {
+                    $pName = $dayNames[$yesterdayDayOfWeek];
+                    return [
+                        'shift' => 'Shift 2',
+                        'production_date' => $yesterdayDate,
+                        'is_production_off' => false,
+                        'time_range' => '18:00 - 06:00',
+                        'label' => "{$pName} - Shift 2 (18:00 - 06:00)",
+                    ];
+                }
+            }
+        }
+
+        // ------------------------------------------------------------------------------------
+        // B. HARI MINGGU (SUNDAY) SELALU LIBUR PRODUKSI (OFF)
+        // ------------------------------------------------------------------------------------
         if ($dayOfWeek === Carbon::SUNDAY) {
             return [
                 'shift' => 'Libur Produksi',
                 'production_date' => $todayDate,
                 'is_production_off' => true,
                 'time_range' => 'Libur Akhir Pekan',
-                'label' => 'Libur Produksi (Sabtu 06:00 - Senin 14:00)',
+                'label' => 'Libur Produksi (Sabtu 08:00 - Senin 14:00)',
             ];
         }
 
-        // 2. SABTU (Saturday)
-        if ($dayOfWeek === Carbon::SATURDAY) {
-            if ($timeStr < '06:00:00') {
-                $fridayDate = $now->copy()->subDay()->toDateString();
-                return [
-                    'shift' => 'Shift 2',
-                    'production_date' => $fridayDate,
-                    'is_production_off' => false,
-                    'time_range' => '18:00 - 06:00',
-                    'label' => 'Jumat - Shift 2 (18:00 - 06:00)',
-                ];
-            } else {
+        // ------------------------------------------------------------------------------------
+        // C. CEK JADWAL KUSTOM HARI INI (JIKA DITETAPKAN FM UNTUK TANGGAL INI)
+        // ------------------------------------------------------------------------------------
+        $todayCustom = self::getActiveCustomScheduleForDate($todayDate);
+        if ($todayCustom) {
+            $curName = $dayNames[$dayOfWeek];
+            $todayCfg = $todayCustom->getConfigForDate($todayDate);
+
+            // Jika hari ini pada jadwal kustom diset Libur Produksi (OFF), misal Sabtu libur
+            if ($todayCfg['is_holiday']) {
                 return [
                     'shift' => 'Libur Produksi',
                     'production_date' => $todayDate,
                     'is_production_off' => true,
-                    'time_range' => 'Libur Akhir Pekan',
-                    'label' => 'Libur Produksi (Sabtu 06:00 - Senin 14:00)',
+                    'time_range' => 'Libur Produksi',
+                    'label' => ($todayCfg['description'] ?? 'Libur Produksi (OFF)') . " ({$curName})",
                 ];
             }
+
+            $s1Start = $todayCfg['shift1_start'];
+            $s1End = $todayCfg['shift1_end'];
+            $s2Start = $todayCfg['shift2_start'];
+            $s2End = $todayCfg['shift2_end'];
+            $s1Range = "{$s1Start} - {$s1End}";
+            $s2Range = "{$s2Start} - {$s2End}";
+
+            // Sebelum Shift 1 mulai
+            if ($timeStr < $s1Start) {
+                return [
+                    'shift' => 'Libur Produksi',
+                    'production_date' => $todayDate,
+                    'is_production_off' => true,
+                    'time_range' => "Sebelum Shift 1 (Mulai {$s1Start})",
+                    'label' => "Libur / Belum Mulai Produksi ({$curName})",
+                ];
+            }
+
+            // Sedang berjalan Shift 1
+            if ($timeStr < $s1End) {
+                return [
+                    'shift' => 'Shift 1',
+                    'production_date' => $todayDate,
+                    'is_production_off' => false,
+                    'time_range' => $s1Range,
+                    'label' => "{$curName} - Shift 1 ({$s1Range})",
+                ];
+            }
+
+            // Cek Shift 2
+            $isOvernight = ($s2End < $s2Start);
+            if ($isOvernight) {
+                if ($timeStr >= $s2Start) {
+                    return [
+                        'shift' => 'Shift 2',
+                        'production_date' => $todayDate,
+                        'is_production_off' => false,
+                        'time_range' => $s2Range,
+                        'label' => "{$curName} - Shift 2 ({$s2Range})",
+                    ];
+                }
+            } else {
+                if ($timeStr >= $s2Start && $timeStr < $s2End) {
+                    return [
+                        'shift' => 'Shift 2',
+                        'production_date' => $todayDate,
+                        'is_production_off' => false,
+                        'time_range' => $s2Range,
+                        'label' => "{$curName} - Shift 2 ({$s2Range})",
+                    ];
+                }
+            }
+
+            // Jika berada di sela-sela antar shift atau sudah selesai shift 2
+            return [
+                'shift' => 'Libur Produksi',
+                'production_date' => $todayDate,
+                'is_production_off' => true,
+                'time_range' => 'Luar Jam Shift',
+                'label' => "Luar Jam Operasional Shift ({$curName})",
+            ];
         }
 
-        // 3. SENIN (Monday)
+        // ------------------------------------------------------------------------------------
+        // D. JADWAL DEFAULT PABRIK (TIDAK ADA JADWAL KUSTOM)
+        // ------------------------------------------------------------------------------------
+
+        // 1. SABTU (Saturday) - Setelah jam 08:00 adalah Libur Produksi
+        if ($dayOfWeek === Carbon::SATURDAY) {
+            return [
+                'shift' => 'Libur Produksi',
+                'production_date' => $todayDate,
+                'is_production_off' => true,
+                'time_range' => 'Libur Akhir Pekan',
+                'label' => 'Libur Produksi (Sabtu 08:00 - Senin 14:00)',
+            ];
+        }
+
+        // 2. SENIN (Monday)
         if ($dayOfWeek === Carbon::MONDAY) {
             if ($timeStr < '14:00:00') {
                 return [
@@ -100,60 +297,30 @@ class AbsenService
             }
         }
 
-        // 4. SELASA (Tuesday)
-        if ($dayOfWeek === Carbon::TUESDAY) {
-            if ($timeStr < '06:00:00') {
-                $mondayDate = $now->copy()->subDay()->toDateString();
-                return [
-                    'shift' => 'Shift 2',
-                    'production_date' => $mondayDate,
-                    'is_production_off' => false,
-                    'time_range' => '22:00 - 06:00',
-                    'label' => 'Senin - Shift 2 (22:00 - 06:00)',
-                ];
-            } elseif ($timeStr < '18:00:00') {
+        // 3. JUMAT (Friday) - Shift 1: 06:00 - 19:00, Shift 2: 19:00 - 08:00
+        if ($dayOfWeek === Carbon::FRIDAY) {
+            if ($timeStr < '19:00:00') {
                 return [
                     'shift' => 'Shift 1',
                     'production_date' => $todayDate,
                     'is_production_off' => false,
-                    'time_range' => '06:00 - 18:00',
-                    'label' => 'Selasa - Shift 1 (06:00 - 18:00)',
+                    'time_range' => '06:00 - 19:00',
+                    'label' => 'Jumat - Shift 1 (06:00 - 19:00)',
                 ];
             } else {
                 return [
                     'shift' => 'Shift 2',
                     'production_date' => $todayDate,
                     'is_production_off' => false,
-                    'time_range' => '18:00 - 06:00',
-                    'label' => 'Selasa - Shift 2 (18:00 - 06:00)',
+                    'time_range' => '19:00 - 08:00',
+                    'label' => 'Jumat - Shift 2 (19:00 - 08:00)',
                 ];
             }
         }
 
-        // 5. RABU, KAMIS, JUMAT (Wednesday, Thursday, Friday)
-        $dayNames = [
-            Carbon::WEDNESDAY => 'Rabu',
-            Carbon::THURSDAY => 'Kamis',
-            Carbon::FRIDAY => 'Jumat',
-        ];
-        $prevDayNames = [
-            Carbon::WEDNESDAY => 'Selasa',
-            Carbon::THURSDAY => 'Rabu',
-            Carbon::FRIDAY => 'Kamis',
-        ];
-
-        if ($timeStr < '06:00:00') {
-            $prevDate = $now->copy()->subDay()->toDateString();
-            $pName = $prevDayNames[$dayOfWeek] ?? 'Kemarin';
-            return [
-                'shift' => 'Shift 2',
-                'production_date' => $prevDate,
-                'is_production_off' => false,
-                'time_range' => '18:00 - 06:00',
-                'label' => "{$pName} - Shift 2 (18:00 - 06:00)",
-            ];
-        } elseif ($timeStr < '18:00:00') {
-            $curName = $dayNames[$dayOfWeek];
+        // 4. SELASA, RABU, KAMIS (Tuesday, Wednesday, Thursday) - Shift 1: 06:00 - 18:00, Shift 2: 18:00 - 06:00
+        $curName = $dayNames[$dayOfWeek];
+        if ($timeStr < '18:00:00') {
             return [
                 'shift' => 'Shift 1',
                 'production_date' => $todayDate,
@@ -162,7 +329,6 @@ class AbsenService
                 'label' => "{$curName} - Shift 1 (06:00 - 18:00)",
             ];
         } else {
-            $curName = $dayNames[$dayOfWeek];
             return [
                 'shift' => 'Shift 2',
                 'production_date' => $todayDate,
@@ -190,29 +356,100 @@ class AbsenService
         $date = Carbon::parse($dateString, 'Asia/Jakarta');
         $dayOfWeek = (int) $date->dayOfWeek;
 
+        $dayNames = [
+            Carbon::SUNDAY => 'Minggu',
+            Carbon::MONDAY => 'Senin',
+            Carbon::TUESDAY => 'Selasa',
+            Carbon::WEDNESDAY => 'Rabu',
+            Carbon::THURSDAY => 'Kamis',
+            Carbon::FRIDAY => 'Jumat',
+            Carbon::SATURDAY => 'Sabtu',
+        ];
+
+        // 1. MINGGU: Selalu Libur Produksi (OFF)
         if ($dayOfWeek === Carbon::SUNDAY) {
             return [
                 'day_name' => 'Minggu',
                 'is_holiday' => true,
+                'is_custom' => false,
+                'custom_schedule_id' => null,
                 'description' => 'Libur Produksi (OFF)',
                 'shifts' => [],
             ];
         }
 
+        // 2. CEK JADWAL KUSTOM FM
+        $custom = self::getActiveCustomScheduleForDate($dateString);
+        if ($custom) {
+            $cfg = $custom->getConfigForDate($dateString);
+
+            if ($cfg['is_holiday']) {
+                return [
+                    'day_name' => $dayNames[$dayOfWeek],
+                    'is_holiday' => true,
+                    'is_custom' => true,
+                    'custom_schedule_id' => $custom->id,
+                    'custom_schedule_name' => $custom->nama_jadwal ?: 'Jadwal Kustom FM',
+                    'description' => ($cfg['description'] ?? 'Libur Produksi (OFF)') . ' (Kustom FM)',
+                    'shifts' => [],
+                ];
+            }
+
+            $s1Start = $cfg['shift1_start'];
+            $s1End = $cfg['shift1_end'];
+            $s2Start = $cfg['shift2_start'];
+            $s2End = $cfg['shift2_end'];
+            $s1Dur = self::calculateShiftDuration($s1Start, $s1End);
+            $s2Dur = self::calculateShiftDuration($s2Start, $s2End);
+
+            return [
+                'day_name' => $dayNames[$dayOfWeek],
+                'is_holiday' => false,
+                'is_custom' => true,
+                'custom_schedule_id' => $custom->id,
+                'custom_schedule_name' => $custom->nama_jadwal ?: 'Jadwal Kustom FM',
+                'description' => "Shift 1: {$s1Start} - {$s1End} | Shift 2: {$s2Start} - {$s2End} (Kustom FM)",
+                'shifts' => [
+                    'Shift 1' => [
+                        'name' => 'Shift 1',
+                        'start' => $s1Start,
+                        'end' => $s1End,
+                        'range' => "{$s1Start} - {$s1End}",
+                        'duration' => $s1Dur,
+                    ],
+                    'Shift 2' => [
+                        'name' => 'Shift 2',
+                        'start' => $s2Start,
+                        'end' => $s2End,
+                        'range' => "{$s2Start} - {$s2End}",
+                        'duration' => $s2Dur,
+                    ],
+                ],
+            ];
+        }
+
+        // 3. JADWAL DEFAULT PABRIK
+
+        // SABTU: Libur produksi mulai jam 08:00
         if ($dayOfWeek === Carbon::SATURDAY) {
             return [
                 'day_name' => 'Sabtu',
                 'is_holiday' => true,
-                'description' => 'Libur Produksi mulai jam 06:00 (OFF)',
+                'is_custom' => false,
+                'custom_schedule_id' => null,
+                'description' => 'Libur Produksi mulai jam 08:00 (OFF)',
                 'shifts' => [],
             ];
         }
 
+        // SENIN: Shift 1 (14:00 - 22:00), Shift 2 (22:00 - 06:00)
         if ($dayOfWeek === Carbon::MONDAY) {
             return [
                 'day_name' => 'Senin',
                 'is_holiday' => false,
-                'description' => 'Produksi mulai jam 14:00 (Pagi Libur)',
+                'is_custom' => false,
+                'custom_schedule_id' => null,
+                'description' => 'Produksi mulai jam 14:00 (Pagi Libur) | Shift 1: 14:00 - 22:00 | Shift 2: 22:00 - 06:00',
                 'shifts' => [
                     'Shift 1' => [
                         'name' => 'Shift 1',
@@ -232,16 +469,39 @@ class AbsenService
             ];
         }
 
-        $names = [
-            Carbon::TUESDAY => 'Selasa',
-            Carbon::WEDNESDAY => 'Rabu',
-            Carbon::THURSDAY => 'Kamis',
-            Carbon::FRIDAY => 'Jumat',
-        ];
+        // JUMAT: Shift 1 (06:00 - 19:00), Shift 2 (19:00 - 08:00)
+        if ($dayOfWeek === Carbon::FRIDAY) {
+            return [
+                'day_name' => 'Jumat',
+                'is_holiday' => false,
+                'is_custom' => false,
+                'custom_schedule_id' => null,
+                'description' => 'Shift 1: 06:00 - 19:00 | Shift 2: 19:00 - 08:00 (s/d Sabtu 08:00)',
+                'shifts' => [
+                    'Shift 1' => [
+                        'name' => 'Shift 1',
+                        'start' => '06:00',
+                        'end' => '19:00',
+                        'range' => '06:00 - 19:00',
+                        'duration' => '13 Jam',
+                    ],
+                    'Shift 2' => [
+                        'name' => 'Shift 2',
+                        'start' => '19:00',
+                        'end' => '08:00',
+                        'range' => '19:00 - 08:00',
+                        'duration' => '13 Jam',
+                    ],
+                ],
+            ];
+        }
 
+        // SELASA, RABU, KAMIS: Shift 1 (06:00 - 18:00), Shift 2 (18:00 - 06:00)
         return [
-            'day_name' => $names[$dayOfWeek] ?? 'Hari Kerja',
+            'day_name' => $dayNames[$dayOfWeek] ?? 'Hari Kerja',
             'is_holiday' => false,
+            'is_custom' => false,
+            'custom_schedule_id' => null,
             'description' => 'Shift 1: 06:00 - 18:00 | Shift 2: 18:00 - 06:00',
             'shifts' => [
                 'Shift 1' => [
@@ -420,7 +680,7 @@ class AbsenService
     }
 
     /**
-     * Hapus cache status absen agar perubahan seketika aktif.
+     * Hapus cache status absen dan jadwal shift agar perubahan seketika aktif.
      */
     public static function clearCache(?string $date = null, ?string $shift = null): void
     {
@@ -429,16 +689,41 @@ class AbsenService
             Cache::forget("absen_status_karu_{$date}_{$shift}");
         }
 
+        if ($date) {
+            Cache::forget("shift_custom_schedule_{$date}");
+        }
+
         // Hapus juga cache untuk shift yang saat ini berjalan
         $details = self::getCurrentShiftDetails();
         $d = $details['production_date'];
         $s = $details['shift'];
         Cache::forget("absen_status_kashift_{$d}_{$s}");
         Cache::forget("absen_status_karu_{$d}_{$s}");
+        Cache::forget("shift_custom_schedule_{$d}");
 
         // Legacy keys fallback
         Cache::forget(self::CACHE_KEY_KASHIFT);
         Cache::forget(self::CACHE_KEY_KARU);
+    }
+
+    /**
+     * Hapus cache khusus jadwal shift kustom pada rentang tanggal tertentu.
+     */
+    public static function clearScheduleCache(?string $startDate = null, ?string $endDate = null): void
+    {
+        if ($startDate && $endDate) {
+            try {
+                $start = Carbon::parse($startDate);
+                $end = Carbon::parse($endDate);
+                while ($start->lte($end)) {
+                    Cache::forget("shift_custom_schedule_" . $start->toDateString());
+                    $start->addDay();
+                }
+            } catch (\Exception $e) {
+                // Ignore parse errors
+            }
+        }
+        self::clearCache();
     }
 
     /**

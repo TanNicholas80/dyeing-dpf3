@@ -168,6 +168,8 @@ Route::middleware(['auth', 'prevent-back-history'])->group(function () {
     Route::middleware('role:super_admin,fm')->group(function () {
         Route::get('/absen', [AbsenController::class, 'index'])->name('absen.index');
         Route::post('/absen/toggle', [AbsenController::class, 'toggle'])->name('absen.toggle');
+        Route::post('/absen/shift-schedule', [AbsenController::class, 'storeShiftSchedule'])->name('absen.shift-schedule.store');
+        Route::post('/absen/shift-schedule/{id}/cancel', [AbsenController::class, 'cancelShiftSchedule'])->name('absen.shift-schedule.cancel');
     });
 
     /**

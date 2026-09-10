@@ -18,11 +18,19 @@ Schedule::command('absen:auto-reset')
     ->withoutOverlapping();
 
 Schedule::command('absen:auto-reset')
+    ->dailyAt('08:00')
+    ->withoutOverlapping();
+
+Schedule::command('absen:auto-reset')
     ->dailyAt('14:00')
     ->withoutOverlapping();
 
 Schedule::command('absen:auto-reset')
     ->dailyAt('18:00')
+    ->withoutOverlapping();
+
+Schedule::command('absen:auto-reset')
+    ->dailyAt('19:00')
     ->withoutOverlapping();
 
 Schedule::command('absen:auto-reset')
