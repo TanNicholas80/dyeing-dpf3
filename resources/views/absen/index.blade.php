@@ -252,13 +252,13 @@
                                                 </button>
                                             @else
                                                 <button type="button" class="btn btn-sm btn-outline-danger font-weight-bold"
-                                                    onclick="openToggleModal('kepala_shift', 'Kepala Shift (Kashift)', '{{ $sName }}', '{{ $sInfo['range'] }}', 'OFF', '{{ addslashes($row->keterangan ?? '') }}')">
+                                                    onclick="openToggleModal('kepala_shift', 'Kepala Shift (Kashift)', '{{ $sName }}', '{{ $sInfo['range'] }}', 'OFF')">
                                                     <i class="fas fa-user-slash mr-1"></i> Set {{ $sName }} ke OFF (Izin / Sakit)
                                                 </button>
                                             @endif
                                         @else
                                             <button type="button" class="btn btn-sm btn-success font-weight-bold"
-                                                onclick="openToggleModal('kepala_shift', 'Kepala Shift (Kashift)', '{{ $sName }}', '{{ $sInfo['range'] }}', 'ON', 'Hadir kembali / Normal')">
+                                                onclick="openToggleModal('kepala_shift', 'Kepala Shift (Kashift)', '{{ $sName }}', '{{ $sInfo['range'] }}', 'ON')">
                                                 <i class="fas fa-user-check mr-1"></i> Kembalikan {{ $sName }} ke ON (Hadir)
                                             </button>
                                         @endif
@@ -376,13 +376,13 @@
                                                 </button>
                                             @else
                                                 <button type="button" class="btn btn-sm btn-outline-danger font-weight-bold"
-                                                    onclick="openToggleModal('kepala_ruangan', 'Kepala Ruangan (Karu)', '{{ $sName }}', '{{ $sInfo['range'] }}', 'OFF', '{{ addslashes($row->keterangan ?? '') }}')">
+                                                    onclick="openToggleModal('kepala_ruangan', 'Kepala Ruangan (Karu)', '{{ $sName }}', '{{ $sInfo['range'] }}', 'OFF')">
                                                     <i class="fas fa-user-slash mr-1"></i> Set {{ $sName }} ke OFF (Izin / Sakit)
                                                 </button>
                                             @endif
                                         @else
                                             <button type="button" class="btn btn-sm btn-success font-weight-bold"
-                                                onclick="openToggleModal('kepala_ruangan', 'Kepala Ruangan (Karu)', '{{ $sName }}', '{{ $sInfo['range'] }}', 'ON', 'Hadir kembali / Normal')">
+                                                onclick="openToggleModal('kepala_ruangan', 'Kepala Ruangan (Karu)', '{{ $sName }}', '{{ $sInfo['range'] }}', 'ON')">
                                                 <i class="fas fa-user-check mr-1"></i> Kembalikan {{ $sName }} ke ON (Hadir)
                                             </button>
                                         @endif
@@ -529,6 +529,7 @@
                 @csrf
                 <input type="hidden" name="role_target" id="modal_role_target">
                 <input type="hidden" name="shift" id="modal_shift">
+                <input type="hidden" name="status" id="modal_status_input">
                 <input type="hidden" name="tanggal" value="{{ $activeDate }}">
 
                 <div class="modal-header" id="modal_header_bg">
@@ -560,17 +561,9 @@
                     </p>
 
                     <div class="form-group">
-                        <label class="font-weight-bold small">Status Wewenang Baru:</label>
-                        <select name="status" id="modal_status_select" class="form-control" required onchange="handleModalStatusChange(this.value)">
-                            <option value="OFF">OFF (Absen / Sakit / Izin - Delegasikan Wewenang)</option>
-                            <option value="ON">ON (Hadir / Normal Kembali)</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label class="font-weight-bold small">Keterangan / Alasan Izin:</label>
+                        <label class="font-weight-bold small" id="modal_keterangan_label">Alasan Izin / Sakit:</label>
                         <input type="text" name="keterangan" id="modal_keterangan_input" class="form-control" 
-                            placeholder="Contoh: Izin Sakit, Keperluan Keluarga, Kembali Bertugas..." required>
+                            placeholder="Tuliskan alasan izin / sakit..." required>
                     </div>
                 </div>
                 <div class="modal-footer bg-light py-2">
@@ -1060,18 +1053,30 @@
 </form>
 
 <script>
-    function openToggleModal(roleTarget, roleLabel, shiftName, shiftRange, targetStatus, currentNote) {
+    function openToggleModal(roleTarget, roleLabel, shiftName, shiftRange, targetStatus) {
         document.getElementById('modal_role_target').value = roleTarget;
         document.getElementById('modal_shift').value = shiftName;
         document.getElementById('modal_role_label').innerText = roleLabel;
         document.getElementById('modal_shift_label').innerText = shiftName + ' (' + shiftRange + ')';
-        document.getElementById('modal_status_select').value = targetStatus;
+        document.getElementById('modal_status_input').value = targetStatus;
 
         const ketInput = document.getElementById('modal_keterangan_input');
-        if (targetStatus === 'ON') {
-            ketInput.value = 'Hadir kembali / Normal';
+        const ketLabel = document.getElementById('modal_keterangan_label');
+        const explanationText = document.getElementById('modal_explanation_text');
+
+        // Selalu kosongkan isian agar tidak ada teks otomatis/lama yang nyangkut
+        ketInput.value = '';
+
+        if (targetStatus === 'OFF') {
+            ketLabel.innerHTML = 'Alasan Izin / Sakit: <span class="text-danger">*</span>';
+            ketInput.placeholder = 'Tuliskan alasan izin / sakit (misal: Sakit demam, Izin keperluan keluarga, dll)';
+            ketInput.required = true;
+            explanationText.innerText = 'Pendelegasian wewenang hanya berlaku untuk shift ini. Setelah shift selesai, sistem Auto-Reset otomatis mengembalikan wewenang ke Hadir/Normal.';
         } else {
-            ketInput.value = (currentNote && currentNote !== 'Default sistem: Aktif / Hadir' && currentNote !== 'Hadir kembali / Normal') ? currentNote : '';
+            ketLabel.innerHTML = 'Catatan Kembali Bertugas (Opsional):';
+            ketInput.placeholder = 'Contoh: Masuk kerja kembali normal (boleh dikosongkan)';
+            ketInput.required = false;
+            explanationText.innerText = 'Mengembalikan status personil menjadi Hadir/Normal kembali pada shift ini.';
         }
 
         handleModalStatusChange(targetStatus);

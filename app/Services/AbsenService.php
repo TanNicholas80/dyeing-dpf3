@@ -850,6 +850,10 @@ class AbsenService
             }
         }
 
+        $finalKeterangan = !empty(trim((string) $keterangan)) 
+            ? trim((string) $keterangan) 
+            : ($isActive ? 'Hadir kembali / Normal' : 'Izin / Sakit');
+
         $delegasi = AbsenDelegasi::updateOrCreate(
             [
                 'tanggal' => $dateToUse,
@@ -858,7 +862,7 @@ class AbsenService
             ],
             [
                 'is_active' => $isActive,
-                'keterangan' => $keterangan,
+                'keterangan' => $finalKeterangan,
                 'updated_by' => $userId,
             ]
         );
@@ -869,7 +873,7 @@ class AbsenService
             'shift' => $shiftToUse,
             'role_target' => $roleTarget,
             'status' => $normalizedStatus,
-            'keterangan' => $keterangan,
+            'keterangan' => $finalKeterangan,
             'user_id' => $userId,
         ]);
 
