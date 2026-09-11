@@ -744,6 +744,8 @@
                                                                                 ? 'RM'
                                                                                 : 'M')));
                                                                 // Inisialisasi default agar aman dan tidak undefined untuk semua jenis proses (termasuk Maintenance)
+                                                                $isPinjamMesinHist = (bool) ($proses->is_pinjam_mesin ?? false);
+                                                                $isBreakHist = (bool) ($proses->is_break ?? false);
                                                                 $firstDetail = (isset($proses->details) && is_iterable($proses->details)) ? collect($proses->details)->first() : null;
                                                                 $firstRoll = $firstDetail->roll ?? 0;
                                                                 $firstPendingKain = false;
@@ -1089,7 +1091,7 @@
                                                                             </div>
                                                                             {{-- Indikator di bawah GDA pertama (Sinyal IoT, Pinjam Mesin, Catatan) --}}
                                                                             <div class="card-indicators-bar proses-indicators-bar" style="display: flex; justify-content: center; align-items: center; gap: 8px; margin-top: 3px;">
-                                                                                <div class="pinjam-mesin-indicator" style="{{ $isPinjamMesinHist ? 'display: flex;' : 'display: none;' }} justify-content: center; align-items: center;">
+                                                                                <div class="pinjam-mesin-indicator" style="{{ ($isPinjamMesinHist ?? false) ? 'display: flex;' : 'display: none;' }} justify-content: center; align-items: center;">
                                                                                     <span class="badge-pinjam-mesin"
                                                                                         title="Pinjam Mesin Aktif{{ !empty($proses->pinjam_mesin_alasan) ? ': ' . $proses->pinjam_mesin_alasan : '' }}"
                                                                                         style="font-weight: 800; font-size: 12px; color: #111; background: #ffeb3b; border-radius: 4px; padding: 1px 5px; border: 1px solid rgba(0,0,0,0.25); box-shadow: 0 1px 2px rgba(0,0,0,0.25); letter-spacing: 0.5px; line-height: 1.2; text-align: center;">
@@ -1118,7 +1120,7 @@
                                                                             $isBreakHist = (bool) ($proses->is_break ?? false);
                                                                         @endphp
                                                                         <div class="break-proses-indicator"
-                                                                            style="{{ $isBreakHist ? 'display: flex;' : 'display: none;' }} justify-content: center; align-items: center; width: 24px; margin-top: 2px;">
+                                                                            style="{{ ($isBreakHist ?? false) ? 'display: flex;' : 'display: none;' }} justify-content: center; align-items: center; width: 24px; margin-top: 2px;">
                                                                             <span class="badge-break-proses"
                                                                                 title="Break Aktif{{ !empty($proses->break_alasan) ? ': ' . $proses->break_alasan : '' }}"
                                                                                 style="font-weight: 800; font-size: 13px; color: #fff; background: #424242; border-radius: 4px; padding: 1px 3px; letter-spacing: 0.5px; line-height: 1; text-align: center;">
@@ -1139,7 +1141,7 @@
                                                                     @if ($proses->jenis === 'Maintenance')
                                                                         {{-- Indikator Maintenance: Di bawah kotak Maintenance, di atas cycle time --}}
                                                                         <div class="card-indicators-bar maintenance-indicators-bar" style="display: flex; justify-content: center; align-items: center; gap: 8px; margin: 4px 0 6px 0;">
-                                                                            <div class="pinjam-mesin-indicator" style="{{ $isPinjamMesinHist ? 'display: flex;' : 'display: none;' }} justify-content: center; align-items: center;">
+                                                                            <div class="pinjam-mesin-indicator" style="{{ ($isPinjamMesinHist ?? false) ? 'display: flex;' : 'display: none;' }} justify-content: center; align-items: center;">
                                                                                 <span class="badge-pinjam-mesin"
                                                                                     title="Pinjam Mesin Aktif{{ !empty($proses->pinjam_mesin_alasan) ? ': ' . $proses->pinjam_mesin_alasan : '' }}"
                                                                                     style="font-weight: 800; font-size: 12px; color: #111; background: #ffeb3b; border-radius: 4px; padding: 1px 5px; border: 1px solid rgba(0,0,0,0.25); box-shadow: 0 1px 2px rgba(0,0,0,0.25); letter-spacing: 0.5px; line-height: 1.2; text-align: center;">

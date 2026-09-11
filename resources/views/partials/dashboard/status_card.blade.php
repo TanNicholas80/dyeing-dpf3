@@ -58,6 +58,8 @@
     $hasBarcodeAux = false;
     $allKainComplete = false;
     $hasPendingKainOverGi = false;
+    $isPinjamMesin = (bool) ($proses->is_pinjam_mesin ?? false);
+    $isBreak = (bool) ($proses->is_break ?? false);
 
     // Status blok G, D, A (G: hijau jika barcode kain >= roll, D/A: hijau jika ada barcode)
     if ($proses->jenis === 'Maintenance') {
@@ -426,7 +428,7 @@
                         style="{{ $showIotDisconnected ? 'display: inline-block;' : 'display: none;' }}; font-size: 15px;"></i>
 
                     {{-- 2. Pinjam Mesin (PM) --}}
-                    <div class="pinjam-mesin-indicator" style="{{ $isPinjamMesin ? 'display: flex;' : 'display: none;' }} justify-content: center; align-items: center;">
+                    <div class="pinjam-mesin-indicator" style="{{ ($isPinjamMesin ?? false) ? 'display: flex;' : 'display: none;' }} justify-content: center; align-items: center;">
                         <span class="badge-pinjam-mesin" title="Pinjam Mesin Aktif{{ !empty($proses->pinjam_mesin_alasan) ? ': ' . $proses->pinjam_mesin_alasan : '' }}"
                             style="font-weight: 800; font-size: 12px; color: #111; background: #ffeb3b; border-radius: 4px; padding: 1px 5px; border: 1px solid rgba(0,0,0,0.25); box-shadow: 0 1px 2px rgba(0,0,0,0.25); letter-spacing: 0.5px; line-height: 1.2; text-align: center;">
                             PM
@@ -448,7 +450,7 @@
                     style="width: 24px; height: 24px; border-radius: 50%; background: {{ $light == 'green' ? '#00ff1a' : ($light == 'yellow' ? '#ffeb3b' : '#ff2a2a') }}; display: inline-block; border: 3px solid #fff; box-shadow: 0 0 0 0 transparent; transition: background 0.2s;">
                 </div>
             </div>
-            <div class="break-indicator" style="{{ $isBreak ? 'display: flex;' : 'display: none;' }} justify-content: center; align-items: center; width: 24px; margin-top: 2px;">
+            <div class="break-indicator" style="{{ ($isBreak ?? false) ? 'display: flex;' : 'display: none;' }} justify-content: center; align-items: center; width: 24px; margin-top: 2px;">
                 <span class="badge-break" title="Break Aktif{{ !empty($proses->break_alasan) ? ': ' . $proses->break_alasan : '' }}"
                     style="font-weight: 800; font-size: 13px; color: #ffeb3b; text-shadow: 0 1px 3px rgba(0,0,0,0.9); letter-spacing: 0.5px; line-height: 1; text-align: center;">
                     BR
@@ -473,7 +475,7 @@
                     style="{{ $showIotDisconnected ? 'display: inline-block;' : 'display: none;' }}; font-size: 15px;"></i>
 
                 {{-- 2. Pinjam Mesin (PM) --}}
-                <div class="pinjam-mesin-indicator" style="{{ $isPinjamMesin ? 'display: flex;' : 'display: none;' }} justify-content: center; align-items: center;">
+                <div class="pinjam-mesin-indicator" style="{{ ($isPinjamMesin ?? false) ? 'display: flex;' : 'display: none;' }} justify-content: center; align-items: center;">
                     <span class="badge-pinjam-mesin" title="Pinjam Mesin Aktif{{ !empty($proses->pinjam_mesin_alasan) ? ': ' . $proses->pinjam_mesin_alasan : '' }}"
                         style="font-weight: 800; font-size: 12px; color: #111; background: #ffeb3b; border-radius: 4px; padding: 1px 5px; border: 1px solid rgba(0,0,0,0.25); box-shadow: 0 1px 2px rgba(0,0,0,0.25); letter-spacing: 0.5px; line-height: 1.2; text-align: center;">
                         PM
