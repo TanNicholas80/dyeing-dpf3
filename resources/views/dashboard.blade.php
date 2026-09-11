@@ -776,11 +776,27 @@
                                                                     if (!$hasBarcodeAux && isset($proses->barcode_aux)) {
                                                                         $hasBarcodeAux = (bool) $proses->barcode_aux;
                                                                     }
-                                                                    // Blok pertama (G greige / F finish): hijau jika semua detail OP memenuhi barcode kain >= roll
+                                                                    // Status GDA khusus untuk OP pertama (header card)
+                                                                    $firstDetail = (isset($proses->details) && is_iterable($proses->details)) ? collect($proses->details)->first() : null;
+                                                                    $firstRoll = $firstDetail->roll ?? 0;
+                                                                    $firstPendingKain = isset($firstDetail->barcodeKains) && $firstDetail->barcodeKains->where('cancel', false)->where('approval_status', 'pending')->isNotEmpty();
+                                                                    $firstApprovedKainCount = isset($firstDetail->barcodeKains)
+                                                                        ? $firstDetail->barcodeKains->where('cancel', false)->where('approval_status', 'approved')->count()
+                                                                        : 0;
+                                                                    $firstHasKain = ($firstApprovedKainCount >= $firstRoll && $firstRoll > 0);
+                                                                    $firstKainColor = $firstPendingKain ? 'yellow' : ($firstHasKain ? 'green' : 'red');
+
+                                                                    $firstHasLa = isset($firstDetail->barcodeLas)
+                                                                        ? $firstDetail->barcodeLas->where('cancel', false)->where('approval_id', null)->count() >= ($proses->qty_dye_stuff ?? 0)
+                                                                        : $hasBarcodeLa;
+                                                                    $firstHasAux = isset($firstDetail->barcodeAuxs)
+                                                                        ? $firstDetail->barcodeAuxs->where('cancel', false)->where('approval_id', null)->count() >= ($proses->qty_aux ?? 0)
+                                                                        : $hasBarcodeAux;
+
                                                                     $blockColors = [
-                                                                        $allKainComplete ? 'green' : 'red',
-                                                                        $hasBarcodeLa ? 'green' : 'red',
-                                                                        $hasBarcodeAux ? 'green' : 'red',
+                                                                        $firstKainColor,
+                                                                        $firstHasLa ? 'green' : 'red',
+                                                                        $firstHasAux ? 'green' : 'red',
                                                                     ];
                                                                 }
                                                                 $barcodeKainOptional = $proses->barcode_kain_optional ?? false;
@@ -866,10 +882,11 @@
                                                                     $laInitialComplete = $laInitialScanned >= ($proses->qty_dye_stuff ?? 0);
                                                                     $auxInitialComplete = $auxInitialScanned >= ($proses->qty_aux ?? 0);
                                                                     if ($barcodeKainOptional) {
-                                                                        $blockColors = [$laInitialComplete ? 'green' : 'red', $auxInitialComplete ? 'green' : 'red'];
+                                                                        $blockColors = [$firstHasLa ? 'green' : 'red', $firstHasAux ? 'green' : 'red'];
                                                                     } else {
-                                                                        $blockColors[1] = $laInitialComplete ? 'green' : 'red';
-                                                                        $blockColors[2] = $auxInitialComplete ? 'green' : 'red';
+                                                                        $blockColors[0] = $firstKainColor;
+                                                                        $blockColors[1] = $firstHasLa ? 'green' : 'red';
+                                                                        $blockColors[2] = $firstHasAux ? 'green' : 'red';
                                                                     }
                                                                 } else {
                                                                     $pendingToppingLa = $hasToppingLa = $hasToppingAux = false;
@@ -879,10 +896,11 @@
                                                                     $laInitialComplete = $hasBarcodeLa;
                                                                     $auxInitialComplete = $hasBarcodeAux;
                                                                     if ($barcodeKainOptional) {
-                                                                        $blockColors = [$laInitialComplete ? 'green' : 'red', $auxInitialComplete ? 'green' : 'red'];
+                                                                        $blockColors = [$firstHasLa ? 'green' : 'red', $firstHasAux ? 'green' : 'red'];
                                                                     } else {
-                                                                        $blockColors[1] = $laInitialComplete ? 'green' : 'red';
-                                                                        $blockColors[2] = $auxInitialComplete ? 'green' : 'red';
+                                                                        $blockColors[0] = $firstKainColor;
+                                                                        $blockColors[1] = $firstHasLa ? 'green' : 'red';
+                                                                        $blockColors[2] = $firstHasAux ? 'green' : 'red';
                                                                     }
                                                                 }
                                                                 // Cek apakah proses ini terlibat dalam swap position approval dari proses lain
@@ -1006,7 +1024,7 @@
                                                                         </span>
                                                                     </div>
                                                                     <div class="status-header-center"
-                                                                        style="{{ $proses->jenis === 'Maintenance' ? 'flex: 1; padding: 0 4px;' : 'flex: 2;' }} text-align: center; display: flex; justify-content: center; align-items: center;">
+                                                                        style="{{ $proses->jenis === 'Maintenance' ? 'flex: 1; padding: 0 4px;' : 'flex: 2;' }} text-align: center; display: flex; flex-direction: column; justify-content: center; align-items: center;">
                                                                         @if ($proses->jenis === 'Maintenance')
                                                                             <div class="op-row" data-detail-id=""
                                                                                 style="flex: 1; width: auto; padding: 4px 8px; margin: 0; display: flex; align-items: center; justify-content: center; gap: 6px; border-radius: 8px; cursor: pointer; background: rgba(255,255,255,0.22); border: 1.5px solid rgba(0,0,0,0.18);">
@@ -1014,17 +1032,9 @@
                                                                                     style="font-weight: 800; color: #111; font-size: 19px; letter-spacing: 2px; text-shadow: 0 1px 4px #fff8; margin: 0;">
                                                                                     MAINTENANCE
                                                                                 </div>
-                                                                                {{-- Icon Catatan di dalam kotak Maintenance --}}
-                                                                                <span class="note-icon-slot">
-                                                                                    @if(!empty($proses->note))
-                                                                                        <i class="fas fa-sticky-note text-warning icon-has-note"
-                                                                                            title="Catatan: {{ Str::limit($proses->note, 60) }}"
-                                                                                            style="font-size: 16px; vertical-align: middle; text-shadow: 0 1px 2px #000; cursor: pointer;"></i>
-                                                                                    @endif
-                                                                                </span>
                                                                             </div>
                                                                         @else
-                                                                            <div
+                                                                            <div class="op-gda-container" data-detail-id="{{ $firstDetail->id ?? '' }}"
                                                                                 style="display: flex; justify-content: center; align-items: center; gap: 6px;">
                                                                                 @foreach ($blocks as $i => $b)
                                                                                     @php
@@ -1032,11 +1042,11 @@
                                                                                         $blockBg =
                                                                                             $color === 'green'
                                                                                             ? '#d4f8e8'
-                                                                                            : '#ffb3b3';
+                                                                                            : ($color === 'yellow' ? '#fff9c4' : '#ffb3b3');
                                                                                         $blockBorder =
                                                                                             $color === 'green'
                                                                                             ? '#43a047'
-                                                                                            : '#c62828';
+                                                                                            : ($color === 'yellow' ? '#f9a825' : '#c62828');
                                                                                     @endphp
                                                                                     <span class="gda-block" data-block-type="{{ $b }}"
                                                                                         style="display: inline-block; background: {{ $blockBg }}; color: #111; font-weight: bold; font-size: 22px; padding: 2px 10px; border-radius: 6px; border: 2.5px solid {{ $blockBorder }}; box-shadow: 0 1px 4px rgba(0,0,0,0.10); letter-spacing: 1px; text-shadow: 0 1px 2px #fff8;">
@@ -1060,6 +1070,23 @@
                                                                                         style="display: inline-block; {{ $taStyle }}; font-weight: bold; font-size: 18px; padding: 2px 8px; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.10); letter-spacing: 1px;">TA</span>
                                                                                 @endif
                                                                             </div>
+                                                                            {{-- Indikator di bawah GDA pertama (Sinyal IoT, Pinjam Mesin, Catatan) --}}
+                                                                            <div class="card-indicators-bar proses-indicators-bar" style="display: flex; justify-content: center; align-items: center; gap: 8px; margin-top: 3px;">
+                                                                                <div class="pinjam-mesin-indicator" style="{{ $isPinjamMesinHist ? 'display: flex;' : 'display: none;' }} justify-content: center; align-items: center;">
+                                                                                    <span class="badge-pinjam-mesin"
+                                                                                        title="Pinjam Mesin Aktif{{ !empty($proses->pinjam_mesin_alasan) ? ': ' . $proses->pinjam_mesin_alasan : '' }}"
+                                                                                        style="font-weight: 800; font-size: 12px; color: #111; background: #ffeb3b; border-radius: 4px; padding: 1px 5px; border: 1px solid rgba(0,0,0,0.25); box-shadow: 0 1px 2px rgba(0,0,0,0.25); letter-spacing: 0.5px; line-height: 1.2; text-align: center;">
+                                                                                        PM
+                                                                                    </span>
+                                                                                </div>
+                                                                                <span class="note-icon-slot">
+                                                                                    @if(!empty($proses->note))
+                                                                                        <i class="fas fa-sticky-note text-warning icon-has-note"
+                                                                                            title="Catatan: {{ Str::limit($proses->note, 60) }}"
+                                                                                            style="font-size: 15px; vertical-align: middle; text-shadow: 0 1px 2px #000; cursor: pointer;"></i>
+                                                                                    @endif
+                                                                                </span>
+                                                                            </div>
                                                                         @endif
                                                                     </div>
                                                                     <div class="status-header-right"
@@ -1069,17 +1096,6 @@
                                                                             <div class="status-light {{ $light == 'green' ? 'running-light' : ($light == 'yellow' ? 'running-light-yellow' : '') }}"
                                                                                 style="width: 24px; height: 24px; border-radius: 50%; background: {{ $light == 'green' ? '#00ff1a' : ($light == 'yellow' ? '#ffeb3b' : '#ff2a2a') }}; display: inline-block; border: 3px solid #fff; box-shadow: 0 0 0 0 transparent; transition: background 0.2s;">
                                                                             </div>
-                                                                        </div>
-                                                                        @php
-                                                                            $isPinjamMesinHist = (bool) ($proses->is_pinjam_mesin ?? false);
-                                                                        @endphp
-                                                                        <div class="pinjam-mesin-indicator"
-                                                                            style="{{ $isPinjamMesinHist ? 'display: flex;' : 'display: none;' }} justify-content: center; align-items: center; width: 24px; margin-top: 2px;">
-                                                                            <span class="badge-pinjam-mesin"
-                                                                                title="Pinjam Mesin Aktif{{ !empty($proses->pinjam_mesin_alasan) ? ': ' . $proses->pinjam_mesin_alasan : '' }}"
-                                                                                style="font-weight: 800; font-size: 13px; color: #111; text-shadow: 0 1px 3px rgba(255,255,255,0.9), 0 0 4px rgba(255,255,255,0.8); letter-spacing: 0.5px; line-height: 1; text-align: center;">
-                                                                                PM
-                                                                            </span>
                                                                         </div>
                                                                         @php
                                                                             $isBreakHist = (bool) ($proses->is_break ?? false);
@@ -1103,21 +1119,32 @@
                                                                             : ($proses->details ?? collect());
                                                                         $isMultipleOp = $detailList->count() > 1;
                                                                     @endphp
-                                                                    @if ($proses->jenis !== 'Maintenance')
+                                                                    @if ($proses->jenis === 'Maintenance')
+                                                                        {{-- Indikator Maintenance: Di bawah kotak Maintenance, di atas cycle time --}}
+                                                                        <div class="card-indicators-bar maintenance-indicators-bar" style="display: flex; justify-content: center; align-items: center; gap: 8px; margin: 4px 0 6px 0;">
+                                                                            <div class="pinjam-mesin-indicator" style="{{ $isPinjamMesinHist ? 'display: flex;' : 'display: none;' }} justify-content: center; align-items: center;">
+                                                                                <span class="badge-pinjam-mesin"
+                                                                                    title="Pinjam Mesin Aktif{{ !empty($proses->pinjam_mesin_alasan) ? ': ' . $proses->pinjam_mesin_alasan : '' }}"
+                                                                                    style="font-weight: 800; font-size: 12px; color: #111; background: #ffeb3b; border-radius: 4px; padding: 1px 5px; border: 1px solid rgba(0,0,0,0.25); box-shadow: 0 1px 2px rgba(0,0,0,0.25); letter-spacing: 0.5px; line-height: 1.2; text-align: center;">
+                                                                                    PM
+                                                                                </span>
+                                                                            </div>
+                                                                            <span class="note-icon-slot">
+                                                                                @if(!empty($proses->note))
+                                                                                    <i class="fas fa-sticky-note text-warning icon-has-note"
+                                                                                        title="Catatan: {{ Str::limit($proses->note, 60) }}"
+                                                                                        style="font-size: 15px; vertical-align: middle; text-shadow: 0 1px 2px #000; cursor: pointer;"></i>
+                                                                                @endif
+                                                                            </span>
+                                                                        </div>
+                                                                    @else
                                                                         <div class="op-list">
                                                                             @if ($detailList->isEmpty())
                                                                                 {{-- Tidak ada detail --}}
                                                                                 <div class="op-row" data-detail-id="">
                                                                                     <div class="op-row-noop"
-                                                                                        style="display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: bold; color: #111; font-size: 22px; letter-spacing: 2px; text-shadow: 0 1px 4px #fff8;">
-                                                                                        <span>-</span>
-                                                                                        <span class="note-icon-slot">
-                                                                                            @if(!empty($proses->note))
-                                                                                                <i class="fas fa-sticky-note text-warning icon-has-note"
-                                                                                                    title="Catatan: {{ Str::limit($proses->note, 60) }}"
-                                                                                                    style="font-size: 16px; vertical-align: middle; text-shadow: 0 1px 2px #000; cursor: pointer;"></i>
-                                                                                            @endif
-                                                                                        </span>
+                                                                                        style="font-weight: bold; color: #111; font-size: 22px; letter-spacing: 2px; text-shadow: 0 1px 4px #fff8;">
+                                                                                        -
                                                                                     </div>
                                                                                 </div>
                                                                             @elseif ($isMultipleOp)
@@ -1129,15 +1156,8 @@
                                                                                 {{-- OP Pertama: Detail lengkap dengan No OP dan Info --}}
                                                                                 <div class="op-row" data-detail-id="{{ $firstDetail->id }}">
                                                                                     <div class="op-row-noop"
-                                                                                        style="display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: bold; color: #111; font-size: 22px; letter-spacing: 2px; text-shadow: 0 1px 4px #fff8; margin-bottom: 4px;">
-                                                                                        <span>{{ $firstDetail->no_op ?? '-' }}</span>
-                                                                                        <span class="note-icon-slot">
-                                                                                            @if(!empty($proses->note))
-                                                                                                <i class="fas fa-sticky-note text-warning icon-has-note"
-                                                                                                    title="Catatan: {{ Str::limit($proses->note, 60) }}"
-                                                                                                    style="font-size: 16px; vertical-align: middle; text-shadow: 0 1px 2px #000; cursor: pointer;"></i>
-                                                                                            @endif
-                                                                                        </span>
+                                                                                        style="font-weight: bold; color: #111; font-size: 22px; letter-spacing: 2px; text-shadow: 0 1px 4px #fff8; margin-bottom: 4px;">
+                                                                                        {{ $firstDetail->no_op ?? '-' }}
                                                                                     </div>
                                                                                     @if($firstDetail->customer)
                                                                                         <div
@@ -1160,21 +1180,23 @@
                                                                                 {{-- Loop OP kedua dan seterusnya dengan garis pemisah --}}
                                                                                 @foreach ($detailList->skip(1) as $d)
                                                                                     @php
-                                                                                        // Indikator G: hijau hanya jika jumlah barcode kain >= roll
+                                                                                        // Indikator G: kuning jika pending approval, hijau jika approved >= roll
                                                                                         $subRoll = $d->roll ?? 0;
-                                                                                        $subBarcodeKainCount = isset($d->barcodeKains)
-                                                                                            ? $d->barcodeKains->where('cancel', false)->count()
+                                                                                        $subHasPendingKain = isset($d->barcodeKains) && $d->barcodeKains->where('cancel', false)->where('approval_status', 'pending')->isNotEmpty();
+                                                                                        $subApprovedKainCount = isset($d->barcodeKains)
+                                                                                            ? $d->barcodeKains->where('cancel', false)->where('approval_status', 'approved')->count()
                                                                                             : 0;
-                                                                                        $subHasKain = ($subBarcodeKainCount >= $subRoll && $subRoll > 0);
+                                                                                        $subHasKain = ($subApprovedKainCount >= $subRoll && $subRoll > 0);
+                                                                                        $subKainColor = $subHasPendingKain ? 'yellow' : ($subHasKain ? 'green' : 'red');
                                                                                         $subHasLa = isset($d->barcodeLas)
-                                                                                            ? $d->barcodeLas->where('cancel', false)->count() > 0
+                                                                                            ? $d->barcodeLas->where('cancel', false)->where('approval_id', null)->count() >= ($proses->qty_dye_stuff ?? 0)
                                                                                             : false;
                                                                                         $subHasAux = isset($d->barcodeAuxs)
-                                                                                            ? $d->barcodeAuxs->where('cancel', false)->count() > 0
+                                                                                            ? $d->barcodeAuxs->where('cancel', false)->where('approval_id', null)->count() >= ($proses->qty_aux ?? 0)
                                                                                             : false;
                                                                                         $subMap = $barcodeKainOptional
                                                                                             ? [$blocks[0] => $subHasLa ? 'green' : 'red', $blocks[1] => $subHasAux ? 'green' : 'red']
-                                                                                            : [$blocks[0] => $subHasKain ? 'green' : 'red', $blocks[1] => $subHasLa ? 'green' : 'red', $blocks[2] => $subHasAux ? 'green' : 'red'];
+                                                                                            : [$blocks[0] => $subKainColor, $blocks[1] => $subHasLa ? 'green' : 'red', $blocks[2] => $subHasAux ? 'green' : 'red'];
                                                                                     @endphp
                                                                                     {{-- Garis pemisah --}}
                                                                                     <div
@@ -1182,13 +1204,13 @@
                                                                                     </div>
                                                                                     {{-- GDA/FDA + TD/TA per OP (di luar detail OP, ukuran sama
                                                                                     dengan header) --}}
-                                                                                    <div
+                                                                                    <div class="op-gda-container" data-detail-id="{{ $d->id }}"
                                                                                         style="display: flex; justify-content: center; gap: 6px; margin-bottom: 6px;">
                                                                                         @foreach ($blocks as $b)
                                                                                             @php
                                                                                                 $color = $subMap[$b] ?? 'red';
-                                                                                                $blockBg = $color === 'green' ? '#d4f8e8' : '#ffb3b3';
-                                                                                                $blockBorder = $color === 'green' ? '#43a047' : '#c62828';
+                                                                                                $blockBg = $color === 'green' ? '#d4f8e8' : ($color === 'yellow' ? '#fff9c4' : '#ffb3b3');
+                                                                                                $blockBorder = $color === 'green' ? '#43a047' : ($color === 'yellow' ? '#f9a825' : '#c62828');
                                                                                             @endphp
                                                                                             <span class="gda-block" data-block-type="{{ $b }}"
                                                                                                 style="display: inline-block; background: {{ $blockBg }}; color: #111; font-weight: bold; font-size: 22px; padding: 2px 10px; border-radius: 6px; border: 2.5px solid {{ $blockBorder }}; box-shadow: 0 1px 4px rgba(0,0,0,0.10); letter-spacing: 1px; text-shadow: 0 1px 2px #fff8;">
@@ -1240,15 +1262,8 @@
                                                                                 @endphp
                                                                                 <div class="op-row" data-detail-id="{{ $singleDetail->id }}">
                                                                                     <div class="op-row-noop"
-                                                                                        style="display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: bold; color: #111; font-size: 22px; letter-spacing: 2px; text-shadow: 0 1px 4px #fff8;">
-                                                                                        <span>{{ $singleDetail->no_op ?? '-' }}</span>
-                                                                                        <span class="note-icon-slot">
-                                                                                            @if(!empty($proses->note))
-                                                                                                <i class="fas fa-sticky-note text-warning icon-has-note"
-                                                                                                    title="Catatan: {{ Str::limit($proses->note, 60) }}"
-                                                                                                    style="font-size: 16px; vertical-align: middle; text-shadow: 0 1px 2px #000; cursor: pointer;"></i>
-                                                                                            @endif
-                                                                                        </span>
+                                                                                        style="font-weight: bold; color: #111; font-size: 22px; letter-spacing: 2px; text-shadow: 0 1px 4px #fff8; margin-bottom: 4px;">
+                                                                                        {{ $singleDetail->no_op ?? '-' }}
                                                                                     </div>
                                                                                     @if($singleDetail->customer)
                                                                                         <div
@@ -5303,14 +5318,27 @@
                                 .removeAttr('title');
                         }
 
-                        // Update G/D/A indicators based on completion status
-                        const hasPendingKainGlobal = (data.all_barcode_kain_progress || []).some(p => p.has_pending) || (data.barcode_kain_progress || []).some(p => p.has_pending);
-                        const hasKainActiveGlobal = data.can_scan_la_aux === true ? true : (hasPendingKainGlobal ? 'yellow' : false);
+                        // Update G/D/A indicators per OP
                         const laProgGlobal = data.la_progress || {};
                         const auxProgGlobal = data.aux_progress || {};
                         const hasLaActiveGlobal = laProgGlobal.initial_is_complete !== undefined ? laProgGlobal.initial_is_complete : (laProgGlobal.initial_scanned >= (laProgGlobal.initial_required !== undefined ? laProgGlobal.initial_required : 0));
                         const hasAuxActiveGlobal = auxProgGlobal.initial_is_complete !== undefined ? auxProgGlobal.initial_is_complete : (auxProgGlobal.initial_scanned >= (auxProgGlobal.initial_required !== undefined ? auxProgGlobal.initial_required : 0));
-                        window.updateGDAIndicators(proses.id, selectedDetailId, hasKainActiveGlobal, hasLaActiveGlobal, hasAuxActiveGlobal);
+
+                        if (data.all_barcode_kain_progress && Array.isArray(data.all_barcode_kain_progress) && data.all_barcode_kain_progress.length > 0) {
+                            data.all_barcode_kain_progress.forEach(function (p) {
+                                const detailId = p.detail_proses_id;
+                                const kainColor = p.has_pending ? 'yellow' : (p.is_complete ? 'green' : 'red');
+                                window.updateGDAIndicators(proses.id, detailId, kainColor, hasLaActiveGlobal, hasAuxActiveGlobal);
+                            });
+                        } else if (data.barcode_kain_progress && Array.isArray(data.barcode_kain_progress) && data.barcode_kain_progress.length > 0) {
+                            data.barcode_kain_progress.forEach(function (p) {
+                                const detailId = p.detail_proses_id || selectedDetailId;
+                                const kainColor = p.has_pending ? 'yellow' : (p.is_complete ? 'green' : 'red');
+                                window.updateGDAIndicators(proses.id, detailId, kainColor, hasLaActiveGlobal, hasAuxActiveGlobal);
+                            });
+                        } else {
+                            window.updateGDAIndicators(proses.id, selectedDetailId, 'red', hasLaActiveGlobal, hasAuxActiveGlobal);
+                        }
                     },
                     error: function () {
                         $('#barcode-kain-list').html(
@@ -8273,14 +8301,27 @@
                                 $btnScanKainLocal.prop('disabled', false).removeClass('btn-secondary').addClass('btn-success').css('cursor', 'pointer').removeAttr('title');
                             }
                         }
-                        // Update G/D/A indicators based on completion status
-                        const hasPendingKainGlobal = (data.all_barcode_kain_progress || []).some(function (p) { return p.has_pending; }) || (data.barcode_kain_progress || []).some(function (p) { return p.has_pending; });
-                        const hasKainActiveGlobal = data.can_scan_la_aux === true ? true : (hasPendingKainGlobal ? 'yellow' : false);
+                        // Update G/D/A indicators per OP
                         const laProgGlobal = data.la_progress || {};
                         const auxProgGlobal = data.aux_progress || {};
                         const hasLaActiveGlobal = laProgGlobal.initial_is_complete !== undefined ? laProgGlobal.initial_is_complete : (laProgGlobal.initial_scanned >= (laProgGlobal.initial_required !== undefined ? laProgGlobal.initial_required : 0));
                         const hasAuxActiveGlobal = auxProgGlobal.initial_is_complete !== undefined ? auxProgGlobal.initial_is_complete : (auxProgGlobal.initial_scanned >= (auxProgGlobal.initial_required !== undefined ? auxProgGlobal.initial_required : 0));
-                        window.updateGDAIndicators(prosesId, selectedDetailId, hasKainActiveGlobal, hasLaActiveGlobal, hasAuxActiveGlobal);
+
+                        if (data.all_barcode_kain_progress && Array.isArray(data.all_barcode_kain_progress) && data.all_barcode_kain_progress.length > 0) {
+                            data.all_barcode_kain_progress.forEach(function (p) {
+                                const detailId = p.detail_proses_id;
+                                const kainColor = p.has_pending ? 'yellow' : (p.is_complete ? 'green' : 'red');
+                                window.updateGDAIndicators(prosesId, detailId, kainColor, hasLaActiveGlobal, hasAuxActiveGlobal);
+                            });
+                        } else if (data.barcode_kain_progress && Array.isArray(data.barcode_kain_progress) && data.barcode_kain_progress.length > 0) {
+                            data.barcode_kain_progress.forEach(function (p) {
+                                const detailId = p.detail_proses_id || selectedDetailId;
+                                const kainColor = p.has_pending ? 'yellow' : (p.is_complete ? 'green' : 'red');
+                                window.updateGDAIndicators(prosesId, detailId, kainColor, hasLaActiveGlobal, hasAuxActiveGlobal);
+                            });
+                        } else {
+                            window.updateGDAIndicators(prosesId, selectedDetailId, 'red', hasLaActiveGlobal, hasAuxActiveGlobal);
+                        }
                     },
                     error: function () {
                         if ($('#barcode-kain-list').length) $('#barcode-kain-list').html('<span style="color:#888;">Belum ada barcode kain.</span>');
@@ -8585,9 +8626,9 @@
 
                 // Fungsi helper untuk set warna blok GDA/FDA
                 function setBlockColor($container, blockType, ok) {
+                    if (!$container || !$container.length) return;
                     const $blocks = $container.find(`.gda-block[data-block-type="${blockType}"]`);
                     if (!$blocks.length) {
-                        console.warn(`Block ${blockType} not found in container for prosesId: ${prosesId}, detailId: ${detailId}`);
                         return;
                     }
 
@@ -8605,76 +8646,63 @@
                 // Convert detailId ke string untuk memastikan match dengan HTML
                 const detailIdStr = detailId ? String(detailId) : null;
 
-                // Jika detailId tidak ada atau kosong, update GDA/FDA di header card (untuk single OP atau OP pertama)
-                if (!detailIdStr || detailIdStr === '' || detailIdStr === 'null' || detailIdStr === 'undefined') {
-                    console.log('Updating blocks in header card (no detailId)');
-                    if (!barcodeKainOptGlobal) setBlockColor($card, firstBlock, hasKain);
-                    setBlockColor($card, 'D', !!hasLa);
-                    setBlockColor($card, 'A', !!hasAux);
-                    return;
+                // 1. Cari kontainer spesifik menggunakan class .op-gda-container[data-detail-id="..."]
+                let $gdaContainer = null;
+                if (detailIdStr) {
+                    $gdaContainer = $card.find(`.op-gda-container[data-detail-id="${detailIdStr}"]`);
                 }
 
-                // Cari OP row yang sesuai dengan detailId (coba dengan string dan number untuk kompatibilitas)
-                const $opRow = $card.find(`.op-row[data-detail-id="${detailIdStr}"], .op-row[data-detail-id="${detailId}"]`);
+                // 2. Jika tidak ditemukan lewat data-detail-id langsung:
+                if (!$gdaContainer || !$gdaContainer.length) {
+                    const $firstOpRow = $card.find('.op-row').first();
+                    const firstOpDetailId = $firstOpRow.length ? String($firstOpRow.attr('data-detail-id') || '') : '';
+                    const isFirstOp = !detailIdStr || (firstOpDetailId && firstOpDetailId === detailIdStr);
 
-                // Untuk multiple OP:
-                // - OP pertama: GDA ada di header card
-                // - OP kedua+: GDA ada di luar .op-row (sebelum .op-row, biasanya di div dengan class khusus)
-
-                // Cek apakah ini OP pertama
-                const $firstOpRow = $card.find('.op-row').first();
-                const firstOpDetailId = $firstOpRow.length ? String($firstOpRow.attr('data-detail-id') || '') : '';
-                const isFirstOp = firstOpDetailId === detailIdStr || firstOpDetailId === String(detailId);
-
-                if (isFirstOp) {
-                    // OP pertama: update blok di header card
-                    console.log('Updating blocks in header card (first OP), detailId:', detailIdStr);
-                    if (!barcodeKainOptGlobal) setBlockColor($card, firstBlock, hasKain);
-                    setBlockColor($card, 'D', !!hasLa);
-                    setBlockColor($card, 'A', !!hasAux);
-                } else if ($opRow.length) {
-                    // OP kedua+: cari blok GDA/FDA yang berada sebelum .op-row ini
-                    // Struktur HTML: <div>GDA blocks</div> <div class="op-row">...</div>
-                    let $gdaContainer = null;
-
-                    // Cek sibling sebelumnya yang memiliki GDA blocks
-                    const $prevSibling = $opRow.prev();
-                    if ($prevSibling.length && $prevSibling.find('.gda-block').length > 0) {
-                        $gdaContainer = $prevSibling;
+                    if (isFirstOp) {
+                        // Targetkan HANYA header container, JANGAN menggunakan $card utuh!
+                        $gdaContainer = $card.find('.status-header-center .op-gda-container');
+                        if (!$gdaContainer.length) {
+                            $gdaContainer = $card.find('.status-header-center');
+                        }
                     } else {
-                        // Cek parent dari op-row untuk mencari GDA di level yang sama
-                        const $opList = $opRow.closest('.op-list');
-                        if ($opList.length) {
-                            // Cari semua elemen sebelum op-row ini dalam op-list
-                            const $allBefore = $opList.children().slice(0, $opList.children().index($opRow));
-                            for (let i = $allBefore.length - 1; i >= 0; i--) {
-                                const $elem = $($allBefore[i]);
-                                if ($elem.find('.gda-block').length > 0) {
-                                    $gdaContainer = $elem;
-                                    break;
+                        // Sub-OP fallback: cari elemen sebelum .op-row yang memiliki gda-block
+                        const $opRow = $card.find(`.op-row[data-detail-id="${detailIdStr}"]`);
+                        if ($opRow.length) {
+                            const $prevSibling = $opRow.prev();
+                            if ($prevSibling.length && $prevSibling.find('.gda-block').length > 0) {
+                                $gdaContainer = $prevSibling;
+                            } else {
+                                const $opList = $opRow.closest('.op-list');
+                                if ($opList.length) {
+                                    const $allBefore = $opList.children().slice(0, $opList.children().index($opRow));
+                                    for (let i = $allBefore.length - 1; i >= 0; i--) {
+                                        const $elem = $($allBefore[i]);
+                                        if ($elem.find('.gda-block').length > 0) {
+                                            $gdaContainer = $elem;
+                                            break;
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
+                }
 
-                    if ($gdaContainer && $gdaContainer.length) {
-                        console.log('Updating blocks in container for OP:', detailIdStr);
-                        if (!barcodeKainOptGlobal) setBlockColor($gdaContainer, firstBlock, hasKain);
-                        setBlockColor($gdaContainer, 'D', !!hasLa);
-                        setBlockColor($gdaContainer, 'A', !!hasAux);
-                    } else {
-                        // Fallback: update di header card jika container tidak ditemukan
-                        console.log('Block container not found, updating in header card as fallback');
-                        if (!barcodeKainOptGlobal) setBlockColor($card, firstBlock, hasKain);
-                        setBlockColor($card, 'D', !!hasLa);
-                        setBlockColor($card, 'A', !!hasAux);
-                    }
+                // Jika kontainer ditemukan, update blok di kontainer tersebut (terisolasi per OP)
+                if ($gdaContainer && $gdaContainer.length) {
+                    console.log('Updating blocks in isolated container for OP:', detailIdStr || 'header');
+                    if (!barcodeKainOptGlobal) setBlockColor($gdaContainer, firstBlock, hasKain);
+                    setBlockColor($gdaContainer, 'D', !!hasLa);
+                    setBlockColor($gdaContainer, 'A', !!hasAux);
                 } else {
-                    // Jika OP row tidak ditemukan, update di header card sebagai fallback
-                    console.log('OP row not found, updating in header card as fallback. detailId:', detailIdStr);
-                    if (!barcodeKainOptGlobal) setBlockColor($card, firstBlock, hasKain);
-                    setBlockColor($card, 'D', !!hasLa);
-                    setBlockColor($card, 'A', !!hasAux);
+                    // Fallback terakhir: update di status-header-center saja (TIDAK pernah $card)
+                    console.warn('GDA container not found for detailId:', detailIdStr, 'falling back to header-center only');
+                    const $headerContainer = $card.find('.status-header-center');
+                    if ($headerContainer.length) {
+                        if (!barcodeKainOptGlobal) setBlockColor($headerContainer, firstBlock, hasKain);
+                        setBlockColor($headerContainer, 'D', !!hasLa);
+                        setBlockColor($headerContainer, 'A', !!hasAux);
+                    }
                 }
             }
 

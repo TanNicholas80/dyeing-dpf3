@@ -49,7 +49,7 @@
     if ($proses->jenis === 'Maintenance') {
         $blockColors = ['gray', 'gray', 'gray'];
     } else {
-        // G: hijau hanya jika SEMUA detail OP sudah memenuhi barcode kain >= roll, kuning jika ada pending approval over limit
+        // Status global untuk validasi background kartu
         $allKainComplete = true;
         $hasPendingKainOverGi = false;
         if (isset($proses->details) && is_iterable($proses->details)) {
@@ -86,14 +86,28 @@
         if (!$hasBarcodeAux && isset($proses->barcode_aux)) {
             $hasBarcodeAux = (bool) $proses->barcode_aux;
         }
-        // G: kuning jika ada pending approval over limit, hijau jika semua detail OP sudah memenuhi barcode kain >= roll
-        // D: hijau jika ada minimal 1 barcode LA (cancel=false)
-        // A: hijau jika ada minimal 1 barcode AUX (cancel=false)
-        $kainColor = $hasPendingKainOverGi ? 'yellow' : ($allKainComplete ? 'green' : 'red');
+
+        // Status GDA khusus untuk OP pertama (header card)
+        $firstDetail = (isset($proses->details) && is_iterable($proses->details)) ? collect($proses->details)->first() : null;
+        $firstRoll = $firstDetail->roll ?? 0;
+        $firstPendingKain = isset($firstDetail->barcodeKains) && $firstDetail->barcodeKains->where('cancel', false)->where('approval_status', 'pending')->isNotEmpty();
+        $firstApprovedKainCount = isset($firstDetail->barcodeKains)
+            ? $firstDetail->barcodeKains->where('cancel', false)->where('approval_status', 'approved')->count()
+            : 0;
+        $firstHasKain = ($firstApprovedKainCount >= $firstRoll && $firstRoll > 0);
+        $firstKainColor = $firstPendingKain ? 'yellow' : ($firstHasKain ? 'green' : 'red');
+
+        $firstHasLa = isset($firstDetail->barcodeLas)
+            ? $firstDetail->barcodeLas->where('cancel', false)->where('approval_id', null)->count() >= ($proses->qty_dye_stuff ?? 0)
+            : $hasBarcodeLa;
+        $firstHasAux = isset($firstDetail->barcodeAuxs)
+            ? $firstDetail->barcodeAuxs->where('cancel', false)->where('approval_id', null)->count() >= ($proses->qty_aux ?? 0)
+            : $hasBarcodeAux;
+
         $blockColors = [
-            $kainColor,
-            $hasBarcodeLa ? 'green' : 'red',
-            $hasBarcodeAux ? 'green' : 'red',
+            $firstKainColor,
+            $firstHasLa ? 'green' : 'red',
+            $firstHasAux ? 'green' : 'red',
         ];
     }
     $barcodeKainOptional = $proses->barcode_kain_optional ?? false;
@@ -182,10 +196,11 @@
             ? $proses->details->every(fn($d) => $d->barcodeAuxs && $d->barcodeAuxs->where('cancel', false)->where('approval_id', null)->count() >= ($proses->qty_aux ?? 0))
             : false;
         if ($barcodeKainOptional) {
-            $blockColors = [$laInitialComplete ? 'green' : 'red', $auxInitialComplete ? 'green' : 'red'];
+            $blockColors = [$firstHasLa ? 'green' : 'red', $firstHasAux ? 'green' : 'red'];
         } else {
-            $blockColors[1] = $laInitialComplete ? 'green' : 'red';
-            $blockColors[2] = $auxInitialComplete ? 'green' : 'red';
+            $blockColors[0] = $firstKainColor;
+            $blockColors[1] = $firstHasLa ? 'green' : 'red';
+            $blockColors[2] = $firstHasAux ? 'green' : 'red';
         }
     } else {
         $pendingToppingLa = $hasToppingLa = $hasToppingAux = false;
@@ -195,10 +210,11 @@
         $laInitialComplete = $hasBarcodeLa;
         $auxInitialComplete = $hasBarcodeAux;
         if ($barcodeKainOptional) {
-            $blockColors = [$laInitialComplete ? 'green' : 'red', $auxInitialComplete ? 'green' : 'red'];
+            $blockColors = [$firstHasLa ? 'green' : 'red', $firstHasAux ? 'green' : 'red'];
         } else {
-            $blockColors[1] = $laInitialComplete ? 'green' : 'red';
-            $blockColors[2] = $auxInitialComplete ? 'green' : 'red';
+            $blockColors[0] = $firstKainColor;
+            $blockColors[1] = $firstHasLa ? 'green' : 'red';
+            $blockColors[2] = $firstHasAux ? 'green' : 'red';
         }
     }
     // Cek apakah proses ini terlibat dalam swap position approval dari proses lain
@@ -316,6 +332,8 @@
     $isIotDisconnected = ($lastSeenTs === null) || (($nowTs - $lastSeenTs) > 90);
     $isRunning = $proses->mulai !== null && ($proses->selesai === null);
     $showIotDisconnected = $isRunning && $isIotDisconnected;
+    $isPinjamMesin = (bool) ($proses->is_pinjam_mesin ?? false);
+    $isBreak = (bool) ($proses->is_break ?? false);
 @endphp
 <div class="status-card draggable" draggable="{{ $canDragDrop ? 'true' : 'false' }}"
     style="background: {{ $gradient }}; background-repeat: no-repeat; background-size: cover; border-radius: 0; color: #fff; margin: 5px 0 0 0; padding: 2px 2px; cursor: {{ $canDragDrop ? 'grab' : 'default' }}; box-shadow: 0 2px 6px rgba(0,0,0,0.2);"
@@ -341,28 +359,18 @@
                 {{ $type }}
             </span>
         </div>
-        <div class="status-header-center" style="{{ $proses->jenis === 'Maintenance' ? 'flex: 1; padding: 0 4px;' : 'flex: 2;' }} text-align: center; display: flex; justify-content: center; align-items: center;">
+        <div class="status-header-center" style="{{ $proses->jenis === 'Maintenance' ? 'flex: 1; padding: 0 4px;' : 'flex: 2;' }} text-align: center; display: flex; flex-direction: column; justify-content: center; align-items: center;">
             {{-- Button Detail Proses --}}
             @if ($proses->jenis === 'Maintenance')
                 <div class="op-row" data-detail-id=""
                     style="flex: 1; width: auto; padding: 4px 8px; margin: 0; display: flex; align-items: center; justify-content: center; gap: 6px; border-radius: 8px; cursor: pointer; background: rgba(255,255,255,0.22); border: 1.5px solid rgba(0,0,0,0.18);">
-                    {{-- Icon Sinyal IoT Terputus di dalam kotak Maintenance --}}
-                    <i class="fas fa-exclamation-triangle iot-offline-icon"
-                        title="Peringatan: Sinyal IoT Mesin Terputus / Tidak Stabil (> 90 detik tidak ada sinyal)"
-                        style="{{ $showIotDisconnected ? 'display: inline-block;' : 'display: none;' }}; font-size: 16px;"></i>
                     <div class="op-row-noop"
                         style="font-weight: 800; color: #111; font-size: 19px; letter-spacing: 2px; text-shadow: 0 1px 4px #fff8; margin: 0;">
                         MAINTENANCE
                     </div>
-                    {{-- Icon Catatan di dalam kotak Maintenance --}}
-                    <span class="note-icon-slot">
-                        @if(!empty($proses->note))
-                            <i class="fas fa-sticky-note text-warning icon-has-note" title="Catatan: {{ Str::limit($proses->note, 60) }}" style="font-size: 16px; vertical-align: middle; text-shadow: 0 1px 2px #000; cursor: pointer;"></i>
-                        @endif
-                    </span>
                 </div>
             @else
-                <div style="display: flex; justify-content: center; align-items: center; gap: 6px;">
+                <div class="op-gda-container" data-detail-id="{{ $firstDetail->id ?? '' }}" style="display: flex; justify-content: center; align-items: center; gap: 6px;">
                     @foreach ($blocks as $i => $b)
                         @php
                             $color = $blockColors[$i];
@@ -395,6 +403,28 @@
                             style="display: inline-block; {{ $taStyle2 }}; font-weight: bold; font-size: 18px; padding: 2px 8px; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.10); letter-spacing: 1px;">TA</span>
                     @endif
                 </div>
+                {{-- Indikator di bawah GDA pertama (Sinyal IoT, Pinjam Mesin, Catatan) --}}
+                <div class="card-indicators-bar proses-indicators-bar" style="display: flex; justify-content: center; align-items: center; gap: 8px; margin-top: 3px;">
+                    {{-- 1. Sinyal IoT Terputus --}}
+                    <i class="fas fa-exclamation-triangle iot-offline-icon"
+                        title="Peringatan: Sinyal IoT Mesin Terputus / Tidak Stabil (> 90 detik tidak ada sinyal)"
+                        style="{{ $showIotDisconnected ? 'display: inline-block;' : 'display: none;' }}; font-size: 15px;"></i>
+
+                    {{-- 2. Pinjam Mesin (PM) --}}
+                    <div class="pinjam-mesin-indicator" style="{{ $isPinjamMesin ? 'display: flex;' : 'display: none;' }} justify-content: center; align-items: center;">
+                        <span class="badge-pinjam-mesin" title="Pinjam Mesin Aktif{{ !empty($proses->pinjam_mesin_alasan) ? ': ' . $proses->pinjam_mesin_alasan : '' }}"
+                            style="font-weight: 800; font-size: 12px; color: #111; background: #ffeb3b; border-radius: 4px; padding: 1px 5px; border: 1px solid rgba(0,0,0,0.25); box-shadow: 0 1px 2px rgba(0,0,0,0.25); letter-spacing: 0.5px; line-height: 1.2; text-align: center;">
+                            PM
+                        </span>
+                    </div>
+
+                    {{-- 3. Catatan (Notepad) --}}
+                    <span class="note-icon-slot">
+                        @if(!empty($proses->note))
+                            <i class="fas fa-sticky-note text-warning icon-has-note" title="Catatan: {{ Str::limit($proses->note, 60) }}" style="font-size: 15px; vertical-align: middle; text-shadow: 0 1px 2px #000; cursor: pointer;"></i>
+                        @endif
+                    </span>
+                </div>
             @endif
         </div>
         <div class="status-header-right" style="{{ $proses->jenis === 'Maintenance' ? 'flex: 0 0 auto;' : 'flex: 1;' }} display: flex; flex-direction: column; align-items: flex-end; justify-content: center;">
@@ -402,16 +432,6 @@
                 <div class="status-light {{ $light == 'green' ? 'running-light' : ($light == 'yellow' ? 'running-light-yellow' : '') }}"
                     style="width: 24px; height: 24px; border-radius: 50%; background: {{ $light == 'green' ? '#00ff1a' : ($light == 'yellow' ? '#ffeb3b' : '#ff2a2a') }}; display: inline-block; border: 3px solid #fff; box-shadow: 0 0 0 0 transparent; transition: background 0.2s;">
                 </div>
-            </div>
-            @php
-                $isPinjamMesin = (bool) ($proses->is_pinjam_mesin ?? false);
-                $isBreak = (bool) ($proses->is_break ?? false);
-            @endphp
-            <div class="pinjam-mesin-indicator" style="{{ $isPinjamMesin ? 'display: flex;' : 'display: none;' }} justify-content: center; align-items: center; width: 24px; margin-top: 2px;">
-                <span class="badge-pinjam-mesin" title="Pinjam Mesin Aktif{{ !empty($proses->pinjam_mesin_alasan) ? ': ' . $proses->pinjam_mesin_alasan : '' }}"
-                    style="font-weight: 800; font-size: 13px; color: #111; text-shadow: 0 1px 3px rgba(255,255,255,0.9), 0 0 4px rgba(255,255,255,0.8); letter-spacing: 0.5px; line-height: 1; text-align: center;">
-                    PM
-                </span>
             </div>
             <div class="break-indicator" style="{{ $isBreak ? 'display: flex;' : 'display: none;' }} justify-content: center; align-items: center; width: 24px; margin-top: 2px;">
                 <span class="badge-break" title="Break Aktif{{ !empty($proses->break_alasan) ? ': ' . $proses->break_alasan : '' }}"
@@ -429,22 +449,37 @@
                 : ($proses->details ?? collect());
             $isMultipleOp = $detailList->count() > 1;
         @endphp
-        @if ($proses->jenis !== 'Maintenance')
+        @if ($proses->jenis === 'Maintenance')
+            {{-- Indikator Maintenance: Di bawah kotak Maintenance, di atas cycle time --}}
+            <div class="card-indicators-bar maintenance-indicators-bar" style="display: flex; justify-content: center; align-items: center; gap: 8px; margin: 4px 0 6px 0;">
+                {{-- 1. Sinyal IoT Terputus --}}
+                <i class="fas fa-exclamation-triangle iot-offline-icon"
+                    title="Peringatan: Sinyal IoT Mesin Terputus / Tidak Stabil (> 90 detik tidak ada sinyal)"
+                    style="{{ $showIotDisconnected ? 'display: inline-block;' : 'display: none;' }}; font-size: 15px;"></i>
+
+                {{-- 2. Pinjam Mesin (PM) --}}
+                <div class="pinjam-mesin-indicator" style="{{ $isPinjamMesin ? 'display: flex;' : 'display: none;' }} justify-content: center; align-items: center;">
+                    <span class="badge-pinjam-mesin" title="Pinjam Mesin Aktif{{ !empty($proses->pinjam_mesin_alasan) ? ': ' . $proses->pinjam_mesin_alasan : '' }}"
+                        style="font-weight: 800; font-size: 12px; color: #111; background: #ffeb3b; border-radius: 4px; padding: 1px 5px; border: 1px solid rgba(0,0,0,0.25); box-shadow: 0 1px 2px rgba(0,0,0,0.25); letter-spacing: 0.5px; line-height: 1.2; text-align: center;">
+                        PM
+                    </span>
+                </div>
+
+                {{-- 3. Catatan (Notepad) --}}
+                <span class="note-icon-slot">
+                    @if(!empty($proses->note))
+                        <i class="fas fa-sticky-note text-warning icon-has-note" title="Catatan: {{ Str::limit($proses->note, 60) }}" style="font-size: 15px; vertical-align: middle; text-shadow: 0 1px 2px #000; cursor: pointer;"></i>
+                    @endif
+                </span>
+            </div>
+        @else
         <div class="op-list">
             @if ($detailList->isEmpty())
                 {{-- Tidak ada detail --}}
                 <div class="op-row" data-detail-id="">
                     <div class="op-row-noop"
-                        style="display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: bold; color: #111; font-size: 22px; letter-spacing: 2px; text-shadow: 0 1px 4px #fff8;">
-                        <i class="fas fa-exclamation-triangle iot-offline-icon"
-                            title="Peringatan: Sinyal IoT Mesin Terputus / Tidak Stabil (> 90 detik tidak ada sinyal)"
-                            style="{{ $showIotDisconnected ? 'display: inline-block;' : 'display: none;' }}; font-size: 17px;"></i>
-                        <span>-</span>
-                        <span class="note-icon-slot">
-                            @if(!empty($proses->note))
-                                <i class="fas fa-sticky-note text-warning icon-has-note" title="Catatan: {{ Str::limit($proses->note, 60) }}" style="font-size: 16px; vertical-align: middle; text-shadow: 0 1px 2px #000; cursor: pointer;"></i>
-                            @endif
-                        </span>
+                        style="font-weight: bold; color: #111; font-size: 22px; letter-spacing: 2px; text-shadow: 0 1px 4px #fff8;">
+                        -
                     </div>
                 </div>
             @elseif ($isMultipleOp)
@@ -452,31 +487,12 @@
                 garis pemisah --}}
                 @php
                     $firstDetail = $detailList->first();
-                    // Indikator G: hijau hanya jika jumlah barcode kain >= roll
-                    $firstRoll = $firstDetail->roll ?? 0;
-                    $firstBarcodeKainCount = isset($firstDetail->barcodeKains)
-                        ? $firstDetail->barcodeKains->where('cancel', false)->count()
-                        : 0;
-                    $firstHasKain = ($firstBarcodeKainCount >= $firstRoll && $firstRoll > 0);
-                    $firstHasLa = ($firstDetail->barcodeLas ? $firstDetail->barcodeLas->where('cancel', false)->where('approval_id', null)->count() : 0) >= ($proses->qty_dye_stuff ?? 0);
-                    $firstHasAux = ($firstDetail->barcodeAuxs ? $firstDetail->barcodeAuxs->where('cancel', false)->where('approval_id', null)->count() : 0) >= ($proses->qty_aux ?? 0);
-                    $firstMap = $barcodeKainOptional
-                        ? [$blocks[0] => $firstHasLa ? 'green' : 'red', $blocks[1] => $firstHasAux ? 'green' : 'red']
-                        : [$blocks[0] => $firstHasKain ? 'green' : 'red', $blocks[1] => $firstHasLa ? 'green' : 'red', $blocks[2] => $firstHasAux ? 'green' : 'red'];
                 @endphp
                 {{-- OP Pertama: Detail lengkap dengan No OP dan Info --}}
                 <div class="op-row" data-detail-id="{{ $firstDetail->id }}">
                     <div class="op-row-noop"
-                        style="display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: bold; color: #111; font-size: 22px; letter-spacing: 2px; text-shadow: 0 1px 4px #fff8; margin-bottom: 4px;">
-                        <i class="fas fa-exclamation-triangle iot-offline-icon"
-                            title="Peringatan: Sinyal IoT Mesin Terputus / Tidak Stabil (> 90 detik tidak ada sinyal)"
-                            style="{{ $showIotDisconnected ? 'display: inline-block;' : 'display: none;' }}; font-size: 17px;"></i>
-                        <span>{{ $firstDetail->no_op ?? '-' }}</span>
-                        <span class="note-icon-slot">
-                            @if(!empty($proses->note))
-                                <i class="fas fa-sticky-note text-warning icon-has-note" title="Catatan: {{ Str::limit($proses->note, 60) }}" style="font-size: 16px; vertical-align: middle; text-shadow: 0 1px 2px #000; cursor: pointer;"></i>
-                            @endif
-                        </span>
+                        style="font-weight: bold; color: #111; font-size: 22px; letter-spacing: 2px; text-shadow: 0 1px 4px #fff8; margin-bottom: 4px;">
+                        {{ $firstDetail->no_op ?? '-' }}
                     </div>
                     @if($firstDetail->customer)
                         <div
@@ -516,7 +532,7 @@
                     </div>
                     {{-- GDA/FDA + TD/TA per OP (di luar detail OP, ukuran sama dengan
                     header) --}}
-                    <div style="display: flex; justify-content: center; gap: 6px; margin-bottom: 6px;">
+                    <div class="op-gda-container" data-detail-id="{{ $d->id }}" style="display: flex; justify-content: center; gap: 6px; margin-bottom: 6px;">
                         @foreach ($blocks as $b)
                             @php
                                 $color = $subMap[$b] ?? 'red';
@@ -570,16 +586,8 @@
                 @endphp
                 <div class="op-row" data-detail-id="{{ $singleDetail->id }}">
                     <div class="op-row-noop"
-                        style="display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: bold; color: #111; font-size: 22px; letter-spacing: 2px; text-shadow: 0 1px 4px #fff8;">
-                        <i class="fas fa-exclamation-triangle iot-offline-icon"
-                            title="Peringatan: Sinyal IoT Mesin Terputus / Tidak Stabil (> 90 detik tidak ada sinyal)"
-                            style="{{ $showIotDisconnected ? 'display: inline-block;' : 'display: none;' }}; font-size: 17px;"></i>
-                        <span>{{ $singleDetail->no_op ?? '-' }}</span>
-                        <span class="note-icon-slot">
-                            @if(!empty($proses->note))
-                                <i class="fas fa-sticky-note text-warning icon-has-note" title="Catatan: {{ Str::limit($proses->note, 60) }}" style="font-size: 16px; vertical-align: middle; text-shadow: 0 1px 2px #000; cursor: pointer;"></i>
-                            @endif
-                        </span>
+                        style="font-weight: bold; color: #111; font-size: 22px; letter-spacing: 2px; text-shadow: 0 1px 4px #fff8; margin-bottom: 4px;">
+                        {{ $singleDetail->no_op ?? '-' }}
                     </div>
                     @if($singleDetail->customer)
                         <div
