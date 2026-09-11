@@ -45,13 +45,26 @@
                 : ($proses->jenis === 'Reproses Makloon'
                     ? 'RM'
                     : 'M')));
+    // Inisialisasi default agar aman dan tidak undefined untuk semua jenis proses (termasuk Maintenance)
+    $firstDetail = (isset($proses->details) && is_iterable($proses->details)) ? collect($proses->details)->first() : null;
+    $firstRoll = $firstDetail->roll ?? 0;
+    $firstPendingKain = false;
+    $firstApprovedKainCount = 0;
+    $firstHasKain = false;
+    $firstKainColor = 'red';
+    $firstHasLa = false;
+    $firstHasAux = false;
+    $hasBarcodeLa = false;
+    $hasBarcodeAux = false;
+    $allKainComplete = false;
+    $hasPendingKainOverGi = false;
+
     // Status blok G, D, A (G: hijau jika barcode kain >= roll, D/A: hijau jika ada barcode)
     if ($proses->jenis === 'Maintenance') {
         $blockColors = ['gray', 'gray', 'gray'];
     } else {
         // Status global untuk validasi background kartu
         $allKainComplete = true;
-        $hasPendingKainOverGi = false;
         if (isset($proses->details) && is_iterable($proses->details)) {
             foreach ($proses->details as $d) {
                 if (isset($d->barcodeKains)) {
@@ -88,8 +101,6 @@
         }
 
         // Status GDA khusus untuk OP pertama (header card)
-        $firstDetail = (isset($proses->details) && is_iterable($proses->details)) ? collect($proses->details)->first() : null;
-        $firstRoll = $firstDetail->roll ?? 0;
         $firstPendingKain = isset($firstDetail->barcodeKains) && $firstDetail->barcodeKains->where('cancel', false)->where('approval_status', 'pending')->isNotEmpty();
         $firstApprovedKainCount = isset($firstDetail->barcodeKains)
             ? $firstDetail->barcodeKains->where('cancel', false)->where('approval_status', 'approved')->count()
@@ -195,12 +206,14 @@
         $auxInitialComplete = isset($proses->details) && $proses->details->isNotEmpty()
             ? $proses->details->every(fn($d) => $d->barcodeAuxs && $d->barcodeAuxs->where('cancel', false)->where('approval_id', null)->count() >= ($proses->qty_aux ?? 0))
             : false;
-        if ($barcodeKainOptional) {
-            $blockColors = [$firstHasLa ? 'green' : 'red', $firstHasAux ? 'green' : 'red'];
-        } else {
-            $blockColors[0] = $firstKainColor;
-            $blockColors[1] = $firstHasLa ? 'green' : 'red';
-            $blockColors[2] = $firstHasAux ? 'green' : 'red';
+        if ($proses->jenis !== 'Maintenance') {
+            if ($barcodeKainOptional) {
+                $blockColors = [$firstHasLa ? 'green' : 'red', $firstHasAux ? 'green' : 'red'];
+            } else {
+                $blockColors[0] = $firstKainColor;
+                $blockColors[1] = $firstHasLa ? 'green' : 'red';
+                $blockColors[2] = $firstHasAux ? 'green' : 'red';
+            }
         }
     } else {
         $pendingToppingLa = $hasToppingLa = $hasToppingAux = false;
@@ -209,12 +222,14 @@
         $auxComplete = $hasBarcodeAux;
         $laInitialComplete = $hasBarcodeLa;
         $auxInitialComplete = $hasBarcodeAux;
-        if ($barcodeKainOptional) {
-            $blockColors = [$firstHasLa ? 'green' : 'red', $firstHasAux ? 'green' : 'red'];
-        } else {
-            $blockColors[0] = $firstKainColor;
-            $blockColors[1] = $firstHasLa ? 'green' : 'red';
-            $blockColors[2] = $firstHasAux ? 'green' : 'red';
+        if ($proses->jenis !== 'Maintenance') {
+            if ($barcodeKainOptional) {
+                $blockColors = [$firstHasLa ? 'green' : 'red', $firstHasAux ? 'green' : 'red'];
+            } else {
+                $blockColors[0] = $firstKainColor;
+                $blockColors[1] = $firstHasLa ? 'green' : 'red';
+                $blockColors[2] = $firstHasAux ? 'green' : 'red';
+            }
         }
     }
     // Cek apakah proses ini terlibat dalam swap position approval dari proses lain

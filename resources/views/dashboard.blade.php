@@ -743,6 +743,19 @@
                                                                             : ($proses->jenis === 'Reproses Makloon'
                                                                                 ? 'RM'
                                                                                 : 'M')));
+                                                                // Inisialisasi default agar aman dan tidak undefined untuk semua jenis proses (termasuk Maintenance)
+                                                                $firstDetail = (isset($proses->details) && is_iterable($proses->details)) ? collect($proses->details)->first() : null;
+                                                                $firstRoll = $firstDetail->roll ?? 0;
+                                                                $firstPendingKain = false;
+                                                                $firstApprovedKainCount = 0;
+                                                                $firstHasKain = false;
+                                                                $firstKainColor = 'red';
+                                                                $firstHasLa = false;
+                                                                $firstHasAux = false;
+                                                                $hasBarcodeLa = false;
+                                                                $hasBarcodeAux = false;
+                                                                $allKainComplete = false;
+
                                                                 if ($proses->jenis === 'Maintenance') {
                                                                     $blockColors = ['gray', 'gray', 'gray'];
                                                                 } else {
@@ -803,8 +816,8 @@
                                                                 if ($barcodeKainOptional) {
                                                                     $blocks = ['D', 'A'];
                                                                     $blockColors = [
-                                                                        $hasBarcodeLa ? 'green' : 'red',
-                                                                        $hasBarcodeAux ? 'green' : 'red',
+                                                                        $firstHasLa ? 'green' : 'red',
+                                                                        $firstHasAux ? 'green' : 'red',
                                                                     ];
                                                                 } else {
                                                                     $blocks = (($proses->mode ?? 'greige') === 'finish') ? ['F', 'D', 'A'] : ['G', 'D', 'A'];
@@ -881,12 +894,14 @@
                                                                     $auxComplete = ($auxInitialScanned + $auxToppingScanned) >= (($proses->qty_aux ?? 0) + $auxToppingRequired);
                                                                     $laInitialComplete = $laInitialScanned >= ($proses->qty_dye_stuff ?? 0);
                                                                     $auxInitialComplete = $auxInitialScanned >= ($proses->qty_aux ?? 0);
-                                                                    if ($barcodeKainOptional) {
-                                                                        $blockColors = [$firstHasLa ? 'green' : 'red', $firstHasAux ? 'green' : 'red'];
-                                                                    } else {
-                                                                        $blockColors[0] = $firstKainColor;
-                                                                        $blockColors[1] = $firstHasLa ? 'green' : 'red';
-                                                                        $blockColors[2] = $firstHasAux ? 'green' : 'red';
+                                                                    if ($proses->jenis !== 'Maintenance') {
+                                                                        if ($barcodeKainOptional) {
+                                                                            $blockColors = [$firstHasLa ? 'green' : 'red', $firstHasAux ? 'green' : 'red'];
+                                                                        } else {
+                                                                            $blockColors[0] = $firstKainColor;
+                                                                            $blockColors[1] = $firstHasLa ? 'green' : 'red';
+                                                                            $blockColors[2] = $firstHasAux ? 'green' : 'red';
+                                                                        }
                                                                     }
                                                                 } else {
                                                                     $pendingToppingLa = $hasToppingLa = $hasToppingAux = false;
@@ -895,12 +910,14 @@
                                                                     $auxComplete = $hasBarcodeAux;
                                                                     $laInitialComplete = $hasBarcodeLa;
                                                                     $auxInitialComplete = $hasBarcodeAux;
-                                                                    if ($barcodeKainOptional) {
-                                                                        $blockColors = [$firstHasLa ? 'green' : 'red', $firstHasAux ? 'green' : 'red'];
-                                                                    } else {
-                                                                        $blockColors[0] = $firstKainColor;
-                                                                        $blockColors[1] = $firstHasLa ? 'green' : 'red';
-                                                                        $blockColors[2] = $firstHasAux ? 'green' : 'red';
+                                                                    if ($proses->jenis !== 'Maintenance') {
+                                                                        if ($barcodeKainOptional) {
+                                                                            $blockColors = [$firstHasLa ? 'green' : 'red', $firstHasAux ? 'green' : 'red'];
+                                                                        } else {
+                                                                            $blockColors[0] = $firstKainColor;
+                                                                            $blockColors[1] = $firstHasLa ? 'green' : 'red';
+                                                                            $blockColors[2] = $firstHasAux ? 'green' : 'red';
+                                                                        }
                                                                     }
                                                                 }
                                                                 // Cek apakah proses ini terlibat dalam swap position approval dari proses lain
