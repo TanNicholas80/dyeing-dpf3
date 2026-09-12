@@ -1951,18 +1951,20 @@
                                             <option value="Produksi" selected id="jenis-option-produksi">Produksi</option>
                                             <option value="Maintenance" id="jenis-option-maintenance">Maintenance</option>
                                             <option value="Reproses" id="jenis-option-reproses">Reproses</option>
-                                            <option value="Proses Makloon" id="jenis-option-proses-makloon">Proses Makloon</option>
-                                            <option value="Reproses Makloon" id="jenis-option-reproses-makloon">Reproses Makloon</option>
+                                            {{-- Jenis Proses Makloon dinonaktifkan sementara --}}
+                                            {{-- <option value="Proses Makloon" id="jenis-option-proses-makloon">Proses Makloon</option> --}}
+                                            {{-- <option value="Reproses Makloon" id="jenis-option-reproses-makloon">Reproses Makloon</option> --}}
                                         </select>
                                         <small id="reprocess-hint-greige" class="form-text text-info mt-1"
                                             style="display:none;">
                                             <i class="fas fa-info-circle"></i> Reproses hanya untuk No OP &amp; No Partai
                                             yang pernah dipakai pada jenis proses Produksi.
                                         </small>
-                                        <small id="makloon-hint-op" class="form-text text-warning mt-1"
+                                        {{-- Hint Makloon dinonaktifkan sementara --}}
+                                        {{-- <small id="makloon-hint-op" class="form-text text-warning mt-1"
                                             style="display:none;">
                                             <i class="fas fa-info-circle"></i> Format No OP untuk Makloon wajib berawalan <strong>007</strong> (contoh: 007000000001).
-                                        </small>
+                                        </small> --}}
                                     </div>
                                 </div>
 
@@ -9769,12 +9771,8 @@
             }
 
             function toggleMakloonHint() {
-                var jenis = $('#jenis').val();
-                var isMakloon = (jenis === 'Proses Makloon' || jenis === 'Reproses Makloon');
                 var $hint = $('#makloon-hint-op');
-                if (isMakloon) {
-                    $hint.show();
-                } else {
+                if ($hint.length) {
                     $hint.hide();
                 }
             }
@@ -9845,30 +9843,30 @@
                 var $prosesMakloon = $('#jenis-option-proses-makloon');
                 var $reprosesMakloon = $('#jenis-option-reproses-makloon');
 
+                // Makloon & Reproses Makloon dinonaktifkan sementara
+                if ($prosesMakloon.length) $prosesMakloon.prop('disabled', true).hide();
+                if ($reprosesMakloon.length) $reprosesMakloon.prop('disabled', true).hide();
+
                 if (mode === 'finish') {
-                    // Finish hanya boleh Reproses dan Reproses Makloon
+                    // Finish hanya boleh Reproses (Reproses Makloon dinonaktifkan sementara)
                     $produksi.prop('disabled', true).hide();
                     $maintenance.prop('disabled', true).hide();
-                    $prosesMakloon.prop('disabled', true).hide();
 
                     $reproses.prop('disabled', false).show();
-                    $reprosesMakloon.prop('disabled', false).show();
 
                     var curVal = $('#jenis').val();
-                    if (curVal !== 'Reproses' && curVal !== 'Reproses Makloon') {
+                    if (curVal !== 'Reproses') {
                         $('#jenis').val('Reproses');
                     }
                     $('#jenis').css({ 'pointer-events': 'auto', 'background-color': '#fff' }).removeAttr('tabindex');
                 } else {
-                    // Greige boleh semua
+                    // Greige: Produksi, Maintenance, Reproses (Makloon dinonaktifkan sementara)
                     $produksi.prop('disabled', false).show();
                     $maintenance.prop('disabled', false).show();
                     $reproses.prop('disabled', false).show();
-                    $prosesMakloon.prop('disabled', false).show();
-                    $reprosesMakloon.prop('disabled', false).show();
 
                     var curVal = $('#jenis').val();
-                    if (!curVal) {
+                    if (!curVal || curVal === 'Proses Makloon' || curVal === 'Reproses Makloon') {
                         $('#jenis').val('Produksi');
                     }
                     $('#jenis').css({ 'pointer-events': 'auto', 'background-color': '#fff' }).removeAttr('tabindex');

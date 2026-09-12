@@ -284,16 +284,17 @@ class ProsesController extends Controller
         $mode = $request->input('mode', 'greige');
         $rules = [
             'mode' => 'nullable|in:greige,finish',
-            'jenis' => 'required|in:Produksi,Maintenance,Reproses,Proses Makloon,Reproses Makloon',
+            // Opsi Proses Makloon dan Reproses Makloon dinonaktifkan sementara
+            'jenis' => 'required|in:Produksi,Maintenance,Reproses',
             'mesin_id' => 'required|exists:mesins,id',
             'cycle_time' => 'required',
             'qty_dye_stuff' => 'nullable|integer|in:0,1,2,3',
             'qty_aux' => 'nullable|integer|in:0,1,2,3',
         ];
 
-        // Finish mode: hanya Reproses dan Reproses Makloon
+        // Finish mode: hanya Reproses (Reproses Makloon dinonaktifkan sementara)
         if ($mode === 'finish') {
-            $rules['jenis'] = 'required|in:Reproses,Reproses Makloon';
+            $rules['jenis'] = 'required|in:Reproses';
         }
 
         if ($request->jenis !== 'Maintenance') {
@@ -731,6 +732,13 @@ class ProsesController extends Controller
      */
     public function proxyMaterialStock(Request $request)
     {
+        // Fitur Makloon dinonaktifkan sementara
+        return response()->json([
+            'results' => [],
+            'raw' => [],
+            'message' => 'Fitur Makloon dinonaktifkan sementara.',
+        ]);
+
         $term = trim((string) $request->input('term', $request->input('q', 'M-')));
         if ($term === '') {
             $term = 'M-';
