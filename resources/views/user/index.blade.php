@@ -69,8 +69,12 @@
                                                 <td>
                                                     @if ($u->role === 'super_admin')
                                                         Super Admin
+                                                    @elseif ($u->role === 'kepala_ruangan')
+                                                        Kepala Regu (Karu)
+                                                    @elseif ($u->role === 'kepala_shift')
+                                                        Kepala Shift
                                                     @else
-                                                        {{ ucfirst($u->role) }}
+                                                        {{ ucfirst(str_replace('_', ' ', $u->role)) }}
                                                     @endif
                                                 </td>
                                                 @if ($canManageUsers)

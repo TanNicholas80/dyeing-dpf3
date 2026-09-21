@@ -43,7 +43,7 @@
    - **Factory Manager (FM)**: Approval Edit Cycle Time, Delete, Move Machine, Swap Queue, Reproses Tahap 1, Pause/Resume.
    - **Vice President (VP)**: Approval Reproses Tahap 2.
    - **Kepala Shift (Kashift)**: Approval Topping LA/AUX, Approval Pinjam Mesin, Force End, Selesai Manual Maintenance, Batal Selesai.
-   - **Kepala Ruangan (Karu)**: Pengajuan Topping LA/AUX, Selesai Maintenance, Batal Selesai Maintenance.
+   - **Kepala Regu (Karu)**: Pengajuan Topping LA/AUX, Selesai Maintenance, Batal Selesai Maintenance.
    - **SPV Listrik**: Monitoring real-time status online/offline koneksi IoT per mesin pada tabel mesin.
    - **Operator & PPIC**: Input order, scan barcode, pengajuan pinjam mesin.
 6. **Audit Trail**: Pencatatan riwayat setiap aksi, perubahan data (before/after), IP address, dan user role.
@@ -102,7 +102,7 @@ graph TD
     subgraph User_Roles [User Roles & Dashboard UI]
         PPIC[PPIC] -->|1. Create Planning & Breakdown| PROSES
         OP[Operator] -->|2. Scan Barcode Kain/LA/AUX & Pinjam Mesin| PROSES
-        KARU[Kepala Ruangan] -->|3. Request Topping LA/AUX| APPR
+        KARU[Kepala Regu] -->|3. Request Topping LA/AUX| APPR
         KASHIFT[Kepala Shift] -->|4. Approve Topping / Pinjam Mesin / Maint Selesai| APPR
         FM_VP[FM / VP] -->|5. Approve Major Changes & Reproses| APPR
     end
@@ -130,7 +130,7 @@ graph TD
 ---
 
 ### 3. Alur Permintaan & Approval Topping (Grace Period 30 Menit)
-1. Jika warna/kain memerlukan penambahan obat saat proses berjalan, **Kepala Ruangan (Karu)** mengajukan permohonan **Topping LA** atau **Topping AUX**.
+1. Jika warna/kain memerlukan penambahan obat saat proses berjalan, **Kepala Regu (Karu)** mengajukan permohonan **Topping LA** atau **Topping AUX**.
 2. **Kepala Shift (Kashift)** memeriksa dan menyetujui (**Approve**) permohonan tersebut.
 3. **Grace Period 30 Menit**:
    - Dihitung sejak waktu approval Kashift (`updated_at`), alarm **TIDAK AKAN MENYALA** selama $\le$ 30 menit untuk memberi waktu pengambilan obat dan penimbangan.
@@ -179,14 +179,14 @@ graph TD
 3. **Kondisi Mesin Mati (OFF)**: Jika mesin memang sudah dalam keadaan OFF saat tombol ditekan, proses langsung diselesaikan secara instan.
 
 #### B. Alur Selesai Maintenance
-1. **Hak Akses**: **Super Admin**, **Kepala Shift**, dan **Kepala Ruangan (KARU)**.
+1. **Hak Akses**: **Super Admin**, **Kepala Shift**, dan **Kepala Regu (KARU)**.
 2. Informasi GDA, mode, jenis OP, qty dye stuff/aux disembunyikan secara otomatis pada proses maintenance.
 3. **Mekanisme Verifikasi Shutdown**:
    - Jika mesin sedang ON saat tombol **Selesai Maintenance** ditekan, sinyal **Address 103 = 1** dikirim ke PLC dan proses berstatus menunggu mesin mati (`stop_requested_at = now()`, `stop_request_type = 'maintenance_finish'`).
    - Proses resmi selesai dan antrian berikutnya baru diizinkan berjalan setelah register **Address 200 = 0** (mesin fisik mati).
 
 #### C. Fitur Pembatalan Selesai ("Batal Force End / Batal Selesai")
-1. **Hak Akses**: **Super Admin**, **Kepala Shift**, dan **Kepala Ruangan**.
+1. **Hak Akses**: **Super Admin**, **Kepala Shift**, dan **Kepala Regu (KARU)**.
 2. **Operasional**:
    - Jika terjadi pembatalan atau salah klik sebelum mesin mati, user dapat membuka modal detail proses.
    - Tersedia tombol **"Batal Force End"** atau **"Batal Selesai"** beserta kotak notifikasi status menunggu mesin mati.

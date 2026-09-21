@@ -157,7 +157,7 @@
                         <div class="card-body p-3">
                             <div class="alert alert-light border py-2 px-3 mb-3 text-muted small">
                                 <i class="fas fa-shield-alt text-primary mr-1"></i>
-                                <strong>Ketentuan Delegasi:</strong> Bila Kashift OFF pada shift berjalan, hak approval topping LA/AUX, force finish, dan cancel barcode otomatis dibuka untuk <strong>Kepala Ruangan (Karu)</strong>.
+                                <strong>Ketentuan Delegasi:</strong> Bila Kashift OFF pada shift berjalan, hak approval topping LA/AUX, force finish, dan cancel barcode otomatis dibuka untuk <strong>Kepala Regu (Karu)</strong>.
                             </div>
 
                             @php
@@ -219,7 +219,7 @@
                                     @if(!$row->is_active)
                                         <div class="alert alert-warning py-1 px-2 mb-2 small font-weight-bold">
                                             <i class="fas fa-exchange-alt mr-1"></i>
-                                            Wewenang {{ $sName }} dialihkan ke Karu: Approval topping & force finish dapat diproses oleh Kepala Ruangan.
+                                            Wewenang {{ $sName }} dialihkan ke Karu: Approval topping & force finish dapat diproses oleh Kepala Regu.
                                         </div>
                                     @endif
 
@@ -247,7 +247,7 @@
                                         @if($row->is_active)
                                             @if($isKaruOff)
                                                 <button type="button" class="btn btn-sm btn-secondary font-weight-bold" disabled
-                                                    title="Tidak dapat izin: Kepala Ruangan (Karu) pada {{ $sName }} sudah berstatus OFF. Salah satu harus tetap hadir.">
+                                                    title="Tidak dapat izin: Kepala Regu (Karu) pada {{ $sName }} sudah berstatus OFF. Salah satu harus tetap hadir.">
                                                     <i class="fas fa-lock mr-1"></i> Terkunci (Karu Sudah Izin)
                                                 </button>
                                             @else
@@ -269,13 +269,13 @@
                     </div>
                 </div>
 
-                <!-- ================= KARTU KEPALA RUANGAN (KARU) ================= -->
+                <!-- ================= KARTU KEPALA REGU (KARU) ================= -->
                 <div class="col-lg-6 mb-4">
                     <div class="card card-outline card-info h-100 shadow-sm">
                         <div class="card-header bg-light py-2">
                             <div class="d-flex justify-content-between align-items-center">
                                 <h4 class="card-title font-weight-bold text-dark mb-0" style="font-size: 1.1rem;">
-                                    <i class="fas fa-user-cog text-info mr-2"></i>Status: Kepala Ruangan (Karu)
+                                    <i class="fas fa-user-cog text-info mr-2"></i>Status: Kepala Regu (Karu)
                                 </h4>
                                 <span class="badge badge-light border text-muted px-2 py-1" style="font-size: 0.8rem;">
                                     Role Target: kepala_ruangan
@@ -376,13 +376,13 @@
                                                 </button>
                                             @else
                                                 <button type="button" class="btn btn-sm btn-outline-danger font-weight-bold"
-                                                    onclick="openToggleModal('kepala_ruangan', 'Kepala Ruangan (Karu)', '{{ $sName }}', '{{ $sInfo['range'] }}', 'OFF')">
+                                                    onclick="openToggleModal('kepala_ruangan', 'Kepala Regu (Karu)', '{{ $sName }}', '{{ $sInfo['range'] }}', 'OFF')">
                                                     <i class="fas fa-user-slash mr-1"></i> Set {{ $sName }} ke OFF (Izin / Sakit)
                                                 </button>
                                             @endif
                                         @else
                                             <button type="button" class="btn btn-sm btn-success font-weight-bold"
-                                                onclick="openToggleModal('kepala_ruangan', 'Kepala Ruangan (Karu)', '{{ $sName }}', '{{ $sInfo['range'] }}', 'ON')">
+                                                onclick="openToggleModal('kepala_ruangan', 'Kepala Regu (Karu)', '{{ $sName }}', '{{ $sInfo['range'] }}', 'ON')">
                                                 <i class="fas fa-user-check mr-1"></i> Kembalikan {{ $sName }} ke ON (Hadir)
                                             </button>
                                         @endif
@@ -430,7 +430,7 @@
                                 <select name="role_target" class="form-control form-control-sm">
                                     <option value="">-- Semua Role --</option>
                                     <option value="kepala_shift" {{ request('role_target') === 'kepala_shift' ? 'selected' : '' }}>Kepala Shift</option>
-                                    <option value="kepala_ruangan" {{ request('role_target') === 'kepala_ruangan' ? 'selected' : '' }}>Kepala Ruangan</option>
+                                    <option value="kepala_ruangan" {{ request('role_target') === 'kepala_ruangan' ? 'selected' : '' }}>Kepala Regu (Karu)</option>
                                 </select>
                             </div>
                             <div class="col-md-3 col-sm-6 mb-2">
@@ -474,7 +474,7 @@
                                             @if($history->role_target === 'kepala_shift')
                                                 <span class="badge badge-primary px-2 py-1"><i class="fas fa-user-tie mr-1"></i> Kepala Shift</span>
                                             @else
-                                                <span class="badge badge-secondary px-2 py-1"><i class="fas fa-user-cog mr-1"></i> Kepala Ruangan</span>
+                                                <span class="badge badge-secondary px-2 py-1"><i class="fas fa-user-cog mr-1"></i> Kepala Regu (Karu)</span>
                                             @endif
                                         </td>
                                         <td>

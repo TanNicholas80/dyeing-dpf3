@@ -127,9 +127,9 @@ class AbsenController extends Controller
             return back()->with('error', $e->getMessage());
         }
 
-        $roleName = $roleTarget === 'kepala_shift' ? 'Kepala Shift' : 'Kepala Ruangan';
+        $roleName = $roleTarget === 'kepala_shift' ? 'Kepala Shift' : 'Kepala Regu';
         $statusMsg = $status === 'OFF' 
-            ? "berhasil diubah menjadi OFF (Izin/Absen) untuk {$shift}. Wewenang dialihkan ke " . ($roleTarget === 'kepala_shift' ? 'Kepala Ruangan (KARU)' : 'Kepala Shift')
+            ? "berhasil diubah menjadi OFF (Izin/Absen) untuk {$shift}. Wewenang dialihkan ke " . ($roleTarget === 'kepala_shift' ? 'Kepala Regu (KARU)' : 'Kepala Shift')
             : "berhasil diubah menjadi ON (Hadir/Normal) untuk {$shift}. Akses kembali normal.";
 
         if (function_exists('activity')) {

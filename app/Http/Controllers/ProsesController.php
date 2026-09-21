@@ -3738,7 +3738,7 @@ class ProsesController extends Controller
         if (!in_array($userRole, ['super_admin', 'kepala_shift', 'kepala_ruangan'], true)) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Hanya Super Admin, Kepala Shift, dan Kepala Ruangan (KARU) yang memiliki hak akses untuk menyelesaikan proses Maintenance.'
+                'message' => 'Hanya Super Admin, Kepala Shift, dan Kepala Regu (KARU) yang memiliki hak akses untuk menyelesaikan proses Maintenance.'
             ], 403);
         }
 
@@ -3877,7 +3877,7 @@ class ProsesController extends Controller
         if (!\App\Services\AbsenService::canForceFinish($user)) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Hanya Kepala Shift, Super Admin, atau Kepala Ruangan (saat Kashift Absen) yang memiliki hak akses untuk menyelesaikan proses ini secara paksa.'
+                'message' => 'Hanya Kepala Shift, Super Admin, atau Kepala Regu (saat Kashift Absen) yang memiliki hak akses untuk menyelesaikan proses ini secara paksa.'
             ], 403);
         }
 
@@ -4022,7 +4022,7 @@ class ProsesController extends Controller
         if (!in_array($userRole, ['super_admin', 'kepala_shift', 'kepala_ruangan'], true)) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Hanya Super Admin, Kepala Shift, dan Kepala Ruangan yang memiliki hak akses untuk membatalkan perintah ini.'
+                'message' => 'Hanya Super Admin, Kepala Shift, dan Kepala Regu yang memiliki hak akses untuk membatalkan perintah ini.'
             ], 403);
         }
 
@@ -4231,7 +4231,7 @@ class ProsesController extends Controller
         if (!in_array($userRole, ['super_admin', 'kepala_ruangan', 'kepala_shift'], true)) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Hanya Kepala Ruangan, Kepala Shift, dan Super Admin yang memiliki hak akses untuk mengubah catatan proses.'
+                'message' => 'Hanya Kepala Regu, Kepala Shift, dan Super Admin yang memiliki hak akses untuk mengubah catatan proses.'
             ], 403);
         }
 

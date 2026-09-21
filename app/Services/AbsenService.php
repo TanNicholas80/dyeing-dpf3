@@ -654,7 +654,7 @@ class AbsenService
     }
 
     /**
-     * Cek apakah status Kepala Ruangan sedang OFF (absen / wewenang dialihkan ke Kashift).
+     * Cek apakah status Kepala Regu sedang OFF (absen / wewenang dialihkan ke Kashift).
      */
     public static function isKaruOff(?Carbon $time = null): bool
     {
@@ -844,8 +844,8 @@ class AbsenService
                 ->first();
 
             if ($counterpartRecord && !$counterpartRecord->is_active) {
-                $counterpartTitle = $counterpartRole === 'kepala_shift' ? 'Kepala Shift (Kashift)' : 'Kepala Ruangan (Karu)';
-                $currentTitle = $roleTarget === 'kepala_shift' ? 'Kepala Shift' : 'Kepala Ruangan';
+                $counterpartTitle = $counterpartRole === 'kepala_shift' ? 'Kepala Shift (Kashift)' : 'Kepala Regu (Karu)';
+                $currentTitle = $roleTarget === 'kepala_shift' ? 'Kepala Shift' : 'Kepala Regu';
                 throw new \InvalidArgumentException("Tidak dapat mengubah {$currentTitle} menjadi OFF. Pada {$shiftToUse}, {$counterpartTitle} sudah berstatus OFF (Izin/Sakit). Salah satu harus tetap hadir (ON) untuk pendelegasian wewenang.");
             }
         }

@@ -67,7 +67,7 @@
                                             'dashboard' => 'Dashboard',
                                             'fm' => 'FM',
                                             'vp' => 'VP',
-                                            'kepala_ruangan' => 'Kepala Ruangan',
+                                            'kepala_ruangan' => 'Kepala Regu (Karu)',
                                             'kepala_shift' => 'Kepala Shift',
                                             'spv_listrik' => 'SPV Listrik',
                                             'scm' => 'SCM',
