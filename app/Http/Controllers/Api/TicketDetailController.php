@@ -38,6 +38,22 @@ class TicketDetailController extends Controller
             $query->where('id_no', $request->id_no);
         }
 
+        if ($request->filled('fabric_name')) {
+            $query->where('fabric_name', 'like', '%' . $request->fabric_name . '%');
+        }
+
+        if ($request->filled('customer_name')) {
+            $query->where('customer_name', 'like', '%' . $request->customer_name . '%');
+        }
+
+        if ($request->filled('order_no')) {
+            $query->where('order_no', 'like', '%' . $request->order_no . '%');
+        }
+
+        if ($request->filled('color_name')) {
+            $query->where('color_name', 'like', '%' . $request->color_name . '%');
+        }
+
         $perPage = $request->input('per_page', 25);
         $ticketDetails = $query->latest('id')->paginate($perPage);
 
@@ -66,7 +82,8 @@ class TicketDetailController extends Controller
             'CONCUNIT', 'REMARK', 'ADJUST', 'PRICE', 'RES_DOUBLE1', 'RES_DOUBLE2', 'RES_DOUBLE3',
             'RES_DOUBLE4', 'RES_STRING1', 'RES_STRING2', 'RES_STRING3', 'RES_STRING4', 'REWEIGHT',
             'DyeWeightTime', 'ReDye', 'UserCode', 'UserAccount', 'Batch_NO', 'RECORD_ORDER',
-            'Station', 'Process', 'GRAVITY', 'CurrentStock'
+            'Station', 'Process', 'GRAVITY', 'CurrentStock',
+            'FABRIC_NAME', 'CUSTOMER_NAME', 'COLOR_NAME', 'ORDER_NO', 'DYELOT_BATCH'
         ];
 
         $dbColumns = [
@@ -76,7 +93,8 @@ class TicketDetailController extends Controller
             'conc_unit', 'remark', 'adjust', 'price', 'res_double1', 'res_double2', 'res_double3',
             'res_double4', 'res_string1', 'res_string2', 'res_string3', 'res_string4', 'reweight',
             'dye_weight_time', 're_dye', 'user_code', 'user_account', 'batch_no', 'record_order',
-            'station', 'process', 'gravity', 'current_stock'
+            'station', 'process', 'gravity', 'current_stock',
+            'fabric_name', 'customer_name', 'color_name', 'order_no', 'dyelot_batch'
         ];
 
         $callback = function () use ($columns, $dbColumns) {

@@ -27,7 +27,7 @@
                                 <label for="search" class="mr-2 font-weight-normal">Pencarian:</label>
                                 <div class="input-group w-100">
                                     <input type="text" name="search" id="search" class="form-control form-control-sm"
-                                        placeholder="Cari Barcode, Resep, Mesin, Lot..." value="{{ request('search') }}">
+                                        placeholder="Cari Barcode, Customer, Kain, Resep, Order..." value="{{ request('search') }}">
                                     <div class="input-group-append">
                                         <button class="btn btn-primary btn-sm" type="submit">
                                             <i class="fas fa-search"></i>
@@ -87,7 +87,7 @@
                                     <th>Barcode (ID NO)</th>
                                     <th>Kode Resep</th>
                                     <th>Mesin</th>
-                                    <th>Product Lot</th>
+                                    <th>Customer / Kain / Lot</th>
                                     <th>Tgl & Jam Timbang</th>
                                     <th>Jml Kimia</th>
                                     <th class="text-right">Target Wt (g)</th>
@@ -108,7 +108,25 @@
                                         </td>
                                         <td><span class="badge badge-light border">{{ $item->recipe_code ?: '-' }}</span></td>
                                         <td><strong>{{ $item->machine ?: '-' }}</strong></td>
-                                        <td><small class="text-muted">{{ $item->product_lot ?: '-' }}</small></td>
+                                        <td>
+                                            @if($item->customer_name)
+                                                <div class="text-truncate" style="max-width: 180px;" title="{{ $item->customer_name }}">
+                                                    <strong class="text-dark">{{ $item->customer_name }}</strong>
+                                                </div>
+                                            @endif
+                                            @if($item->fabric_name)
+                                                <div class="text-truncate" style="max-width: 180px;" title="{{ $item->fabric_name }}">
+                                                    <small class="text-muted">{{ $item->fabric_name }}</small>
+                                                </div>
+                                            @elseif($item->product_lot)
+                                                <small class="text-muted">{{ $item->product_lot }}</small>
+                                            @else
+                                                <small class="text-muted">-</small>
+                                            @endif
+                                            @if($item->order_no)
+                                                <div><span class="badge badge-light border" style="font-size: 0.75rem;">{{ $item->order_no }}</span></div>
+                                            @endif
+                                        </td>
                                         <td>
                                             <small><i class="far fa-calendar-alt text-muted mr-1"></i>{{ $item->comp_date }} {{ $item->comp_time }}</small>
                                         </td>

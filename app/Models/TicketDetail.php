@@ -57,6 +57,11 @@ class TicketDetail extends Model
         'process',
         'gravity',
         'current_stock',
+        'fabric_name',
+        'customer_name',
+        'color_name',
+        'order_no',
+        'dyelot_batch',
     ];
 
     protected $casts = [

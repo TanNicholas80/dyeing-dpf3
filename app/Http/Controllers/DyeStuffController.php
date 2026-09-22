@@ -22,6 +22,11 @@ class DyeStuffController extends Controller
                 DB::raw('MAX(product_lot) as product_lot'),
                 DB::raw('MAX(comp_date) as comp_date'),
                 DB::raw('MAX(comp_time) as comp_time'),
+                DB::raw('MAX(fabric_name) as fabric_name'),
+                DB::raw('MAX(customer_name) as customer_name'),
+                DB::raw('MAX(color_name) as color_name'),
+                DB::raw('MAX(order_no) as order_no'),
+                DB::raw('MAX(batch_no) as batch_no'),
                 DB::raw('COUNT(*) as items_count'),
                 DB::raw('SUM(target_wt) as total_target_wt'),
                 DB::raw('SUM(actual_wt) as total_actual_wt'),
@@ -39,7 +44,11 @@ class DyeStuffController extends Controller
                 $q->whereRaw('LOWER(id_no) LIKE ?', ["%{$search}%"])
                   ->orWhereRaw('LOWER(recipe_code) LIKE ?', ["%{$search}%"])
                   ->orWhereRaw('LOWER(machine) LIKE ?', ["%{$search}%"])
-                  ->orWhereRaw('LOWER(product_lot) LIKE ?', ["%{$search}%"]);
+                  ->orWhereRaw('LOWER(product_lot) LIKE ?', ["%{$search}%"])
+                  ->orWhereRaw('LOWER(fabric_name) LIKE ?', ["%{$search}%"])
+                  ->orWhereRaw('LOWER(customer_name) LIKE ?', ["%{$search}%"])
+                  ->orWhereRaw('LOWER(color_name) LIKE ?', ["%{$search}%"])
+                  ->orWhereRaw('LOWER(order_no) LIKE ?', ["%{$search}%"]);
             });
         }
 
@@ -145,13 +154,13 @@ class DyeStuffController extends Controller
             'isUsedByProses'  => $usedCount > 0,
             'usedCount'       => $usedCount,
             // Field Tambahan Sesuai Layout Tiket fisik
-            'batch_no'        => $first->batch_no ?? '-',
+            'batch_no'        => $first->batch_no ?: ($first->dyelot_batch ?: '-'),
             'no_jo'           => $first->res_string1 ?? '-',
-            'fabric_name'     => $first->product_lot ?? '-',
-            'customer_name'   => $first->res_string2 ?? '-',
+            'fabric_name'     => $first->fabric_name ?: ($first->product_lot ?? '-'),
+            'customer_name'   => $first->customer_name ?: ($first->res_string2 ?? '-'),
             'total_wt_kg'     => $first->fabric_weight ?? 0,
-            'color_name'      => $first->res_string3 ?? '-',
-            'order_no'        => $first->res_string4 ?? '-',
+            'color_name'      => $first->color_name ?: ($first->res_string3 ?? '-'),
+            'order_no'        => $first->order_no ?: ($first->res_string4 ?? '-'),
             'volume'          => $first->volume ?? 0,
             'lr'              => $first->lr ?? '6.0',
             'type_name'       => $first->recipe_type ?: ($first->id_type ?: 'Normal'),
@@ -185,13 +194,13 @@ class DyeStuffController extends Controller
             'total_actual_wt' => $ticketDetails->sum('actual_wt'),
             'items_count'     => $ticketDetails->count(),
             // Field Tambahan Sesuai Layout Tiket fisik
-            'batch_no'        => $first->batch_no ?? '-',
+            'batch_no'        => $first->batch_no ?: ($first->dyelot_batch ?: '-'),
             'no_jo'           => $first->res_string1 ?? '-',
-            'fabric_name'     => $first->product_lot ?? '-',
-            'customer_name'   => $first->res_string2 ?? '-',
+            'fabric_name'     => $first->fabric_name ?: ($first->product_lot ?? '-'),
+            'customer_name'   => $first->customer_name ?: ($first->res_string2 ?? '-'),
             'total_wt_kg'     => $first->fabric_weight ?? 0,
-            'color_name'      => $first->res_string3 ?? '-',
-            'order_no'        => $first->res_string4 ?? '-',
+            'color_name'      => $first->color_name ?: ($first->res_string3 ?? '-'),
+            'order_no'        => $first->order_no ?: ($first->res_string4 ?? '-'),
             'volume'          => $first->volume ?? 0,
             'lr'              => $first->lr ?? '6.0',
             'type_name'       => $first->recipe_type ?: ($first->id_type ?: 'Normal'),
@@ -232,13 +241,13 @@ class DyeStuffController extends Controller
                 'items_count'     => $items->count(),
                 'items'           => $items,
                 // Field Tambahan Sesuai Layout Tiket fisik
-                'batch_no'        => $first->batch_no ?? '-',
+                'batch_no'        => $first->batch_no ?: ($first->dyelot_batch ?: '-'),
                 'no_jo'           => $first->res_string1 ?? '-',
-                'fabric_name'     => $first->product_lot ?? '-',
-                'customer_name'   => $first->res_string2 ?? '-',
+                'fabric_name'     => $first->fabric_name ?: ($first->product_lot ?? '-'),
+                'customer_name'   => $first->customer_name ?: ($first->res_string2 ?? '-'),
                 'total_wt_kg'     => $first->fabric_weight ?? 0,
-                'color_name'      => $first->res_string3 ?? '-',
-                'order_no'        => $first->res_string4 ?? '-',
+                'color_name'      => $first->color_name ?: ($first->res_string3 ?? '-'),
+                'order_no'        => $first->order_no ?: ($first->res_string4 ?? '-'),
                 'volume'          => $first->volume ?? 0,
                 'lr'              => $first->lr ?? '6.0',
                 'type_name'       => $first->recipe_type ?: ($first->id_type ?: 'Normal'),
