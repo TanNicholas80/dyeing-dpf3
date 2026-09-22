@@ -146,11 +146,11 @@
                             $canDashboard = !in_array($role, ['aux', 'spv_listrik', 'dye_stuff']); // Semua role bisa akses dashboard kecuali aux, spv_listrik & dye_stuff
                             $canApprovalFm = in_array($role, ['super_admin', 'fm']);
                             $canApprovalVp = in_array($role, ['super_admin', 'vp']);
-                            $canApprovalKepalaShift = in_array($role, ['super_admin', 'kepala_shift']) || ($role === 'kepala_ruangan' && \App\Services\AbsenService::isKashiftOff());
+                            $canApprovalKepalaShift = in_array($role, ['super_admin', 'kepala_shift']) || (in_array($role, ['kepala_regu', 'kepala_ruangan']) && \App\Services\AbsenService::isKashiftOff());
                             $canUser = in_array($role, ['super_admin']);
                             $canMesin = in_array($role, ['super_admin', 'fm', 'vp', 'ppic', 'owner', 'spv_listrik', 'scm']);
                             $canAux = in_array($role, ['super_admin', 'aux', 'scm']);
-                            $canDyeStuff = in_array($role, ['super_admin', 'ds', 'dye_stuff', 'ppic', 'scm', 'kepala_ruangan', 'operator']);
+                            $canDyeStuff = in_array($role, ['super_admin', 'ds', 'dye_stuff', 'ppic', 'scm', 'kepala_regu', 'kepala_ruangan', 'operator']);
                             $canLog = in_array($role, ['super_admin', 'fm', 'vp']);
                             $canAbsen = in_array($role, ['super_admin', 'fm']);
                         @endphp
@@ -305,11 +305,11 @@
                             $canDashboard = !in_array($role, ['aux', 'spv_listrik', 'dye_stuff']); // Semua role bisa akses dashboard kecuali aux, spv_listrik & dye_stuff
                             $canApprovalFm = in_array($role, ['super_admin', 'fm', 'owner']);
                             $canApprovalVp = in_array($role, ['super_admin', 'vp', 'owner']);
-                            $canApprovalKepalaShift = in_array($role, ['super_admin', 'kepala_shift']) || ($role === 'kepala_ruangan' && \App\Services\AbsenService::isKashiftOff());
+                            $canApprovalKepalaShift = in_array($role, ['super_admin', 'kepala_shift']) || (in_array($role, ['kepala_regu', 'kepala_ruangan']) && \App\Services\AbsenService::isKashiftOff());
                             $canUser = in_array($role, ['super_admin', 'owner']);
                             $canMesin = in_array($role, ['super_admin', 'fm', 'vp', 'ppic', 'owner', 'spv_listrik', 'scm']);
                             $canAux = in_array($role, ['super_admin', 'aux', 'owner', 'scm']);
-                            $canDyeStuff = in_array($role, ['super_admin', 'ds', 'dye_stuff', 'aux', 'ppic', 'scm', 'kepala_ruangan', 'operator', 'owner']);
+                            $canDyeStuff = in_array($role, ['super_admin', 'ds', 'dye_stuff', 'aux', 'ppic', 'scm', 'kepala_regu', 'kepala_ruangan', 'operator', 'owner']);
                             $canLog = in_array($role, ['super_admin', 'fm', 'vp']);
                             $canAbsen = in_array($role, ['super_admin', 'fm']);
                         @endphp

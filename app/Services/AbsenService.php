@@ -597,16 +597,17 @@ class AbsenService
         self::checkAndPerformAutoReset();
 
         $shifts = ['Shift 1', 'Shift 2'];
-        $roles = ['kepala_shift', 'kepala_ruangan'];
+        $roles = ['kepala_shift', 'kepala_regu'];
         $result = [];
 
         foreach ($roles as $role) {
             $result[$role] = [];
             foreach ($shifts as $shift) {
+                $targetRoles = ($role === 'kepala_regu') ? ['kepala_regu', 'kepala_ruangan'] : [$role];
                 $record = AbsenDelegasi::with('updater')
                     ->where('tanggal', $date)
                     ->where('shift', $shift)
-                    ->where('role_target', $role)
+                    ->whereIn('role_target', $targetRoles)
                     ->first();
 
                 if (!$record) {
@@ -623,6 +624,9 @@ class AbsenService
                 $result[$role][$shift] = $record;
             }
         }
+
+        // Backward compatibility jika ada komponen lain yang memanggil index 'kepala_ruangan'
+        $result['kepala_ruangan'] = $result['kepala_regu'];
 
         return $result;
     }
@@ -670,7 +674,7 @@ class AbsenService
         $isActive = Cache::remember($cacheKey, 60, function () use ($prodDate, $shift) {
             $row = AbsenDelegasi::where('tanggal', $prodDate)
                 ->where('shift', $shift)
-                ->where('role_target', 'kepala_ruangan')
+                ->whereIn('role_target', ['kepala_regu', 'kepala_ruangan'])
                 ->first();
 
             return $row ? (bool) $row->is_active : true;
@@ -730,7 +734,7 @@ class AbsenService
      * Validasi apakah user berhak melakukan Approval Kepala Shift:
      * - super_admin: selalu bisa
      * - kepala_shift: selalu bisa
-     * - kepala_ruangan: HANYA BISA jika Kashift berstatus OFF (delegasi)
+     * - kepala_regu (Karu): HANYA BISA jika Kashift berstatus OFF (delegasi)
      */
     public static function canApproveKepalaShift(?User $user): bool
     {
@@ -742,7 +746,7 @@ class AbsenService
             return true;
         }
 
-        if ($user->role === 'kepala_ruangan' && self::isKashiftOff()) {
+        if (in_array($user->role, ['kepala_regu', 'kepala_ruangan'], true) && self::isKashiftOff()) {
             return true;
         }
 
@@ -752,7 +756,7 @@ class AbsenService
     /**
      * Validasi apakah user berhak mengajukan Request Topping LA / AUX:
      * - super_admin: selalu bisa
-     * - kepala_ruangan: selalu bisa
+     * - kepala_regu, kepala_ruangan (Karu): selalu bisa
      * - kepala_shift: HANYA BISA jika Karu berstatus OFF (delegasi)
      */
     public static function canRequestTopping(?User $user): bool
@@ -761,7 +765,7 @@ class AbsenService
             return false;
         }
 
-        if ($user->role === 'super_admin' || $user->role === 'kepala_ruangan') {
+        if (in_array($user->role, ['super_admin', 'kepala_regu', 'kepala_ruangan'], true)) {
             return true;
         }
 
@@ -776,7 +780,7 @@ class AbsenService
      * Validasi apakah user berhak melakukan Force Finish (Selesai Paksa Proses):
      * - super_admin: selalu bisa
      * - kepala_shift: selalu bisa
-     * - kepala_ruangan: HANYA BISA jika Kashift berstatus OFF (delegasi)
+     * - kepala_regu (Karu): HANYA BISA jika Kashift berstatus OFF (delegasi)
      */
     public static function canForceFinish(?User $user): bool
     {
@@ -788,7 +792,7 @@ class AbsenService
             return true;
         }
 
-        if ($user->role === 'kepala_ruangan' && self::isKashiftOff()) {
+        if (in_array($user->role, ['kepala_regu', 'kepala_ruangan'], true) && self::isKashiftOff()) {
             return true;
         }
 
@@ -798,7 +802,7 @@ class AbsenService
     /**
      * Validasi apakah user berhak membatalkan barcode (Cancel Barcode):
      * - super_admin, ppic, kepala_shift: selalu bisa
-     * - kepala_ruangan: BISA jika Kashift berstatus OFF (delegasi)
+     * - kepala_regu (Karu): BISA jika Kashift berstatus OFF (delegasi)
      */
     public static function canCancelBarcode(?User $user): bool
     {
@@ -810,7 +814,7 @@ class AbsenService
             return true;
         }
 
-        if ($user->role === 'kepala_ruangan' && self::isKashiftOff()) {
+        if (in_array($user->role, ['kepala_regu', 'kepala_ruangan'], true) && self::isKashiftOff()) {
             return true;
         }
 
@@ -831,21 +835,25 @@ class AbsenService
         $normalizedStatus = strtoupper(trim($status)) === 'ON' ? 'ON' : 'OFF';
         $isActive = ($normalizedStatus === 'ON');
 
+        // Normalisasi nama role target: jika masih dikirim kepala_ruangan, ubah ke kepala_regu
+        $normalizedRoleTarget = ($roleTarget === 'kepala_ruangan') ? 'kepala_regu' : $roleTarget;
+
         $details = self::getCurrentShiftDetails();
         $dateToUse = $tanggal ?: $details['production_date'];
         $shiftToUse = $shift ?: ($details['is_production_off'] ? 'Shift 1' : $details['shift']);
 
         // Validasi: Tidak boleh kedua role (Kashift & Karu) sama-sama OFF pada shift dan tanggal yang sama
         if (!$isActive) {
-            $counterpartRole = $roleTarget === 'kepala_shift' ? 'kepala_ruangan' : 'kepala_shift';
+            $counterpartRole = $normalizedRoleTarget === 'kepala_shift' ? 'kepala_regu' : 'kepala_shift';
+            $counterpartRoles = ($counterpartRole === 'kepala_regu') ? ['kepala_regu', 'kepala_ruangan'] : [$counterpartRole];
             $counterpartRecord = AbsenDelegasi::where('tanggal', $dateToUse)
                 ->where('shift', $shiftToUse)
-                ->where('role_target', $counterpartRole)
+                ->whereIn('role_target', $counterpartRoles)
                 ->first();
 
             if ($counterpartRecord && !$counterpartRecord->is_active) {
                 $counterpartTitle = $counterpartRole === 'kepala_shift' ? 'Kepala Shift (Kashift)' : 'Kepala Regu (Karu)';
-                $currentTitle = $roleTarget === 'kepala_shift' ? 'Kepala Shift' : 'Kepala Regu';
+                $currentTitle = $normalizedRoleTarget === 'kepala_shift' ? 'Kepala Shift' : 'Kepala Regu';
                 throw new \InvalidArgumentException("Tidak dapat mengubah {$currentTitle} menjadi OFF. Pada {$shiftToUse}, {$counterpartTitle} sudah berstatus OFF (Izin/Sakit). Salah satu harus tetap hadir (ON) untuk pendelegasian wewenang.");
             }
         }
@@ -858,7 +866,7 @@ class AbsenService
             [
                 'tanggal' => $dateToUse,
                 'shift' => $shiftToUse,
-                'role_target' => $roleTarget,
+                'role_target' => $normalizedRoleTarget,
             ],
             [
                 'is_active' => $isActive,
@@ -871,7 +879,7 @@ class AbsenService
         AbsenHistory::create([
             'tanggal' => $dateToUse,
             'shift' => $shiftToUse,
-            'role_target' => $roleTarget,
+            'role_target' => $normalizedRoleTarget,
             'status' => $normalizedStatus,
             'keterangan' => $finalKeterangan,
             'user_id' => $userId,

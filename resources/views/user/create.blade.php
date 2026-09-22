@@ -69,7 +69,7 @@
                                     <option value="dashboard" {{ old('role') == 'dashboard' ? 'selected' : '' }}>Dashboard</option>
                                     <option value="fm" {{ old('role') == 'fm' ? 'selected' : '' }}>FM</option>
                                     <option value="vp" {{ old('role') == 'vp' ? 'selected' : '' }}>VP</option>
-                                    <option value="kepala_ruangan" {{ old('role') == 'kepala_ruangan' ? 'selected' : '' }}>Kepala Regu (Karu)</option>
+                                    <option value="kepala_regu" {{ in_array(old('role'), ['kepala_regu', 'kepala_ruangan']) ? 'selected' : '' }}>Kepala Regu (Karu)</option>
                                     <option value="kepala_shift" {{ old('role') == 'kepala_shift' ? 'selected' : '' }}>Kepala Shift</option>
                                     <option value="spv_listrik" {{ old('role') == 'spv_listrik' ? 'selected' : '' }}>SPV Listrik</option>
                                     <option value="scm" {{ old('role') == 'scm' ? 'selected' : '' }}>SCM</option>

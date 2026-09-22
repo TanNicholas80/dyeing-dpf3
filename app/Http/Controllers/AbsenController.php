@@ -38,8 +38,8 @@ class AbsenController extends Controller
         $delegations = AbsenService::getDayShiftDelegations($activeDate);
         $kashiftShift1 = $delegations['kepala_shift']['Shift 1'];
         $kashiftShift2 = $delegations['kepala_shift']['Shift 2'];
-        $karuShift1 = $delegations['kepala_ruangan']['Shift 1'];
-        $karuShift2 = $delegations['kepala_ruangan']['Shift 2'];
+        $karuShift1 = $delegations['kepala_regu']['Shift 1'] ?? $delegations['kepala_ruangan']['Shift 1'];
+        $karuShift2 = $delegations['kepala_regu']['Shift 2'] ?? $delegations['kepala_ruangan']['Shift 2'];
 
         // Cek apakah tanggal aktif memiliki jadwal kustom aktif
         $activeDateCustomSchedule = AbsenService::getActiveCustomScheduleForDate($activeDate);
@@ -62,7 +62,12 @@ class AbsenController extends Controller
         }
 
         if ($request->filled('role_target')) {
-            $query->where('role_target', $request->role_target);
+            $rt = $request->role_target;
+            if (in_array($rt, ['kepala_regu', 'kepala_ruangan'], true)) {
+                $query->whereIn('role_target', ['kepala_regu', 'kepala_ruangan']);
+            } else {
+                $query->where('role_target', $rt);
+            }
         }
 
         $histories = $query->paginate(15)->withQueryString();
@@ -95,7 +100,7 @@ class AbsenController extends Controller
         }
 
         $validated = $request->validate([
-            'role_target' => 'required|in:kepala_shift,kepala_ruangan',
+            'role_target' => 'required|in:kepala_shift,kepala_regu,kepala_ruangan',
             'status' => 'required|in:ON,OFF,on,off',
             'shift' => 'required|string|max:50',
             'tanggal' => 'nullable|date',

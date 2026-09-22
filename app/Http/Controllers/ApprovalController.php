@@ -136,7 +136,7 @@ class ApprovalController extends Controller
 
             $approval->save();
 
-            $isPltKaru = (Auth::check() && Auth::user()->role === 'kepala_ruangan' && \App\Services\AbsenService::isKashiftOff());
+            $isPltKaru = (Auth::check() && in_array(Auth::user()->role, ['kepala_regu', 'kepala_ruangan'], true) && \App\Services\AbsenService::isKashiftOff());
             $pltNote = $isPltKaru ? ' (oleh KARU - Delegasi Kashift OFF)' : '';
 
             // Jika status approved, eksekusi action sesuai jenis action

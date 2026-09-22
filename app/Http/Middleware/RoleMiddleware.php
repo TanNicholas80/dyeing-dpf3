@@ -20,17 +20,25 @@ class RoleMiddleware
             return $next($request);
         }
 
-        // Cek apakah user role termasuk dalam roles yang diizinkan
-        if (in_array($user->role, $roles)) {
+        // Cek apakah user role termasuk dalam roles yang diizinkan (dukung kepala_regu & kepala_ruangan)
+        $allowedRoles = $roles;
+        if (in_array('kepala_regu', $roles, true) || in_array('kepala_ruangan', $roles, true)) {
+            $allowedRoles[] = 'kepala_regu';
+            $allowedRoles[] = 'kepala_ruangan';
+        }
+
+        if (in_array($user->role, $allowedRoles, true)) {
             return $next($request);
         }
 
         // Pendelegasian dinamis bila salah satu role berstatus OFF (Absen)
-        if (in_array('kepala_shift', $roles, true) && $user->role === 'kepala_ruangan' && \App\Services\AbsenService::isKashiftOff()) {
+        $isKaruUser = in_array($user->role, ['kepala_regu', 'kepala_ruangan'], true);
+        if (in_array('kepala_shift', $roles, true) && $isKaruUser && \App\Services\AbsenService::isKashiftOff()) {
             return $next($request);
         }
 
-        if (in_array('kepala_ruangan', $roles, true) && $user->role === 'kepala_shift' && \App\Services\AbsenService::isKaruOff()) {
+        $requiresKaru = in_array('kepala_regu', $roles, true) || in_array('kepala_ruangan', $roles, true);
+        if ($requiresKaru && $user->role === 'kepala_shift' && \App\Services\AbsenService::isKaruOff()) {
             return $next($request);
         }
 
@@ -45,7 +53,7 @@ class RoleMiddleware
 
         $dashboardRoles = [
             'super_admin', 'ds', 'dye_stuff', 'mesin', 'ppic', 'fm', 'vp', 'owner',
-            'kepala_ruangan', 'kepala_shift', 'dashboard', 'operator', 'scm'
+            'kepala_regu', 'kepala_ruangan', 'kepala_shift', 'dashboard', 'operator', 'scm'
         ];
         if (in_array($user->role, $dashboardRoles, true)) {
             return redirect()->route('dashboard')->with('error', 'Anda tidak memiliki akses');

@@ -67,14 +67,14 @@
                                             'dashboard' => 'Dashboard',
                                             'fm' => 'FM',
                                             'vp' => 'VP',
-                                            'kepala_ruangan' => 'Kepala Regu (Karu)',
+                                            'kepala_regu' => 'Kepala Regu (Karu)',
                                             'kepala_shift' => 'Kepala Shift',
                                             'spv_listrik' => 'SPV Listrik',
                                             'scm' => 'SCM',
                                         ];
                                     @endphp
                                     @foreach ($roles as $value => $label)
-                                        <option value="{{ $value }}" {{ $user->role == $value ? 'selected' : '' }}>
+                                        <option value="{{ $value }}" {{ ($user->role == $value || ($value === 'kepala_regu' && $user->role === 'kepala_ruangan')) ? 'selected' : '' }}>
                                             {{ $label }}
                                         </option>
                                     @endforeach

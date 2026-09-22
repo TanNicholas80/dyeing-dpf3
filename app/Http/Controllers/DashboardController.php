@@ -200,9 +200,9 @@ class DashboardController extends Controller
         $canSwapProses = in_array($userRole, ['super_admin', 'ppic'], true);
 
         $canScanBarcode = !$cantScan;
-        $canFinishMaintenance = in_array($userRole, ['super_admin', 'kepala_shift', 'kepala_ruangan'], true);
-        $canPinjamMesin = in_array($userRole, ['super_admin', 'kepala_ruangan', 'kepala_shift', 'operator'], true);
-        $canBreakProses = in_array($userRole, ['super_admin', 'kepala_ruangan', 'kepala_shift', 'ppic'], true);
+        $canFinishMaintenance = in_array($userRole, ['super_admin', 'kepala_shift', 'kepala_regu', 'kepala_ruangan'], true);
+        $canPinjamMesin = in_array($userRole, ['super_admin', 'kepala_regu', 'kepala_ruangan', 'kepala_shift', 'operator'], true);
+        $canBreakProses = in_array($userRole, ['super_admin', 'kepala_regu', 'kepala_ruangan', 'kepala_shift', 'ppic'], true);
 
         // Opsi filter
         $filterOptions = $this->getFilterOptions();
@@ -420,9 +420,9 @@ class DashboardController extends Controller
         $canMoveProses = in_array($userRole, ['super_admin', 'ppic'], true);
         $canSwapProses = in_array($userRole, ['super_admin', 'ppic'], true);
         $canScanBarcode = !$cantScan;
-        $canFinishMaintenance = in_array($userRole, ['super_admin', 'kepala_shift', 'kepala_ruangan'], true);
-        $canPinjamMesin = in_array($userRole, ['super_admin', 'kepala_ruangan', 'kepala_shift', 'operator'], true);
-        $canBreakProses = in_array($userRole, ['super_admin', 'kepala_ruangan', 'kepala_shift', 'ppic'], true);
+        $canFinishMaintenance = in_array($userRole, ['super_admin', 'kepala_shift', 'kepala_regu', 'kepala_ruangan'], true);
+        $canPinjamMesin = in_array($userRole, ['super_admin', 'kepala_regu', 'kepala_ruangan', 'kepala_shift', 'operator'], true);
+        $canBreakProses = in_array($userRole, ['super_admin', 'kepala_regu', 'kepala_ruangan', 'kepala_shift', 'ppic'], true);
 
         $html = view('partials.dashboard.status_card', [
             'proses' => $proses,

@@ -2307,35 +2307,35 @@
                                     <i class="fas fa-edit mr-1"></i>Edit
                                 </button>
                             @endif
-                            @if ($canFinishMaintenance ?? in_array($userRole ?? '', ['super_admin', 'kepala_shift', 'kepala_ruangan']))
+                            @if ($canFinishMaintenance ?? in_array($userRole ?? '', ['super_admin', 'kepala_shift', 'kepala_regu', 'kepala_ruangan']))
                                 <button type="button" class="btn btn-success btn-finish-maintenance d-none mr-2">
                                     <i class="fas fa-check mr-1"></i>Proses Selesai
                                 </button>
                             @endif
-                            @if (in_array($userRole ?? '', ['super_admin', 'kepala_shift']) || (($userRole ?? '') === 'kepala_ruangan' && \App\Services\AbsenService::isKashiftOff()))
+                            @if (in_array($userRole ?? '', ['super_admin', 'kepala_shift']) || (in_array($userRole ?? '', ['kepala_regu', 'kepala_ruangan']) && \App\Services\AbsenService::isKashiftOff()))
                                 <button type="button" class="btn btn-danger btn-finish-force d-none mr-2"
                                     title="Selesaikan proses saat ini secara paksa dan lanjutkan ke antrian berikutnya">
                                     <i class="fas fa-check-double mr-1"></i>Proses Selesai
                                 </button>
                             @endif
-                            @if (in_array($userRole ?? '', ['super_admin', 'kepala_shift', 'kepala_ruangan']))
+                            @if (in_array($userRole ?? '', ['super_admin', 'kepala_shift', 'kepala_regu', 'kepala_ruangan']))
                                 <button type="button" class="btn btn-outline-warning btn-cancel-stop-request d-none mr-2"
                                     title="Batalkan permohonan selesai dan lanjutkan proses kembali">
                                     <i class="fas fa-undo mr-1"></i>Batal Selesai
                                 </button>
                             @endif
-                            @if ($canPinjamMesin ?? in_array($userRole ?? '', ['super_admin', 'kepala_ruangan', 'kepala_shift', 'operator']))
+                            @if ($canPinjamMesin ?? in_array($userRole ?? '', ['super_admin', 'kepala_regu', 'kepala_ruangan', 'kepala_shift', 'operator']))
                                 <button type="button" class="btn btn-info btn-pinjam-mesin d-none mr-2 text-white">
                                     <i class="fas fa-exchange-alt mr-1"></i>Pinjam Mesin
                                 </button>
                             @endif
-                            @if (in_array($userRole ?? '', ['super_admin', 'kepala_ruangan', 'kepala_shift', 'operator', 'ppic']))
+                            @if (in_array($userRole ?? '', ['super_admin', 'kepala_regu', 'kepala_ruangan', 'kepala_shift', 'operator', 'ppic']))
                                 <button type="button" class="btn btn-outline-info btn-preview-pinjam-mesin d-none mr-2"
                                     title="Lihat riwayat peminjaman mesin pada proses ini">
                                     <i class="fas fa-history mr-1"></i>Riwayat Pinjam Mesin
                                 </button>
                             @endif
-                            @if ($canBreakProses ?? in_array($userRole ?? '', ['super_admin', 'kepala_ruangan', 'kepala_shift', 'ppic']))
+                            @if ($canBreakProses ?? in_array($userRole ?? '', ['super_admin', 'kepala_regu', 'kepala_ruangan', 'kepala_shift', 'ppic']))
                                 <button type="button" class="btn btn-secondary btn-break-proses d-none mr-2 text-white">
                                     <i class="fas fa-pause mr-1"></i>Break
                                 </button>
@@ -3010,9 +3010,9 @@
         window.canMoveProses = @json($canMoveProses ?? true);
         window.canSwapProses = @json($canSwapProses ?? true);
         window.canScanBarcode = @json($canScanBarcode ?? true);
-        window.canFinishMaintenance = {{ ($canFinishMaintenance ?? in_array($userRole ?? '', ['super_admin', 'kepala_shift', 'kepala_ruangan'])) ? 'true' : 'false' }};
-        window.canPinjamMesin = {{ ($canPinjamMesin ?? in_array($userRole ?? '', ['super_admin', 'kepala_ruangan', 'kepala_shift', 'operator'])) ? 'true' : 'false' }};
-        window.canBreakProses = {{ ($canBreakProses ?? in_array($userRole ?? '', ['super_admin', 'kepala_ruangan', 'kepala_shift', 'ppic'])) ? 'true' : 'false' }};
+        window.canFinishMaintenance = {{ ($canFinishMaintenance ?? in_array($userRole ?? '', ['super_admin', 'kepala_shift', 'kepala_regu', 'kepala_ruangan'])) ? 'true' : 'false' }};
+        window.canPinjamMesin = {{ ($canPinjamMesin ?? in_array($userRole ?? '', ['super_admin', 'kepala_regu', 'kepala_ruangan', 'kepala_shift', 'operator'])) ? 'true' : 'false' }};
+        window.canBreakProses = {{ ($canBreakProses ?? in_array($userRole ?? '', ['super_admin', 'kepala_regu', 'kepala_ruangan', 'kepala_shift', 'ppic'])) ? 'true' : 'false' }};
         window.isKashiftOff = @json(\App\Services\AbsenService::isKashiftOff());
         window.isKaruOff = @json(\App\Services\AbsenService::isKaruOff());
 
@@ -4654,7 +4654,7 @@
             if (!proses.selesai) {
                 const isNextInQueue = !isStarted && (parseInt(proses.order) === 1);
                 if (isStarted || isNextInQueue) {
-                    const isAuthorizedPinjam = window.canPinjamMesin === true || ['super_admin', 'kepala_ruangan', 'kepala_shift', 'operator', 'ppic'].includes(userRoleStr);
+                    const isAuthorizedPinjam = window.canPinjamMesin === true || ['super_admin', 'kepala_regu', 'kepala_ruangan', 'kepala_shift', 'operator', 'ppic'].includes(userRoleStr);
                     if (isAuthorizedPinjam) {
                         $btnPinjam.removeClass('d-none');
                         const isPinjamActive = proses.is_pinjam_mesin === true || proses.is_pinjam_mesin === 1 || proses.is_pinjam_mesin === '1';
@@ -4680,7 +4680,7 @@
 
             // Logic untuk tombol Preview Riwayat Pinjam Mesin (Karu, Kashift, Operator, PPIC, Admin)
             const $btnPreviewPinjam = $('.btn-preview-pinjam-mesin');
-            const canPreviewPinjam = ['super_admin', 'kepala_ruangan', 'kepala_shift', 'operator', 'ppic'].includes(userRoleStr);
+            const canPreviewPinjam = ['super_admin', 'kepala_regu', 'kepala_ruangan', 'kepala_shift', 'operator', 'ppic'].includes(userRoleStr);
             if (canPreviewPinjam) {
                 $btnPreviewPinjam.removeClass('d-none');
             } else {
@@ -4696,7 +4696,7 @@
             $btnBreak.addClass('d-none');
             $btnPreviewBreak.addClass('d-none');
 
-            const isAuthorizedBreak = window.canBreakProses === true || ['super_admin', 'kepala_ruangan', 'kepala_shift', 'ppic'].includes(userRoleStr);
+            const isAuthorizedBreak = window.canBreakProses === true || ['super_admin', 'kepala_regu', 'kepala_ruangan', 'kepala_shift', 'ppic'].includes(userRoleStr);
 
             if (isAuthorizedBreak) {
                 $btnPreviewBreak.removeClass('d-none');
@@ -4744,7 +4744,7 @@
             // Setup Kotak Catatan Proses (Note)
             const noteText = proses.note || '';
             $('#proses-note-text').val(noteText);
-            const canEditNote = ['super_admin', 'kepala_ruangan', 'kepala_shift'].includes(userRoleStr);
+            const canEditNote = ['super_admin', 'kepala_regu', 'kepala_ruangan', 'kepala_shift'].includes(userRoleStr);
             if (canEditNote) {
                 $('#proses-note-text').prop('readonly', false).attr('placeholder', 'Tambahkan catatan khusus untuk proses ini (opsional)...');
                 $('#proses-note-actions').show();
@@ -4772,7 +4772,7 @@
                     $('#alert-waiting-stop-title').text('Sedang Menunggu Mesin Berhenti / Unload');
                     $('#alert-waiting-stop-desc').text('Instruksi selesai telah dikirim. Menunggu verifikasi unload atau operator mematikan mesin sebelum proses selesai.');
                 }
-                const canCancelStop = ['super_admin', 'kepala_shift', 'kepala_ruangan'].includes(userRoleStr);
+                const canCancelStop = ['super_admin', 'kepala_shift', 'kepala_regu', 'kepala_ruangan'].includes(userRoleStr);
                 if (canCancelStop) {
                     $btnCancelStopRequest.removeClass('d-none');
                 }
@@ -4780,11 +4780,11 @@
                 $alertWaitingStop.addClass('d-none');
             }
 
-            // Logic untuk tombol Selesai Proses Maintenance (Super Admin, Kepala Shift, dan Kepala Ruangan / KARU)
+            // Logic untuk tombol Selesai Proses Maintenance (Super Admin, Kepala Shift, dan Kepala Regu / KARU)
             $btnFinishMaintenance.addClass('d-none');
             if (proses.jenis === 'Maintenance' && isStarted && !proses.selesai && !isWaitingStop) {
                 const userRoleStr = (window.userRole || '').toLowerCase();
-                const isAuthorized = window.canFinishMaintenance === true || userRoleStr === 'super_admin' || userRoleStr === 'kepala_shift' || userRoleStr === 'kepala_ruangan';
+                const isAuthorized = window.canFinishMaintenance === true || userRoleStr === 'super_admin' || userRoleStr === 'kepala_shift' || userRoleStr === 'kepala_regu' || userRoleStr === 'kepala_ruangan';
                 if (isAuthorized) {
                     $btnFinishMaintenance.removeClass('d-none');
                     if (hasPending || hasPendingReprocess) {
@@ -4799,7 +4799,7 @@
             $btnFinishForce.addClass('d-none');
             if (proses.jenis !== 'Maintenance' && isStarted && !proses.selesai && !isWaitingStop) {
                 const userRoleStr = (window.userRole || '').toLowerCase();
-                const isAuthorizedForce = userRoleStr === 'super_admin' || userRoleStr === 'kepala_shift' || (userRoleStr === 'kepala_ruangan' && window.isKashiftOff);
+                const isAuthorizedForce = userRoleStr === 'super_admin' || userRoleStr === 'kepala_shift' || ((userRoleStr === 'kepala_regu' || userRoleStr === 'kepala_ruangan') && window.isKashiftOff);
                 if (isAuthorizedForce) {
                     $btnFinishForce.removeClass('d-none');
                     if (hasPending || hasPendingReprocess) {
@@ -5109,7 +5109,7 @@
 
                         // Topping LA/AUX: badges TD/TA, tombol Request, tombol Scan
                         const userRole = window.userRole || '';
-                        const canRequestToppingRole = (userRole === 'kepala_ruangan' || userRole === 'super_admin' || (userRole === 'kepala_shift' && window.isKaruOff));
+                        const canRequestToppingRole = (userRole === 'kepala_regu' || userRole === 'kepala_ruangan' || userRole === 'super_admin' || (userRole === 'kepala_shift' && window.isKaruOff));
                         const canRequestLa = data.can_request_topping_la && canRequestToppingRole;
                         const canRequestAux = data.can_request_topping_aux && canRequestToppingRole;
                         const canScanLa = data.can_scan_la === true;
@@ -8174,7 +8174,7 @@
                         $('#barcode-aux-list').html(renderBarcodeGrid(data.barcode_aux, 'aux', prosesId));
 
                         const userRoleLocal = window.userRole || '';
-                        const canRequestToppingRoleLocal = (userRoleLocal === 'kepala_ruangan' || userRoleLocal === 'super_admin' || (userRoleLocal === 'kepala_shift' && window.isKaruOff));
+                        const canRequestToppingRoleLocal = (userRoleLocal === 'kepala_regu' || userRoleLocal === 'kepala_ruangan' || userRoleLocal === 'super_admin' || (userRoleLocal === 'kepala_shift' && window.isKaruOff));
                         const canRequestLa = data.can_request_topping_la && canRequestToppingRoleLocal;
                         const canRequestAux = data.can_request_topping_aux && canRequestToppingRoleLocal;
                         const canScanLa = data.can_scan_la === true;
@@ -8468,7 +8468,7 @@
                             $('#alert-waiting-stop-title').text('Sedang Menunggu Mesin Berhenti / Unload');
                             $('#alert-waiting-stop-desc').text('Instruksi selesai telah dikirim. Menunggu verifikasi unload atau operator mematikan mesin sebelum proses selesai.');
                         }
-                        const canCancel = ['super_admin', 'kepala_shift', 'kepala_ruangan'].includes(userRoleCur);
+                        const canCancel = ['super_admin', 'kepala_shift', 'kepala_regu', 'kepala_ruangan'].includes(userRoleCur);
                         if (canCancel) {
                             $modalBtnCancelStop.removeClass('d-none');
                         } else {
@@ -8482,10 +8482,10 @@
                         const isStartedModal = prosesFromCard.mulai !== null && !prosesFromCard.selesai;
                         if (isStartedModal) {
                             if (prosesFromCard.jenis === 'Maintenance') {
-                                const canFinMaint = window.canFinishMaintenance === true || ['super_admin', 'kepala_shift', 'kepala_ruangan'].includes(userRoleCur);
+                                const canFinMaint = window.canFinishMaintenance === true || ['super_admin', 'kepala_shift', 'kepala_regu', 'kepala_ruangan'].includes(userRoleCur);
                                 if (canFinMaint) $modalBtnFinishMaint.removeClass('d-none');
                             } else {
-                                const canFinForce = ['super_admin', 'kepala_shift'].includes(userRoleCur) || (userRoleCur === 'kepala_ruangan' && window.isKashiftOff);
+                                const canFinForce = ['super_admin', 'kepala_shift'].includes(userRoleCur) || ((userRoleCur === 'kepala_regu' || userRoleCur === 'kepala_ruangan') && window.isKashiftOff);
                                 if (canFinForce) $modalBtnFinishForce.removeClass('d-none');
                             }
                         }

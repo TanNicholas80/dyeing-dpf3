@@ -21,7 +21,7 @@ Route::middleware(['auth', 'prevent-back-history'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
     // Dashboard: semua role yang perlu lihat dashboard kecuali aux (dashboard & operator ada di enum users)
-    Route::middleware('role:super_admin,ds,mesin,ppic,fm,vp,owner,kepala_ruangan,kepala_shift,dashboard,operator,scm')->group(function () {
+    Route::middleware('role:super_admin,ds,mesin,ppic,fm,vp,owner,kepala_regu,kepala_ruangan,kepala_shift,dashboard,operator,scm')->group(function () {
         Route::get('/dashboard', [DashboardController::class, 'dashboard'])->name('dashboard');
         Route::get('/dashboard/proses/{id}/card-html', [DashboardController::class, 'getProsesCardHtml'])->name('dashboard.proses-card');
         Route::get('/dashboard/proses-statuses', [DashboardController::class, 'prosesStatuses'])->name('dashboard.proses-statuses');
@@ -82,8 +82,8 @@ Route::middleware(['auth', 'prevent-back-history'])->group(function () {
         Route::delete('/proses/{id}/delete', [ProsesController::class, 'destroy'])->name('proses.delete');
     });
 
-    // Selesai Maintenance: SuperAdmin, Kepala Shift, Kepala Ruangan (KARU)
-    Route::middleware('role:super_admin,kepala_shift,kepala_ruangan')->group(function () {
+    // Selesai Maintenance: SuperAdmin, Kepala Shift, Kepala Regu (KARU)
+    Route::middleware('role:super_admin,kepala_shift,kepala_regu,kepala_ruangan')->group(function () {
         Route::post('/proses/{id}/selesai', [ProsesController::class, 'finishMaintenance'])->name('proses.selesai');
         Route::post('/proses/{id}/cancel-stop-request', [ProsesController::class, 'cancelStopRequest'])->name('proses.cancel-stop-request');
     });
@@ -94,40 +94,42 @@ Route::middleware(['auth', 'prevent-back-history'])->group(function () {
     });
 
     // Pinjam Mesin & Riwayat Pinjam Mesin: SuperAdmin, Karu, Kashift, Operator, PPIC
-    Route::middleware('role:super_admin,kepala_ruangan,kepala_shift,operator,ppic')->group(function () {
+    Route::middleware('role:super_admin,kepala_regu,kepala_ruangan,kepala_shift,operator,ppic')->group(function () {
         Route::post('/proses/{id}/pinjam-mesin', [ProsesController::class, 'pinjamMesin'])->name('proses.pinjam-mesin');
         Route::get('/proses/{id}/pinjam-mesin-history', [ProsesController::class, 'getPinjamMesinHistory'])->name('proses.pinjam-mesin-history');
     });
 
     // Break & Riwayat Break Proses: SuperAdmin, Karu, Kashift, PPIC (Sinyal Address 103 & Freeze Cycle Time)
-    Route::middleware('role:super_admin,kepala_ruangan,kepala_shift,ppic')->group(function () {
+    Route::middleware('role:super_admin,kepala_regu,kepala_ruangan,kepala_shift,ppic')->group(function () {
         Route::post('/proses/{id}/break', [ProsesController::class, 'toggleBreak'])->name('proses.break');
         Route::get('/proses/{id}/break-history', [ProsesController::class, 'getBreakHistory'])->name('proses.break-history');
     });
 
-    // Catatan Proses (Note): SuperAdmin, Kepala Ruangan, Kepala Shift
-    Route::middleware('role:super_admin,kepala_ruangan,kepala_shift')->group(function () {
+    // Catatan Proses (Note): SuperAdmin, Kepala Regu, Kepala Shift
+    Route::middleware('role:super_admin,kepala_regu,kepala_ruangan,kepala_shift')->group(function () {
         Route::post('/proses/{id}/note', [ProsesController::class, 'updateNote'])->name('proses.note');
     });
 
-    Route::middleware('role:super_admin,mesin,ppic,operator')->group(function () {
-        // Tambah barcode (mesin hanya barcode kain; LA/AUX: ppic, super_admin, kepala_ruangan)
+    // Tambah barcode kain: super_admin, mesin, ppic, operator, kepala_shift, kepala_regu, kepala_ruangan
+    Route::middleware('role:super_admin,mesin,ppic,operator,kepala_shift,kepala_regu,kepala_ruangan')->group(function () {
         Route::post('/proses/{id}/barcode/kain', [ProsesController::class, 'barcodeKain'])->name('proses.barcode.kain');
         Route::post('/proses/{id}/barcode/kain/pengajuan-over-gi', [ProsesController::class, 'pengajuanOverGi'])->name('proses.barcode.kain.pengajuan-over-gi');
     });
-    Route::middleware('role:super_admin,ppic,kepala_ruangan,operator')->group(function () {
+
+    // Tambah barcode LA (Dye Stuff) & AUX: super_admin, ppic, kepala_shift, kepala_regu, kepala_ruangan, operator
+    Route::middleware('role:super_admin,ppic,kepala_shift,kepala_regu,kepala_ruangan,operator')->group(function () {
         Route::post('/proses/{id}/barcode/la', [ProsesController::class, 'barcodeLa'])->name('proses.barcode.la');
         Route::post('/proses/{id}/barcode/aux', [ProsesController::class, 'barcodeAux'])->name('proses.barcode.aux');
     });
 
-    // Request topping LA/AUX (Kepala Ruangan)
-    Route::middleware('role:super_admin,kepala_ruangan')->group(function () {
+    // Request topping LA/AUX: super_admin, kepala_shift, kepala_regu, kepala_ruangan
+    Route::middleware('role:super_admin,kepala_shift,kepala_regu,kepala_ruangan')->group(function () {
         Route::post('/proses/{id}/topping/la/request', [ProsesController::class, 'requestToppingLa'])->name('proses.topping.la.request');
         Route::post('/proses/{id}/topping/aux/request', [ProsesController::class, 'requestToppingAux'])->name('proses.topping.aux.request');
     });
 
     // View barcode: SuperAdmin, DS, Mesin, PPIC, FM, VP, Owner (untuk melihat barcode yang sudah ditambahkan)
-    Route::middleware('role:super_admin,ds,mesin,ppic,fm,vp,kepala_ruangan,kepala_shift,owner,operator,scm')->group(function () {
+    Route::middleware('role:super_admin,ds,mesin,ppic,fm,vp,kepala_regu,kepala_ruangan,kepala_shift,owner,operator,scm')->group(function () {
         Route::get('/proses/{id}/barcodes', [ProsesController::class, 'barcodes'])->name('proses.barcodes');
     });
 
@@ -178,7 +180,7 @@ Route::middleware(['auth', 'prevent-back-history'])->group(function () {
      * - SuperAdmin: akses penuh AUX
      * - Owner: minimal bisa melihat AUX (sementara pakai resource penuh, jika perlu bisa dibatasi di controller)
      */
-    Route::middleware('role:super_admin,aux,scm,ppic,kepala_ruangan,operator')->group(function () {
+    Route::middleware('role:super_admin,aux,scm,ppic,kepala_regu,kepala_ruangan,operator')->group(function () {
         Route::get('aux/print-bulk', [AuxlController::class, 'printBulk'])->name('aux.print-bulk');
         Route::resource('aux', AuxlController::class)->except(['destroy']);
         Route::get('aux/{id}/print', [AuxlController::class, 'print'])->name('aux.print');
@@ -191,7 +193,7 @@ Route::middleware(['auth', 'prevent-back-history'])->group(function () {
     /**
      * Dye Stuff (LA)
      */
-    Route::middleware('role:super_admin,ds,dye_stuff,ppic,scm,kepala_ruangan,operator')->group(function () {
+    Route::middleware('role:super_admin,ds,dye_stuff,ppic,scm,kepala_regu,kepala_ruangan,operator')->group(function () {
         Route::get('dye-stuff/print-bulk', [\App\Http\Controllers\DyeStuffController::class, 'printBulk'])->name('dye-stuff.print-bulk');
         Route::resource('dye-stuff', \App\Http\Controllers\DyeStuffController::class);
         Route::get('dye-stuff/{id}/print', [\App\Http\Controllers\DyeStuffController::class, 'print'])->name('dye-stuff.print');

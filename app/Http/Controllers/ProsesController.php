@@ -1395,15 +1395,8 @@ class ProsesController extends Controller
             $approvalId = $request->approval_id ? (int) $request->approval_id : null;
             $userRole = Auth::user()->role ?? null;
 
-            // Kepala Ruangan (atau Kepala Shift saat Karu OFF): hanya boleh input topping (harus ada approval_id yang valid)
-            if (in_array($userRole, ['kepala_ruangan']) || ($userRole === 'kepala_shift' && \App\Services\AbsenService::isKaruOff())) {
-                if (!$approvalId) {
-                    $msg = 'Anda hanya dapat input barcode LA untuk topping yang sudah di-approve Kepala Shift.';
-                    if ($request->ajax() || $request->wantsJson()) {
-                        return response()->json(['status' => 'error', 'message' => $msg], 403);
-                    }
-                    return redirect()->route('dashboard')->with('error', $msg);
-                }
+            // Validasi jika input topping LA (harus ada approval_id yang valid dan sudah di-approve)
+            if ($approvalId) {
                 $approval = Approval::where('id', $approvalId)
                     ->where('proses_id', $id)
                     ->where('type', 'KEPALA_SHIFT')
@@ -1676,15 +1669,8 @@ class ProsesController extends Controller
             $approvalId = $request->approval_id ? (int) $request->approval_id : null;
             $userRole = Auth::user()->role ?? null;
 
-            // Kepala Ruangan (atau Kepala Shift saat Karu OFF): hanya boleh input topping (harus ada approval_id yang valid)
-            if (in_array($userRole, ['kepala_ruangan']) || ($userRole === 'kepala_shift' && \App\Services\AbsenService::isKaruOff())) {
-                if (!$approvalId) {
-                    $msg = 'Anda hanya dapat input barcode AUX untuk topping yang sudah di-approve Kepala Shift.';
-                    if ($request->ajax() || $request->wantsJson()) {
-                        return response()->json(['status' => 'error', 'message' => $msg], 403);
-                    }
-                    return redirect()->route('dashboard')->with('error', $msg);
-                }
+            // Validasi jika input topping AUX (harus ada approval_id yang valid dan sudah di-approve)
+            if ($approvalId) {
                 $approval = Approval::where('id', $approvalId)
                     ->where('proses_id', $id)
                     ->where('type', 'KEPALA_SHIFT')
@@ -2532,15 +2518,13 @@ class ProsesController extends Controller
 
         $user = Auth::user();
         $userRole = $user->role ?? null;
-        $canActAsKaru = ($userRole === 'kepala_ruangan') || ($userRole === 'kepala_shift' && \App\Services\AbsenService::isKaruOff());
+        $scanRoles = ['super_admin', 'ppic', 'operator', 'kepala_shift', 'kepala_regu', 'kepala_ruangan'];
 
         $canScanLa = (($proses->qty_dye_stuff ?? 0) > 0 || $approvedToppingLa)
-            && (in_array($userRole, ['super_admin', 'ppic', 'operator'])
-                || ($canActAsKaru && ($approvedToppingLa || $laIsComplete) && $allComplete))
+            && in_array($userRole, $scanRoles)
             && $allComplete;
         $canScanAux = (($proses->qty_aux ?? 0) > 0 || $approvedToppingAux)
-            && (in_array($userRole, ['super_admin', 'ppic', 'operator'])
-                || ($canActAsKaru && ($approvedToppingAux || $auxIsComplete) && $allComplete))
+            && in_array($userRole, $scanRoles)
             && $allComplete;
 
         $jenisOp = $proses->jenis_op ?? 'Single';
@@ -2989,7 +2973,7 @@ class ProsesController extends Controller
     public function pinjamMesin(Request $request, $id)
     {
         $userRole = Auth::user() ? Auth::user()->role : null;
-        if (!in_array($userRole, ['super_admin', 'kepala_ruangan', 'kepala_shift', 'operator', 'ppic'], true)) {
+        if (!in_array($userRole, ['super_admin', 'kepala_regu', 'kepala_ruangan', 'kepala_shift', 'operator', 'ppic'], true)) {
             $errorMessage = 'Anda tidak memiliki hak akses untuk mengelola pinjam mesin.';
             if ($request->ajax() || $request->wantsJson()) {
                 return response()->json(['status' => 'error', 'message' => $errorMessage], 403);
@@ -3133,7 +3117,7 @@ class ProsesController extends Controller
     public function toggleBreak(Request $request, $id)
     {
         $userRole = Auth::user() ? Auth::user()->role : null;
-        if (!in_array($userRole, ['super_admin', 'kepala_ruangan', 'kepala_shift', 'ppic'], true)) {
+        if (!in_array($userRole, ['super_admin', 'kepala_regu', 'kepala_ruangan', 'kepala_shift', 'ppic'], true)) {
             $errorMessage = 'Anda tidak memiliki hak akses untuk mengelola break proses.';
             if ($request->ajax() || $request->wantsJson()) {
                 return response()->json(['status' => 'error', 'message' => $errorMessage], 403);
@@ -3735,7 +3719,7 @@ class ProsesController extends Controller
     {
         $user = Auth::user();
         $userRole = $user ? $user->role : null;
-        if (!in_array($userRole, ['super_admin', 'kepala_shift', 'kepala_ruangan'], true)) {
+        if (!in_array($userRole, ['super_admin', 'kepala_shift', 'kepala_regu', 'kepala_ruangan'], true)) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Hanya Super Admin, Kepala Shift, dan Kepala Regu (KARU) yang memiliki hak akses untuk menyelesaikan proses Maintenance.'
@@ -4019,7 +4003,7 @@ class ProsesController extends Controller
     {
         $user = Auth::user();
         $userRole = $user ? $user->role : null;
-        if (!in_array($userRole, ['super_admin', 'kepala_shift', 'kepala_ruangan'], true)) {
+        if (!in_array($userRole, ['super_admin', 'kepala_shift', 'kepala_regu', 'kepala_ruangan'], true)) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Hanya Super Admin, Kepala Shift, dan Kepala Regu yang memiliki hak akses untuk membatalkan perintah ini.'
@@ -4228,7 +4212,7 @@ class ProsesController extends Controller
     {
         $user = Auth::user();
         $userRole = $user ? $user->role : null;
-        if (!in_array($userRole, ['super_admin', 'kepala_ruangan', 'kepala_shift'], true)) {
+        if (!in_array($userRole, ['super_admin', 'kepala_regu', 'kepala_ruangan', 'kepala_shift'], true)) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Hanya Kepala Regu, Kepala Shift, dan Super Admin yang memiliki hak akses untuk mengubah catatan proses.'
@@ -4276,7 +4260,7 @@ class ProsesController extends Controller
     {
         $user = Auth::user();
         $userRole = $user ? $user->role : null;
-        if (!in_array($userRole, ['super_admin', 'kepala_ruangan', 'kepala_shift', 'operator', 'ppic'], true)) {
+        if (!in_array($userRole, ['super_admin', 'kepala_regu', 'kepala_ruangan', 'kepala_shift', 'operator', 'ppic'], true)) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Anda tidak memiliki hak akses untuk melihat riwayat peminjaman mesin.'
@@ -4354,7 +4338,7 @@ class ProsesController extends Controller
     {
         $user = Auth::user();
         $userRole = $user ? $user->role : null;
-        if (!in_array($userRole, ['super_admin', 'kepala_ruangan', 'kepala_shift', 'ppic'], true)) {
+        if (!in_array($userRole, ['super_admin', 'kepala_regu', 'kepala_ruangan', 'kepala_shift', 'ppic'], true)) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Anda tidak memiliki hak akses untuk melihat riwayat break proses.'

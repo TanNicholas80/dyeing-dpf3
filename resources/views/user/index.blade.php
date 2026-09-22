@@ -69,7 +69,7 @@
                                                 <td>
                                                     @if ($u->role === 'super_admin')
                                                         Super Admin
-                                                    @elseif ($u->role === 'kepala_ruangan')
+                                                    @elseif (in_array($u->role, ['kepala_regu', 'kepala_ruangan']))
                                                         Kepala Regu (Karu)
                                                     @elseif ($u->role === 'kepala_shift')
                                                         Kepala Shift

@@ -109,9 +109,11 @@
                     <div class="mt-3 pt-2 border-top d-flex justify-content-between align-items-center flex-wrap">
                         <p class="mb-0 text-muted" style="font-size: 0.88rem;">
                             <i class="fas fa-info-circle text-info mr-1"></i>
+                            <strong>Scan Barcode:</strong> Kashift dan Karu keduanya dapat melakukan Scan Barcode Kain, LA, dan AUX.
+                            &nbsp;|&nbsp;
                             <strong>Kashift OFF:</strong> Approval topping, force finish, & cancel barcode dialihkan ke <strong>Karu</strong>.
                             &nbsp;|&nbsp;
-                            <strong>Karu OFF:</strong> Request topping dialihkan ke <strong>Kashift</strong>.
+                            <strong>Karu OFF:</strong> Pengajuan Request Topping dialihkan ke <strong>Kashift</strong>.
                             &nbsp;|&nbsp;
                             <span class="text-success font-weight-bold"><i class="fas fa-magic mr-1"></i>Auto Reset:</span> Selesai satu shift, wewenang shift berikutnya otomatis kembali <strong>Hadir/Normal (ON)</strong>.
                         </p>
@@ -278,7 +280,7 @@
                                     <i class="fas fa-user-cog text-info mr-2"></i>Status: Kepala Regu (Karu)
                                 </h4>
                                 <span class="badge badge-light border text-muted px-2 py-1" style="font-size: 0.8rem;">
-                                    Role Target: kepala_ruangan
+                                    Role: Karu (kepala_regu)
                                 </span>
                             </div>
                         </div>
@@ -286,7 +288,7 @@
                         <div class="card-body p-3">
                             <div class="alert alert-light border py-2 px-3 mb-3 text-muted small">
                                 <i class="fas fa-tools text-info mr-1"></i>
-                                <strong>Ketentuan Delegasi:</strong> Bila Karu OFF pada shift berjalan, hak pengajuan Request Topping LA/AUX dan scan barcode dibuka untuk <strong>Kepala Shift</strong>.
+                                <strong>Ketentuan Delegasi:</strong> Karu adalah pemohon utama Request Topping LA/AUX. Bila Karu OFF pada shift berjalan, hak pengajuan Request Topping dialihkan ke <strong>Kepala Shift</strong>. Scan barcode kain, LA, dan AUX dapat dilakukan oleh Karu maupun Kashift.
                             </div>
 
                             @php
@@ -343,7 +345,7 @@
                                     @if(!$row->is_active)
                                         <div class="alert alert-warning py-1 px-2 mb-2 small font-weight-bold">
                                             <i class="fas fa-exchange-alt mr-1"></i>
-                                            Wewenang {{ $sName }} dialihkan ke Kashift: Pengajuan topping LA/AUX & scan barcode dapat dilakukan oleh Kepala Shift.
+                                            Wewenang {{ $sName }} dialihkan ke Kashift: Pengajuan Request Topping LA/AUX dapat dilakukan oleh Kepala Shift.
                                         </div>
                                     @endif
 
@@ -376,13 +378,13 @@
                                                 </button>
                                             @else
                                                 <button type="button" class="btn btn-sm btn-outline-danger font-weight-bold"
-                                                    onclick="openToggleModal('kepala_ruangan', 'Kepala Regu (Karu)', '{{ $sName }}', '{{ $sInfo['range'] }}', 'OFF')">
+                                                    onclick="openToggleModal('kepala_regu', 'Kepala Regu (Karu)', '{{ $sName }}', '{{ $sInfo['range'] }}', 'OFF')">
                                                     <i class="fas fa-user-slash mr-1"></i> Set {{ $sName }} ke OFF (Izin / Sakit)
                                                 </button>
                                             @endif
                                         @else
                                             <button type="button" class="btn btn-sm btn-success font-weight-bold"
-                                                onclick="openToggleModal('kepala_ruangan', 'Kepala Regu (Karu)', '{{ $sName }}', '{{ $sInfo['range'] }}', 'ON')">
+                                                onclick="openToggleModal('kepala_regu', 'Kepala Regu (Karu)', '{{ $sName }}', '{{ $sInfo['range'] }}', 'ON')">
                                                 <i class="fas fa-user-check mr-1"></i> Kembalikan {{ $sName }} ke ON (Hadir)
                                             </button>
                                         @endif
@@ -430,7 +432,7 @@
                                 <select name="role_target" class="form-control form-control-sm">
                                     <option value="">-- Semua Role --</option>
                                     <option value="kepala_shift" {{ request('role_target') === 'kepala_shift' ? 'selected' : '' }}>Kepala Shift</option>
-                                    <option value="kepala_ruangan" {{ request('role_target') === 'kepala_ruangan' ? 'selected' : '' }}>Kepala Regu (Karu)</option>
+                                    <option value="kepala_regu" {{ in_array(request('role_target'), ['kepala_regu', 'kepala_ruangan']) ? 'selected' : '' }}>Kepala Regu (Karu)</option>
                                 </select>
                             </div>
                             <div class="col-md-3 col-sm-6 mb-2">
