@@ -15,9 +15,12 @@ Route::match(['get', 'post'], '/weight', function(Request $request) {
 
         // Simpan berat ke cache Redis
         Cache::put('latest_weight', [
-            'weight' => $weight,
-            'device' => $device,
-            'time' => $time,
+            'weight' => $request->weight,
+            'device' => $request->device,
+            'status' => $request->status,
+            'unit'   => $request->unit,
+            'type'   => $request->type,
+            'time'   => $request->time,
         ], 60);
 
         // Broadcast real-time ke WebSocket Reverb agar halaman AUX update seketika (<50ms)
@@ -34,7 +37,10 @@ Route::match(['get', 'post'], '/weight', function(Request $request) {
     return response()->json([
         'weight' => $data['weight'] ?? null,
         'device' => $data['device'] ?? null,
-        'time' => $data['time'] ?? null,
+        'status' => $data['status'] ?? null,
+        'unit'   => $data['unit'] ?? null,
+        'type'   => $data['type'] ?? null,
+        'time'   => $data['time'] ?? null,
     ]);
 });
 
