@@ -13,7 +13,10 @@ Route::match(['get', 'post'], '/weight', function(Request $request) {
         Cache::put('latest_weight', [
             'weight' => $request->weight,
             'device' => $request->device,
-            'time' => $request->time,
+            'status' => $request->status,
+            'unit'   => $request->unit,
+            'type'   => $request->type,
+            'time'   => $request->time,
         ], 60);
         return response()->json(['success' => true]);
     }
@@ -22,7 +25,10 @@ Route::match(['get', 'post'], '/weight', function(Request $request) {
     return response()->json([
         'weight' => $data['weight'] ?? null,
         'device' => $data['device'] ?? null,
-        'time' => $data['time'] ?? null,
+        'status' => $data['status'] ?? null,
+        'unit'   => $data['unit'] ?? null,
+        'type'   => $data['type'] ?? null,
+        'time'   => $data['time'] ?? null,
     ]);
 });
 
