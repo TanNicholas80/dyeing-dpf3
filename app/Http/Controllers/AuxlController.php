@@ -17,7 +17,11 @@ class AuxlController extends Controller
 {
     public function index()
     {
-        $auxls = Auxl::with(['proses.details', 'proses.mesin', 'details'])->orderByDesc('created_at')->get();
+        // Batasi 300 data terbaru untuk mencegah PHP memory exhaust / timeout pada client-side DataTable
+        $auxls = Auxl::with(['proses.details', 'proses.mesin', 'details'])
+            ->orderByDesc('created_at')
+            ->limit(300)
+            ->get();
 
         // Tandai auxl yang sudah dipakai proses (ter-scan sebagai Barcode AUX aktif).
         $usageCountsByBarcode = collect();

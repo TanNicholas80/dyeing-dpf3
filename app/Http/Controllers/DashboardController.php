@@ -413,7 +413,7 @@ class DashboardController extends Controller
         $cantModifyStructure = in_array($userRole, ['operator', 'mesin', 'scm']);
         $cantScan = in_array($userRole, ['dashboard', 'scm']);
 
-        $canCancelBarcode = in_array($userRole, ['super_admin', 'kepala_shift']);
+        $canCancelBarcode = in_array($userRole, ['super_admin', 'ppic', 'kepala_shift']);
         $canAddProses = !$cantModifyStructure;
         $canEditProses = in_array($userRole, ['super_admin', 'ppic'], true);
         $canDeleteProses = in_array($userRole, ['super_admin', 'ppic'], true);

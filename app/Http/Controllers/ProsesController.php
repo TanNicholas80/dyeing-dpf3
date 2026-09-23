@@ -2625,7 +2625,14 @@ class ProsesController extends Controller
                 return response()->json(['status' => 'error', 'message' => 'Cancel barcode tidak dapat dilakukan saat mesin berjalan'], 400);
             }
             if (!empty($opberjalan->mulai) && !empty($opberjalan->selesai)) {
-                return response()->json(['status' => 'error', 'message' => 'Cancel barcode tidak dapat dilakukan saat proses telah selesai'], 400);
+                $user = $request->user();
+                $allowedRoles = ['super_admin', 'ppic', 'kepala_shift'];
+                if (!$user || !in_array($user->role, $allowedRoles, true)) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'Cancel barcode untuk proses yang telah selesai (history) hanya dapat dilakukan oleh Super Admin, PPIC, atau Kepala Shift'
+                    ], 403);
+                }
             }
         }
 

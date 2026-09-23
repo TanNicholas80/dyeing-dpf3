@@ -128,65 +128,65 @@ class MesinController extends Controller
     public function statuses()
     {
         try {
-            $mesins = Mesin::all();
-            $result = [];
-            foreach ($mesins as $mesin) {
-                // Logic Auto-Offline: jika tidak ada sinyal > 90 detik
-                $isTimeout = true;
-                if ($mesin->last_seen_at) {
-                    // Gunakan timestamp untuk perbandingan agar aman dari masalah timezone Laravel vs DB
-                    $lastSeenTs = $mesin->last_seen_at->getTimestamp();
-                    $nowTs = now()->getTimestamp();
-                    $isTimeout = ($nowTs - $lastSeenTs) > 90;
-                }
-
-                // Paksa status ke Mati (false) jika timeout dan saat ini masih Hidup
-                if ($isTimeout && $mesin->status) {
-                    $mesin->status = false;
-                    $mesin->save();
-
-                    // Cek apakah ada proses yang terdampak (menggantikan fungsi trigger mesin_after_update_status)
-                    $prosesAktif = $mesin->proses()
-                        ->whereNotNull('mulai')
-                        ->whereNull('selesai')
-                        ->orderBy('order', 'asc')
-                        ->orderBy('id', 'asc')
-                        ->get();
-
-                    foreach ($prosesAktif as $p) {
-                        $p->is_paused = true;
-                        $p->save();
-
-                        // Refresh dan load relasi untuk broadcast
-                        $p->refresh();
-                        $p->load(['approvals', 'details.barcodeKains', 'details.barcodeLas', 'details.barcodeAuxs']);
-                        $statusService = new \App\Services\ProsesStatusService();
-                        $affectedProsesIds = $statusService->getAffectedProsesIds();
-                        $statusData = $statusService->generateProsesStatus($p, $affectedProsesIds);
-                        
-                        // UBAH: Pancarkan EVENT EKSKLUSIF PAUSE agar mencolok di terminal Queue
-                        event(new \App\Events\ProsesPaused($p->id, $statusData));
+            $result = Cache::remember('mesin:statuses_summary', 3, function () {
+                $mesins = Mesin::all();
+                $data = [];
+                foreach ($mesins as $mesin) {
+                    // Logic Auto-Offline: jika tidak ada sinyal > 90 detik
+                    $isTimeout = true;
+                    if ($mesin->last_seen_at) {
+                        $lastSeenTs = $mesin->last_seen_at->getTimestamp();
+                        $nowTs = now()->getTimestamp();
+                        $isTimeout = ($nowTs - $lastSeenTs) > 90;
                     }
 
-                    // Broadcast ke dashboard pusher untuk update real-time
-                    event(new MesinUpdated([
-                        'id' => $mesin->id,
-                        'jenis_mesin' => $mesin->jenis_mesin,
-                        'status' => false,
-                        'auto_offline' => true
-                    ]));
-                }
+                    // Paksa status ke Mati (false) jika timeout dan saat ini masih Hidup
+                    if ($isTimeout && $mesin->status) {
+                        $mesin->status = false;
+                        $mesin->save();
 
-                $result[$mesin->id] = [
-                    'status' => (bool) $mesin->status,
-                    'label' => $mesin->status ? 'Hidup' : 'Mati',
-                    'force_alarm_off' => (bool) Cache::get($this->forceAlarmKey((int) $mesin->id), false),
-                    'iot_signal' => !$isTimeout,
-                    'iot_label' => !$isTimeout ? 'Terhubung' : 'Terputus',
-                    'last_on' => $mesin->last_on_at ? $mesin->last_on_at->translatedFormat('d-m-Y H:i:s') : '-',
-                    'last_off' => $mesin->last_off_at ? $mesin->last_off_at->translatedFormat('d-m-Y H:i:s') : '-',
-                ];
-            }
+                        // Cek apakah ada proses yang terdampak
+                        $prosesAktif = $mesin->proses()
+                            ->whereNotNull('mulai')
+                            ->whereNull('selesai')
+                            ->orderBy('order', 'asc')
+                            ->orderBy('id', 'asc')
+                            ->get();
+
+                        foreach ($prosesAktif as $p) {
+                            $p->is_paused = true;
+                            $p->save();
+
+                            $p->refresh();
+                            $p->load(['approvals', 'details.barcodeKains', 'details.barcodeLas', 'details.barcodeAuxs']);
+                            $statusService = new \App\Services\ProsesStatusService();
+                            $affectedProsesIds = $statusService->getAffectedProsesIds();
+                            $statusData = $statusService->generateProsesStatus($p, $affectedProsesIds);
+                            
+                            event(new \App\Events\ProsesPaused($p->id, $statusData));
+                        }
+
+                        event(new MesinUpdated([
+                            'id' => $mesin->id,
+                            'jenis_mesin' => $mesin->jenis_mesin,
+                            'status' => false,
+                            'auto_offline' => true
+                        ]));
+                    }
+
+                    $data[$mesin->id] = [
+                        'status' => (bool) $mesin->status,
+                        'label' => $mesin->status ? 'Hidup' : 'Mati',
+                        'force_alarm_off' => (bool) Cache::get($this->forceAlarmKey((int) $mesin->id), false),
+                        'iot_signal' => !$isTimeout,
+                        'iot_label' => !$isTimeout ? 'Terhubung' : 'Terputus',
+                        'last_on' => $mesin->last_on_at ? $mesin->last_on_at->translatedFormat('d-m-Y H:i:s') : '-',
+                        'last_off' => $mesin->last_off_at ? $mesin->last_off_at->translatedFormat('d-m-Y H:i:s') : '-',
+                    ];
+                }
+                return $data;
+            });
+
             return response()->json($result);
         } catch (\Exception $e) {
             return response()->json(['error' => $e->getMessage()], 500);
@@ -234,8 +234,10 @@ class MesinController extends Controller
             ]), now()->addDays(30));
         }
 
-        // Paksa refresh hasil polling alarm berikutnya.
+        // Paksa refresh hasil polling alarm & summary mesin berikutnya.
         Cache::forget("iot:mesin:{$mesin->id}:alarm_result");
+        Cache::forget("iot:all_signals_cache");
+        Cache::forget("mesin:statuses_summary");
 
         // Catat ke activity log (Spatie)
         try {

@@ -5059,7 +5059,9 @@
                             // Ambil data proses dari card atau modal
                             const $card = $(`.status-card[data-proses-id="${prosesId}"]`);
                             const prosesData = $card.length ? $card.data('proses') : $('#modalDetailProses').data('proses');
-                            const canCancelByProses = !prosesData || (!prosesData.mulai || !prosesData.selesai);
+                            const isHistory = prosesData && Boolean(prosesData.mulai) && Boolean(prosesData.selesai);
+                            const isHistoryRoleAllowed = ['super_admin', 'ppic', 'kepala_shift'].includes(window.userRole);
+                            const canCancelByProses = !isHistory || isHistoryRoleAllowed;
 
                             const allowCancel = canCancel && canCancelByProses;
                             let html = '<div style="display:flex;flex-wrap:wrap;gap:6px;">';
@@ -7879,9 +7881,10 @@
             setInterval(updateRunningTimes, 1000);
             updateRunningTimes(); // jalankan sekali di awal
 
-            // Trigger background checks for auto-offline every 5 seconds
+            // Trigger background checks for auto-offline every 15 seconds
             // Ini untuk memastikan logic timeout tetap jalan meskipun menu Data Mesin tidak dibuka
             setInterval(function () {
+                if (document.hidden) return; // Jangan request jika tab sedang tidak aktif
                 fetch('/mesin/statuses?_=' + new Date().getTime(), { cache: 'no-store' })
                     .then(res => res.json())
                     .then(data => {
@@ -7906,10 +7909,12 @@
                         }
                     })
                     .catch(e => console.error('Error triggering statuses:', e));
-            }, 5000);
+            }, 15000);
 
             // Auto-update / background sync status proses (Pinjam Mesin, Mesin Mati/Nyala, Selesai, Topping) tanpa refresh
+            // Fallback berkala (15 detik) melengkapi WebSocket Reverb
             function syncProsesStatuses() {
+                if (document.hidden) return; // Jangan request jika tab sedang tidak aktif
                 if (typeof handleProsesStatusUpdate !== 'function') return;
                 const currentParams = window.location.search || '';
                 const separator = currentParams ? '&' : '?';
@@ -7927,7 +7932,7 @@
                     })
                     .catch(e => { });
             }
-            setInterval(syncProsesStatuses, 4000);
+            setInterval(syncProsesStatuses, 15000);
         });
 
         // Real-time update warna card berdasarkan status mulai/selesai
@@ -8134,7 +8139,9 @@
                             const activeBarcodes = (barcodes || []).filter(function (bk) { return !bk.cancel; });
                             if (!activeBarcodes.length) return '<span style="color:#888;">Belum ada barcode.</span>';
                             const canCancel = window.canCancelBarcode !== false;
-                            const canCancelByProses = !proses.mulai || !proses.selesai;
+                            const isHistory = proses && Boolean(proses.mulai) && Boolean(proses.selesai);
+                            const isHistoryRoleAllowed = ['super_admin', 'ppic', 'kepala_shift'].includes(window.userRole);
+                            const canCancelByProses = !isHistory || isHistoryRoleAllowed;
 
                             const allowCancel = canCancel && canCancelByProses;
 

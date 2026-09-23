@@ -9,12 +9,24 @@ use App\Http\Controllers\Api\TicketDetailController;
 // Endpoint untuk menerima data berat dari timbangan (POST) dan juga bisa GET data terakhir
 Route::match(['get', 'post'], '/weight', function(Request $request) {
     if ($request->isMethod('post')) {
-        // Simpan berat ke cache
+        $weight = $request->weight;
+        $device = $request->device;
+        $time = $request->time ?: now()->toIso8601String();
+
+        // Simpan berat ke cache Redis
         Cache::put('latest_weight', [
-            'weight' => $request->weight,
-            'device' => $request->device,
-            'time' => $request->time,
+            'weight' => $weight,
+            'device' => $device,
+            'time' => $time,
         ], 60);
+
+        // Broadcast real-time ke WebSocket Reverb agar halaman AUX update seketika (<50ms)
+        try {
+            broadcast(new \App\Events\WeightUpdated($weight, $device, $time));
+        } catch (\Throwable $e) {
+            // Ignore socket broadcast errors so POST always succeeds
+        }
+
         return response()->json(['success' => true]);
     }
     // GET: ambil berat terakhir

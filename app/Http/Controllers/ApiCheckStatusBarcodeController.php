@@ -87,6 +87,7 @@ class ApiCheckStatusBarcodeController extends Controller
         // Invalidate cache alarm agar polling berikutnya mendapat status terbaru
         Cache::forget("iot:mesin:{$mesin->id}:alarm_result");
         Cache::forget($this->alarmStateKey((int) $mesin->id));
+        Cache::forget("iot:all_signals_cache");
 
         // Update status mesin di database (1 = Hidup/ON, 0 = Mati/OFF)
         // Jika sengaja OFF, selesaikan proses aktif terlebih dahulu sebelum merubah status mesin
@@ -1011,13 +1012,17 @@ class ApiCheckStatusBarcodeController extends Controller
     public function getAllSignals(Request $request)
     {
         $this->assertDeviceToken($request);
-        $mesins = Mesin::orderBy('id')->get();
-        $results = [];
 
-        foreach ($mesins as $mesin) {
-            $signalResponse = $this->getAlarmStatus($request, $mesin);
-            $results[] = $signalResponse->getData(true);
-        }
+        // Optimasi: Micro-cache di Redis selama 2 detik agar ribuan hit per menit tidak membebani database
+        $results = Cache::remember('iot:all_signals_cache', 2, function () use ($request) {
+            $mesins = Mesin::orderBy('id')->get();
+            $data = [];
+            foreach ($mesins as $mesin) {
+                $signalResponse = $this->getAlarmStatus($request, $mesin);
+                $data[] = $signalResponse->getData(true);
+            }
+            return $data;
+        });
 
         return response()->json([
             'status' => 'success',
@@ -1079,6 +1084,7 @@ class ApiCheckStatusBarcodeController extends Controller
         }
 
         // 1. Bersihkan semua cache alarm & sinyal per mesin
+        Cache::forget("iot:all_signals_cache");
         $mesins = Mesin::all(['id', 'jenis_mesin']);
         foreach ($mesins as $m) {
             Cache::forget("iot:mesin:{$m->id}:alarm_result");

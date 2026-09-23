@@ -205,53 +205,63 @@
             let currentForceAlarmMesinId = null;
             let currentForceAlarmEnabled = null;
 
+            function updateSingleMesinUI(mesinId, data) {
+                if (!mesinId || !data) return;
+
+                const badge = document.querySelector(`.status-badge[data-id="${mesinId}"]`);
+                if (badge) {
+                    badge.textContent = data.label || (data.status ? 'Hidup' : 'Mati');
+                    badge.classList.remove('badge-success', 'badge-secondary');
+                    badge.classList.add(data.status ? 'badge-success' : 'badge-secondary');
+                }
+                const nyalaEl = document.querySelector(`.nyala-time[data-id="${mesinId}"]`);
+                if (nyalaEl && data.last_on) {
+                    nyalaEl.textContent = data.last_on;
+                }
+                const matiEl = document.querySelector(`.mati-time[data-id="${mesinId}"]`);
+                if (matiEl && data.last_off) {
+                    matiEl.textContent = data.last_off;
+                }
+                const sigBadge = document.querySelector(`.signal-badge[data-id="${mesinId}"]`);
+                if (sigBadge) {
+                    sigBadge.textContent = data.iot_label || (data.iot_signal ? 'Terhubung' : 'Terputus');
+                    sigBadge.classList.remove('badge-success', 'badge-danger', 'badge-secondary');
+                    sigBadge.classList.add(data.iot_signal ? 'badge-success' : 'badge-danger');
+                }
+                const toggle = document.querySelector(`.force-alarm-toggle[data-id="${mesinId}"]`);
+                if (toggle && data.force_alarm_off !== undefined) {
+                    const checked = !!data.force_alarm_off;
+                    if (toggle.checked !== checked) {
+                        toggle.checked = checked;
+                    }
+                    const label = document.querySelector('label[for="' + toggle.id + '"]');
+                    if (label) {
+                        label.textContent = checked ? 'ON' : 'OFF';
+                    }
+                }
+            }
+
+            // Realtime WebSocket via Laravel Echo (Reverb) - Instan (<50ms) saat status mesin berubah
+            if (typeof Echo !== 'undefined') {
+                Echo.channel('dashboard.proses-statuses')
+                    .listen('.mesin.updated', function(e) {
+                        if (e && e.mesin) {
+                            updateSingleMesinUI(e.mesin.id, e.mesin);
+                        }
+                    });
+            }
+
+            // Fallback Polling (15 detik sekali) hanya sebagai backup jika koneksi WebSocket terputus
             setInterval(function() {
+                if (document.hidden) return; // Jangan request jika tab sedang tidak aktif
                 fetch('/mesin/statuses?_=' + new Date().getTime(), { cache: 'no-store' })
                     .then(response => response.json())
                     .then(data => {
-                        document.querySelectorAll('.status-badge').forEach(function(badge) {
-                            var mesinId = badge.getAttribute('data-id');
-                            if (data[mesinId]) {
-                                badge.textContent = data[mesinId].label;
-                                badge.classList.remove('badge-success', 'badge-secondary');
-                                badge.classList.add(data[mesinId].status ? 'badge-success' : 'badge-secondary');
-                            }
-                        });
-                        document.querySelectorAll('.nyala-time').forEach(function(el) {
-                            var mesinId = el.getAttribute('data-id');
-                            if (data[mesinId] && data[mesinId].last_on) {
-                                el.textContent = data[mesinId].last_on;
-                            }
-                        });
-                        document.querySelectorAll('.mati-time').forEach(function(el) {
-                            var mesinId = el.getAttribute('data-id');
-                            if (data[mesinId] && data[mesinId].last_off) {
-                                el.textContent = data[mesinId].last_off;
-                            }
-                        });
-                        document.querySelectorAll('.signal-badge').forEach(function(badge) {
-                            var mesinId = badge.getAttribute('data-id');
-                            if (data[mesinId]) {
-                                badge.textContent = data[mesinId].iot_label;
-                                badge.classList.remove('badge-success', 'badge-danger', 'badge-secondary');
-                                badge.classList.add(data[mesinId].iot_signal ? 'badge-success' : 'badge-danger');
-                            }
-                        });
-                        document.querySelectorAll('.force-alarm-toggle').forEach(function(toggle) {
-                            var mesinId = toggle.getAttribute('data-id');
-                            if (data[mesinId] && data[mesinId].force_alarm_off !== undefined) {
-                                var checked = !!data[mesinId].force_alarm_off;
-                                if (toggle.checked !== checked) {
-                                    toggle.checked = checked;
-                                }
-                                var label = document.querySelector('label[for="' + toggle.id + '"]');
-                                if (label) {
-                                    label.textContent = checked ? 'ON' : 'OFF';
-                                }
-                            }
+                        Object.keys(data).forEach(function(mesinId) {
+                            updateSingleMesinUI(mesinId, data[mesinId]);
                         });
                     });
-            }, 1000);
+            }, 15000);
 
             document.querySelectorAll('.force-alarm-toggle').forEach(function(toggle) {
                 toggle.addEventListener('change', function() {

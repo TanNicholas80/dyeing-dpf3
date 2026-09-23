@@ -142,6 +142,7 @@ RUN { \
 # Enable PHP-FPM status page for healthcheck (php-fpm-healthcheck)
 # pm.status_path must be inside [www] pool; use www.conf (zz-docker.conf may cause "unknown entry")
 RUN sed -i '/^\[www\]$/a pm.status_path = /status' /usr/local/etc/php-fpm.d/www.conf
+COPY ./docker/production/php-fpm/zz-tuning.conf /usr/local/etc/php-fpm.d/zz-tuning.conf
 # Update the variables_order to include E (for ENV)
 #RUN sed -i 's/variables_order = "GPCS"/variables_order = "EGPCS"/' "$PHP_INI_DIR/php.ini"
 

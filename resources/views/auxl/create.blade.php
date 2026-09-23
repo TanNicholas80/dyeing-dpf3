@@ -696,25 +696,41 @@
                 }
             });
 
+            function applyWeightValue(weight) {
+                if (typeof weight !== 'undefined' && !isNaN(parseFloat(weight))) {
+                    const weightInputs = document.querySelectorAll('.weight-input[readonly]');
+                    if (weightInputs.length > 0) {
+                        weightInputs[weightInputs.length - 1].value = parseFloat(weight).toFixed(2);
+                        calcVolume();
+                    }
+                }
+            }
+
+            // Realtime WebSocket via Laravel Echo (Reverb) - Instan saat timbangan ditekan/berubah
+            if (typeof Echo !== 'undefined') {
+                Echo.channel('timbangan')
+                    .listen('.weight.updated', function(data) {
+                        if (data && data.weight !== undefined) {
+                            applyWeightValue(data.weight);
+                        }
+                    });
+            }
+
+            // Fallback Polling (15 detik sekali) hanya sebagai backup jika koneksi WebSocket terputus
             async function fetchWeight() {
+                if (document.hidden) return; // Jangan request jika tab sedang tidak aktif
                 try {
-                    const res = await fetch('https://dpf3dunia.com/api/weight');
+                    const res = await fetch('/api/weight');
                     if (!res.ok) return;
 
                     const data = await res.json();
-                    if (typeof data.weight !== 'undefined' && !isNaN(parseFloat(data.weight))) {
-                        const weightInputs = document.querySelectorAll('.weight-input[readonly]');
-                        if (weightInputs.length > 0) {
-                            weightInputs[weightInputs.length - 1].value = parseFloat(data.weight).toFixed(2);
-                            calcVolume();
-                        }
-                    }
+                    applyWeightValue(data.weight);
                 } catch (error) {
                     console.error('Error fetching weight:', error);
                 }
             }
 
-            setInterval(fetchWeight, 1000);
+            setInterval(fetchWeight, 15000);
         });
     </script>
 @endsection
