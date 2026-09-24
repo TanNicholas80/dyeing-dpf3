@@ -16,6 +16,17 @@
         background-color: #007bff;
         border-color: #007bff;
     }
+    /* Styling tabel modal rincian kimia */
+    #table-modal-chemical thead.sticky-top th {
+        top: 0;
+        position: sticky;
+        background-color: #f4f6f9;
+        z-index: 2;
+        border-bottom: 2px solid #dee2e6;
+    }
+    #table-modal-chemical td, #table-modal-chemical th {
+        vertical-align: middle !important;
+    }
 </style>
 @endpush
 
@@ -373,7 +384,7 @@
 
 {{-- MODAL RINCIAN KIMIA (Dye Stuff / Aux) --}}
 <div class="modal fade" id="modalChemicalDetails" tabindex="-1" aria-labelledby="modalChemicalDetailsLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg" style="border-radius: 10px;">
             <div class="modal-header bg-primary text-white py-3">
                 <h5 class="modal-title font-weight-bold" id="modalChemicalDetailsLabel">
@@ -424,31 +435,49 @@
 
                 {{-- Content Container --}}
                 <div id="modal-chemical-content" class="d-none">
-                    {{-- Detail Aux Tambahan (Volume / Liquor Ratio) --}}
-                    <div id="modal-aux-extra-info" class="d-none mb-3 p-2 bg-white rounded border small d-flex justify-content-around text-center">
-                        <div>
-                            <span class="text-muted d-block">Volume:</span>
-                            <strong id="modal-aux-volume">-</strong>
+                    {{-- Detail Aux Tambahan (Volume / Liquor Ratio / Total WT) --}}
+                    <div id="modal-aux-extra-info" class="p-2 mb-3 bg-white rounded border small text-center shadow-none" style="display: none;">
+                        <div class="row m-0 align-items-center">
+                            <div class="col-4">
+                                <span class="text-muted d-block small text-uppercase font-weight-bold">Volume</span>
+                                <strong id="modal-aux-volume" class="h6 font-weight-bold text-dark mb-0">-</strong>
+                            </div>
+                            <div class="col-4 border-left">
+                                <span class="text-muted d-block small text-uppercase font-weight-bold">Liquor Ratio</span>
+                                <strong id="modal-aux-lr" class="h6 font-weight-bold text-dark mb-0">-</strong>
+                            </div>
+                            <div class="col-4 border-left">
+                                <span class="text-muted d-block small text-uppercase font-weight-bold">Total WT</span>
+                                <strong id="modal-aux-total-wt" class="h6 font-weight-bold text-success mb-0">-</strong>
+                            </div>
                         </div>
-                        <div class="border-left pl-3">
-                            <span class="text-muted d-block">Liquor Ratio:</span>
-                            <strong id="modal-aux-lr">-</strong>
-                        </div>
-                        <div class="border-left pl-3">
-                            <span class="text-muted d-block">Total WT:</span>
-                            <strong id="modal-aux-total-wt" class="text-success">-</strong>
+                    </div>
+
+                    {{-- Detail Dye Stuff Tambahan (Total Target / Actual / Selisih) --}}
+                    <div id="modal-la-extra-info" class="p-2 mb-3 bg-white rounded border small text-center shadow-none" style="display: none;">
+                        <div class="row m-0 align-items-center">
+                            <div class="col-4">
+                                <span class="text-muted d-block small text-uppercase font-weight-bold">Total Target WT</span>
+                                <strong id="modal-la-target-wt" class="h6 font-weight-bold text-dark mb-0">-</strong>
+                            </div>
+                            <div class="col-4 border-left">
+                                <span class="text-muted d-block small text-uppercase font-weight-bold">Total Actual WT</span>
+                                <strong id="modal-la-actual-wt" class="h6 font-weight-bold text-primary mb-0">-</strong>
+                            </div>
+                            <div class="col-4 border-left">
+                                <span class="text-muted d-block small text-uppercase font-weight-bold">Total Selisih</span>
+                                <strong id="modal-la-diff-wt" class="h6 font-weight-bold mb-0">-</strong>
+                            </div>
                         </div>
                     </div>
 
                     {{-- Tabel Bahan Kimia --}}
-                    <div class="table-responsive border rounded" style="max-height: 350px;">
-                        <table class="table table-sm table-striped table-hover mb-0" id="table-modal-chemical">
-                            <thead class="thead-light sticky-top" style="font-size: 12.5px;">
-                                <tr id="table-modal-chemical-head">
-                                    {{-- Diisi secara dinamis via JS --}}
-                                </tr>
+                    <div class="table-responsive border rounded" style="max-height: 400px;">
+                        <table class="table table-sm table-striped table-hover mb-0 text-nowrap" id="table-modal-chemical">
+                            <thead class="thead-light sticky-top" id="table-modal-chemical-head" style="font-size: 13px;">
+                                {{-- Diisi secara dinamis via JS --}}
                             </thead>
-                            <tbody id="table-modal-chemical-body" style="font-size: 12.5px;">
+                            <tbody id="table-modal-chemical-body" style="font-size: 13px;">
                                 {{-- Diisi secara dinamis via JS --}}
                             </tbody>
                         </table>
@@ -456,8 +485,8 @@
                 </div>
             </div>
             <div class="modal-footer bg-light py-2 px-4 d-flex justify-content-between align-items-center">
-                {{-- Tombol Direct ke Detail Proses Dashboard --}}
-                <a href="#" id="btn-modal-open-proses" class="btn btn-primary shadow-sm" target="_blank">
+                {{-- Tombol Direct ke Detail Proses Dashboard (Di tab yang sama) --}}
+                <a href="#" id="btn-modal-open-proses" class="btn btn-primary shadow-sm">
                     <i class="fas fa-external-link-alt mr-1"></i>Buka Detail Proses
                 </a>
                 <button type="button" class="btn btn-secondary shadow-sm" data-dismiss="modal">
@@ -537,7 +566,8 @@
             $('#modal-chemical-loading').removeClass('d-none');
             $('#modal-chemical-error').addClass('d-none');
             $('#modal-chemical-content').addClass('d-none');
-            $('#modal-aux-extra-info').addClass('d-none');
+            $('#modal-aux-extra-info').hide();
+            $('#modal-la-extra-info').hide();
             $('#table-modal-chemical-head').empty();
             $('#table-modal-chemical-body').empty();
 
@@ -555,42 +585,69 @@
                         $('#modal-chemical-content').removeClass('d-none');
 
                         if (type === 'la') {
+                            // Info Card Dye Stuff
+                            const totalTarget = res.total_target_wt !== undefined ? parseFloat(res.total_target_wt) : 0;
+                            const totalActual = res.total_actual_wt !== undefined ? parseFloat(res.total_actual_wt) : 0;
+                            const totalDiff = totalActual - totalTarget;
+                            const totalDiffText = totalDiff > 0 ? ('+' + totalDiff.toFixed(2)) : totalDiff.toFixed(2);
+                            const totalDiffClass = Math.abs(totalDiff) > 0.05 ? 'text-warning font-weight-bold' : 'text-success font-weight-bold';
+
+                            $('#modal-la-target-wt').text(totalTarget.toFixed(2) + ' Gram');
+                            $('#modal-la-actual-wt').text(totalActual.toFixed(2) + ' Gram');
+                            $('#modal-la-diff-wt').text(totalDiffText + ' Gram').removeClass('text-warning text-success font-weight-bold').addClass(totalDiffClass);
+                            $('#modal-la-extra-info').show();
+
                             // Tampilan Header Dye Stuff
                             $('#table-modal-chemical-head').html(`
                                 <tr>
-                                    <th class="text-center" style="width: 40px;">#</th>
-                                    <th>Kode Bahan</th>
-                                    <th>Nama Bahan Kimia</th>
-                                    <th class="text-right">Target WT</th>
-                                    <th class="text-right">Actual WT</th>
-                                    <th class="text-right">Selisih</th>
-                                    <th class="text-center">Satuan</th>
-                                    <th class="text-center">Waktu Timbang</th>
+                                    <th class="text-center align-middle" style="width: 45px;">#</th>
+                                    <th class="align-middle" style="width: 140px;">Kode Bahan</th>
+                                    <th class="align-middle" style="min-width: 200px;">Nama Bahan Kimia</th>
+                                    <th class="text-right align-middle" style="width: 120px;">Target WT</th>
+                                    <th class="text-right align-middle" style="width: 120px;">Actual WT</th>
+                                    <th class="text-right align-middle" style="width: 110px;">Selisih</th>
+                                    <th class="text-center align-middle" style="width: 90px;">Satuan</th>
+                                    <th class="text-center align-middle" style="width: 160px;">Waktu Timbang</th>
                                 </tr>
                             `);
 
                             let rowsHtml = '';
                             if (res.items.length === 0) {
-                                rowsHtml = `<tr><td colspan="8" class="text-center text-muted py-3">Tidak ada data penimbangan kimia pada barcode ini.</td></tr>`;
+                                rowsHtml = `<tr><td colspan="8" class="text-center text-muted py-4">Tidak ada data penimbangan kimia pada barcode ini.</td></tr>`;
                             } else {
                                 res.items.forEach(function (item, idx) {
                                     const target = item.target_wt !== null ? parseFloat(item.target_wt) : 0;
                                     const actual = item.actual_wt !== null ? parseFloat(item.actual_wt) : 0;
                                     const diff = actual - target;
                                     const diffText = diff > 0 ? ('+' + diff.toFixed(2)) : diff.toFixed(2);
-                                    const diffClass = Math.abs(diff) > 0.05 ? 'text-warning font-weight-bold' : 'text-success';
-                                    const timeStr = (item.comp_date || '') + ' ' + (item.comp_time || '');
+                                    const diffClass = Math.abs(diff) > 0.05 ? 'text-warning font-weight-bold' : 'text-success font-weight-bold';
+
+                                    // Format waktu timbang agar rapi (DD/MM/YYYY HH:mm)
+                                    let dateDisplay = '-';
+                                    if (item.comp_date) {
+                                        const dStr = String(item.comp_date).trim();
+                                        if (dStr.length === 8) {
+                                            dateDisplay = `${dStr.substring(6, 8)}/${dStr.substring(4, 6)}/${dStr.substring(0, 4)}`;
+                                        } else {
+                                            dateDisplay = dStr;
+                                        }
+                                    }
+                                    let timeDisplay = item.comp_time ? String(item.comp_time).trim() : '';
+                                    if (timeDisplay.length >= 5) {
+                                        timeDisplay = timeDisplay.substring(0, 5);
+                                    }
+                                    const fullTimeStr = dateDisplay !== '-' ? (dateDisplay + (timeDisplay ? ' ' + timeDisplay : '')) : (timeDisplay || '-');
 
                                     rowsHtml += `
                                         <tr>
-                                            <td class="text-center text-muted">${idx + 1}</td>
-                                            <td><code>${item.product_code || '-'}</code></td>
-                                            <td class="font-weight-bold">${item.product_name || '-'}</td>
-                                            <td class="text-right">${target.toFixed(2)}</td>
-                                            <td class="text-right font-weight-bold text-primary">${actual.toFixed(2)}</td>
-                                            <td class="text-right ${diffClass}">${diffText}</td>
-                                            <td class="text-center"><span class="badge badge-light border">${item.unit || 'Gram'}</span></td>
-                                            <td class="text-center small text-muted">${timeStr.trim() || '-'}</td>
+                                            <td class="text-center align-middle text-muted">${idx + 1}</td>
+                                            <td class="align-middle"><code class="text-primary font-weight-bold">${item.product_code || '-'}</code></td>
+                                            <td class="align-middle font-weight-bold text-dark">${item.product_name || '-'}</td>
+                                            <td class="text-right align-middle">${target.toFixed(2)}</td>
+                                            <td class="text-right align-middle font-weight-bold text-primary">${actual.toFixed(2)}</td>
+                                            <td class="text-right align-middle ${diffClass}">${diffText}</td>
+                                            <td class="text-center align-middle"><span class="badge badge-light border">${item.unit || 'Gram'}</span></td>
+                                            <td class="text-center align-middle small text-muted font-weight-bold">${fullTimeStr}</td>
                                         </tr>
                                     `;
                                 });
@@ -598,30 +655,40 @@
                             $('#table-modal-chemical-body').html(rowsHtml);
 
                         } else if (type === 'aux') {
-                            // Tampilan Header AUX
-                            $('#modal-aux-extra-info').removeClass('d-none');
-                            $('#modal-aux-volume').text((res.volume_litres !== null ? res.volume_litres : '-') + ' L');
-                            $('#modal-aux-lr').text(res.liquor_ratio || '-');
-                            $('#modal-aux-total-wt').text((res.total_wt !== null ? res.total_wt.toFixed(2) : '-') + ' KG');
+                            // Info Card Auxiliary
+                            const volumeVal = res.volume_litres !== null ? (parseFloat(res.volume_litres).toFixed(2) + ' L') : '-';
+                            const lrVal = res.liquor_ratio ? (parseFloat(res.liquor_ratio).toFixed(2)) : '-';
+                            const totalWtVal = res.total_wt !== null ? (parseFloat(res.total_wt).toFixed(2) + ' KG') : '-';
 
+                            $('#modal-aux-volume').text(volumeVal);
+                            $('#modal-aux-lr').text(lrVal);
+                            $('#modal-aux-total-wt').text(totalWtVal);
+                            $('#modal-aux-extra-info').show();
+
+                            // Tampilan Header AUX
                             $('#table-modal-chemical-head').html(`
                                 <tr>
-                                    <th class="text-center" style="width: 40px;">#</th>
-                                    <th>Nama Auxiliary</th>
-                                    <th class="text-right">Konsentrasi</th>
+                                    <th class="text-center align-middle" style="width: 50px;">#</th>
+                                    <th class="align-middle">Nama Auxiliary</th>
+                                    <th class="text-right align-middle" style="width: 200px;">Konsentrasi</th>
                                 </tr>
                             `);
 
                             let rowsHtml = '';
                             if (res.items.length === 0) {
-                                rowsHtml = `<tr><td colspan="3" class="text-center text-muted py-3">Tidak ada data rincian auxiliary pada barcode ini.</td></tr>`;
+                                rowsHtml = `<tr><td colspan="3" class="text-center text-muted py-4">Tidak ada data rincian auxiliary pada barcode ini.</td></tr>`;
                             } else {
                                 res.items.forEach(function (item, idx) {
+                                    const konsentrasiVal = item.konsentrasi !== null ? parseFloat(item.konsentrasi).toFixed(4) : '-';
                                     rowsHtml += `
                                         <tr>
-                                            <td class="text-center text-muted">${idx + 1}</td>
-                                            <td class="font-weight-bold text-dark">${item.auxiliary || '-'}</td>
-                                            <td class="text-right font-weight-bold text-success">${item.konsentrasi !== null ? item.konsentrasi : '-'} g/L</td>
+                                            <td class="text-center align-middle text-muted">${idx + 1}</td>
+                                            <td class="align-middle font-weight-bold text-dark">${item.auxiliary || '-'}</td>
+                                            <td class="text-right align-middle">
+                                                <span class="badge badge-light border text-success font-weight-bold px-2 py-1" style="font-size: 12px;">
+                                                    ${konsentrasiVal} g/L
+                                                </span>
+                                            </td>
                                         </tr>
                                     `;
                                 });
