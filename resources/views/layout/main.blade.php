@@ -114,6 +114,8 @@
             }
         }
     </style>
+    @yield('styles')
+    @stack('styles')
 </head>
 
 <body class="hold-transition sidebar-collapse layout-top-nav">
@@ -676,6 +678,7 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 
     @yield('scripts')
+    @stack('scripts')
 </body>
 
 </html>

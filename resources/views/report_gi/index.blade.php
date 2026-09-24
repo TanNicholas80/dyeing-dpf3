@@ -1,5 +1,24 @@
 @extends('layout.main')
 
+@push('styles')
+<style>
+    /* Styling agar pagination rata kanan rapi dan compact */
+    .card-footer .pagination {
+        margin: 0 !important;
+        justify-content: flex-end !important;
+    }
+    .card-footer nav {
+        display: flex;
+        justify-content: flex-end;
+        margin: 0;
+    }
+    .page-item.active .page-link {
+        background-color: #007bff;
+        border-color: #007bff;
+    }
+</style>
+@endpush
+
 @section('content')
 <div class="content-wrapper">
     {{-- Content Header --}}
@@ -303,6 +322,8 @@
                                             {{-- Dye Stuff, Topping Dyes, Aux, Topping Aux: Modal List Kimia --}}
                                             <button type="button"
                                                 class="btn btn-sm btn-outline-info py-1 px-2 shadow-sm btn-show-chemical"
+                                                data-toggle="modal"
+                                                data-target="#modalChemicalDetails"
                                                 data-type="{{ $row->source_type }}"
                                                 data-barcode="{{ $row->barcode }}"
                                                 data-jenis="{{ $row->jenis }}"
@@ -336,11 +357,11 @@
 
                 {{-- Pagination Footer --}}
                 @if ($records->hasPages() || $records->total() > 0)
-                    <div class="card-footer bg-white d-flex flex-wrap justify-content-between align-items-center py-3">
+                    <div class="card-footer bg-white d-flex flex-column flex-md-row justify-content-between align-items-center py-3">
                         <div class="text-muted small mb-2 mb-md-0">
                             Menampilkan <strong>{{ $records->firstItem() ?? 0 }}</strong> sampai <strong>{{ $records->lastItem() ?? 0 }}</strong> dari <strong>{{ number_format($records->total(), 0, ',', '.') }}</strong> total transaksi
                         </div>
-                        <div>
+                        <div class="ml-auto d-flex justify-content-end align-items-center">
                             {{ $records->links('pagination::bootstrap-4') }}
                         </div>
                     </div>
@@ -448,7 +469,7 @@
 </div>
 @endsection
 
-@push('scripts')
+@section('scripts')
 <script>
     $(document).ready(function () {
         // Handler Copy Barcode to Clipboard
@@ -505,8 +526,12 @@
             $('#modal-info-tanggal').text(tanggal);
 
             // Set Link Buka Detail Proses ke Dashboard
-            const dashboardUrl = `{{ url('dashboard') }}?open_proses_id=${prosesId}&detail_id=${detailId || ''}`;
-            $('#btn-modal-open-proses').attr('href', dashboardUrl);
+            if (prosesId && prosesId !== '-') {
+                const dashboardUrl = `{{ url('dashboard') }}?open_proses_id=${prosesId}&detail_id=${detailId || ''}`;
+                $('#btn-modal-open-proses').attr('href', dashboardUrl).show();
+            } else {
+                $('#btn-modal-open-proses').hide();
+            }
 
             // Reset modal states
             $('#modal-chemical-loading').removeClass('d-none');
@@ -618,4 +643,4 @@
         });
     });
 </script>
-@endpush
+@endsection

@@ -205,7 +205,7 @@ Route::middleware(['auth', 'prevent-back-history'])->group(function () {
      */
     Route::middleware('role:super_admin,ppic,adm_prod,scm')->group(function () {
         Route::get('/report-gi', [\App\Http\Controllers\ReportGiController::class, 'index'])->name('report-gi.index');
-        Route::get('/report-gi/chemicals/{type}/{barcode}', [\App\Http\Controllers\ReportGiController::class, 'getChemicalDetails'])->name('report-gi.chemicals');
+        Route::get('/report-gi/chemicals/{type}/{barcode}', [\App\Http\Controllers\ReportGiController::class, 'getChemicalDetails'])->where('barcode', '.*')->name('report-gi.chemicals');
     });
 });
 
