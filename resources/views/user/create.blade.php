@@ -73,6 +73,7 @@
                                     <option value="kepala_shift" {{ old('role') == 'kepala_shift' ? 'selected' : '' }}>Kepala Shift</option>
                                     <option value="spv_listrik" {{ old('role') == 'spv_listrik' ? 'selected' : '' }}>SPV Listrik</option>
                                     <option value="scm" {{ old('role') == 'scm' ? 'selected' : '' }}>SCM</option>
+                                    <option value="adm_prod" {{ old('role') == 'adm_prod' ? 'selected' : '' }}>Admin Produksi (adm_prod)</option>
                                 </select>
                                 @error('role')
                                     <small class="text-danger">{{ $message }}</small>

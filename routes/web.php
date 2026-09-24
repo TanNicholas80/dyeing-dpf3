@@ -21,7 +21,7 @@ Route::middleware(['auth', 'prevent-back-history'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
     // Dashboard: semua role yang perlu lihat dashboard kecuali aux (dashboard & operator ada di enum users)
-    Route::middleware('role:super_admin,ds,mesin,ppic,fm,vp,owner,kepala_regu,kepala_ruangan,kepala_shift,dashboard,operator,scm')->group(function () {
+    Route::middleware('role:super_admin,ds,mesin,ppic,fm,vp,owner,kepala_regu,kepala_ruangan,kepala_shift,dashboard,operator,scm,adm_prod')->group(function () {
         Route::get('/dashboard', [DashboardController::class, 'dashboard'])->name('dashboard');
         Route::get('/dashboard/proses/{id}/card-html', [DashboardController::class, 'getProsesCardHtml'])->name('dashboard.proses-card');
         Route::get('/dashboard/proses-statuses', [DashboardController::class, 'prosesStatuses'])->name('dashboard.proses-statuses');
@@ -129,7 +129,7 @@ Route::middleware(['auth', 'prevent-back-history'])->group(function () {
     });
 
     // View barcode: SuperAdmin, DS, Mesin, PPIC, FM, VP, Owner (untuk melihat barcode yang sudah ditambahkan)
-    Route::middleware('role:super_admin,ds,mesin,ppic,fm,vp,kepala_regu,kepala_ruangan,kepala_shift,owner,operator,scm')->group(function () {
+    Route::middleware('role:super_admin,ds,mesin,ppic,fm,vp,kepala_regu,kepala_ruangan,kepala_shift,owner,operator,scm,adm_prod')->group(function () {
         Route::get('/proses/{id}/barcodes', [ProsesController::class, 'barcodes'])->name('proses.barcodes');
     });
 
@@ -197,6 +197,15 @@ Route::middleware(['auth', 'prevent-back-history'])->group(function () {
         Route::get('dye-stuff/print-bulk', [\App\Http\Controllers\DyeStuffController::class, 'printBulk'])->name('dye-stuff.print-bulk');
         Route::resource('dye-stuff', \App\Http\Controllers\DyeStuffController::class);
         Route::get('dye-stuff/{id}/print', [\App\Http\Controllers\DyeStuffController::class, 'print'])->name('dye-stuff.print');
+    });
+
+    /**
+     * REPORT GI
+     * - Akses: Super Admin, PPIC, Adm Prod, SCM
+     */
+    Route::middleware('role:super_admin,ppic,adm_prod,scm')->group(function () {
+        Route::get('/report-gi', [\App\Http\Controllers\ReportGiController::class, 'index'])->name('report-gi.index');
+        Route::get('/report-gi/chemicals/{type}/{barcode}', [\App\Http\Controllers\ReportGiController::class, 'getChemicalDetails'])->name('report-gi.chemicals');
     });
 });
 

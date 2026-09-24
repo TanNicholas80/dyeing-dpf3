@@ -71,6 +71,7 @@
                                             'kepala_shift' => 'Kepala Shift',
                                             'spv_listrik' => 'SPV Listrik',
                                             'scm' => 'SCM',
+                                            'adm_prod' => 'Admin Produksi',
                                         ];
                                     @endphp
                                     @foreach ($roles as $value => $label)

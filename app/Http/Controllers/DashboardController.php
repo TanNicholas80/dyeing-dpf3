@@ -188,11 +188,11 @@ class DashboardController extends Controller
 
         // Ambil role user dan permission untuk optimasi (hindari checking di view)
         $userRole = $user ? $user->role : null;
-        $canCancelBarcode = !in_array($userRole, ['ds', 'mesin', 'vp', 'fm', 'owner', 'scm']);
+        $canCancelBarcode = !in_array($userRole, ['ds', 'mesin', 'vp', 'fm', 'owner', 'scm', 'adm_prod']);
 
-        $cantModifyStructure = in_array($userRole, ['fm', 'vp', 'ds', 'mesin', 'owner', 'scm']);
+        $cantModifyStructure = in_array($userRole, ['fm', 'vp', 'ds', 'mesin', 'owner', 'scm', 'adm_prod']);
 
-        $cantScan = in_array($userRole, ['fm', 'vp', 'ds', 'owner', 'scm']);
+        $cantScan = in_array($userRole, ['fm', 'vp', 'ds', 'owner', 'scm', 'adm_prod']);
         $canAddProses = !$cantModifyStructure;
         $canEditProses = in_array($userRole, ['super_admin', 'ppic'], true);
         $canDeleteProses = in_array($userRole, ['super_admin', 'ppic'], true);
@@ -410,8 +410,8 @@ class DashboardController extends Controller
 
         $user = $request->user();
         $userRole = $user ? $user->role : null;
-        $cantModifyStructure = in_array($userRole, ['operator', 'mesin', 'scm']);
-        $cantScan = in_array($userRole, ['dashboard', 'scm']);
+        $cantModifyStructure = in_array($userRole, ['operator', 'mesin', 'scm', 'adm_prod']);
+        $cantScan = in_array($userRole, ['dashboard', 'scm', 'adm_prod']);
 
         $canCancelBarcode = in_array($userRole, ['super_admin', 'ppic', 'kepala_shift']);
         $canAddProses = !$cantModifyStructure;

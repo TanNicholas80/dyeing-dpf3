@@ -11087,6 +11087,37 @@
                 document.addEventListener('MSFullscreenChange', handleResize);
             }, 1500);
         });
+
+        // Auto-open modal detail proses jika diarahkan dari halaman lain (seperti Report GI)
+        $(document).ready(function () {
+            const urlParams = new URLSearchParams(window.location.search);
+            const openProsesId = urlParams.get('open_proses_id');
+            const detailId = urlParams.get('detail_id');
+
+            if (openProsesId) {
+                setTimeout(function () {
+                    const $card = $(`.status-card[data-proses-id="${openProsesId}"]`);
+                    if ($card.length) {
+                        // Jika card berada di tab history atau wrapper history tertutup
+                        if ($card.hasClass('history-card') || $card.closest('.proses-history-container').length) {
+                            if ($('#mode-history-btn').length) {
+                                $('#mode-history-btn').trigger('click');
+                            }
+                            $card.closest('.proses-history-container').show();
+                        }
+                        $('html, body').animate({ scrollTop: $card.offset().top - 120 }, 400);
+
+                        // Trigger dblclick pada baris OP tertentu jika ada detailId, atau card
+                        const $targetRow = detailId ? $card.find(`.op-row[data-detail-id="${detailId}"]`) : $card.find('.op-row').first();
+                        if ($targetRow.length) {
+                            $targetRow.trigger('dblclick');
+                        } else {
+                            $card.trigger('dblclick');
+                        }
+                    }
+                }, 700);
+            }
+        });
     </script>
 
 @endsection

@@ -153,6 +153,7 @@
                             $canDyeStuff = in_array($role, ['super_admin', 'ds', 'dye_stuff', 'ppic', 'scm', 'kepala_regu', 'kepala_ruangan', 'operator']);
                             $canLog = in_array($role, ['super_admin', 'fm', 'vp']);
                             $canAbsen = in_array($role, ['super_admin', 'fm']);
+                            $canReportGi = in_array($role, ['super_admin', 'ppic', 'adm_prod', 'scm']);
                         @endphp
 
                         @if ($canDashboard)
@@ -235,6 +236,12 @@
                         @if ($canAbsen)
                             <li class="nav-item">
                                 <a href="{{ route('absen.index') }}" class="nav-link" title="Absen & Delegasi">Absen</a>
+                            </li>
+                        @endif
+
+                        @if ($canReportGi)
+                            <li class="nav-item">
+                                <a href="{{ route('report-gi.index') }}" class="nav-link {{ request()->routeIs('report-gi.*') ? 'active' : '' }}" title="Report GI">Report GI</a>
                             </li>
                         @endif
                     </ul>
