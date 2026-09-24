@@ -27,6 +27,9 @@
     #table-modal-chemical td, #table-modal-chemical th {
         vertical-align: middle !important;
     }
+    .card-header::after {
+        display: none !important;
+    }
 </style>
 @endpush
 
@@ -216,9 +219,11 @@
                     <h3 class="card-title font-weight-bold text-dark mb-0">
                         <i class="fas fa-table mr-2 text-primary"></i>Data Transaksi Goods Issue
                     </h3>
-                    <span class="badge badge-light border px-2 py-1" style="font-size: 13px;">
-                        Total: <strong>{{ number_format($records->total(), 0, ',', '.') }}</strong> Data
-                    </span>
+                    <div class="card-tools ml-auto">
+                        <span class="badge badge-light border px-2 py-1" style="font-size: 13px;">
+                            Total: <strong>{{ number_format($records->total(), 0, ',', '.') }}</strong> Data
+                        </span>
+                    </div>
                 </div>
                 <div class="card-body p-0 table-responsive">
                     <table class="table table-hover table-striped align-middle mb-0 text-nowrap">
