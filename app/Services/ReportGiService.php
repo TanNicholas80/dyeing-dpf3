@@ -32,7 +32,10 @@ class ReportGiService
                     'barcode_kain.barcode',
                     'barcode_kain.no_op',
                     'barcode_kain.no_partai',
-                    'detail_proses.konstruksi as konstruksi',
+                    DB::raw("COALESCE(
+                        NULLIF(detail_proses.konstruksi, ''),
+                        (SELECT dp_sub.konstruksi FROM detail_proses dp_sub WHERE dp_sub.no_op = barcode_kain.no_op AND dp_sub.konstruksi IS NOT NULL AND dp_sub.konstruksi != '' LIMIT 1)
+                    ) as konstruksi"),
                     DB::raw("CAST(COALESCE(barcode_kain.qty_gi, 0) AS DECIMAL(15,4)) as qty"),
                     DB::raw("'KG' as uom"),
                     DB::raw("CASE WHEN proses.mode = 'finish' THEN 'Finish' ELSE 'Greige' END as jenis"),
@@ -62,7 +65,7 @@ class ReportGiService
                     $q->whereRaw("LOWER(barcode_kain.no_op) LIKE ?", ["%{$searchLower}%"])
                       ->orWhereRaw("LOWER(barcode_kain.no_partai) LIKE ?", ["%{$searchLower}%"])
                       ->orWhereRaw("LOWER(barcode_kain.barcode) LIKE ?", ["%{$searchLower}%"])
-                      ->orWhereRaw("LOWER(detail_proses.konstruksi) LIKE ?", ["%{$searchLower}%"]);
+                      ->orWhereRaw("LOWER(COALESCE(detail_proses.konstruksi, '')) LIKE ?", ["%{$searchLower}%"]);
                 });
             }
 
@@ -80,7 +83,11 @@ class ReportGiService
                     'barcode_la.barcode',
                     'barcode_la.no_op',
                     'barcode_la.no_partai',
-                    'detail_proses.konstruksi as konstruksi',
+                    DB::raw("COALESCE(
+                        NULLIF(detail_proses.konstruksi, ''),
+                        (SELECT td_sub.fabric_name FROM ticket_details td_sub WHERE td_sub.id_no = barcode_la.barcode AND td_sub.fabric_name IS NOT NULL AND td_sub.fabric_name != '' LIMIT 1),
+                        (SELECT dp_sub.konstruksi FROM detail_proses dp_sub WHERE dp_sub.no_op = barcode_la.no_op AND dp_sub.konstruksi IS NOT NULL AND dp_sub.konstruksi != '' LIMIT 1)
+                    ) as konstruksi"),
                     DB::raw("CAST((SELECT COALESCE(SUM(actual_wt), 0) FROM ticket_details WHERE ticket_details.id_no = barcode_la.barcode) AS DECIMAL(15,4)) as qty"),
                     DB::raw("'Gram' as uom"),
                     DB::raw("CASE WHEN barcode_la.approval_id IS NOT NULL THEN 'Topping Dye Stuff' ELSE 'Dye Stuff' END as jenis"),
@@ -110,7 +117,13 @@ class ReportGiService
                     $q->whereRaw("LOWER(barcode_la.no_op) LIKE ?", ["%{$searchLower}%"])
                       ->orWhereRaw("LOWER(barcode_la.no_partai) LIKE ?", ["%{$searchLower}%"])
                       ->orWhereRaw("LOWER(barcode_la.barcode) LIKE ?", ["%{$searchLower}%"])
-                      ->orWhereRaw("LOWER(detail_proses.konstruksi) LIKE ?", ["%{$searchLower}%"]);
+                      ->orWhereRaw("LOWER(COALESCE(detail_proses.konstruksi, '')) LIKE ?", ["%{$searchLower}%"])
+                      ->orWhereExists(function ($sub) use ($searchLower) {
+                          $sub->select(DB::raw(1))
+                              ->from('ticket_details')
+                              ->whereColumn('ticket_details.id_no', 'barcode_la.barcode')
+                              ->whereRaw("LOWER(ticket_details.fabric_name) LIKE ?", ["%{$searchLower}%"]);
+                      });
                 });
             }
 
@@ -129,7 +142,11 @@ class ReportGiService
                     'barcode_aux.barcode',
                     'barcode_aux.no_op',
                     'barcode_aux.no_partai',
-                    'detail_proses.konstruksi as konstruksi',
+                    DB::raw("COALESCE(
+                        NULLIF(detail_proses.konstruksi, ''),
+                        NULLIF(auxls.konstruksi, ''),
+                        (SELECT dp_sub.konstruksi FROM detail_proses dp_sub WHERE dp_sub.no_op = barcode_aux.no_op AND dp_sub.konstruksi IS NOT NULL AND dp_sub.konstruksi != '' LIMIT 1)
+                    ) as konstruksi"),
                     DB::raw("CAST(COALESCE(auxls.total_wt, 0) AS DECIMAL(15,4)) as qty"),
                     DB::raw("'KG' as uom"),
                     DB::raw("CASE WHEN barcode_aux.approval_id IS NOT NULL THEN 'Topping Aux' ELSE 'Aux' END as jenis"),
@@ -159,7 +176,8 @@ class ReportGiService
                     $q->whereRaw("LOWER(barcode_aux.no_op) LIKE ?", ["%{$searchLower}%"])
                       ->orWhereRaw("LOWER(barcode_aux.no_partai) LIKE ?", ["%{$searchLower}%"])
                       ->orWhereRaw("LOWER(barcode_aux.barcode) LIKE ?", ["%{$searchLower}%"])
-                      ->orWhereRaw("LOWER(detail_proses.konstruksi) LIKE ?", ["%{$searchLower}%"]);
+                      ->orWhereRaw("LOWER(COALESCE(detail_proses.konstruksi, '')) LIKE ?", ["%{$searchLower}%"])
+                      ->orWhereRaw("LOWER(COALESCE(auxls.konstruksi, '')) LIKE ?", ["%{$searchLower}%"]);
                 });
             }
 

@@ -296,10 +296,21 @@
                                     <td>
                                         <div class="d-flex align-items-center">
                                             <code class="text-primary font-weight-bold mr-2" style="font-size: 13px; font-family: Consolas, monospace;">{{ $row->barcode }}</code>
-                                            <button type="button" class="btn btn-xs btn-outline-secondary btn-copy"
+                                            <button type="button" class="btn btn-xs btn-outline-secondary btn-copy mr-2"
                                                 data-clipboard="{{ $row->barcode }}" title="Salin Barcode" style="padding: 1px 5px; font-size: 10px;">
                                                 <i class="far fa-copy"></i>
                                             </button>
+
+                                            @if ($row->source_type !== 'kain')
+                                                <button type="button"
+                                                    class="btn btn-xs btn-outline-info btn-toggle-expand py-0 px-2 shadow-none font-weight-bold"
+                                                    data-target="#row-expand-{{ $loop->iteration }}"
+                                                    data-type="{{ $row->source_type }}"
+                                                    data-barcode="{{ $row->barcode }}"
+                                                    title="Buka / Tutup Rincian Bahan Kimia Langsung">
+                                                    <i class="fas fa-chevron-down mr-1 expand-icon"></i><span class="expand-text">Rincian</span>
+                                                </button>
+                                            @endif
                                         </div>
                                     </td>
 
@@ -331,38 +342,37 @@
                                         @endif
                                     </td>
 
-                                    {{-- 11. Aksi --}}
+                                    {{-- 11. Aksi (Semua jenis menggunakan Button Detail mengarah ke Dashboard Detail Proses) --}}
                                     <td class="text-center">
-                                        @if ($row->source_type === 'kain')
-                                            {{-- Greige & Finish: Direct Redirect ke Dashboard Detail Proses --}}
-                                            <a href="{{ route('dashboard', ['open_proses_id' => $row->proses_id, 'detail_id' => $row->detail_proses_id]) }}"
-                                                class="btn btn-sm btn-outline-primary py-1 px-2 shadow-sm"
-                                                title="Lihat Detail Proses di Dashboard">
-                                                <i class="fas fa-external-link-alt mr-1"></i>Detail
-                                            </a>
-                                        @else
-                                            {{-- Dye Stuff, Topping Dyes, Aux, Topping Aux: Modal List Kimia --}}
-                                            <button type="button"
-                                                class="btn btn-sm btn-outline-info py-1 px-2 shadow-sm btn-show-chemical"
-                                                data-toggle="modal"
-                                                data-target="#modalChemicalDetails"
-                                                data-type="{{ $row->source_type }}"
-                                                data-barcode="{{ $row->barcode }}"
-                                                data-jenis="{{ $row->jenis }}"
-                                                data-op="{{ $row->no_op }}"
-                                                data-partai="{{ $row->no_partai }}"
-                                                data-konstruksi="{{ $row->konstruksi }}"
-                                                data-qty="{{ number_format((float) $row->qty, 2, ',', '.') }}"
-                                                data-uom="{{ $row->uom }}"
-                                                data-tanggal="{{ \Carbon\Carbon::parse($row->tanggal_gi)->format('d/m/Y H:i') }}"
-                                                data-proses-id="{{ $row->proses_id }}"
-                                                data-detail-id="{{ $row->detail_proses_id }}"
-                                                title="Lihat Rincian Kimia">
-                                                <i class="fas fa-flask mr-1"></i>Detail Kimia
-                                            </button>
-                                        @endif
+                                        <a href="{{ route('dashboard', ['open_proses_id' => $row->proses_id, 'detail_id' => $row->detail_proses_id]) }}"
+                                            class="btn btn-sm btn-outline-primary py-1 px-2 shadow-sm"
+                                            title="Lihat Detail Proses di Dashboard">
+                                            <i class="fas fa-external-link-alt mr-1"></i>Detail
+                                        </a>
                                     </td>
                                 </tr>
+
+                                {{-- Baris Expandable untuk Rincian Kimia (Dye Stuff & Aux) di Luar Modal --}}
+                                @if ($row->source_type !== 'kain')
+                                    <tr id="row-expand-{{ $loop->iteration }}" class="row-chemical-expand d-none" style="background-color: #f8fafc;">
+                                        <td colspan="11" class="p-0 border-top-0">
+                                            <div class="expand-content-container p-3 m-2 bg-white rounded border shadow-sm">
+                                                {{-- Loading Indicator --}}
+                                                <div class="chemical-expand-loading text-center py-3 text-muted">
+                                                    <i class="fas fa-spinner fa-spin mr-2 text-info"></i>Memuat rincian bahan kimia untuk barcode <strong class="text-primary font-monospace">{{ $row->barcode }}</strong>...
+                                                </div>
+                                                {{-- Error Alert --}}
+                                                <div class="chemical-expand-error alert alert-danger d-none py-2 px-3 small mb-0">
+                                                    <i class="fas fa-exclamation-triangle mr-1"></i>Gagal mengambil rincian bahan kimia. Silakan klik tombol "Rincian" kembali.
+                                                </div>
+                                                {{-- Content Body (Hasil AJAX) --}}
+                                                <div class="chemical-expand-body d-none">
+                                                    {{-- Diisi secara dinamis via JavaScript --}}
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                @endif
                             @empty
                                 <tr>
                                     <td colspan="11" class="text-center py-5 text-muted">
@@ -540,6 +550,189 @@
                         title: 'Barcode disalin: ' + textToCopy,
                         timer: 2000
                     });
+                }
+            });
+        });
+
+        // Handler Expandable Inline Rincian Kimia (Dye Stuff & Aux)
+        $(document).on('click', '.btn-toggle-expand', function () {
+            const $btn = $(this);
+            const targetId = $btn.data('target');
+            const $targetRow = $(targetId);
+            const $icon = $btn.find('.expand-icon');
+            const $text = $btn.find('.expand-text');
+            const type = $btn.data('type');
+            const barcode = $btn.data('barcode');
+
+            // Jika sedang terbuka, tutup
+            if (!$targetRow.hasClass('d-none')) {
+                $targetRow.addClass('d-none');
+                $icon.removeClass('fa-chevron-up').addClass('fa-chevron-down');
+                $text.text('Rincian');
+                $btn.removeClass('btn-info text-white').addClass('btn-outline-info');
+                return;
+            }
+
+            // Buka baris target
+            $targetRow.removeClass('d-none');
+            $icon.removeClass('fa-chevron-down').addClass('fa-chevron-up');
+            $text.text('Tutup');
+            $btn.removeClass('btn-outline-info').addClass('btn-info text-white');
+
+            // Jika data sudah pernah di-load untuk barcode ini, tidak perlu request ulang
+            if ($targetRow.data('loaded')) {
+                return;
+            }
+
+            const $loading = $targetRow.find('.chemical-expand-loading');
+            const $error = $targetRow.find('.chemical-expand-error');
+            const $content = $targetRow.find('.chemical-expand-body');
+
+            $loading.removeClass('d-none');
+            $error.addClass('d-none');
+            $content.addClass('d-none').empty();
+
+            const requestUrl = `{{ url('report-gi/chemicals') }}/${type}/${encodeURIComponent(barcode)}`;
+            $.ajax({
+                url: requestUrl,
+                method: 'GET',
+                dataType: 'json',
+                success: function (res) {
+                    $loading.addClass('d-none');
+                    if (res.status === 'success' && res.items) {
+                        $targetRow.data('loaded', true);
+                        $content.removeClass('d-none');
+
+                        if (type === 'la') {
+                            const totalTarget = res.total_target_wt !== undefined ? parseFloat(res.total_target_wt) : 0;
+                            const totalActual = res.total_actual_wt !== undefined ? parseFloat(res.total_actual_wt) : 0;
+                            const totalDiff = totalActual - totalTarget;
+                            const totalDiffText = totalDiff > 0 ? ('+' + totalDiff.toFixed(2)) : totalDiff.toFixed(2);
+                            const totalDiffBadge = Math.abs(totalDiff) > 0.05 ? 'badge-warning text-dark' : 'badge-success text-white';
+
+                            let tableRows = '';
+                            if (res.items.length === 0) {
+                                tableRows = `<tr><td colspan="7" class="text-center text-muted py-3">Tidak ada data penimbangan kimia pada barcode ini.</td></tr>`;
+                            } else {
+                                res.items.forEach(function (item, idx) {
+                                    const target = item.target_wt !== null ? parseFloat(item.target_wt) : 0;
+                                    const actual = item.actual_wt !== null ? parseFloat(item.actual_wt) : 0;
+                                    const diff = actual - target;
+                                    const diffText = diff > 0 ? ('+' + diff.toFixed(2)) : diff.toFixed(2);
+                                    const diffClass = Math.abs(diff) > 0.05 ? 'text-warning font-weight-bold' : 'text-success font-weight-bold';
+
+                                    let dateDisplay = '-';
+                                    if (item.comp_date) {
+                                        const dStr = String(item.comp_date).trim();
+                                        if (dStr.length === 8) {
+                                            dateDisplay = `${dStr.substring(6, 8)}/${dStr.substring(4, 6)}/${dStr.substring(0, 4)}`;
+                                        } else {
+                                            dateDisplay = dStr;
+                                        }
+                                    }
+                                    let timeDisplay = item.comp_time ? String(item.comp_time).trim() : '';
+                                    if (timeDisplay.length >= 5) {
+                                        timeDisplay = timeDisplay.substring(0, 5);
+                                    }
+                                    const fullTime = (dateDisplay !== '-' || timeDisplay !== '') ? `${dateDisplay} ${timeDisplay}`.trim() : '-';
+
+                                    tableRows += `
+                                        <tr>
+                                            <td class="text-center font-weight-bold text-muted">${item.step_no !== null ? item.step_no : (idx + 1)}</td>
+                                            <td><code class="text-dark font-weight-bold">${item.product_code || '-'}</code></td>
+                                            <td class="font-weight-bold text-dark">${item.product_name || '-'}</td>
+                                            <td class="text-right">${target.toFixed(2)}</td>
+                                            <td class="text-right font-weight-bold text-primary">${actual.toFixed(2)}</td>
+                                            <td class="text-right ${diffClass}">${diffText}</td>
+                                            <td class="text-center small text-muted"><i class="far fa-clock mr-1"></i>${fullTime}</td>
+                                        </tr>
+                                    `;
+                                });
+                            }
+
+                            $content.html(`
+                                <div class="d-flex flex-wrap justify-content-between align-items-center mb-2 pb-2 border-bottom">
+                                    <div class="d-flex align-items-center">
+                                        <span class="badge badge-info mr-2 px-2 py-1"><i class="fas fa-palette mr-1"></i>Rincian Resep Dye Stuff</span>
+                                        <span class="small text-muted">Total: <strong>${res.count}</strong> Komponen Bahan</span>
+                                    </div>
+                                    <div class="d-flex flex-wrap align-items-center" style="gap: 12px;">
+                                        <span class="small">Target WT: <strong>${totalTarget.toFixed(2)} Gram</strong></span>
+                                        <span class="small">Actual WT: <strong class="text-primary">${totalActual.toFixed(2)} Gram</strong></span>
+                                        <span class="badge ${totalDiffBadge} px-2 py-1" style="font-size: 11.5px;">Selisih: ${totalDiffText} Gram</span>
+                                    </div>
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-bordered table-hover mb-0" style="font-size: 12px;">
+                                        <thead class="thead-light">
+                                            <tr>
+                                                <th style="width: 50px;" class="text-center">Step</th>
+                                                <th style="width: 140px;">Kode Produk</th>
+                                                <th>Nama Bahan Kimia (Dyes)</th>
+                                                <th style="width: 120px;" class="text-right">Target (Gr)</th>
+                                                <th style="width: 120px;" class="text-right">Actual (Gr)</th>
+                                                <th style="width: 110px;" class="text-right">Selisih</th>
+                                                <th style="width: 160px;" class="text-center">Waktu Timbang</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${tableRows}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            `);
+                        } else if (type === 'aux') {
+                            let tableRows = '';
+                            if (res.items.length === 0) {
+                                tableRows = `<tr><td colspan="3" class="text-center text-muted py-3">Tidak ada detail item auxiliary pada barcode ini.</td></tr>`;
+                            } else {
+                                res.items.forEach(function (detail, idx) {
+                                    tableRows += `
+                                        <tr>
+                                            <td class="text-center font-weight-bold text-muted">${idx + 1}</td>
+                                            <td class="font-weight-bold text-dark">${detail.auxiliary || '-'}</td>
+                                            <td class="text-right font-weight-bold text-primary">${detail.konsentrasi !== null ? detail.konsentrasi : '-'}</td>
+                                        </tr>
+                                    `;
+                                });
+                            }
+
+                            $content.html(`
+                                <div class="d-flex flex-wrap justify-content-between align-items-center mb-2 pb-2 border-bottom">
+                                    <div class="d-flex align-items-center">
+                                        <span class="badge badge-success mr-2 px-2 py-1"><i class="fas fa-flask mr-1"></i>Rincian Resep Auxiliaries</span>
+                                        <span class="small text-muted">Total: <strong>${res.count}</strong> Item Kimia</span>
+                                    </div>
+                                    <div class="d-flex flex-wrap align-items-center" style="gap: 15px;">
+                                        <span class="small">Volume: <strong>${res.volume_litres || '-'} L</strong></span>
+                                        <span class="small">Liquor Ratio: <strong>1:${res.liquor_ratio || '-'}</strong></span>
+                                        <span class="small">Warna: <strong>${res.color || '-'}</strong></span>
+                                        <span class="badge badge-success px-2 py-1" style="font-size: 11.5px;">Total WT: ${res.total_wt ? parseFloat(res.total_wt).toFixed(2) : '0.00'} KG</span>
+                                    </div>
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-bordered table-hover mb-0" style="font-size: 12px;">
+                                        <thead class="thead-light">
+                                            <tr>
+                                                <th style="width: 50px;" class="text-center">#</th>
+                                                <th>Nama Auxiliary</th>
+                                                <th style="width: 180px;" class="text-right">Konsentrasi</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${tableRows}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            `);
+                        }
+                    } else {
+                        $error.removeClass('d-none').text(res.message || 'Gagal mengambil rincian bahan kimia.');
+                    }
+                },
+                error: function () {
+                    $loading.addClass('d-none');
+                    $error.removeClass('d-none').text('Terjadi kesalahan koneksi saat memuat rincian bahan kimia.');
                 }
             });
         });
