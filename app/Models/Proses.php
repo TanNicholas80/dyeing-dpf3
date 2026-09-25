@@ -211,7 +211,7 @@ class Proses extends Model
             'cycle_time_actual' => $this->cycle_time_actual,
             'mulai' => $this->mulai,
             'selesai' => $this->selesai,
-            'mesin_id' => $this->mesin->jenis_mesin,
+            'mesin_id' => $this->mesin?->jenis_mesin ?? ($this->mesin_id ? 'Mesin ' . $this->mesin_id : null),
             'order' => $this->order,
         ];
 

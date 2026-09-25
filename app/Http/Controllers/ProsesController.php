@@ -3159,109 +3159,137 @@ class ProsesController extends Controller
         $requestedAction = $request->input('action');
         $isDeactivate = ($requestedAction === 'deactivate') || ($proses->is_break && $requestedAction !== 'activate');
 
-        if ($isDeactivate) {
-            // Nonaktifkan Break (Sinyal Address 103 -> 0)
+        try {
+            if ($isDeactivate) {
+                // Nonaktifkan Break (Sinyal Address 103 -> 0)
+                $now = now();
+                $breakDuration = 0;
+
+                // Tutup sesi log break yang sedang aktif
+                $openHistory = \App\Models\BreakHistory::where('proses_id', $proses->id)
+                    ->whereNull('selesai_at')
+                    ->latest('break_at')
+                    ->first();
+                if ($openHistory) {
+                    $openHistory->update([
+                        'selesai_at' => $now,
+                        'selesai_by' => Auth::id(),
+                    ]);
+                    $breakDuration = $openHistory->break_at ? abs($now->diffInSeconds(\Carbon\Carbon::parse($openHistory->break_at))) : 0;
+                } elseif ($proses->break_at) {
+                    $breakDuration = abs($now->diffInSeconds(\Carbon\Carbon::parse($proses->break_at)));
+                }
+
+                // Update proses: matikan flag break, catat total_break_seconds, dan sesuaikan waktu mulai
+                $proses->is_break = false;
+                $proses->total_break_seconds = ((int) ($proses->total_break_seconds ?? 0)) + $breakDuration;
+                if ($breakDuration > 0 && $proses->mulai) {
+                    // Geser mulai maju sebesar durasi break agar cycle time actual tidak menghitung waktu break
+                    $proses->mulai = \Carbon\Carbon::parse($proses->mulai)->addSeconds($breakDuration);
+                }
+                $proses->break_alasan = null;
+                $proses->break_at = null;
+                $proses->break_by = null;
+                $proses->save();
+
+                Cache::forget("iot:mesin:{$proses->mesin_id}:alarm_result");
+                Cache::forget("iot:mesin:{$proses->mesin_id}:alarm_on_state");
+
+                $proses->refresh();
+                $proses->load(['mesin', 'approvals', 'details.barcodeKains', 'details.barcodeLas', 'details.barcodeAuxs']);
+                $statusService = new \App\Services\ProsesStatusService();
+                $affectedProsesIds = $statusService->getAffectedProsesIds();
+                $statusData = $statusService->generateProsesStatus($proses, $affectedProsesIds);
+
+                try {
+                    event(new \App\Events\ProsesStatusUpdated($proses->id, $statusData));
+                } catch (\Throwable $eventEx) {
+                    Log::warning('Gagal broadcast ProsesStatusUpdated saat deactivate break: ' . $eventEx->getMessage());
+                }
+
+                $successMessage = 'Break proses berhasil dinonaktifkan. Proses dilanjutkan.';
+
+                if ($request->ajax() || $request->wantsJson()) {
+                    return response()->json([
+                        'status' => 'success',
+                        'is_break' => false,
+                        'message' => $successMessage,
+                        'redirect' => route('dashboard', ['page' => $page])
+                    ]);
+                }
+
+                return redirect()->route('dashboard', ['page' => $page])->with('success', $successMessage);
+            }
+
+            // Aktifkan Break: Alasan Wajib Diisi! (Sinyal Address 103 -> 1)
+            $request->validate([
+                'alasan' => 'required|string|max:500',
+            ], [
+                'alasan.required' => 'Alasan break wajib diisi.',
+                'alasan.max' => 'Alasan break maksimal 500 karakter.',
+            ]);
+
             $now = now();
-            $breakDuration = 0;
-
-            // Tutup sesi log break yang sedang aktif
-            $openHistory = \App\Models\BreakHistory::where('proses_id', $proses->id)
-                ->whereNull('selesai_at')
-                ->latest('break_at')
-                ->first();
-            if ($openHistory) {
-                $openHistory->update([
-                    'selesai_at' => $now,
-                    'selesai_by' => Auth::id(),
-                ]);
-                $breakDuration = abs($now->diffInSeconds($openHistory->break_at));
-            } elseif ($proses->break_at) {
-                $breakDuration = abs($now->diffInSeconds($proses->break_at));
-            }
-
-            // Update proses: matikan flag break, catat total_break_seconds, dan sesuaikan waktu mulai
-            $proses->is_break = false;
-            $proses->total_break_seconds = ((int) ($proses->total_break_seconds ?? 0)) + $breakDuration;
-            if ($breakDuration > 0 && $proses->mulai) {
-                // Geser mulai maju sebesar durasi break agar cycle time actual tidak menghitung waktu break
-                $proses->mulai = \Carbon\Carbon::parse($proses->mulai)->addSeconds($breakDuration);
-            }
-            $proses->break_alasan = null;
-            $proses->break_at = null;
-            $proses->break_by = null;
+            $proses->is_break = true;
+            $proses->break_alasan = $request->alasan;
+            $proses->break_at = $now;
+            $proses->break_by = Auth::id();
             $proses->save();
+
+            // Buat record baru di tabel riwayat break
+            \App\Models\BreakHistory::create([
+                'proses_id' => $proses->id,
+                'mesin_id' => $proses->mesin_id,
+                'alasan' => $request->alasan,
+                'break_at' => $now,
+                'break_by' => Auth::id(),
+            ]);
 
             Cache::forget("iot:mesin:{$proses->mesin_id}:alarm_result");
             Cache::forget("iot:mesin:{$proses->mesin_id}:alarm_on_state");
 
             $proses->refresh();
-            $proses->load(['approvals', 'details.barcodeKains', 'details.barcodeLas', 'details.barcodeAuxs']);
+            $proses->load(['mesin', 'approvals', 'details.barcodeKains', 'details.barcodeLas', 'details.barcodeAuxs']);
             $statusService = new \App\Services\ProsesStatusService();
             $affectedProsesIds = $statusService->getAffectedProsesIds();
             $statusData = $statusService->generateProsesStatus($proses, $affectedProsesIds);
-            event(new \App\Events\ProsesStatusUpdated($proses->id, $statusData));
 
-            $successMessage = 'Break proses berhasil dinonaktifkan. Proses dilanjutkan.';
+            try {
+                event(new \App\Events\ProsesStatusUpdated($proses->id, $statusData));
+            } catch (\Throwable $eventEx) {
+                Log::warning('Gagal broadcast ProsesStatusUpdated saat activate break: ' . $eventEx->getMessage());
+            }
+
+            $successMessage = 'Break proses berhasil diaktifkan. Mesin dihentikan sementara.';
 
             if ($request->ajax() || $request->wantsJson()) {
                 return response()->json([
                     'status' => 'success',
-                    'is_break' => false,
+                    'is_break' => true,
                     'message' => $successMessage,
                     'redirect' => route('dashboard', ['page' => $page])
                 ]);
             }
 
-            return redirect()->route('dashboard', ['page' => $page])->with('success', $successMessage);
-        }
+            return redirect()->route('dashboard', ['page' => $page])
+                ->with('success', $successMessage);
 
-        // Aktifkan Break: Alasan Wajib Diisi! (Sinyal Address 103 -> 1)
-        $request->validate([
-            'alasan' => 'required|string|max:500',
-        ], [
-            'alasan.required' => 'Alasan break wajib diisi.',
-            'alasan.max' => 'Alasan break maksimal 500 karakter.',
-        ]);
-
-        $now = now();
-        $proses->is_break = true;
-        $proses->break_alasan = $request->alasan;
-        $proses->break_at = $now;
-        $proses->break_by = Auth::id();
-        $proses->save();
-
-        // Buat record baru di tabel riwayat break
-        \App\Models\BreakHistory::create([
-            'proses_id' => $proses->id,
-            'mesin_id' => $proses->mesin_id,
-            'alasan' => $request->alasan,
-            'break_at' => $now,
-            'break_by' => Auth::id(),
-        ]);
-
-        Cache::forget("iot:mesin:{$proses->mesin_id}:alarm_result");
-        Cache::forget("iot:mesin:{$proses->mesin_id}:alarm_on_state");
-
-        $proses->refresh();
-        $proses->load(['approvals', 'details.barcodeKains', 'details.barcodeLas', 'details.barcodeAuxs']);
-        $statusService = new \App\Services\ProsesStatusService();
-        $affectedProsesIds = $statusService->getAffectedProsesIds();
-        $statusData = $statusService->generateProsesStatus($proses, $affectedProsesIds);
-        event(new \App\Events\ProsesStatusUpdated($proses->id, $statusData));
-
-        $successMessage = 'Break proses berhasil diaktifkan. Mesin dihentikan sementara.';
-
-        if ($request->ajax() || $request->wantsJson()) {
-            return response()->json([
-                'status' => 'success',
-                'is_break' => true,
-                'message' => $successMessage,
-                'redirect' => route('dashboard', ['page' => $page])
+        } catch (\Throwable $e) {
+            Log::error("Gagal toggle break proses [ID: {$id}]: " . $e->getMessage(), [
+                'exception' => $e,
+                'trace' => $e->getTraceAsString(),
             ]);
-        }
 
-        return redirect()->route('dashboard', ['page' => $page])
-            ->with('success', $successMessage);
+            $errorMsg = 'Gagal memproses break proses: ' . $e->getMessage();
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => $errorMsg
+                ], 500);
+            }
+
+            return back()->with('error', $errorMsg);
+        }
     }
 
     // Swap posisi dua proses di mesin yang sama
@@ -4352,74 +4380,85 @@ class ProsesController extends Controller
             ], 403);
         }
 
-        $proses = Proses::findOrFail($id);
-        $histories = \App\Models\BreakHistory::with(['userBreak', 'userSelesai'])
-            ->where('proses_id', $proses->id)
-            ->orderBy('break_at', 'asc')
-            ->get();
+        try {
+            $proses = Proses::findOrFail($id);
+            $histories = \App\Models\BreakHistory::with(['userBreak', 'userSelesai'])
+                ->where('proses_id', $proses->id)
+                ->orderBy('break_at', 'asc')
+                ->get();
 
-        $data = $histories->map(function ($item) {
-            $breakAt = $item->break_at;
-            $selesaiAt = $item->selesai_at;
-            $durasiFormatted = '-';
+            $data = $histories->map(function ($item) {
+                $breakAt = $item->break_at ? \Carbon\Carbon::parse($item->break_at) : null;
+                $selesaiAt = $item->selesai_at ? \Carbon\Carbon::parse($item->selesai_at) : null;
+                $durasiFormatted = '-';
 
-            if ($breakAt && $selesaiAt) {
-                $diffInSec = $breakAt->diffInSeconds($selesaiAt);
-                $hours = floor($diffInSec / 3600);
-                $minutes = floor(($diffInSec % 3600) / 60);
-                $seconds = $diffInSec % 60;
-                if ($hours > 0) {
-                    $durasiFormatted = "{$hours} jam {$minutes} mnt";
-                } elseif ($minutes > 0) {
-                    $durasiFormatted = "{$minutes} mnt {$seconds} dtk";
-                } else {
-                    $durasiFormatted = "{$seconds} dtk";
+                if ($breakAt && $selesaiAt) {
+                    $diffInSec = abs($breakAt->diffInSeconds($selesaiAt));
+                    $hours = floor($diffInSec / 3600);
+                    $minutes = floor(($diffInSec % 3600) / 60);
+                    $seconds = $diffInSec % 60;
+                    if ($hours > 0) {
+                        $durasiFormatted = "{$hours} jam {$minutes} mnt";
+                    } elseif ($minutes > 0) {
+                        $durasiFormatted = "{$minutes} mnt {$seconds} dtk";
+                    } else {
+                        $durasiFormatted = "{$seconds} dtk";
+                    }
+                } elseif ($breakAt && !$selesaiAt) {
+                    $diffInSec = abs($breakAt->diffInSeconds(now()));
+                    $hours = floor($diffInSec / 3600);
+                    $minutes = floor(($diffInSec % 3600) / 60);
+                    if ($hours > 0) {
+                        $durasiFormatted = "{$hours} jam {$minutes} mnt (Sedang Break)";
+                    } else {
+                        $durasiFormatted = "{$minutes} mnt (Sedang Break)";
+                    }
                 }
-            } elseif ($breakAt && !$selesaiAt) {
-                $diffInSec = $breakAt->diffInSeconds(now());
-                $hours = floor($diffInSec / 3600);
-                $minutes = floor(($diffInSec % 3600) / 60);
-                if ($hours > 0) {
-                    $durasiFormatted = "{$hours} jam {$minutes} mnt (Sedang Break)";
-                } else {
-                    $durasiFormatted = "{$minutes} mnt (Sedang Break)";
-                }
-            }
 
-            return [
-                'id' => $item->id,
-                'proses_id' => $item->proses_id,
-                'alasan' => $item->alasan,
-                'break_at' => $breakAt?->toIso8601String(),
-                'break_at_formatted' => $breakAt?->format('d/m/Y H:i:s'),
-                'selesai_at' => $selesaiAt?->toIso8601String(),
-                'selesai_at_formatted' => $selesaiAt ? $selesaiAt->format('d/m/Y H:i:s') : '-',
-                'durasi' => $durasiFormatted,
-                'user_break' => $item->userBreak ? [
-                    'id' => $item->userBreak->id,
-                    'nama' => $item->userBreak->nama,
-                    'role' => $item->userBreak->role,
-                ] : null,
-                'user_selesai' => $item->userSelesai ? [
-                    'id' => $item->userSelesai->id,
-                    'nama' => $item->userSelesai->nama,
-                    'role' => $item->userSelesai->role,
-                ] : null,
-            ];
-        });
+                return [
+                    'id' => $item->id,
+                    'proses_id' => $item->proses_id,
+                    'alasan' => $item->alasan,
+                    'break_at' => $breakAt?->toIso8601String(),
+                    'break_at_formatted' => $breakAt?->format('d/m/Y H:i:s'),
+                    'selesai_at' => $selesaiAt?->toIso8601String(),
+                    'selesai_at_formatted' => $selesaiAt ? $selesaiAt->format('d/m/Y H:i:s') : '-',
+                    'durasi' => $durasiFormatted,
+                    'user_break' => $item->userBreak ? [
+                        'id' => $item->userBreak->id,
+                        'nama' => $item->userBreak->nama,
+                        'role' => $item->userBreak->role,
+                    ] : null,
+                    'user_selesai' => $item->userSelesai ? [
+                        'id' => $item->userSelesai->id,
+                        'nama' => $item->userSelesai->nama,
+                        'role' => $item->userSelesai->role,
+                    ] : null,
+                ];
+            });
 
-        return response()->json([
-            'status' => 'success',
-            'proses' => [
-                'id' => $proses->id,
-                'jenis' => $proses->jenis,
-                'is_break' => (bool) $proses->is_break,
-                'break_alasan' => $proses->break_alasan,
-                'mesin_nama' => $proses->mesin?->nama ?? ('Mesin ' . $proses->mesin_id),
-            ],
-            'total_sesi' => $data->count(),
-            'data' => $data
-        ]);
+            return response()->json([
+                'status' => 'success',
+                'proses' => [
+                    'id' => $proses->id,
+                    'jenis' => $proses->jenis,
+                    'is_break' => (bool) $proses->is_break,
+                    'break_alasan' => $proses->break_alasan,
+                    'mesin_nama' => $proses->mesin?->nama ?? ('Mesin ' . $proses->mesin_id),
+                ],
+                'total_sesi' => $data->count(),
+                'data' => $data
+            ]);
+        } catch (\Throwable $e) {
+            Log::error("Gagal getBreakHistory [Proses ID: {$id}]: " . $e->getMessage(), [
+                'exception' => $e,
+            ]);
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Gagal memuat riwayat break: ' . $e->getMessage()
+            ], 500);
+        }
     }
 }
 

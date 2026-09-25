@@ -5,6 +5,7 @@ namespace App\Observers;
 use App\Models\Proses;
 use App\Events\ProsesStatusUpdated;
 use App\Services\ProsesStatusService;
+use Illuminate\Support\Facades\Log;
 
 class ProsesObserver
 {
@@ -19,16 +20,20 @@ class ProsesObserver
         
         // Jika ada field yang relevan berubah, broadcast event
         if (array_intersect($relevantFields, $changedFields)) {
-            // Load relasi yang diperlukan
-            $proses->load(['approvals', 'details.barcodeKains', 'details.barcodeLas', 'details.barcodeAuxs']);
-            
-            // Generate status data
-            $statusService = new ProsesStatusService();
-            $affectedProsesIds = $statusService->getAffectedProsesIds();
-            $statusData = $statusService->generateProsesStatus($proses, $affectedProsesIds);
-            
-            // Broadcast event
-            event(new ProsesStatusUpdated($proses->id, $statusData));
+            try {
+                // Load relasi yang diperlukan
+                $proses->load(['mesin', 'approvals', 'details.barcodeKains', 'details.barcodeLas', 'details.barcodeAuxs']);
+                
+                // Generate status data
+                $statusService = new ProsesStatusService();
+                $affectedProsesIds = $statusService->getAffectedProsesIds();
+                $statusData = $statusService->generateProsesStatus($proses, $affectedProsesIds);
+                
+                // Broadcast event
+                event(new ProsesStatusUpdated($proses->id, $statusData));
+            } catch (\Throwable $e) {
+                Log::warning('Gagal broadcast ProsesStatusUpdated dari ProsesObserver [Proses ID: ' . $proses->id . ']: ' . $e->getMessage());
+            }
         }
     }
 }

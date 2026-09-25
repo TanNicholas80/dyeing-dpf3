@@ -85,7 +85,7 @@ class BarcodeLa extends Model
             'barcode' => $this->barcode,
             'matdok' => $this->matdok,
             'item_document' => $this->item_document,
-            'mesin_id' => $this->mesin->jenis_mesin,
+            'mesin_id' => $this->mesin?->jenis_mesin ?? ($this->mesin_id ? 'Mesin ' . $this->mesin_id : null),
             'cancel' => $this->cancel,
         ];
 
