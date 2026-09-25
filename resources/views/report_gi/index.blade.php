@@ -182,7 +182,7 @@
                                 <label class="small font-weight-bold text-muted mb-1">Pencarian</label>
                                 <div class="input-group input-group-sm">
                                     <input type="text" name="search" class="form-control"
-                                        placeholder="Cari No OP / Partai / Barcode..." value="{{ $filters['search'] }}">
+                                        placeholder="Cari No OP / Partai / Konstruksi / Barcode..." value="{{ $filters['search'] }}">
                                     <div class="input-group-append">
                                         <button class="btn btn-primary" type="submit" title="Terapkan Filter">
                                             <i class="fas fa-search"></i>
@@ -230,15 +230,16 @@
                         <thead class="thead-light">
                             <tr style="font-size: 13px;">
                                 <th style="width: 50px;" class="text-center">#</th>
-                                <th style="width: 150px;">Jenis</th>
+                                <th style="width: 140px;">Jenis</th>
                                 <th style="width: 130px;">No OP</th>
-                                <th style="width: 110px;">Partai</th>
+                                <th style="width: 100px;">Partai</th>
+                                <th style="min-width: 140px;">Konstruksi</th>
                                 <th>Barcode</th>
-                                <th style="width: 140px;" class="text-right">Qty</th>
-                                <th style="width: 80px;" class="text-center">UoM</th>
-                                <th style="width: 160px;">Tanggal GI</th>
-                                <th style="width: 90px;" class="text-center">Status</th>
-                                <th style="width: 120px;" class="text-center">Aksi</th>
+                                <th style="width: 130px;" class="text-right">Qty</th>
+                                <th style="width: 75px;" class="text-center">UoM</th>
+                                <th style="width: 150px;">Tanggal GI</th>
+                                <th style="width: 85px;" class="text-center">Status</th>
+                                <th style="width: 110px;" class="text-center">Aksi</th>
                             </tr>
                         </thead>
                         <tbody style="font-size: 13px;">
@@ -286,7 +287,12 @@
                                     {{-- 4. Partai --}}
                                     <td>{{ $row->no_partai ?: '-' }}</td>
 
-                                    {{-- 5. Barcode --}}
+                                    {{-- 5. Konstruksi --}}
+                                    <td>
+                                        <span class="text-dark font-weight-medium">{{ $row->konstruksi ?: '-' }}</span>
+                                    </td>
+
+                                    {{-- 6. Barcode --}}
                                     <td>
                                         <div class="d-flex align-items-center">
                                             <code class="text-primary font-weight-bold mr-2" style="font-size: 13px; font-family: Consolas, monospace;">{{ $row->barcode }}</code>
@@ -297,26 +303,26 @@
                                         </div>
                                     </td>
 
-                                    {{-- 6. Qty --}}
+                                    {{-- 7. Qty --}}
                                     <td class="text-right font-weight-bold text-dark">
                                         {{ number_format((float) $row->qty, 2, ',', '.') }}
                                     </td>
 
-                                    {{-- 7. UoM --}}
+                                    {{-- 8. UoM --}}
                                     <td class="text-center">
                                         <span class="badge badge-light border px-2 py-1" style="font-size: 11px;">
                                             {{ $row->uom }}
                                         </span>
                                     </td>
 
-                                    {{-- 8. Tanggal GI --}}
+                                    {{-- 9. Tanggal GI --}}
                                     <td>
                                         <span class="text-muted" style="font-size: 12.5px;">
                                             <i class="far fa-clock mr-1"></i>{{ \Carbon\Carbon::parse($row->tanggal_gi)->format('d/m/Y H:i') }}
                                         </span>
                                     </td>
 
-                                    {{-- 9. Status --}}
+                                    {{-- 10. Status --}}
                                     <td class="text-center">
                                         @if ($row->is_cancel)
                                             <span class="badge badge-danger px-2 py-1" style="font-size: 11px;">Batal</span>
@@ -325,7 +331,7 @@
                                         @endif
                                     </td>
 
-                                    {{-- 10. Aksi --}}
+                                    {{-- 11. Aksi --}}
                                     <td class="text-center">
                                         @if ($row->source_type === 'kain')
                                             {{-- Greige & Finish: Direct Redirect ke Dashboard Detail Proses --}}
@@ -345,6 +351,7 @@
                                                 data-jenis="{{ $row->jenis }}"
                                                 data-op="{{ $row->no_op }}"
                                                 data-partai="{{ $row->no_partai }}"
+                                                data-konstruksi="{{ $row->konstruksi }}"
                                                 data-qty="{{ number_format((float) $row->qty, 2, ',', '.') }}"
                                                 data-uom="{{ $row->uom }}"
                                                 data-tanggal="{{ \Carbon\Carbon::parse($row->tanggal_gi)->format('d/m/Y H:i') }}"
@@ -358,7 +365,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="10" class="text-center py-5 text-muted">
+                                    <td colspan="11" class="text-center py-5 text-muted">
                                         <div class="py-4">
                                             <i class="fas fa-search fa-3x text-muted mb-3 d-block" style="opacity: 0.5;"></i>
                                             <h5 class="font-weight-bold text-dark">Tidak ada data GI yang ditemukan</h5>
@@ -420,7 +427,7 @@
                                     OP: <span id="modal-info-op">-</span> | Partai: <span id="modal-info-partai">-</span>
                                 </div>
                                 <div class="text-muted small mt-1">
-                                    Total GI: <span class="badge badge-success px-2 py-1" style="font-size: 12px;" id="modal-info-qty">-</span>
+                                    Konstruksi: <span class="font-weight-bold text-dark" id="modal-info-konstruksi">-</span> | Total GI: <span class="badge badge-success px-2 py-1" style="font-size: 12px;" id="modal-info-qty">-</span>
                                 </div>
                             </div>
                         </div>
@@ -545,6 +552,7 @@
             const jenis = $btn.data('jenis');
             const noOp = $btn.data('op') || '-';
             const noPartai = $btn.data('partai') || '-';
+            const konstruksi = $btn.data('konstruksi') || '-';
             const qty = $btn.data('qty') || '-';
             const uom = $btn.data('uom') || '';
             const tanggal = $btn.data('tanggal') || '-';
@@ -556,6 +564,7 @@
             $('#modal-info-jenis').text(jenis);
             $('#modal-info-op').text(noOp);
             $('#modal-info-partai').text(noPartai);
+            $('#modal-info-konstruksi').text(konstruksi);
             $('#modal-info-qty').text(qty + ' ' + uom);
             $('#modal-info-tanggal').text(tanggal);
 
