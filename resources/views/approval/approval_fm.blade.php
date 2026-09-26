@@ -943,7 +943,7 @@
                                                             }
                                                             
                                                             $newOrder1 = $oldOrder2;
-                                                            $newOrder2 = $oldOrder1;
+                                                            $newOrder2 = $oldOrder1 > $oldOrder2 ? ($oldOrder2 + 1) : ($oldOrder2 - 1);
                                                             $affectedCount = is_array($affectedProsesIds) ? count($affectedProsesIds) : 0;
                                                             @endphp
                                                             
@@ -1071,11 +1071,9 @@
                                                                                 foreach ($affectedProses->sortBy('order') as $p) {
                                                                                     if ($p->id == $proses1Id) {
                                                                                         $sortedAfter->push((object)['order' => $newOrder1, 'proses' => $p, 'isMoved' => true]);
-                                                                                    } elseif ($p->id == $proses2Id) {
-                                                                                        $sortedAfter->push((object)['order' => $newOrder2, 'proses' => $p, 'isMoved' => false]);
-                                                                                    } elseif ($oldOrder1 < $oldOrder2 && $p->order > $oldOrder1 && $p->order < $oldOrder2) {
+                                                                                    } elseif ($oldOrder1 > $oldOrder2 && $p->order >= $oldOrder2 && $p->order < $oldOrder1) {
                                                                                         $sortedAfter->push((object)['order' => $p->order + 1, 'proses' => $p, 'isMoved' => false]);
-                                                                                    } elseif ($oldOrder1 > $oldOrder2 && $p->order > $oldOrder2 && $p->order < $oldOrder1) {
+                                                                                    } elseif ($oldOrder1 < $oldOrder2 && $p->order > $oldOrder1 && $p->order <= $oldOrder2) {
                                                                                         $sortedAfter->push((object)['order' => $p->order - 1, 'proses' => $p, 'isMoved' => false]);
                                                                                     } else {
                                                                                         $sortedAfter->push((object)['order' => $p->order, 'proses' => $p, 'isMoved' => false]);

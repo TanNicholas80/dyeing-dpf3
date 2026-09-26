@@ -3529,23 +3529,22 @@ class ProsesController extends Controller
         $affectedOrders = [];
         if ($order1 !== $order2 && $order1 > 0 && $order2 > 0 && isset($affectedProses)) {
             $newOrder1 = $order2; // Proses1 akan pindah ke posisi order2
-            $newOrder2 = $order1; // Proses2 akan pindah ke posisi order1
 
             foreach ($affectedProses as $p) {
                 if ($p->id == $proses1->id) {
                     $affectedOrders[$p->id] = $newOrder1;
-                } elseif ($p->id == $proses2Id) {
-                    $affectedOrders[$p->id] = $newOrder2;
-                } elseif ($order1 < $order2) {
-                    // Proses1 pindah ke bawah (order naik), proses di antara bergeser ke atas (order +1)
-                    if ($p->order > $order1 && $p->order < $order2) {
+                } elseif ($order1 > $order2) {
+                    // Proses1 pindah ke atas (order turun, misal 3 -> 1):
+                    // Proses di antara (dari order2 sampai order1 - 1) bergeser ke bawah (order + 1)
+                    if ($p->order >= $order2 && $p->order < $order1) {
                         $affectedOrders[$p->id] = $p->order + 1;
                     } else {
                         $affectedOrders[$p->id] = $p->order;
                     }
                 } else {
-                    // Proses1 pindah ke atas (order turun), proses di antara bergeser ke bawah (order -1)
-                    if ($p->order > $order2 && $p->order < $order1) {
+                    // Proses1 pindah ke bawah (order naik, misal 1 -> 3):
+                    // Proses di antara (dari order1 + 1 sampai order2) bergeser ke atas (order - 1)
+                    if ($p->order > $order1 && $p->order <= $order2) {
                         $affectedOrders[$p->id] = $p->order - 1;
                     } else {
                         $affectedOrders[$p->id] = $p->order;

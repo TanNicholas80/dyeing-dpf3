@@ -554,6 +554,8 @@ class ApprovalController extends Controller
                     // Jika belum ada order yang jelas, normalisasi dulu berdasarkan ID
                     if ($oldOrder === 0 || $newOrder === 0) {
                         $allProses = Proses::where('mesin_id', $mesinId)
+                            ->whereNull('mulai')
+                            ->whereNull('selesai')
                             ->orderBy('order')
                             ->orderBy('id')
                             ->get();
@@ -581,12 +583,16 @@ class ApprovalController extends Controller
                         if ($newOrder < $oldOrder) {
                             // Contoh: 3 -> 1  => geser 1..2 jadi 2..3
                             Proses::where('mesin_id', $mesinId)
+                                ->whereNull('mulai')
+                                ->whereNull('selesai')
                                 ->where('id', '!=', $proses1->id)
                                 ->whereBetween('order', [$newOrder, $oldOrder - 1])
                                 ->increment('order');
                         } else {
                             // Contoh: 1 -> 3  => geser 2..3 jadi 1..2
                             Proses::where('mesin_id', $mesinId)
+                                ->whereNull('mulai')
+                                ->whereNull('selesai')
                                 ->where('id', '!=', $proses1->id)
                                 ->whereBetween('order', [$oldOrder + 1, $newOrder])
                                 ->decrement('order');

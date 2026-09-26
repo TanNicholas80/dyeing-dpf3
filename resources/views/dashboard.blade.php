@@ -3076,6 +3076,7 @@
             let sourceMesinId = null;
             let targetMesinId = null;
             let dropTargetElement = null; // Simpan elemen target yang tepat di posisi drop
+            let draggedOriginalIndex = -1;
 
             window.initDraggable = function (draggable) {
                 if (draggable.dataset.dragInitialized) return;
@@ -3113,9 +3114,12 @@
                     if (proses && proses.mesin_id) {
                         sourceMesinId = proses.mesin_id;
                     }
+
+                    const activeContainer = draggable.closest('.proses-aktif-container');
+                    const allCards = activeContainer ? [...activeContainer.querySelectorAll('.status-card:not(.history-card)')] : [];
+                    draggedOriginalIndex = allCards.indexOf(draggable);
+
                     // Store original position dan next sibling untuk fallback
-                    // const parent = draggedCard.parentElement;
-                    // draggedCard.setAttribute('data-original-parent', parent.getAttribute('data-mesin-id'));
                     const mesintContainer = draggedCard.closest('.card-dropzone');
                     if (mesintContainer) {
                         draggedCard.setAttribute('data-original-parent', mesintContainer
@@ -3141,6 +3145,7 @@
                         sourceMesinId = null;
                         targetMesinId = null;
                         dropTargetElement = null; // Reset drop target element
+                        draggedOriginalIndex = -1;
                     }
                 });
             };
@@ -3162,126 +3167,42 @@
                     const targetMesin = container.getAttribute('data-mesin-id');
                     targetMesinId = targetMesin ? parseInt(targetMesin) : null;
 
+                    const activeContainer = container.querySelector('.proses-aktif-container') || container;
+
                     // Validasi: proses yang belum mulai tidak boleh diletakkan di atas proses yang sudah selesai atau sedang berjalan
                     const draggedProses = $(dragging).data('proses');
                     const isDraggedNotStarted = draggedProses && (draggedProses.mulai === null ||
                         draggedProses.mulai === undefined || draggedProses.mulai === '');
 
                     if (isDraggedNotStarted) {
-                        // Cek semua elemen sebelum afterElement untuk memastikan tidak ada proses yang sudah selesai atau sedang berjalan
-                        const allElements = [...container.querySelectorAll(
-                            '.draggable:not(.dragging)')];
-                        const afterElement = getDragAfterElement(container, e.clientY, dragging);
+                        const afterElement = getDragAfterElement(activeContainer, e.clientY, dragging);
 
                         if (afterElement) {
-                            // Cek apakah afterElement adalah proses yang sudah selesai atau sedang berjalan
                             const afterProses = $(afterElement).data('proses');
                             if (afterProses) {
-                                const isAfterFinished = afterProses.selesai !== null && afterProses
-                                    .selesai !== undefined && afterProses.selesai !== '';
-                                const isAfterRunning = afterProses.mulai !== null && afterProses
-                                    .mulai !== undefined && afterProses.mulai !== '' &&
-                                    (afterProses.selesai === null || afterProses.selesai ===
-                                        undefined || afterProses.selesai === '');
+                                const isAfterFinished = afterProses.selesai !== null && afterProses.selesai !== undefined && afterProses.selesai !== '';
+                                const isAfterRunning = afterProses.mulai !== null && afterProses.mulai !== undefined && afterProses.mulai !== '' &&
+                                    (afterProses.selesai === null || afterProses.selesai === undefined || afterProses.selesai === '');
 
                                 if (isAfterFinished || isAfterRunning) {
-                                    // Cari posisi yang valid (di atas proses yang belum mulai atau di akhir)
-                                    let validPosition = null;
-                                    let validTargetElement = null;
-                                    for (let i = 0; i < allElements.length; i++) {
-                                        if (allElements[i] === afterElement) {
-                                            // Cari elemen sebelumnya yang belum mulai
-                                            for (let j = i - 1; j >= 0; j--) {
-                                                const prevProses = $(allElements[j]).data('proses');
-                                                if (prevProses && (prevProses.mulai === null ||
-                                                    prevProses.mulai === undefined || prevProses
-                                                        .mulai === '')) {
-                                                    validPosition = allElements[j].nextSibling;
-                                                    validTargetElement = allElements[j];
-                                                    break;
-                                                }
-                                            }
-                                            if (!validPosition) {
-                                                // Jika tidak ada posisi valid sebelumnya, letakkan di akhir
-                                                validPosition = null;
-                                                const allCards = [...container.querySelectorAll(
-                                                    '.status-card:not(.dragging):not(.history-card)'
-                                                )];
-                                                validTargetElement = allCards.length > 0 ? allCards[
-                                                    allCards.length - 1] : null;
-                                            }
-                                            break;
-                                        }
-                                    }
-
-                                    // Simpan drop target element
-                                    dropTargetElement = validTargetElement;
-
-                                    if (validPosition === null) {
-                                        container.appendChild(dragging);
-                                    } else {
-                                        // Pastikan validPosition masih merupakan child dari container sebelum insertBefore
-                                        if (container.contains(validPosition) && validPosition
-                                            .parentElement === container) {
-                                            container.insertBefore(dragging, validPosition);
-                                        } else {
-                                            // Jika validPosition tidak valid, cari ulang posisi yang valid
-                                            const allCards = [...container.querySelectorAll(
-                                                '.status-card:not(.dragging):not(.history-card)'
-                                            )];
-                                            if (validTargetElement && container.contains(
-                                                validTargetElement)) {
-                                                // Cari nextSibling dari validTargetElement yang masih di container
-                                                const validNextSibling = validTargetElement
-                                                    .nextSibling;
-                                                if (validNextSibling && container.contains(
-                                                    validNextSibling)) {
-                                                    container.insertBefore(dragging,
-                                                        validNextSibling);
-                                                } else {
-                                                    container.appendChild(dragging);
-                                                }
-                                            } else {
-                                                container.appendChild(dragging);
-                                            }
-                                        }
-                                    }
+                                    // Jangan izinkan posisi di atas proses yang sedang berjalan atau selesai
                                     return;
                                 }
                             }
                         }
                     }
 
-                    const afterElement = getDragAfterElement(container, e.clientY, dragging);
+                    const afterElement = getDragAfterElement(activeContainer, e.clientY, dragging);
 
                     // Simpan drop target element untuk digunakan saat drop
-                    // Target adalah elemen yang tepat di posisi drop (afterElement atau elemen terakhir)
                     if (afterElement == null) {
-                        // Jika tidak ada afterElement, cek elemen terakhir di container
-                        const allCards = [...container.querySelectorAll(
+                        const allCards = [...activeContainer.querySelectorAll(
                             '.status-card:not(.dragging):not(.history-card)')];
-                        dropTargetElement = allCards.length > 0 ? allCards[allCards.length - 1] :
-                            null;
-                        container.appendChild(dragging);
+                        dropTargetElement = allCards.length > 0 ? allCards[allCards.length - 1] : null;
+                        activeContainer.appendChild(dragging);
                     } else {
-                        // Pastikan afterElement masih merupakan child dari container sebelum insertBefore
-                        if (container.contains(afterElement) && afterElement.parentElement ===
-                            container) {
-                            // Target adalah elemen sebelum afterElement (karena dragging akan di-insert sebelum afterElement)
-                            const allCards = [...container.querySelectorAll(
-                                '.status-card:not(.dragging):not(.history-card)')];
-                            const afterIndex = allCards.indexOf(afterElement);
-                            dropTargetElement = afterIndex > 0 ? allCards[afterIndex - 1] :
-                                afterElement;
-                            container.insertBefore(dragging, afterElement);
-                        } else {
-                            // Jika afterElement tidak valid, cari ulang atau append di akhir
-                            const allCards = [...container.querySelectorAll(
-                                '.status-card:not(.dragging):not(.history-card)')];
-                            dropTargetElement = allCards.length > 0 ? allCards[allCards.length -
-                                1] : null;
-                            container.appendChild(dragging);
-                        }
+                        dropTargetElement = afterElement;
+                        activeContainer.insertBefore(dragging, afterElement);
                     }
                 });
 
@@ -3377,103 +3298,48 @@
                     // DETECT: Jika dipindah ke mesin yang sama = SWAP POSITION (reorder)
                     // Jika dipindah ke mesin berbeda = MOVE MACHINE
                     if (newMesinId === oldMesinId) {
-                        // SWAP POSITION: Cari proses target (proses yang ada di posisi drop)
-                        // Gunakan dropTargetElement yang sudah disimpan saat dragover untuk akurasi lebih baik
-                        let targetProses = null;
-                        let targetCard = null;
+                        const activeContainer = container.querySelector('.proses-aktif-container') || container;
+                        const allActiveCards = [...activeContainer.querySelectorAll('.status-card:not(.history-card)')];
+                        const newIndex = allActiveCards.indexOf(dragging);
 
-                        // Prioritas 1: Gunakan dropTargetElement yang sudah disimpan (paling akurat)
-                        if (dropTargetElement &&
-                            dropTargetElement.classList &&
-                            dropTargetElement.classList.contains('status-card') &&
-                            !dropTargetElement.classList.contains('history-card')) {
-                            const targetProsesData = $(dropTargetElement).data('proses');
-                            if (targetProsesData &&
-                                targetProsesData.id !== proses.id &&
-                                targetProsesData.mulai === null &&
-                                targetProsesData.selesai === null &&
-                                targetProsesData.mesin_id == newMesinId) {
-                                targetProses = targetProsesData;
-                                targetCard = dropTargetElement;
-                            }
-                        }
-
-                        // Prioritas 2: Jika dropTargetElement tidak valid, cek next sibling (proses setelah posisi drop)
-                        if (!targetProses) {
-                            const nextSibling = dragging.nextElementSibling;
-                            if (nextSibling && nextSibling.classList && nextSibling.classList
-                                .contains('status-card') && !nextSibling.classList.contains(
-                                    'history-card')) {
-                                const nextProses = $(nextSibling).data('proses');
-                                if (nextProses &&
-                                    nextProses.id !== proses.id &&
-                                    nextProses.mulai === null &&
-                                    nextProses.selesai === null &&
-                                    nextProses.mesin_id == newMesinId) {
-                                    targetProses = nextProses;
-                                    targetCard = nextSibling;
-                                }
-                            }
-                        }
-
-                        // Prioritas 3: Jika tidak ada next sibling, cek previous sibling
-                        if (!targetProses) {
-                            const prevSibling = dragging.previousElementSibling;
-                            if (prevSibling && prevSibling.classList && prevSibling.classList
-                                .contains('status-card') && !prevSibling.classList.contains(
-                                    'history-card')) {
-                                const prevProses = $(prevSibling).data('proses');
-                                if (prevProses &&
-                                    prevProses.id !== proses.id &&
-                                    prevProses.mulai === null &&
-                                    prevProses.selesai === null &&
-                                    prevProses.mesin_id == newMesinId) {
-                                    targetProses = prevProses;
-                                    targetCard = prevSibling;
-                                }
-                            }
-                        }
-
-                        // Prioritas 4: Jika masih tidak ada target, cari dari semua card di container yang valid
-                        // Cari card yang paling dekat dengan posisi drop berdasarkan index
-                        if (!targetProses) {
-                            const allCards = [...container.querySelectorAll(
-                                '.status-card:not(.dragging):not(.history-card)')];
-                            const draggingIndex = Array.from(container.children).indexOf(dragging);
-
-                            // Cari card terdekat berdasarkan index
-                            let closestCard = null;
-                            let closestDistance = Infinity;
-
-                            for (let card of allCards) {
-                                const cardProses = $(card).data('proses');
-                                if (cardProses &&
-                                    cardProses.id !== proses.id &&
-                                    cardProses.mulai === null &&
-                                    cardProses.selesai === null &&
-                                    cardProses.mesin_id == newMesinId) {
-                                    const cardIndex = Array.from(container.children).indexOf(card);
-                                    const distance = Math.abs(cardIndex - draggingIndex);
-                                    if (distance < closestDistance) {
-                                        closestDistance = distance;
-                                        closestCard = card;
-                                    }
-                                }
-                            }
-
-                            if (closestCard) {
-                                targetProses = $(closestCard).data('proses');
-                                targetCard = closestCard;
-                            }
-                        }
-
-                        if (!targetProses || !targetCard) {
-                            // Tidak ada target yang valid, kembalikan ke posisi semula
+                        if (newIndex === -1 || newIndex === draggedOriginalIndex) {
+                            // Posisi tidak berubah
                             restoreCardToOriginalPosition(dragging);
                             dragging.classList.remove('dragging');
+                            return;
+                        }
 
+                        let targetCard = null;
+                        if (draggedOriginalIndex !== -1 && newIndex < draggedOriginalIndex) {
+                            // Pindah ke atas: target adalah card di posisi newIndex sebelum dragging di-insert (sekarang jadi next sibling dari dragging)
+                            targetCard = allActiveCards[newIndex + 1] || dragging.nextElementSibling;
+                        } else if (draggedOriginalIndex !== -1 && newIndex > draggedOriginalIndex) {
+                            // Pindah ke bawah: target adalah card sebelum posisi baru dragging
+                            targetCard = allActiveCards[newIndex - 1] || dragging.previousElementSibling;
+                        }
+
+                        let targetProses = targetCard ? $(targetCard).data('proses') : null;
+
+                        // Fallback ke dropTargetElement jika targetProses belum terdeteksi
+                        if (!targetProses && dropTargetElement && dropTargetElement.classList && dropTargetElement.classList.contains('status-card')) {
+                            targetProses = $(dropTargetElement).data('proses');
+                            targetCard = dropTargetElement;
+                        }
+
+                        if (!targetProses || targetProses.id === proses.id) {
+                            restoreCardToOriginalPosition(dragging);
+                            dragging.classList.remove('dragging');
                             ToastError.fire({
                                 title: 'Tidak ada proses yang valid untuk ditukar posisinya.'
+                            });
+                            return;
+                        }
+
+                        if (targetProses.mulai !== null || targetProses.selesai !== null) {
+                            restoreCardToOriginalPosition(dragging);
+                            dragging.classList.remove('dragging');
+                            ToastError.fire({
+                                title: 'Tidak dapat memindahkan proses. Proses target sudah dimulai atau selesai.'
                             });
                             return;
                         }
@@ -3512,7 +3378,7 @@
                         const proses1NoOp = getNoOpFromProses(proses);
                         const proses2NoOp = getNoOpFromProses(targetProses);
                         const infoText =
-                            `Apakah Anda yakin ingin menukar posisi proses <strong>${proses1NoOp}</strong> dengan proses <strong>${proses2NoOp}</strong>?<br><br><small class="text-muted">Permintaan ini akan menunggu persetujuan FM.</small>`;
+                            `Apakah Anda yakin ingin memindahkan posisi proses <strong>${proses1NoOp}</strong> ke posisi proses <strong>${proses2NoOp}</strong>?<br><br><small class="text-muted">Permintaan ini akan menunggu persetujuan FM.</small>`;
                         $('#confirmSwapDragDropInfo').html(infoText);
                         $('#modalConfirmSwapDragDrop').modal('show');
                         return;
